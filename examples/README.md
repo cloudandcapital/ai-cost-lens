@@ -1,47 +1,23 @@
 # Examples
 
-Sample billing exports for all three supported providers.
+## Canonical v0.2 example
 
-## Analyze by model
+```bash
+ai-cost-lens ccac \
+  --input examples/canonical-usage-v2.csv \
+  --price-book examples/illustrative-price-book.json \
+  --generated-at 2026-08-04T12:15:00Z \
+  --output ai-cost-result.json
+```
+
+The usage and price-book files are synthetic and explicitly illustrative. The price book is not a representation of current provider pricing.
+
+## Legacy samples
+
+`openai-sample.csv`, `anthropic-sample.csv`, and `bedrock-sample.csv` exercise the legacy provider-shape detector:
 
 ```bash
 ai-cost-lens analyze --input examples/openai-sample.csv --group-by model --format table
 ```
 
-Expected output:
-
-```
-  -----------------------------------------------------------------------
-  Model                  Cost  Input Tok    Output Tok   Requests  Provider
-  -----------------------------------------------------------------------
-  gpt-4o              $9.9050    365000        128000        450  openai
-  o1-mini             $3.7100    135000         53000        235  openai
-  gpt-4o-mini         $1.6480   2670000        720000       6300  openai
-  text-embedding-...  $0.2560   6400000              0      2130  openai
-  -----------------------------------------------------------------------
-  TOTAL              $15.5190
-```
-
-## Analyze by day
-
-```bash
-ai-cost-lens analyze --input examples/anthropic-sample.csv --group-by day --format json
-```
-
-## Compare two periods
-
-```bash
-ai-cost-lens compare \
-  --baseline examples/openai-sample.csv \
-  --proposed examples/bedrock-sample.csv \
-  --group-by model
-```
-
-## Multi-provider combined analysis
-
-Concatenate exports from multiple providers (skip repeated headers) and analyze together:
-
-```bash
-(head -1 examples/openai-sample.csv; tail -n +2 examples/openai-sample.csv; tail -n +2 examples/anthropic-sample.csv) > combined.csv
-ai-cost-lens analyze --input combined.csv --group-by model --format table
-```
+They are hand-authored examples, not authenticated provider exports or invoice evidence. Do not concatenate provider-shaped legacy files: the legacy detector selects one adapter for the entire file. Use the canonical v0.2 schema for multi-provider analysis.

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import textwrap
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 def _write_csv(tmp_path: Path, filename: str, content: str) -> Path:
@@ -33,7 +34,10 @@ def test_detect_openai_o1():
 
 
 def test_detect_anthropic_via_model_value():
-    assert detect_provider({"model", "date", "cost_usd"}, "claude-sonnet-4-6") == "anthropic"
+    assert (
+        detect_provider({"model", "date", "cost_usd"}, "claude-sonnet-4-6")
+        == "anthropic"
+    )
 
 
 def test_detect_unknown_raises():
@@ -54,11 +58,15 @@ from ai_cost_lens.providers.detector import load_and_normalize
 
 
 def test_normalize_openai(tmp_path):
-    p = _write_csv(tmp_path, "openai.csv", """\
+    p = _write_csv(
+        tmp_path,
+        "openai.csv",
+        """\
         date,model,input_tokens,output_tokens,requests,cost_usd
         2026-03-01,gpt-4o,1000,500,5,0.0750
         2026-03-02,gpt-4o-mini,5000,2000,20,0.0120
-    """)
+    """,
+    )
     records = load_and_normalize(p)
     assert len(records) == 2
     assert records[0].provider == "openai"
@@ -70,10 +78,14 @@ def test_normalize_openai(tmp_path):
 
 
 def test_normalize_anthropic(tmp_path):
-    p = _write_csv(tmp_path, "anthropic.csv", """\
+    p = _write_csv(
+        tmp_path,
+        "anthropic.csv",
+        """\
         date,model,input_tokens,output_tokens,requests,cost_usd
         2026-03-01,claude-sonnet-4-6,2000,800,10,0.1200
-    """)
+    """,
+    )
     records = load_and_normalize(p)
     assert len(records) == 1
     assert records[0].provider == "anthropic"
@@ -81,10 +93,14 @@ def test_normalize_anthropic(tmp_path):
 
 
 def test_normalize_bedrock(tmp_path):
-    p = _write_csv(tmp_path, "bedrock.csv", """\
+    p = _write_csv(
+        tmp_path,
+        "bedrock.csv",
+        """\
         date,model_id,input_tokens,output_tokens,requests,cost_usd
         2026-03-01,amazon.nova-pro-v1:0,3000,1000,15,0.0480
-    """)
+    """,
+    )
     records = load_and_normalize(p)
     assert len(records) == 1
     assert records[0].provider == "bedrock"
