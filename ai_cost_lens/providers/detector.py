@@ -14,10 +14,25 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Iterator, List
 
-
-OPENAI_MODEL_PREFIXES = ("gpt-", "o1", "o3", "text-embedding", "whisper", "dall-e", "tts-")
+OPENAI_MODEL_PREFIXES = (
+    "gpt-",
+    "o1",
+    "o3",
+    "text-embedding",
+    "whisper",
+    "dall-e",
+    "tts-",
+)
 ANTHROPIC_MODEL_PREFIXES = ("claude-",)
-BEDROCK_MODEL_PATTERNS = ("amazon.", "anthropic.", "meta.", "ai21.", "cohere.", "mistral.", "amazon.nova")
+BEDROCK_MODEL_PATTERNS = (
+    "amazon.",
+    "anthropic.",
+    "meta.",
+    "ai21.",
+    "cohere.",
+    "mistral.",
+    "amazon.nova",
+)
 
 
 @dataclass(frozen=True)
@@ -90,12 +105,27 @@ def load_and_normalize(path: Path) -> List[FocusRecord]:
 
         rows = list(reader)
 
+    if not rows:
+        raise ValueError(f"CSV file contains no usage rows: {path}")
+
     sample_model = ""
-    model_col = "model_id" if "model_id" in columns else "model" if "model" in columns else ""
+    model_col = (
+        "model_id" if "model_id" in columns else "model" if "model" in columns else ""
+    )
     if model_col and rows:
         sample_model = (rows[0].get(model_col) or "").strip().lower()
 
     provider = detect_provider(columns, sample_model)
+    if model_col:
+        for index, row in enumerate(rows, start=2):
+            model_value = (row.get(model_col) or "").strip().lower()
+            if not model_value:
+                raise ValueError(f"Row {index}: model is required")
+            row_provider = detect_provider(columns, model_value)
+            if row_provider != provider:
+                raise ValueError(
+                    f"Row {index}: mixed provider-shaped rows are not supported by the legacy adapter"
+                )
 
     if provider == "openai":
         return list(_normalize_openai(rows))
@@ -116,7 +146,7 @@ def _normalize_openai(rows: list[dict]) -> Iterator[FocusRecord]:
     for row in rows:
         date_val = row.get("date") or row.get("Date") or ""
         model = row.get("model") or row.get("Model") or ""
-        cost = row.get("cost_usd") or row.get("Cost (USD)") or row.get("cost") or "0"
+        cost = row.get("cost_usd") or row.get("Cost (USD)") or row.get("cost") or ""
         input_tokens = row.get("input_tokens") or row.get("Input tokens") or ""
         output_tokens = row.get("output_tokens") or row.get("Output tokens") or ""
         requests = row.get("requests") or row.get("Requests") or ""
@@ -139,7 +169,7 @@ def _normalize_anthropic(rows: list[dict]) -> Iterator[FocusRecord]:
     for row in rows:
         date_val = row.get("date") or row.get("Date") or ""
         model = row.get("model") or row.get("Model") or ""
-        cost = row.get("cost_usd") or row.get("Cost (USD)") or row.get("cost") or "0"
+        cost = row.get("cost_usd") or row.get("Cost (USD)") or row.get("cost") or ""
         input_tokens = row.get("input_tokens") or row.get("Input tokens") or ""
         output_tokens = row.get("output_tokens") or row.get("Output tokens") or ""
         requests = row.get("requests") or row.get("Requests") or ""
@@ -162,7 +192,7 @@ def _normalize_bedrock(rows: list[dict]) -> Iterator[FocusRecord]:
     for row in rows:
         date_val = row.get("date") or row.get("Date") or ""
         model = row.get("model_id") or row.get("model") or ""
-        cost = row.get("cost_usd") or row.get("Cost (USD)") or row.get("cost") or "0"
+        cost = row.get("cost_usd") or row.get("Cost (USD)") or row.get("cost") or ""
         input_tokens = row.get("input_tokens") or row.get("Input tokens") or ""
         output_tokens = row.get("output_tokens") or row.get("Output tokens") or ""
         requests = row.get("requests") or row.get("Requests") or ""

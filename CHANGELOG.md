@@ -2,6 +2,23 @@
 
 All notable changes to AI Cost Lens are documented here.
 
+## [0.2.0] — 2026-08-04
+
+### Added
+- A standard `ai-cost-lens --version` installation smoke check.
+- Strict canonical `ai-cost-lens/2.0` CSV ingestion.
+- Separate provider-reported and calculated cost bases.
+- Cached-input, output, and reasoning token pricing with explicit batch multipliers.
+- Versioned, dated, source-declared user price books.
+- Project, team, environment, and task attribution.
+- Deterministic illustrative CCAC output with source hashes, pricing evidence, reconciliation, and Bedrock overlap metadata.
+
+### Corrected
+- Unsupported models, missing values, NaN, infinity, fractional token counts, duplicates, and mixed currencies now fail closed in the canonical path.
+- Removed claims of provider API integrations, live pricing, official FOCUS conformance, redundant-model detection, and an active Cloud Cost Guard feed.
+- Untagged ownership is reported as unattributed cost rather than savings.
+- Legacy adapters now reject empty, mixed-provider, malformed, non-finite, and negative usage rows instead of silently dropping values or emitting zero.
+
 ## [0.1.0] — Initial release
 
 ### Added

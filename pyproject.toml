@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ai-cost-lens"
-version = "0.1.0"
-description = "FOCUS-style cost analysis CLI for OpenAI, Anthropic, and AWS Bedrock billing exports"
+version = "0.2.0"
+description = "Strict AI usage cost analysis with pricing provenance and CCAC output"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Diana", email = "your.email@example.com" }]
+authors = [{ name = "Diana Molski" }]
 keywords = ["finops", "ai", "openai", "anthropic", "bedrock", "cost", "focus", "cli"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -25,13 +25,28 @@ dependencies = [
     "click>=8.1.7",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "black>=26,<27",
+    "flake8>=7,<8",
+    "isort>=6,<7",
+    "pip-audit>=2.10,<3",
+    "pytest>=8,<9",
+]
+
 [project.scripts]
 ai-cost-lens = "ai_cost_lens.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/dianuhs/ai-cost-lens"
-Repository = "https://github.com/dianuhs/ai-cost-lens.git"
-"Bug Tracker" = "https://github.com/dianuhs/ai-cost-lens/issues"
+Homepage = "https://github.com/cloudandcapital/ai-cost-lens"
+Repository = "https://github.com/cloudandcapital/ai-cost-lens.git"
+"Bug Tracker" = "https://github.com/cloudandcapital/ai-cost-lens/issues"
 
 [tool.hatch.version]
 path = "ai_cost_lens/__init__.py"
+
+[tool.black]
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"

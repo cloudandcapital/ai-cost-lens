@@ -37,9 +37,17 @@ def runner():
     return CliRunner()
 
 
+def test_version_option(runner):
+    result = runner.invoke(cli, ["--version"])
+    assert result.exit_code == 0
+    assert result.output.strip() == "ai-cost-lens, version 0.2.0"
+
+
 def test_analyze_table(runner, tmp_path):
     p = _write_csv(tmp_path, "openai.csv", OPENAI_CSV)
-    result = runner.invoke(cli, ["analyze", "--input", str(p), "--group-by", "model", "--format", "table"])
+    result = runner.invoke(
+        cli, ["analyze", "--input", str(p), "--group-by", "model", "--format", "table"]
+    )
     assert result.exit_code == 0
     assert "gpt-4o" in result.output
     assert "gpt-4o-mini" in result.output
@@ -48,7 +56,9 @@ def test_analyze_table(runner, tmp_path):
 
 def test_analyze_json(runner, tmp_path):
     p = _write_csv(tmp_path, "openai.csv", OPENAI_CSV)
-    result = runner.invoke(cli, ["analyze", "--input", str(p), "--group-by", "model", "--format", "json"])
+    result = runner.invoke(
+        cli, ["analyze", "--input", str(p), "--group-by", "model", "--format", "json"]
+    )
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["schema_version"] == "1.0"
@@ -67,7 +77,9 @@ def test_analyze_csv_format(runner, tmp_path):
 
 def test_analyze_group_by_day(runner, tmp_path):
     p = _write_csv(tmp_path, "openai.csv", OPENAI_CSV)
-    result = runner.invoke(cli, ["analyze", "--input", str(p), "--group-by", "day", "--format", "table"])
+    result = runner.invoke(
+        cli, ["analyze", "--input", str(p), "--group-by", "day", "--format", "table"]
+    )
     assert result.exit_code == 0
     assert "2026-03-01" in result.output
     assert "2026-03-02" in result.output
@@ -94,3 +106,16 @@ def test_analyze_anthropic(runner, tmp_path):
     data = json.loads(result.output)
     assert any(r["key"] == "claude-sonnet-4-6" for r in data["rows"])
     assert all(r["provider"] == "anthropic" for r in data["rows"])
+
+
+def test_legacy_malformed_cost_fails_instead_of_zero(runner, tmp_path):
+    p = _write_csv(tmp_path, "bad.csv", OPENAI_CSV.replace("0.0750", "NaN"))
+    result = runner.invoke(cli, ["analyze", "--input", str(p), "--format", "json"])
+    assert result.exit_code == 4
+
+
+def test_legacy_mixed_provider_rows_are_rejected(runner, tmp_path):
+    mixed = OPENAI_CSV + "2026-03-03,claude-sonnet-4-6,100,50,1,0.1\n"
+    p = _write_csv(tmp_path, "mixed.csv", mixed)
+    result = runner.invoke(cli, ["analyze", "--input", str(p), "--format", "json"])
+    assert result.exit_code == 4
