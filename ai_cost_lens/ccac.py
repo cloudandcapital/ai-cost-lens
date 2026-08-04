@@ -123,7 +123,7 @@ def build_result(
             ),
             "lossy_mapping": False,
             "mapping_notes": [
-                "Provider-reported, invoice-allocated, and calculated costs retain distinct bases."
+                "Provider-reported and calculated costs retain distinct canonical bases."
             ],
         }
     ]
@@ -427,12 +427,16 @@ def build_result(
             "effective_at": price_book["effective_at"],
             "input_sha256": price_hash,
             "used_price_keys": used_price_keys,
-            "used_rate_keys": [
-                "cached_input_per_million",
-                "input_per_million",
-                "output_per_million",
-                "reasoning_per_million",
-            ],
+            "used_rate_keys": (
+                [
+                    "cached_input_per_million",
+                    "input_per_million",
+                    "output_per_million",
+                    "reasoning_per_million",
+                ]
+                if used_price_keys
+                else []
+            ),
         }
     return {
         "contract": CONTRACT,

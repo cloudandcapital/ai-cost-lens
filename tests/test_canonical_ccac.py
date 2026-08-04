@@ -263,6 +263,41 @@ def test_provider_reported_only_needs_no_price_book(tmp_path: Path):
     assert metric["dimensions"]["cost_basis"] == "provider_reported"
 
 
+def test_provider_reported_only_with_unused_price_book_has_empty_rate_lineage(
+    tmp_path: Path,
+):
+    usage = _write_usage(tmp_path, [_usage_row("reported", "provider_reported", "3")])
+    payload = build_result(
+        usage, price_book_path=_write_price_book(tmp_path, "real"), mode="real"
+    )
+    provenance = payload["extensions"]["ai_cost_lens"]["pricing_provenance"]
+    assert provenance["mode"] == "real"
+    assert provenance["source"] == "Test rates"
+    assert provenance["used_price_keys"] == []
+    assert provenance["used_rate_keys"] == []
+    cost = next(
+        metric
+        for metric in payload["metrics"]
+        if metric["unit"] == "currency" and metric["id"] != "metric.ai.total-cost"
+    )
+    assert cost["value"] == 3.0
+    assert cost["basis"] == "observed"
+    assert cost["dimensions"]["cost_basis"] == "provider_reported"
+    total = next(
+        metric
+        for metric in payload["metrics"]
+        if metric["id"] == "metric.ai.total-cost"
+    )
+    assert total["value"] == 3.0
+    assert total["evidence_ids"] == ["evidence.ai-cost-lens.usage"]
+    assert total["input_metric_ids"] == [cost["id"]]
+    reconciliation = payload["extensions"]["ai_cost_lens"]["reconciliation"]
+    assert reconciliation["row_cost_sum"] == 3.0
+    assert reconciliation["model_cost_sum"] == 3.0
+    assert reconciliation["difference"] == 0.0
+    assert reconciliation["status"] == "passed"
+
+
 def test_calculated_usage_without_price_book_fails_closed(tmp_path: Path):
     usage = _write_usage(tmp_path, [_usage_row("priced", "calculated", "")])
     with pytest.raises(CanonicalError, match="requires a price book"):
