@@ -52,8 +52,8 @@ The deterministic demo uses the same parser, price calculator, reconciliation, a
 
 ```bash
 ai-cost-lens ccac \
-  --input examples/canonical-usage-v2.csv \
-  --price-book examples/illustrative-price-book.json \
+  --input your-canonical-usage.csv \
+  --price-book your-real-price-book.json \
   --output ai-cost-result.json
 ```
 
@@ -65,18 +65,20 @@ The canonical CSV requires all token categories, request count, batch multiplier
 
 Price books use `ai-cost-lens-price-book/1.0` and declare:
 
+- `mode`, either `illustrative` or `real`
 - `effective_at`
 - `source`
 - model key as `provider/model`
 - currency
 - per-million input, cached-input, output, and reasoning rates
 
-Prices are supplied by the user because provider rates, model names, regions, tiers, batch discounts, and caching rules change. AI Cost Lens does not silently treat its illustrative book as live pricing.
+Prices are supplied by the user because provider rates, model names, regions, tiers, batch discounts, and caching rules change. Real calculated runs require a user-supplied price book explicitly marked `"mode": "real"`. The bundled synthetic book is marked `illustrative`, is not current provider pricing, and is rejected in real mode. Price-book mode must match the analysis mode; missing, invalid, and mismatched modes fail closed.
 
 ## Cost interpretation
 
 - `provider_reported` means the cost was present in the imported source. It is observed source data, not independently verified invoice truth.
 - `calculated` means AI Cost Lens applied the declared token categories, rates, and batch multiplier.
+- Provider-reported and calculated rows remain separate metrics even when all allocation dimensions match. Calculated costs are estimates based on the supplied rates; provider-reported costs remain observed source values.
 - The total AI metric is non-additive at the technology-spend boundary.
 - Bedrock usage may already exist in FinOps Lite’s AWS cost total. Its dimensions explicitly declare potential overlap so Command Center must reconcile it before aggregation.
 - Unattributed project/team cost is an allocation finding, not an optimization opportunity.

@@ -208,11 +208,30 @@ def load_price_book(path: Path | None) -> tuple[dict[str, Any] | None, str | Non
             "price book must use ai-cost-lens-price-book/1.0 with a prices object"
         )
     text(value.get("source"), "price book source")
+    mode = text(value.get("mode"), "price book mode").lower()
+    if mode not in {"illustrative", "real"}:
+        raise CanonicalError("price book mode must be illustrative or real")
+    value["mode"] = mode
     try:
         date.fromisoformat(text(value.get("effective_at"), "price book effective_at"))
     except ValueError as exc:
         raise CanonicalError("price book effective_at must be ISO YYYY-MM-DD") from exc
     return value, hashlib.sha256(raw).hexdigest()
+
+
+def validate_price_book_mode(
+    price_book: Mapping[str, Any] | None, analysis_mode: str
+) -> None:
+    """Require supplied pricing to match the declared analysis mode."""
+    if price_book is None:
+        return
+    price_book_mode = str(price_book["mode"])
+    if price_book_mode != analysis_mode:
+        raise CanonicalError(
+            f"price book mode {price_book_mode!r} cannot be used for "
+            f"{analysis_mode!r} analysis; supply a price book marked "
+            f"{analysis_mode!r}"
+        )
 
 
 def price_usage(

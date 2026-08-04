@@ -3,14 +3,10 @@
 ## Canonical v0.2 example
 
 ```bash
-ai-cost-lens ccac \
-  --input examples/canonical-usage-v2.csv \
-  --price-book examples/illustrative-price-book.json \
-  --generated-at 2026-08-04T12:15:00Z \
-  --output ai-cost-result.json
+ai-cost-lens ccac --demo --output ai-cost-result.json
 ```
 
-The usage and price-book files are synthetic and explicitly illustrative. The price book is not a representation of current provider pricing.
+The usage and price-book files are synthetic and explicitly illustrative. The price book is not a representation of current provider pricing and cannot be used for a real-mode run. Real calculated analysis requires a user-supplied price book with `"mode": "real"`. Provider-reported values remain observed, while price-book-calculated values remain separate estimates.
 
 ## Legacy samples
 

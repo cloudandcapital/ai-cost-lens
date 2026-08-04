@@ -18,6 +18,7 @@ from .canonical import (
     load_price_book,
     load_usage,
     price_usage,
+    validate_price_book_mode,
 )
 
 CONTRACT = "ccac/1.0.0"
@@ -92,6 +93,7 @@ def build_result(
         raise CanonicalError("mode must be illustrative or real")
     records, usage_hash = load_usage(usage_path)
     price_book, price_hash = load_price_book(price_book_path)
+    validate_price_book_mode(price_book, mode)
     priced = price_usage(records, price_book)
     try:
         rid = str(uuid.UUID(run_id)) if run_id else str(uuid.uuid4())
@@ -172,21 +174,29 @@ def build_result(
                 "content_sha256": price_hash,
             }
         )
-    totals: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = defaultdict(
-        lambda: {
-            "cost": Decimal("0"),
-            "input": 0,
-            "cached": 0,
-            "output": 0,
-            "reasoning": 0,
-            "requests": 0,
-            "bases": set(),
-            "price_keys": set(),
-        }
+    totals: dict[tuple[str, str, str, str, str, str, str], dict[str, Any]] = (
+        defaultdict(
+            lambda: {
+                "cost": Decimal("0"),
+                "input": 0,
+                "cached": 0,
+                "output": 0,
+                "reasoning": 0,
+                "requests": 0,
+            }
+        )
     )
     for item in priced:
         r = item.record
-        key = (r.provider, r.model, r.project, r.team, r.environment, r.task)
+        key = (
+            r.provider,
+            r.model,
+            r.project,
+            r.team,
+            r.environment,
+            r.task,
+            r.cost_basis,
+        )
         data = totals[key]
         data["cost"] += item.cost
         data["input"] += r.uncached_input_tokens
@@ -194,14 +204,11 @@ def build_result(
         data["output"] += r.output_tokens
         data["reasoning"] += r.reasoning_tokens
         data["requests"] += r.requests
-        data["bases"].add(item.basis)
-        if item.price_key:
-            data["price_keys"].add(item.price_key)
     metrics = []
     findings = []
     model_cost_ids = []
     for key, data in sorted(totals.items()):
-        provider, model, project, team, environment, task = key
+        provider, model, project, team, environment, task, cost_basis = key
         comp = _slug("|".join(key))
         prefix = f"metric.ai.{comp}"
         dims = {
@@ -212,17 +219,14 @@ def build_result(
             "team": team,
             "environment": environment,
             "task": task,
+            "cost_basis": cost_basis,
             "cloud_spend_overlap": (
                 "potential" if provider == "bedrock" else "none_known"
             ),
         }
-        basis = next(iter(data["bases"])) if len(data["bases"]) == 1 else "calculated"
+        basis = "observed" if cost_basis == "provider_reported" else "calculated"
         formula = (
-            "sum canonical usage row costs with mixed bases"
-            if len(data["bases"]) > 1
-            else (
-                "sum calculated token-category costs" if basis == "calculated" else None
-            )
+            "sum calculated token-category costs" if basis == "calculated" else None
         )
         cost_id = f"{prefix}.cost"
         model_cost_ids.append(cost_id)
@@ -370,7 +374,25 @@ def build_result(
                     "last_observed_at": generated,
                 }
             )
+    used_price_keys = sorted(
+        {item.price_key for item in priced if item.price_key is not None}
+    )
     total = sum((item.cost for item in priced), Decimal("0"))
+    cost_bases = sorted({item.record.cost_basis for item in priced})
+    total_cost_basis = (
+        cost_bases[0] if len(cost_bases) == 1 else "mixed_" + "_and_".join(cost_bases)
+    )
+    row_token_sum = sum(
+        item.record.uncached_input_tokens
+        + item.record.cached_input_tokens
+        + item.record.output_tokens
+        + item.record.reasoning_tokens
+        for item in priced
+    )
+    metric_token_sum = sum(
+        data["input"] + data["cached"] + data["output"] + data["reasoning"]
+        for data in totals.values()
+    )
     total_id = "metric.ai.total-cost"
     metrics.append(
         _metric(
@@ -384,13 +406,34 @@ def build_result(
             period,
             {
                 "scope": "ai_usage",
+                "cost_basis": total_cost_basis,
                 "cloud_spend_overlap": "potential_when_provider_is_bedrock",
             },
             usage_evidence,
-            "sum model/allocation costs; non-additive outside the AI domain",
+            "sum provider-reported and calculated model/allocation cost metrics exactly once; non-additive outside the AI domain",
         )
     )
     metrics[-1]["input_metric_ids"] = model_cost_ids
+    if used_price_keys:
+        metrics[-1]["evidence_ids"] = [
+            usage_evidence,
+            "evidence.ai-cost-lens.price-book",
+        ]
+    pricing_provenance = None
+    if price_book is not None:
+        pricing_provenance = {
+            "mode": price_book["mode"],
+            "source": price_book["source"],
+            "effective_at": price_book["effective_at"],
+            "input_sha256": price_hash,
+            "used_price_keys": used_price_keys,
+            "used_rate_keys": [
+                "cached_input_per_million",
+                "input_per_million",
+                "output_per_million",
+                "reasoning_per_million",
+            ],
+        }
     return {
         "contract": CONTRACT,
         "document_type": "tool_result",
@@ -409,6 +452,7 @@ def build_result(
             "ai_cost_lens": {
                 "usage_records": len(priced),
                 "pricing_mode": "user_supplied_price_book_and_or_reported_cost",
+                "pricing_provenance": pricing_provenance,
                 "model_cost_metric_ids": model_cost_ids,
                 "reconciliation": {
                     "row_cost_sum": cost_number(total),
@@ -416,6 +460,9 @@ def build_result(
                         sum((data["cost"] for data in totals.values()), Decimal("0"))
                     ),
                     "difference": 0.0,
+                    "row_token_sum": row_token_sum,
+                    "metric_token_sum": metric_token_sum,
+                    "token_difference": row_token_sum - metric_token_sum,
                     "status": "passed",
                 },
                 "accounting_boundary": "AI domain cost is non-additive at the technology-spend boundary until Bedrock/cloud billing overlap is reconciled.",
