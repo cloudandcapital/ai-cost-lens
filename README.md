@@ -21,12 +21,14 @@ It does not connect to provider APIs, fetch live prices, certify invoices, or id
 - Unattributed AI cost findings that are never called savings
 - Reconciled `ccac/1.0.0` output
 
-## Install
+The public demo is credential-free and uses entirely illustrative data.
+
+## Install the released CLI
 
 Python 3.10 or newer is required.
 
 ```bash
-pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git"
+pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v0.2.0"
 ai-cost-lens --help
 ```
 
@@ -41,6 +43,9 @@ python -m pip install -e ".[dev]"
 ```bash
 ai-cost-lens ccac --demo --output ai-cost-result.json
 ```
+
+The command writes `ai-cost-result.json`; rerunning with the same path
+replaces that explicitly named local file.
 
 The acceptance suite validates this artifact against the shared CCAC reference schemas. Contributors may run `ccac validate ai-cost-result.json` after installing the separate CCAC reference package.
 
