@@ -52,6 +52,12 @@ def cli() -> None:
     help="Versioned JSON price book for calculated rows.",
 )
 @click.option(
+    "--analysis",
+    "analysis_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    help="Versioned CCAC 1.1 period and coverage declaration.",
+)
+@click.option(
     "--demo", is_flag=True, help="Use deterministic illustrative usage and prices."
 )
 @click.option(
@@ -70,6 +76,7 @@ def cli() -> None:
 def ccac_command(
     input_path: Path | None,
     price_book: Path | None,
+    analysis_path: Path | None,
     demo: bool,
     contract_version: str,
     output: Path | None,
@@ -84,6 +91,7 @@ def ccac_command(
         if contract_version == "1.1.0":
             input_path = data_dir / "canonical-usage-v2.1.csv"
             price_book = data_dir / "illustrative-price-book-v1.1.json"
+            analysis_path = data_dir / "illustrative-analysis-v1.json"
         else:
             input_path = data_dir / "canonical-usage-v2.csv"
             price_book = data_dir / "illustrative-price-book.json"
@@ -93,10 +101,12 @@ def ccac_command(
         payload = build_ccac_result(
             input_path,
             price_book_path=price_book,
+            analysis_path=analysis_path,
             mode="illustrative" if demo else "real",
             run_id=run_id,
             generated_at=generated_at,
             contract_version=contract_version,
+            compatibility_demo=demo and contract_version == "1.0.0",
         )  # type: ignore[arg-type]
     except CanonicalError as exc:
         raise click.ClickException(str(exc)) from exc

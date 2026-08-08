@@ -6,7 +6,7 @@ All notable changes to AI Cost Lens are documented here.
 
 ### Added
 - Explicit `ccac/1.1.0` selection with one canonical direct-AI technology-spend scope.
-- Versioned billing-channel, net-cost, period, and completeness declarations for the 1.1 file-first path.
+- Separate versioned usage, pricing, and analysis declarations for billing provenance, net-cost basis, period, and completeness.
 - Fail-closed separation of direct AI-vendor billing from provider-billed native AI.
 
 ### Compatibility

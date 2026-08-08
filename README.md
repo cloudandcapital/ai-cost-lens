@@ -67,18 +67,26 @@ The deterministic demo uses the same parser, price calculator, reconciliation, a
 ai-cost-lens ccac \
   --input your-canonical-usage.csv \
   --price-book your-real-price-book.json \
+  --analysis your-analysis-declaration.json \
+  --contract-version 1.1.0 \
   --output ai-cost-result.json
 ```
 
 Rows with `cost_basis=provider_reported` require `billed_cost`. Rows with `cost_basis=calculated` require a matching price-book entry and must leave `billed_cost` blank. Unsupported calculated models fail; they never become zero-cost usage.
 
-Explicit 1.1 local-file runs use `ai-cost-lens/2.1` CSV input and `ai-cost-lens-price-book/1.1`. Every row requires a supported `billing_channel`, and the price declaration must provide `scope_cost_basis=net_cost`, an exact scenario period, and a completeness declaration. Local files remain partial and ineligible for an all-in technology-spend total because they do not establish complete vendor or billing-period coverage. No provider-name heuristic supplies missing classifications.
+Explicit 1.1 local-file runs keep three declarations separate:
+
+1. `ai-cost-lens/2.1` usage rows state what was consumed, the model provider, the charge issuer in `billing_provider`, and the explicit `billing_channel`.
+2. `ai-cost-lens-price-book/1.1` states only how calculated token costs were priced and where those rates came from.
+3. `ai-cost-lens-analysis/1.0` states the reporting period, timezone, accounting cost basis, coverage status, absent-date treatment, and completeness explanation.
+
+Every 1.1 row requires both billing fields. Neither the model provider nor billing provider is used to infer a missing channel. Known billing issuers must agree with the declared channel: for example, OpenAI model usage billed by Azure is Cloud, while OpenAI model usage billed by OpenAI is direct AI. Real/local runs require an explicit analysis declaration and remain partial and ineligible for an all-in technology-spend total because a local file does not establish complete vendor or billing-period coverage.
 
 The canonical CSV requires all token categories, request count, batch multiplier, currency, and allocation dimensions to be explicit. `uncached_input_tokens` excludes cached tokens, and `output_tokens` excludes separately reported reasoning tokens. All four categories must be mutually exclusive. This prevents ambiguous double-counting. Use the literal value `unattributed` when ownership is unknown. Empty values are invalid.
 
 ## Price-book contract
 
-Price books use `ai-cost-lens-price-book/1.0` and declare:
+Price books use `ai-cost-lens-price-book/1.0` for the compatibility path or `ai-cost-lens-price-book/1.1` for explicit CCAC 1.1, and declare:
 
 - `mode`, either `illustrative` or `real`
 - `effective_at`

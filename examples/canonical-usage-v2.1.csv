@@ -1,5 +1,5 @@
-usage_id,date,provider,model,currency,uncached_input_tokens,cached_input_tokens,output_tokens,reasoning_tokens,requests,batch_multiplier,billed_cost,cost_basis,billing_channel,project,team,environment,task
-usage-001,2026-07-01,openai,illustrative-model-a,USD,1000000,200000,300000,50000,100,1,,calculated,direct_ai_vendor,assistant,product,production,customer-support
-usage-002,2026-07-01,anthropic,illustrative-model-b,USD,600000,100000,200000,0,80,0.5,,calculated,direct_ai_vendor,research,data,development,summarization
-usage-003,2026-07-02,bedrock,illustrative-model-c,USD,800000,0,100000,0,60,1,4.25,provider_reported,cloud_provider_billing,assistant,platform,production,batch-classification
-usage-004,2026-07-02,openai,illustrative-model-a,USD,250000,50000,80000,10000,25,1,,calculated,direct_ai_vendor,unattributed,unattributed,development,experimentation
+usage_id,date,provider,model,currency,uncached_input_tokens,cached_input_tokens,output_tokens,reasoning_tokens,requests,batch_multiplier,billed_cost,cost_basis,billing_channel,billing_provider,project,team,environment,task
+usage-001,2026-07-01,openai,illustrative-model-a,USD,1000000,200000,300000,50000,100,1,,calculated,direct_ai_vendor,openai,assistant,product,production,customer-support
+usage-002,2026-07-01,anthropic,illustrative-model-b,USD,600000,100000,200000,0,80,0.5,,calculated,direct_ai_vendor,anthropic,research,data,development,summarization
+usage-003,2026-07-02,bedrock,illustrative-model-c,USD,800000,0,100000,0,60,1,4.25,provider_reported,cloud_provider_billing,aws,assistant,platform,production,batch-classification
+usage-004,2026-07-02,openai,illustrative-model-a,USD,250000,50000,80000,10000,25,1,,calculated,direct_ai_vendor,openai,unattributed,unattributed,development,experimentation
