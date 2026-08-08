@@ -52,7 +52,19 @@ def cli() -> None:
     help="Versioned JSON price book for calculated rows.",
 )
 @click.option(
+    "--analysis",
+    "analysis_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    help="Versioned CCAC 1.1 period and coverage declaration.",
+)
+@click.option(
     "--demo", is_flag=True, help="Use deterministic illustrative usage and prices."
+)
+@click.option(
+    "--contract-version",
+    type=click.Choice(["1.0.0", "1.1.0"]),
+    default="1.0.0",
+    show_default=True,
 )
 @click.option(
     "--output",
@@ -64,7 +76,9 @@ def cli() -> None:
 def ccac_command(
     input_path: Path | None,
     price_book: Path | None,
+    analysis_path: Path | None,
     demo: bool,
+    contract_version: str,
     output: Path | None,
     run_id: str | None,
     generated_at: str | None,
@@ -74,12 +88,26 @@ def ccac_command(
         raise click.UsageError("provide either --demo or --input")
     if demo:
         data_dir = Path(__file__).resolve().parent / "data"
-        input_path = data_dir / "canonical-usage-v2.csv"
-        price_book = data_dir / "illustrative-price-book.json"
+        if contract_version == "1.1.0":
+            input_path = data_dir / "canonical-usage-v2.1.csv"
+            price_book = data_dir / "illustrative-price-book-v1.1.json"
+            analysis_path = data_dir / "illustrative-analysis-v1.json"
+        else:
+            input_path = data_dir / "canonical-usage-v2.csv"
+            price_book = data_dir / "illustrative-price-book.json"
         run_id = run_id or "123e4567-e89b-12d3-a456-426614174030"
         generated_at = generated_at or "2026-08-04T12:15:00Z"
     try:
-        payload = build_ccac_result(input_path, price_book_path=price_book, mode="illustrative" if demo else "real", run_id=run_id, generated_at=generated_at)  # type: ignore[arg-type]
+        payload = build_ccac_result(
+            input_path,
+            price_book_path=price_book,
+            analysis_path=analysis_path,
+            mode="illustrative" if demo else "real",
+            run_id=run_id,
+            generated_at=generated_at,
+            contract_version=contract_version,
+            compatibility_demo=demo and contract_version == "1.0.0",
+        )  # type: ignore[arg-type]
     except CanonicalError as exc:
         raise click.ClickException(str(exc)) from exc
     rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"

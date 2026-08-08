@@ -84,6 +84,8 @@ class UsageRecord:
     batch_multiplier: Decimal
     billed_cost: Decimal | None
     cost_basis: str
+    billing_channel: str | None
+    billing_provider: str | None
     project: str
     team: str
     environment: str
@@ -176,6 +178,8 @@ def load_usage(path: Path) -> tuple[list[UsageRecord], str]:
                 multiplier,
                 billed,
                 basis,
+                (str(row.get("billing_channel") or "").strip().lower() or None),
+                (str(row.get("billing_provider") or "").strip().lower() or None),
                 text(row.get("project"), f"row {row_number} project"),
                 text(row.get("team"), f"row {row_number} team"),
                 text(row.get("environment"), f"row {row_number} environment"),
@@ -201,11 +205,12 @@ def load_price_book(path: Path | None) -> tuple[dict[str, Any] | None, str | Non
         raise CanonicalError(f"unable to read price book: {exc}") from exc
     if (
         not isinstance(value, dict)
-        or value.get("schema_version") != "ai-cost-lens-price-book/1.0"
+        or value.get("schema_version")
+        not in {"ai-cost-lens-price-book/1.0", "ai-cost-lens-price-book/1.1"}
         or not isinstance(value.get("prices"), dict)
     ):
         raise CanonicalError(
-            "price book must use ai-cost-lens-price-book/1.0 with a prices object"
+            "price book must use ai-cost-lens-price-book/1.0 or 1.1 with a prices object"
         )
     text(value.get("source"), "price book source")
     mode = text(value.get("mode"), "price book mode").lower()
@@ -216,6 +221,23 @@ def load_price_book(path: Path | None) -> tuple[dict[str, Any] | None, str | Non
         date.fromisoformat(text(value.get("effective_at"), "price book effective_at"))
     except ValueError as exc:
         raise CanonicalError("price book effective_at must be ISO YYYY-MM-DD") from exc
+    return value, hashlib.sha256(raw).hexdigest()
+
+
+def load_analysis(path: Path | None) -> tuple[dict[str, Any] | None, str | None]:
+    if path is None:
+        return None, None
+    try:
+        raw = path.read_bytes()
+        value = json.loads(raw)
+    except FileNotFoundError as exc:
+        raise CanonicalError(f"analysis declaration not found: {path}") from exc
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise CanonicalError(f"unable to read analysis declaration: {exc}") from exc
+    if not isinstance(value, dict) or value.get("schema_version") != (
+        "ai-cost-lens-analysis/1.0"
+    ):
+        raise CanonicalError("analysis declaration must use ai-cost-lens-analysis/1.0")
     return value, hashlib.sha256(raw).hexdigest()
 
 

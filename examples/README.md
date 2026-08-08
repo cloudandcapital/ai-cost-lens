@@ -1,5 +1,13 @@
 # Examples
 
+The explicit CCAC 1.1 example keeps three inputs distinct:
+
+- `canonical-usage-v2.1.csv`: usage, model provenance, billing provider, and billing channel.
+- `illustrative-price-book-v1.1.json`: synthetic pricing rates and pricing provenance only.
+- `illustrative-analysis-v1.json`: reporting period, accounting cost basis, and illustrative completeness.
+
+The original usage and price-book files remain the unchanged CCAC 1.0 compatibility inputs.
+
 ## Canonical v0.2 example
 
 ```bash
