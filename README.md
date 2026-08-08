@@ -19,7 +19,7 @@ It does not connect to provider APIs, fetch live prices, certify invoices, or id
 - Fail-closed unsupported models and malformed financial values
 - Explicit Bedrock/cloud-billing overlap protection
 - Unattributed AI cost findings that are never called savings
-- Reconciled `ccac/1.0.0` output
+- Reconciled `ccac/1.0.0` output by default, with explicit `ccac/1.1.0` direct-AI scope output
 
 The public demo is credential-free and uses entirely illustrative data.
 
@@ -51,6 +51,14 @@ The acceptance suite validates this artifact against the shared CCAC reference s
 
 **Illustrative sample AI usage and synthetic prices. No customer accounts, credentials, provider APIs, invoices, or production resources are connected. The included prices are not current provider prices.**
 
+The default remains the byte-stable `ccac/1.0.0` compatibility artifact. To emit the canonical direct-AI scope under CCAC 1.1:
+
+```bash
+ai-cost-lens ccac --demo --contract-version 1.1.0 --output ai-cost-result-1.1.json
+```
+
+The 1.1 public scenario explicitly classifies OpenAI and Anthropic usage as `direct_ai_vendor` and Bedrock as `cloud_provider_billing`. Its canonical `metric.tech-spend.scope.direct_ai` includes only the direct-vendor components. The declared period is 2026-07-01 through 2026-07-22, start-inclusive and end-exclusive, in UTC. The fixture declares absent dates as zero illustrative usage; this completeness statement applies only to the deterministic public scenario.
+
 The deterministic demo uses the same parser, price calculator, reconciliation, and CCAC producer as local user files.
 
 ## Analyze local usage
@@ -63,6 +71,8 @@ ai-cost-lens ccac \
 ```
 
 Rows with `cost_basis=provider_reported` require `billed_cost`. Rows with `cost_basis=calculated` require a matching price-book entry and must leave `billed_cost` blank. Unsupported calculated models fail; they never become zero-cost usage.
+
+Explicit 1.1 local-file runs use `ai-cost-lens/2.1` CSV input and `ai-cost-lens-price-book/1.1`. Every row requires a supported `billing_channel`, and the price declaration must provide `scope_cost_basis=net_cost`, an exact scenario period, and a completeness declaration. Local files remain partial and ineligible for an all-in technology-spend total because they do not establish complete vendor or billing-period coverage. No provider-name heuristic supplies missing classifications.
 
 The canonical CSV requires all token categories, request count, batch multiplier, currency, and allocation dimensions to be explicit. `uncached_input_tokens` excludes cached tokens, and `output_tokens` excludes separately reported reasoning tokens. All four categories must be mutually exclusive. This prevents ambiguous double-counting. Use the literal value `unattributed` when ownership is unknown. Empty values are invalid.
 
@@ -103,7 +113,7 @@ These commands sum cost values already present in loosely shaped CSV files. They
 
 ## Pipeline compatibility
 
-AI Cost Lens `0.2.x` feeds Tech Spend Command Center `0.2.x` through `ccac/1.0.0`. AI totals remain non-additive, and Bedrock overlap stays visible instead of being combined with AWS spend. The complete illustrative acceptance run passes independent validation. Cloud Cost Guard remains unchanged until its downstream adapter is reviewed separately.
+AI Cost Lens `0.3.x` preserves the `ccac/1.0.0` compatibility path and can explicitly emit its canonical direct-AI scope through `ccac/1.1.0`. The existing AI-domain total remains non-additive, and Bedrock remains excluded from the canonical direct-AI scope because provider-billed native AI belongs to Cloud. Cloud Cost Guard and downstream consumers remain unchanged.
 
 ## Development
 

@@ -1,5 +1,7 @@
 # Examples
 
+`canonical-usage-v2.1.csv` and `illustrative-price-book-v1.1.json` demonstrate the explicit CCAC 1.1 billing-channel, period, net-cost, and illustrative-completeness declarations. The original files remain the unchanged CCAC 1.0 compatibility inputs.
+
 ## Canonical v0.2 example
 
 ```bash

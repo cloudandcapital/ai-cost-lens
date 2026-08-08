@@ -2,6 +2,17 @@
 
 All notable changes to AI Cost Lens are documented here.
 
+## [0.3.0] — unreleased
+
+### Added
+- Explicit `ccac/1.1.0` selection with one canonical direct-AI technology-spend scope.
+- Versioned billing-channel, net-cost, period, and completeness declarations for the 1.1 file-first path.
+- Fail-closed separation of direct AI-vendor billing from provider-billed native AI.
+
+### Compatibility
+- Default and explicit `ccac/1.0.0` demo artifacts remain byte-identical to the 0.2.0 baseline.
+- CCAC remains a CI and acceptance dependency rather than a production runtime dependency.
+
 ## [0.2.0] — 2026-08-04
 
 ### Added

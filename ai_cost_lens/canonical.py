@@ -84,6 +84,7 @@ class UsageRecord:
     batch_multiplier: Decimal
     billed_cost: Decimal | None
     cost_basis: str
+    billing_channel: str | None
     project: str
     team: str
     environment: str
@@ -176,6 +177,7 @@ def load_usage(path: Path) -> tuple[list[UsageRecord], str]:
                 multiplier,
                 billed,
                 basis,
+                (str(row.get("billing_channel") or "").strip().lower() or None),
                 text(row.get("project"), f"row {row_number} project"),
                 text(row.get("team"), f"row {row_number} team"),
                 text(row.get("environment"), f"row {row_number} environment"),
@@ -201,11 +203,12 @@ def load_price_book(path: Path | None) -> tuple[dict[str, Any] | None, str | Non
         raise CanonicalError(f"unable to read price book: {exc}") from exc
     if (
         not isinstance(value, dict)
-        or value.get("schema_version") != "ai-cost-lens-price-book/1.0"
+        or value.get("schema_version")
+        not in {"ai-cost-lens-price-book/1.0", "ai-cost-lens-price-book/1.1"}
         or not isinstance(value.get("prices"), dict)
     ):
         raise CanonicalError(
-            "price book must use ai-cost-lens-price-book/1.0 with a prices object"
+            "price book must use ai-cost-lens-price-book/1.0 or 1.1 with a prices object"
         )
     text(value.get("source"), "price book source")
     mode = text(value.get("mode"), "price book mode").lower()
