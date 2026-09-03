@@ -1,0 +1,465 @@
+from __future__ import annotations
+
+import re
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).parents[1]
+WEB = ROOT / "web"
+
+
+def test_web_assets_and_brand_contract_are_present():
+    html = (WEB / "index.html").read_text()
+    css = (WEB / "styles.css").read_text()
+    assert (WEB / "app.js").is_file()
+    assert (WEB / "data" / "illustrative-review-result.json").is_file()
+    assert (WEB / "preview.html").is_file()
+    assert (WEB / "templates" / "ai-cost-lens-spend-template.csv").is_file()
+    assert (WEB / "templates" / "ai-cost-lens-work-log-template.csv").is_file()
+    assert "--paper: #f5eee9" in css
+    assert "--surface: #ffffff" in css
+    assert "CLOUD &amp; CAPITAL" in html
+    assert "EVIDENCE CHECK" in html
+    assert 'id="boundary-title"' in html
+    assert "ILLUSTRATIVE DATA" not in html  # The current file supplies the label.
+    assert "Illustrative data is never presented as customer evidence" in html
+    assert "What would you like to check?" in html
+    assert "See the worked example" in html
+    assert "Check an OpenAI bill" in html
+    assert "Test a model or route change" in html
+    assert "BEST PLACE TO START" in html
+    assert "OPENAI CONVENIENCE IMPORTER" in html
+    assert "ANY PROVIDER OR AI TOOL" in html
+    assert (
+        "universal templates for Claude, Bedrock, Gemini, gateways, or other AI tools"
+        in html
+    )
+    assert "The universal path works across providers and AI tools" in html
+    assert "One universal spend file" in html
+    assert "Add the bill" in html
+    assert "Add what happened to the work" in html
+    assert "Set the decision rules" in html
+    assert html.count("data-builder-mode=") == 3
+    assert 'id="workload-builder-fields" hidden' in html
+    assert 'id="openai-builder-fields" hidden' in html
+    assert 'id="builder-actions" hidden' in html
+    assert ".builder-actions[hidden]" in css
+    assert 'aria-pressed="false"' in html
+    assert "SAVE NOW" in (WEB / "app.js").read_text()
+    assert "Quick sample" in html
+    assert "How this number is built" in html
+    assert "BREAK EVEN EXPLORER" in html
+    assert "PLAN CHECK" in html
+    assert 'id="planning-section"' in html
+    assert 'id="payback-verdict"' in html
+    assert "LUMEN'S READ" in html
+    assert 'id="decision-code"' in html
+    assert 'id="lumen-dialog"' in html
+    assert 'id="lumen-form"' not in html
+    assert "deterministic record explainer, not a general AI chat" in html
+    assert "Share view" in html
+    assert "body.story-mode .masthead," not in css
+    assert "body.story-mode .header-actions > :not(#story-toggle)" in css
+    assert "Download decision record (JSON)" in html
+    assert 'id="print-memo"' in html
+    assert 'id="finance-memo"' in html
+    assert "Print finance memo" in html
+    assert "Choose the path that matches the evidence you have" in html
+    assert 'id="baseline-policy-approved"' in html
+    assert 'id="proposed-policy-approved"' in html
+    assert 'id="policy-approved"' not in html
+    app = (WEB / "app.js").read_text()
+    assert "builderMode: null" in app
+    assert "state.demoData = cloneData(state.data)" in app
+    assert 'state.builderMode === "example"' in app
+    assert "renderFinanceMemo" in app
+    assert 'document.body.classList.add("printing-memo")' in app
+    assert app.count('document.body.classList.remove("printing-memo")') == 2
+    assert (
+        'window.setTimeout(() => document.body.classList.remove("printing-memo"), 1500)'
+        in app
+    )
+    assert "The provider bill fell" in app
+    assert "The cost of a ready result rose" in app
+    assert "buildPlanningRecord" in app
+    assert "NO OPERATING PAYBACK" in app
+    assert "What happened versus plan?" in html
+    assert "Does the change pay back?" in html
+    assert "Cost per ready result" in app
+    assert "KEEP CURRENT ROUTE" in app
+    assert "At these costs, the proposed route needs" in app
+    assert 'id="yield-slider" type="range" min="0"' in html
+    assert "NO READY RESULTS" in app
+    assert 'input.step = "any"' in app
+    assert "safeMax / 200" not in app
+    assert "The example's numbers match. But this is not real-world proof." in app
+    assert "if (proposed.costs.one_time_change_cost > 0)" in app
+    assert ".status-illustrative" in css
+    assert (
+        'evidence-pill ${state.data.mode === "illustrative" ? "is-illustrative"' in app
+    )
+    assert "modeled cost" in app
+    assert "Latest evidence date" in app
+    assert "Statistical range" in app
+    assert "the sample was not declared random or systematic" in app
+    assert "wholeNumber(baseline.outcomes.human_review_minutes)" in app
+    assert ".question-nav[hidden]" in css
+    assert "body.story-mode .cockpit-grid" in css
+    assert "content: attr(data-label)" in css
+    assert "None included" in app
+    assert ".evidence-pill.is-illustrative" in css
+    assert ".review-map" not in css
+    assert ".finance-memo" in css
+    assert "body.printing-memo .finance-memo" in css
+    memo_next = re.findall(r"\.memo-next\s*\{([^}]*)\}", css, re.DOTALL)[-1]
+    assert "background: #fff" in memo_next
+    assert "color: #171816" in memo_next
+
+
+def test_single_file_preview_embeds_assets_and_data():
+    preview = (WEB / "preview.html").read_text()
+    assert '<link rel="stylesheet" href="styles.css"' not in preview
+    assert '<script src="app.js"' not in preview
+    assert '"schema_version": "ai-cost-lens-review-result/1.0"' in preview
+    assert 'fetch("data/illustrative-review-result.json")' not in preview
+    assert 'href="templates/ai-cost-lens-spend-template.csv"' not in preview
+    assert 'href="templates/ai-cost-lens-work-log-template.csv"' not in preview
+    assert "data:text/csv;base64," in preview
+
+
+def test_static_site_build_uses_the_self_contained_review_as_index():
+    script = (ROOT / "scripts" / "build-static-site.mjs").read_text()
+    assert 'import("./build-model-route-decision-preview.mjs")' in script
+    assert (
+        'copyFile(resolve(web, "preview.html"), resolve(build, "index.html"))' in script
+    )
+
+
+def test_universal_templates_preserve_finance_join_fields():
+    spend = (WEB / "templates" / "ai-cost-lens-spend-template.csv").read_text()
+    work = (WEB / "templates" / "ai-cost-lens-work-log-template.csv").read_text()
+    assert "period,date,workload,provider,model,route,requests" in spend
+    assert "provider_cost,cost_basis,currency" in spend
+    assert "provider_reported" in spend
+    assert "calculated" in spend
+    assert "period,result_id,outcome_status,human_minutes" in work
+    assert "ready_to_use" in work
+    assert "needs_correction" in work
+
+
+def test_javascript_element_references_exist_in_html():
+    html = (WEB / "index.html").read_text()
+    script = (WEB / "app.js").read_text()
+    ids = set(re.findall(r'id="([^"]+)"', html))
+    references = set(re.findall(r'getElementById\("([^"]+)"\)', script))
+    assert references <= ids
+
+
+def test_html_ids_are_unique():
+    html = (WEB / "index.html").read_text()
+    ids = re.findall(r'id="([^"]+)"', html)
+    assert len(ids) == len(set(ids))
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_finance_memo_uses_the_active_decision_record_values():
+    script = r"""
+const fs = require("fs");
+const elements = new Map();
+global.document = {
+  getElementById(id) {
+    if (!elements.has(id)) elements.set(id, { textContent: "", innerHTML: "", hidden: false });
+    return elements.get(id);
+  },
+};
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function renderAll() {",
+  "  globalThis.__setMemoData = (value) => { state.data = value; }; globalThis.__renderFinanceMemo = renderFinanceMemo; return;\n  function renderAll() {",
+);
+eval(source);
+globalThis.__setMemoData(JSON.parse(fs.readFileSync(process.argv[2], "utf8")));
+globalThis.__renderFinanceMemo();
+console.log(JSON.stringify(Object.fromEntries([...elements.entries()].map(([id, value]) => [id, value]))));
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "app.js"),
+            str(WEB / "data" / "illustrative-review-result.json"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    memo = __import__("json").loads(result.stdout)
+    assert memo["memo-title"]["textContent"] == "AI spend decision memo"
+    assert "Customer due diligence case summaries" in memo["memo-meta"]["textContent"]
+    assert memo["memo-decision-code"]["textContent"] == "KEEP CURRENT ROUTE"
+    assert "$143.55" in memo["memo-table-body"]["innerHTML"]
+    assert "$150.40" in memo["memo-table-body"]["innerHTML"]
+    assert "+4.8%" in memo["memo-table-body"]["innerHTML"]
+    assert "−$6,436.00" in memo["memo-plan-grid"]["innerHTML"]
+    assert memo["memo-planning"]["hidden"] is False
+    assert "Illustrative data" in memo["memo-footer-status"]["textContent"]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_openai_bill_memo_preserves_the_provider_evidence_boundary():
+    script = r"""
+const fs = require("fs");
+const elements = new Map();
+global.document = {
+  getElementById(id) {
+    if (!elements.has(id)) elements.set(id, { textContent: "", innerHTML: "", hidden: false });
+    return elements.get(id);
+  },
+};
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function renderAll() {",
+  "  globalThis.__buildBill = buildOpenAIBillReview; globalThis.__setMemoData = (value) => { state.data = value; }; globalThis.__renderFinanceMemo = renderFinanceMemo; return;\n  function renderAll() {",
+);
+eval(source);
+(async () => {
+  const review = await globalThis.__buildBill(
+    fs.readFileSync(process.argv[2], "utf8"),
+    fs.readFileSync(process.argv[3], "utf8"),
+  );
+  globalThis.__setMemoData(review);
+  globalThis.__renderFinanceMemo();
+  console.log(JSON.stringify(Object.fromEntries([...elements.entries()].map(([id, value]) => [id, value]))));
+})();
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "app.js"),
+            str(ROOT / "tests" / "fixtures" / "openai-dashboard-usage.csv"),
+            str(ROOT / "tests" / "fixtures" / "openai-dashboard-cost.csv"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    memo = __import__("json").loads(result.stdout)
+    assert memo["memo-decision-code"]["textContent"] == "RECONCILE FIRST"
+    assert "$12.75" in memo["memo-table-body"]["innerHTML"]
+    assert "Unavailable from these exports" in memo["memo-evidence"]["innerHTML"]
+    assert "Not supported" in memo["memo-evidence"]["innerHTML"]
+    assert memo["memo-planning"]["hidden"] is True
+
+
+def test_question_navigation_matches_views():
+    html = (WEB / "index.html").read_text()
+    nav_views = set(re.findall(r'data-view="([^"]+)"', html))
+    section_views = set(re.findall(r'id="view-([^"]+)"', html))
+    assert nav_views == section_views == {"review", "anatomy", "evidence"}
+
+
+def test_release_review_regressions_have_plain_language_and_precise_formatting():
+    app = (WEB / "app.js").read_text()
+    model_review = (WEB / "model-route-review.js").read_text()
+    model_review_preview = (WEB / "model-route-review-preview.html").read_text()
+    assert "button.disabled = isBill" in app
+    assert "button.tabIndex = isBill ? -1 : 0" in app
+    assert "That file isn't valid JSON. Choose a saved AI Cost Lens review." in app
+    assert 'project record${usage.by_project.length === 1 ? "" : "s"}' in app
+    assert 'model route${usage.by_model.length === 1 ? "" : "s"}' in app
+    assert "unitMoney(perAccepted)" in model_review
+    assert "value < 1 ? `${(value * 100).toFixed(1)}¢`" in model_review
+    assert "unitMoney(perAccepted)" in model_review_preview
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_browser_javascript_has_valid_syntax():
+    result = subprocess.run(
+        ["node", "--check", str(WEB / "app.js")],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_browser_openai_csv_review_matches_strict_fixture_totals():
+    script = r"""
+const fs = require("fs");
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function validateResult(data) {",
+  "  globalThis.__buildOpenAIBillReview = buildOpenAIBillReview; return;\n  function validateResult(data) {",
+);
+eval(source);
+(async () => {
+  const result = await globalThis.__buildOpenAIBillReview(
+    fs.readFileSync(process.argv[2], "utf8"),
+    fs.readFileSync(process.argv[3], "utf8"),
+  );
+  console.log(JSON.stringify(result));
+})();
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "app.js"),
+            str(ROOT / "tests" / "fixtures" / "openai-dashboard-usage.csv"),
+            str(ROOT / "tests" / "fixtures" / "openai-dashboard-cost.csv"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = __import__("json").loads(result.stdout)
+    assert payload["bill"]["total"] == 12.75
+    assert payload["usage"]["totals"]["requests"] == 30
+    assert payload["period"]["aligned"] is True
+    assert payload["reconciliation"]["model_cost_allocation_supported"] is False
+    assert payload["reconciliation"]["savings_claim_allowed"] is False
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_browser_workload_builder_accepts_three_state_outcome_template():
+    script = r"""
+const fs = require("fs");
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function validateResult(data) {",
+  "  globalThis.__buildLocalReview = buildLocalReview; return;\n  function validateResult(data) {",
+);
+eval(source);
+(async () => {
+  const result = await globalThis.__buildLocalReview(
+    fs.readFileSync(process.argv[2], "utf8"),
+    fs.readFileSync(process.argv[3], "utf8"),
+    {
+      acceptanceRule: "Correct without a material rewrite",
+      verifier: "Human review",
+      qualityFloor: 0.5,
+      hourlyRate: 60,
+      policyApproved: true,
+      baselineShared: 0,
+      proposedShared: 0,
+      changeCost: 0,
+      planning: {
+        label: "Approved plan for the current route",
+        plan: {
+          providerCost: 5,
+          sharedCost: 0,
+          humanCost: 0,
+          completedResults: 2,
+          readyRate: 0.5,
+        },
+        expectedReadyPerMonth: 2,
+        horizonMonths: 6,
+      },
+    },
+  );
+  console.log(JSON.stringify(result));
+})();
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "app.js"),
+            str(WEB / "templates" / "ai-cost-lens-spend-template.csv"),
+            str(WEB / "templates" / "ai-cost-lens-work-log-template.csv"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = __import__("json").loads(result.stdout)
+    assert payload["baseline"]["outcomes"]["status_counts"] == {
+        "ready_to_use": 1,
+        "needs_correction": 1,
+        "needs_escalation": 0,
+    }
+    assert payload["proposed"]["outcomes"]["status_counts"]["ready_to_use"] == 2
+    assert payload["baseline"]["evidence"]["cost_basis"] == "observed"
+    assert payload["proposed"]["evidence"]["cost_basis"] == "calculated"
+    assert payload["comparison"]["same_cost_basis"] is False
+    assert payload["comparison"]["provider_cost_reported"] is False
+    assert payload["comparison"]["savings_claim_allowed"] is False
+    assert payload["planning"]["plan"]["recurring_operating_cost"] == 5
+    assert payload["planning"]["actual"]["provider_cost"] == 18.4
+    assert payload["planning"]["variance"]["provider_cost"] == 13.4
+    assert payload["planning"]["payback"]["decision_horizon_months"] == 6
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_browser_sampled_review_labels_estimates_and_blocks_savings_claim():
+    script = r"""
+const fs = require("fs");
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function validateResult(data) {",
+  "  globalThis.__buildSampledReview = buildSampledReview; return;\n  function validateResult(data) {",
+);
+eval(source);
+(async () => {
+  const result = await globalThis.__buildSampledReview(
+    fs.readFileSync(process.argv[2], "utf8"),
+    {
+      baseline: { population: 1000, ready: 20, correction: 8, escalation: 2, humanMinutes: 120 },
+      proposed: { population: 1000, ready: 24, correction: 5, escalation: 1, humanMinutes: 90 },
+    },
+    {
+      acceptanceRule: "Correct without a material rewrite",
+      verifier: "Human review",
+      qualityFloor: 0.5,
+      hourlyRate: 60,
+      policyApproved: true,
+      baselineShared: 0,
+      proposedShared: 0,
+      changeCost: 0,
+      sampleRandom: true,
+    },
+  );
+  console.log(JSON.stringify(result));
+})();
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "app.js"),
+            str(WEB / "templates" / "ai-cost-lens-spend-template.csv"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = __import__("json").loads(result.stdout)
+    assert payload["mode"] == "sampled"
+    assert payload["comparison"]["savings_claim_allowed"] is False
+    assert payload["comparison"]["outcome_evidence_basis"] == "sampled"
+    assert payload["baseline"]["outcomes"]["sample_size"] == 30
+    assert payload["baseline"]["outcomes"]["completed_results"] == 1000
+    assert payload["baseline"]["outcomes"]["usable_results"] == pytest.approx(
+        666.666667
+    )
+    assert payload["baseline"]["evidence"]["coverage_status"] == "sampled"
+    assert payload["baseline"]["evidence"]["cost_basis"] == "observed"
+    assert payload["proposed"]["evidence"]["cost_basis"] == "calculated"
+    assert payload["comparison"]["same_cost_basis"] is False
+    assert payload["baseline"]["outcomes"]["ready_rate_interval_95"][0] < 20 / 30
+    assert payload["baseline"]["outcomes"]["ready_rate_interval_95"][1] > 20 / 30

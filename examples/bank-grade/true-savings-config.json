@@ -1,0 +1,12 @@
+{
+  "acceptanceRule": "Accurate against the source record, evidence cited, and no material rewrite required",
+  "verifier": "Independent operations quality review",
+  "qualityFloor": 0.9,
+  "hourlyRate": 120,
+  "baselinePolicyApproved": true,
+  "proposedPolicyApproved": true,
+  "baselineShared": 25000,
+  "proposedShared": 22000,
+  "changeCost": 150000,
+  "outcomeLogComplete": true
+}

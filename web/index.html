@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="AI Cost Lens turns AI usage, billing, and outcome evidence into a financial decision record."
+    />
+    <title>AI Cost Lens | Cloud & Capital</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="masthead">
+        <a class="wordmark" href="#" aria-label="Cloud and Capital home">
+          <span>CLOUD &amp; CAPITAL</span>
+          <small>AI COST LENS</small>
+        </a>
+        <div class="header-actions">
+          <a class="text-button" href="model-route-decision.html">See model test</a>
+          <button class="text-button" id="story-toggle" type="button">Share view</button>
+          <button class="text-button" id="download-review" type="button" title="Save the complete machine-readable review">Download decision record (JSON)</button>
+          <button class="text-button" id="print-memo" type="button" title="Open the print dialog, where you can save the memo as a PDF">Print finance memo</button>
+          <button class="file-button primary-action" id="start-review" type="button">Start a review</button>
+          <label class="text-button" for="review-file">Open saved review</label>
+          <input id="review-file" type="file" accept="application/json,.json" />
+        </div>
+      </header>
+
+      <nav class="question-nav" aria-label="Review sections">
+        <button class="nav-item active" data-view="review" type="button">
+          The review
+        </button>
+        <button class="nav-item" data-view="anatomy" type="button">
+          The bill
+        </button>
+        <button class="nav-item" data-view="evidence" type="button">
+          The evidence
+        </button>
+      </nav>
+
+      <main>
+        <section class="bill-review-screen" id="bill-review-screen" aria-labelledby="bill-review-title">
+          <div class="eyebrow-row">
+            <p class="eyebrow" id="bill-period-label"></p>
+            <span class="mode-tag" id="bill-mode-tag">PROVIDER REPORTED</span>
+          </div>
+
+          <div class="title-grid bill-title-grid">
+            <div>
+              <p class="kicker">OPENAI BILL REVIEW</p>
+              <h1 id="bill-review-title">What can this bill actually prove?</h1>
+            </div>
+            <div class="workload-intro">
+              <strong>Saved dashboard exports</strong>
+              <p>Total cost and usage mix are real evidence. Unsupported allocations stay blank.</p>
+            </div>
+          </div>
+
+          <article class="finding" aria-labelledby="bill-finding-title">
+            <div class="finding-mark" aria-hidden="true">↘</div>
+            <div>
+              <p class="kicker">THE FINANCE READ</p>
+              <h2 id="bill-finding-title"></h2>
+              <p class="finding-limit" id="bill-finding-limit"></p>
+            </div>
+          </article>
+
+          <div class="metric-ledger bill-metrics" id="bill-metric-ledger"></div>
+
+          <section class="comparison-section" aria-labelledby="model-mix-title">
+            <div class="section-heading">
+              <div>
+                <p class="kicker">USAGE MIX</p>
+                <h2 id="model-mix-title">Where the requests and tokens went</h2>
+              </div>
+              <p>These are observed usage measures. They are not billed dollars by model.</p>
+            </div>
+            <div class="usage-table-wrap">
+              <table class="usage-table">
+                <thead><tr><th>Model</th><th>Requests</th><th>Input</th><th>Output</th><th>Cache share</th><th>Billed cost</th></tr></thead>
+                <tbody id="bill-model-rows"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="opportunity-section" aria-labelledby="bill-ledger-title">
+            <div class="section-heading">
+              <div>
+                <p class="kicker">THE JUDGMENT</p>
+                <h2 id="bill-ledger-title">What to act on, and what to leave alone</h2>
+              </div>
+              <p>This separates what the bill proves from what still needs testing.</p>
+            </div>
+            <div class="opportunity-ledger" id="bill-opportunity-ledger"></div>
+          </section>
+
+          <section class="boundary-note">
+            <div>
+              <p class="kicker">NEXT EVIDENCE</p>
+              <h2 id="bill-next-step"></h2>
+            </div>
+            <p id="bill-boundary-copy"></p>
+          </section>
+        </section>
+
+        <section class="view active" id="view-review" aria-labelledby="review-title">
+          <div class="eyebrow-row">
+            <p class="eyebrow" id="period-label"></p>
+            <span class="mode-tag" id="mode-tag"></span>
+          </div>
+
+          <div class="title-grid">
+            <div>
+              <p class="kicker">FINANCE FIRST AI SPEND REVIEW</p>
+              <h1 id="review-title">What did one ready result really cost?</h1>
+            </div>
+            <div class="workload-intro">
+              <strong id="workload-name"></strong>
+              <p id="workload-description"></p>
+            </div>
+          </div>
+
+          <section class="truth-section share-card" aria-labelledby="truth-title">
+            <div class="truth-heading">
+              <div>
+                <p class="kicker">THE NUMBER FINANCE NEEDS</p>
+                <h2 id="truth-title">The cost of one ready result</h2>
+              </div>
+              <p id="truth-summary"></p>
+            </div>
+            <div class="cockpit-grid">
+              <div class="cockpit-main">
+                <article class="unit-economics-card" id="unit-economics-card"></article>
+                <article class="outcome-yield-card" id="outcome-yield-card"></article>
+                <section class="break-even-card" aria-labelledby="break-even-title">
+                  <div class="break-even-heading">
+                    <div>
+                      <p class="kicker">BREAK EVEN EXPLORER</p>
+                      <h3 id="break-even-title">What would make the proposed route worth it?</h3>
+                    </div>
+                    <strong id="break-even-verdict"></strong>
+                  </div>
+                  <div class="break-even-layout">
+                    <div class="break-even-controls">
+                      <label>
+                        <span>Ready result rate <strong id="yield-slider-value"></strong></span>
+                        <input id="yield-slider" type="range" min="0" max="100" step="0.1" />
+                      </label>
+                      <label>
+                        <span>Provider bill <strong id="provider-slider-value"></strong></span>
+                        <input id="provider-slider" type="range" min="0" max="1" step="1" />
+                      </label>
+                      <label>
+                        <span>Human review and correction <strong id="human-slider-value"></strong></span>
+                        <input id="human-slider" type="range" min="0" max="1" step="1" />
+                      </label>
+                    </div>
+                    <div class="break-even-result">
+                      <span>MODELED COST PER READY RESULT</span>
+                      <strong id="break-even-unit-cost"></strong>
+                      <p id="break-even-copy"></p>
+                      <button class="reset-link" id="reset-break-even" type="button">Reset proposed inputs</button>
+                    </div>
+                  </div>
+                </section>
+              </div>
+              <aside class="lumen-panel" aria-labelledby="lumen-panel-title">
+                <div class="lumen-orbit" aria-hidden="true">L</div>
+                <p class="kicker inverse">LUMEN'S READ</p>
+                <h3 id="lumen-panel-title"></h3>
+                <p id="lumen-panel-copy"></p>
+                <div class="lumen-signals" id="lumen-signals"></div>
+                <button class="lumen-button" id="open-lumen" type="button">Open Lumen's guided read</button>
+                <small>Deterministic explanations grounded in this record. Lumen explains the math but never changes it.</small>
+              </aside>
+            </div>
+            <details class="methodology-note">
+              <summary>How this number is built</summary>
+              <div>
+                <p><strong>Full recurring cost</strong> = provider spend + shared infrastructure included in the review + human review and correction.</p>
+                <p><strong>Cost per ready result</strong> = full recurring cost ÷ results that met the quality bar.</p>
+                <p>Observed logs, samples, estimates, and missing evidence remain visibly different. A sampled or user-estimated result cannot become proven savings.</p>
+              </div>
+            </details>
+          </section>
+
+          <article class="finding" aria-labelledby="finding-title">
+            <div class="finding-mark" aria-hidden="true">↘</div>
+            <div>
+              <p class="kicker">THE FINANCE READ</p>
+              <h2 id="finding-title"></h2>
+              <p class="finding-limit" id="finding-limit"></p>
+            </div>
+          </article>
+
+          <section class="comparison-section" aria-labelledby="comparison-title">
+            <div class="section-heading">
+              <div>
+                <p class="kicker">THE WORK</p>
+                <h2 id="comparison-title">How the two routes compare</h2>
+              </div>
+              <p>
+                Total spend can mislead when volume or quality changes. This view uses the
+                same ready-to-use outcome on both sides.
+              </p>
+            </div>
+
+            <div class="bar-ledger" id="unit-cost-chart" role="img"></div>
+
+            <div class="metric-ledger" id="metric-ledger"></div>
+          </section>
+
+          <section class="planning-section" id="planning-section" aria-labelledby="planning-title" hidden>
+            <div class="section-heading">
+              <div>
+                <p class="kicker">PLAN CHECK</p>
+                <h2 id="planning-title">Did the current route land where expected?</h2>
+              </div>
+              <p>The plan, the actual result, and the proposed change stay separate. A lower forecast is not the same as money already saved.</p>
+            </div>
+            <div class="planning-layout">
+              <div class="planning-table-card">
+                <div class="planning-card-head">
+                  <strong id="planning-label"></strong>
+                  <span>Same workload and period</span>
+                </div>
+                <div class="planning-table-wrap">
+                  <table class="planning-table">
+                    <thead><tr><th>Measure</th><th>Plan</th><th>Actual</th><th>Variance</th></tr></thead>
+                    <tbody id="planning-rows"></tbody>
+                  </table>
+                </div>
+                <div class="variance-notes" id="variance-notes"></div>
+              </div>
+              <aside class="payback-card" aria-labelledby="payback-title">
+                <p class="kicker inverse">PAYBACK WINDOW</p>
+                <h3 id="payback-title">Would the proposed route pay back in time?</h3>
+                <strong id="payback-verdict"></strong>
+                <p id="payback-copy"></p>
+                <dl id="payback-metrics"></dl>
+              </aside>
+            </div>
+          </section>
+
+          <section class="opportunity-section" aria-labelledby="opportunity-title">
+            <div class="section-heading">
+              <div>
+                <p class="kicker">THE LEAK</p>
+                <h2 id="opportunity-title">Not every lower number is a saving</h2>
+              </div>
+              <p>
+                The evidence puts each item in one place: save now, test first,
+                fix what is missing, or keep the current route.
+              </p>
+            </div>
+            <div class="opportunity-ledger" id="opportunity-ledger"></div>
+          </section>
+
+          <section class="decision-note" aria-labelledby="decision-title">
+            <div>
+              <p class="kicker">THE DECISION</p>
+              <strong class="decision-code" id="decision-code"></strong>
+            </div>
+            <h2 id="decision-title"></h2>
+            <div class="decision-meta">
+              <span id="claim-status"></span>
+              <span id="payback-status"></span>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-anatomy" aria-labelledby="anatomy-title">
+          <div class="eyebrow-row">
+            <p class="eyebrow">RECURRING COST BOUNDARY</p>
+            <span class="mode-tag">MODEL + SHARED INFRASTRUCTURE + HUMAN REVIEW</span>
+          </div>
+          <div class="section-page-title">
+            <p class="kicker">COST ANATOMY</p>
+            <h1 id="anatomy-title">The bill is bigger than tokens.</h1>
+            <p>
+              A cheaper rate can disappear after retries, review, or infrastructure. The
+              breakdown keeps each part visible instead of burying everything in one total.
+            </p>
+          </div>
+
+          <div class="anatomy-grid" id="anatomy-grid"></div>
+
+          <section class="behavior-section" aria-labelledby="behavior-title">
+            <div class="section-heading">
+              <div>
+                <p class="kicker">WORKLOAD BEHAVIOR</p>
+                <h2 id="behavior-title">Where the economics changed</h2>
+              </div>
+              <p>
+                These measures cover all provider requests, including retries. Cost per
+                ready result uses only outputs that cleared the quality rule.
+              </p>
+            </div>
+            <div class="behavior-ledger" id="behavior-ledger"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-evidence" aria-labelledby="evidence-title">
+          <div class="eyebrow-row">
+            <p class="eyebrow">DECISION RECORD</p>
+            <span class="mode-tag">NO PROVIDER CREDENTIALS REQUIRED</span>
+          </div>
+          <div class="section-page-title">
+            <p class="kicker">EVIDENCE CHECK</p>
+            <h1 id="evidence-title">What can we actually prove?</h1>
+            <p>
+              Every conclusion should show where the cost came from, what counted as a
+              good result, what was reviewed, and what is still missing.
+            </p>
+          </div>
+
+          <div class="evidence-grid" id="evidence-grid"></div>
+
+          <section class="boundary-note">
+            <div>
+              <p class="kicker">ACCOUNTING BOUNDARY</p>
+              <h2 id="boundary-title"></h2>
+            </div>
+            <p id="boundary-copy"></p>
+          </section>
+        </section>
+      </main>
+
+      <footer>
+        <p>AI Cost Lens is free, open source, and local first.</p>
+        <p>Illustrative data is never presented as customer evidence.</p>
+      </footer>
+    </div>
+
+    <article class="finance-memo" id="finance-memo" aria-label="AI Cost Lens finance memo">
+      <header class="memo-header">
+        <div>
+          <p>CLOUD &amp; CAPITAL · AI COST LENS</p>
+          <h1 id="memo-title">AI spend decision memo</h1>
+        </div>
+        <div class="memo-meta" id="memo-meta"></div>
+      </header>
+      <section class="memo-decision">
+        <p>FINANCE DECISION</p>
+        <strong id="memo-decision-code"></strong>
+        <h2 id="memo-decision-title"></h2>
+        <p id="memo-decision-limit"></p>
+      </section>
+      <section class="memo-section">
+        <div class="memo-section-heading">
+          <p>THE NUMBERS</p>
+          <h2 id="memo-numbers-title">What changed</h2>
+        </div>
+        <div class="memo-table-wrap">
+          <table class="memo-table">
+            <thead id="memo-table-head"></thead>
+            <tbody id="memo-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="memo-two-column">
+        <div class="memo-section">
+          <div class="memo-section-heading">
+            <p>DECISION RULES</p>
+            <h2>What the review counted</h2>
+          </div>
+          <dl class="memo-list" id="memo-rules"></dl>
+        </div>
+        <div class="memo-section">
+          <div class="memo-section-heading">
+            <p>EVIDENCE</p>
+            <h2>What finance can rely on</h2>
+          </div>
+          <dl class="memo-list" id="memo-evidence"></dl>
+        </div>
+      </section>
+      <section class="memo-section memo-planning" id="memo-planning" hidden>
+        <div class="memo-section-heading">
+          <p>PLAN &amp; PAYBACK</p>
+          <h2>What this means for the budget</h2>
+        </div>
+        <div class="memo-plan-grid" id="memo-plan-grid"></div>
+      </section>
+      <section class="memo-next">
+        <p>NEXT STEP</p>
+        <h2 id="memo-next-step"></h2>
+      </section>
+      <footer class="memo-footer">
+        <p>Prepared locally in AI Cost Lens. The source files were not uploaded.</p>
+        <p id="memo-footer-status"></p>
+      </footer>
+    </article>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <dialog class="review-dialog" id="review-dialog" aria-labelledby="review-dialog-title">
+      <form class="review-builder" id="review-builder" method="dialog" novalidate>
+        <div class="builder-head">
+          <div>
+            <p class="kicker">NEW LOCAL REVIEW</p>
+            <h2 id="review-dialog-title">What would you like to check?</h2>
+          </div>
+          <button class="dialog-close" id="close-review" type="button" aria-label="Close review setup">Close</button>
+        </div>
+
+        <div class="privacy-note">
+          <strong>Your files stay in this browser.</strong>
+          <span>AI Cost Lens reads them locally. Nothing is uploaded or stored.</span>
+        </div>
+
+        <p class="builder-choice-label">Choose the path that matches the evidence you have.</p>
+        <div class="builder-mode-choice" role="group" aria-label="Choose how to start">
+          <button class="builder-mode builder-mode-featured" data-builder-mode="example" type="button" aria-pressed="false">
+            <small>NO FILES NEEDED</small>
+            <strong>See the worked example</strong>
+            <span>Follow a cheaper AI bill that turns into more expensive work.</span>
+            <em>BEST PLACE TO START</em>
+          </button>
+          <button class="builder-mode" data-builder-mode="openai" type="button" aria-pressed="false">
+            <small>OPENAI CONVENIENCE IMPORTER</small>
+            <strong>Check an OpenAI bill</strong>
+            <span>Use saved OpenAI exports to reconcile the provider total and usage mix.</span>
+          </button>
+          <button class="builder-mode" data-builder-mode="workload" type="button" aria-pressed="false">
+            <small>ANY PROVIDER OR AI TOOL</small>
+            <strong>Test a model or route change</strong>
+            <span>Use universal templates for Claude, Bedrock, Gemini, gateways, or other AI tools.</span>
+          </button>
+        </div>
+
+        <p class="builder-path-help" id="builder-path-help">Not sure? Open the worked example first. The universal path works across providers and AI tools.</p>
+
+        <div id="workload-builder-fields" hidden>
+        <div class="path-requirements">
+          <strong>What you need</strong>
+          <span>One universal spend file, plus either a small reviewed sample or a work log. We will keep assumptions and missing proof visible.</span>
+        </div>
+        <section class="builder-step" aria-labelledby="builder-files-title">
+          <div class="step-number">01</div>
+          <div>
+            <h3 id="builder-files-title">Add the bill</h3>
+            <p>The spend file holds the current and proposed routes in one place. Each cost stays labeled as provider reported, calculated, or allocated.</p>
+            <div class="template-links">
+              <a href="templates/ai-cost-lens-spend-template.csv" download>Download spend template</a>
+            </div>
+            <div class="file-pair single-file-row">
+              <label class="field-wide">
+                <span>Spend and usage CSV</span>
+                <input id="spend-file" type="file" accept=".csv,text/csv" required />
+                <small id="spend-file-name">Baseline and proposed rows belong in one file. Label each provider cost as provider_reported, calculated, or allocated.</small>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section class="builder-step" aria-labelledby="builder-work-title">
+          <div class="step-number">02</div>
+          <div>
+            <h3 id="builder-work-title">Add what happened to the work</h3>
+            <p>Use the same definition of “ready” for both routes. A quick sample gives you a clearly labeled estimate; a complete work log supports a stronger review.</p>
+            <div class="outcome-mode-choice" role="group" aria-label="Choose outcome evidence">
+              <button class="outcome-mode active" data-outcome-mode="sample" type="button" aria-pressed="true">
+                <strong>Quick sample</strong>
+                <span>Count 20–30 reviewed outputs from each route. No outcome CSV required.</span>
+              </button>
+              <button class="outcome-mode" data-outcome-mode="detailed" type="button" aria-pressed="false">
+                <strong>Detailed log</strong>
+                <span>Use one row per completed result for observed evidence.</span>
+              </button>
+            </div>
+
+            <div id="sample-outcome-fields" class="sample-outcome-fields">
+              <div class="sample-intro">
+                <strong>Use the same quality rule on both routes.</strong>
+                <span>Enter the number of outputs in the period, then what you found in the reviewed sample.</span>
+              </div>
+              <div class="sample-route-grid">
+                <fieldset class="sample-route-card">
+                  <legend>Current route</legend>
+                  <div class="sample-field-grid">
+                    <label><span>Results in period</span><input id="baseline-population" type="number" min="1" step="1" value="1000" /></label>
+                    <label><span>Ready in sample</span><input id="baseline-ready" type="number" min="1" step="1" value="22" /></label>
+                    <label><span>Needed correction</span><input id="baseline-correction" type="number" min="0" step="1" value="6" /></label>
+                    <label><span>Needed escalation</span><input id="baseline-escalation" type="number" min="0" step="1" value="2" /></label>
+                    <label class="field-wide"><span>Total human minutes in sample</span><input id="baseline-human-minutes" type="number" min="0" step="0.1" value="120" /></label>
+                  </div>
+                </fieldset>
+                <fieldset class="sample-route-card">
+                  <legend>Proposed route</legend>
+                  <div class="sample-field-grid">
+                    <label><span>Results in period</span><input id="proposed-population" type="number" min="1" step="1" value="1000" /></label>
+                    <label><span>Ready in sample</span><input id="proposed-ready" type="number" min="1" step="1" value="24" /></label>
+                    <label><span>Needed correction</span><input id="proposed-correction" type="number" min="0" step="1" value="5" /></label>
+                    <label><span>Needed escalation</span><input id="proposed-escalation" type="number" min="0" step="1" value="1" /></label>
+                    <label class="field-wide"><span>Total human minutes in sample</span><input id="proposed-human-minutes" type="number" min="0" step="0.1" value="90" /></label>
+                  </div>
+                </fieldset>
+              </div>
+              <label class="check-field sample-method-check">
+                <input id="sample-random" type="checkbox" />
+                <span>The outputs were selected randomly or by a repeatable sampling rule</span>
+              </label>
+              <p class="sample-caveat">AI Cost Lens will extrapolate the sampled outcome rate and human time across the declared period. A user-selected sample stays directional and will not show a statistical range. Every result remains labeled as sampled, not observed production truth.</p>
+            </div>
+
+            <div id="detailed-outcome-fields" hidden>
+              <div class="template-links detailed-template-link">
+                <a href="templates/ai-cost-lens-work-log-template.csv" download>Download work log</a>
+              </div>
+              <div class="file-pair single-file-row">
+                <label class="field-wide">
+                  <span>Work log CSV</span>
+                  <input id="work-file" type="file" accept=".csv,text/csv" />
+                  <small id="work-file-name">Minimum columns: period, result_id, outcome_status, human_minutes.</small>
+                </label>
+              </div>
+              <label class="check-field detailed-log-check">
+                <input id="outcome-log-complete" type="checkbox" checked />
+                <span>This log covers every completed result for the same workload and period as the spend file</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section class="builder-step" aria-labelledby="builder-declarations-title">
+          <div class="step-number">03</div>
+          <div>
+            <h3 id="builder-declarations-title">Set the decision rules</h3>
+            <p>Tell finance what “ready” means, who checked it, the minimum quality you will accept, and whether each route is allowed for this workload.</p>
+            <div class="field-grid">
+              <label class="field-wide">
+                <span>Ready to use means</span>
+                <input id="acceptance-rule" type="text" value="Completed correctly without a material rewrite" required />
+              </label>
+              <label>
+                <span>Verified by</span>
+                <input id="verifier" type="text" value="Human review" required />
+              </label>
+              <label>
+                <span>Quality floor</span>
+                <div class="input-suffix"><input id="quality-floor" type="number" min="1" max="100" step="0.1" value="80" required /><em>%</em></div>
+              </label>
+              <label>
+                <span>Human review rate</span>
+                <div class="input-prefix"><em>$</em><input id="hourly-rate" type="number" min="0" step="0.01" value="60" required /></div>
+              </label>
+              <label class="check-field">
+                <input id="baseline-policy-approved" type="checkbox" checked />
+                <span>The current route is approved for this workload</span>
+              </label>
+              <label class="check-field">
+                <input id="proposed-policy-approved" type="checkbox" />
+                <span>The proposed route is approved for this workload</span>
+              </label>
+            </div>
+
+            <details class="advanced-costs">
+              <summary>Add a plan, shared infrastructure, or change cost</summary>
+              <div class="field-grid compact-fields">
+                <label>
+                  <span>Baseline shared cost</span>
+                  <div class="input-prefix"><em>$</em><input id="baseline-shared" type="number" min="0" step="0.01" value="0" /></div>
+                </label>
+                <label>
+                  <span>Proposed shared cost</span>
+                  <div class="input-prefix"><em>$</em><input id="proposed-shared" type="number" min="0" step="0.01" value="0" /></div>
+                </label>
+                <label>
+                  <span>One time change cost</span>
+                  <div class="input-prefix"><em>$</em><input id="change-cost" type="number" min="0" step="0.01" value="0" /></div>
+                </label>
+              </div>
+              <div class="planning-inputs">
+                <div class="sample-intro">
+                  <strong>Optional plan and decision horizon</strong>
+                  <span>Fill every field below to add Plan vs Actual and time-based payback to the review.</span>
+                </div>
+                <div class="field-grid compact-fields">
+                  <label><span>Plan provider cost</span><div class="input-prefix"><em>$</em><input id="plan-provider-cost" type="number" min="0" step="0.01" /></div></label>
+                  <label><span>Plan shared cost</span><div class="input-prefix"><em>$</em><input id="plan-shared-cost" type="number" min="0" step="0.01" /></div></label>
+                  <label><span>Plan human cost</span><div class="input-prefix"><em>$</em><input id="plan-human-cost" type="number" min="0" step="0.01" /></div></label>
+                  <label><span>Plan results in period</span><input id="plan-results" type="number" min="1" step="1" /></label>
+                  <label><span>Plan ready result rate</span><div class="input-suffix"><input id="plan-ready-rate" type="number" min="0.1" max="100" step="0.1" /><em>%</em></div></label>
+                  <label><span>Expected ready results per month</span><input id="expected-ready-month" type="number" min="1" step="1" /></label>
+                  <label><span>Decision horizon</span><div class="input-suffix"><input id="decision-horizon" type="number" min="1" step="1" /><em>months</em></div></label>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
+        </div>
+
+        <div id="openai-builder-fields" hidden>
+          <div class="path-requirements">
+            <strong>What you need</strong>
+            <span>The Completions usage CSV and Cost CSV exported from the same date range in the OpenAI Usage dashboard.</span>
+          </div>
+          <section class="builder-step" aria-labelledby="openai-files-title">
+            <div class="step-number">01</div>
+            <div>
+              <h3 id="openai-files-title">Add the two saved OpenAI reports</h3>
+              <p>
+                Export completions usage and cost from the same date range in the OpenAI
+                Usage dashboard. Blank daily buckets are fine; the review checks the period.
+              </p>
+              <div class="file-pair">
+                <label>
+                  <span>Completions usage CSV</span>
+                  <input id="openai-usage-file" type="file" accept=".csv,text/csv" />
+                  <small id="openai-usage-file-name">Requests, models, projects, tokens, and cache fields.</small>
+                </label>
+                <label>
+                  <span>Cost CSV</span>
+                  <input id="openai-cost-file" type="file" accept=".csv,text/csv" />
+                  <small id="openai-cost-file-name">Provider reported organization cost.</small>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="builder-step openai-boundary-step" aria-labelledby="openai-boundary-title">
+            <div class="step-number">02</div>
+            <div>
+              <h3 id="openai-boundary-title">Keep the financial grain honest</h3>
+              <p>
+                This review will show the observed total bill and usage mix. It will not
+                manufacture cost by model or savings per outcome when the exports do not
+                contain those joins.
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <div class="builder-error" id="builder-error" role="alert"></div>
+        <div class="builder-actions" id="builder-actions" hidden>
+          <span id="builder-action-note"></span>
+          <button class="build-button" id="build-review" type="submit">Continue</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="lumen-dialog" id="lumen-dialog" aria-labelledby="lumen-dialog-title">
+      <div class="lumen-drawer">
+        <header>
+          <div>
+            <p class="kicker">LUMEN · GUIDED EXPLAINER</p>
+            <h2 id="lumen-dialog-title">Choose what you want explained.</h2>
+          </div>
+          <button class="dialog-close" id="close-lumen" type="button" aria-label="Close Lumen">Close</button>
+        </header>
+        <p class="lumen-boundary">This is a deterministic record explainer, not a general AI chat. Each question opens a tested finance explanation using exact values from the review in this browser. Your file is not uploaded.</p>
+        <div class="lumen-conversation" id="lumen-conversation" aria-live="polite"></div>
+        <div class="lumen-prompts" aria-label="Suggested questions">
+          <button type="button" data-lumen-question="why">Why isn't the cheaper route cheaper?</button>
+          <button type="button" data-lumen-question="changed">What changed?</button>
+          <button type="button" data-lumen-question="improve">What has to improve?</button>
+          <button type="button" data-lumen-question="evidence">What evidence is missing?</button>
+          <button type="button" data-lumen-question="cfo">Explain it for a CFO.</button>
+          <button type="button" data-lumen-question="plan">What happened versus plan?</button>
+          <button type="button" data-lumen-question="payback">Does the change pay back?</button>
+          <button type="button" data-lumen-question="challenge">Challenge the conclusion.</button>
+        </div>
+      </div>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>

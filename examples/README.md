@@ -16,6 +16,10 @@ ai-cost-lens ccac --demo --output ai-cost-result.json
 
 The usage and price-book files are synthetic and explicitly illustrative. The price book is not a representation of current provider pricing and cannot be used for a real-mode run. Real calculated analysis requires a user-supplied price book with `"mode": "real"`. Provider-reported values remain observed, while price-book-calculated values remain separate estimates.
 
+`outcome-log-template.csv` shows the small human evidence file used by `ai-cost-lens build-review`. Each row represents one completed result and records whether it was accepted, how many model requests and retry requests it required, and the human review and correction time. The included rows are illustrative only.
+
+`review-build-manifest-template.json` shows the explicit join between two OpenAI evidence inventories and their two outcome logs. Copy it beside those four files, replace the project, workload, cost, verifier, and policy declarations, and keep the same evidence mode across all inputs. The template is not runnable until its placeholder paths and project IDs are replaced.
+
 ## Legacy samples
 
 `openai-sample.csv`, `anthropic-sample.csv`, and `bedrock-sample.csv` exercise the legacy provider-shape detector:

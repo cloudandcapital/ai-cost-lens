@@ -1,0 +1,3 @@
+result_id,date,outcome_status,model_requests,retry_requests,human_review_minutes,correction_minutes
+illustrative-result-001,2026-08-01,ready_to_use,1,0,2.5,0
+illustrative-result-002,2026-08-01,needs_correction,2,1,4,3

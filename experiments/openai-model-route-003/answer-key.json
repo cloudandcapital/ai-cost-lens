@@ -1,0 +1,46 @@
+{
+  "schema_version": "ai-cost-lens-model-route-answer-key/2.0",
+  "experiment_id": "openai-model-route-003",
+  "answers": {
+    "accepted-result-reversal": {
+      "decision": "REJECT",
+      "metric_label": "proposed recurring cost per accepted result",
+      "metric_label_exact": true,
+      "metric_value": 2.2857,
+      "metric_unit": "USD_PER_ACCEPTED_RESULT",
+      "claim_states": {"provider_bill_lower": "VERIFIED_FACT", "proposed_recurring_cheaper": "CONTRADICTED"}
+    },
+    "allocated-vs-reported": {
+      "decision": "REJECT",
+      "metric_label": "token-share allocation to Route B",
+      "metric_label_exact": true,
+      "metric_value": 4800,
+      "metric_unit": "USD_ALLOCATED",
+      "claim_states": {"token_share": "VERIFIED_FACT", "reported_route_cost": "CONTRADICTED"}
+    },
+    "cache-share-boundary": {
+      "decision": "INVESTIGATE",
+      "metric_label": "bounded input cost reduction",
+      "metric_label_exact": true,
+      "metric_value": 49.4505,
+      "metric_unit": "PERCENT",
+      "claim_states": {"input_cost_reduction": "VERIFIED_FACT", "whole_workflow_reduction": "UNKNOWN"}
+    },
+    "break-even-yield": {
+      "decision": "REJECT",
+      "metric_label": "proposed break-even ready-result rate",
+      "metric_label_exact": true,
+      "metric_value": 72,
+      "metric_unit": "PERCENT",
+      "claim_states": {"recurring_total_lower": "VERIFIED_FACT", "proposed_unit_cheaper": "CONTRADICTED"}
+    },
+    "payback-horizon": {
+      "decision": "REJECT",
+      "metric_label": "migration payback period",
+      "metric_label_exact": true,
+      "metric_value": 6,
+      "metric_unit": "MONTHS",
+      "claim_states": {"monthly_cost_lower": "VERIFIED_FACT", "four_month_savings": "CONTRADICTED"}
+    }
+  }
+}

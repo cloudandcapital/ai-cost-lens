@@ -1,0 +1,56 @@
+{
+  "schema_version": "ai-cost-lens-model-route-cases/2.0",
+  "experiment_id": "openai-model-route-003",
+  "cases": [
+    {
+      "case_id": "accepted-result-reversal",
+      "decision_question": "Should finance approve the proposed route as cheaper on recurring cost per accepted result?",
+      "required_metric": {"label": "proposed recurring cost per accepted result", "unit": "USD_PER_ACCEPTED_RESULT", "nullable": false},
+      "situation": "Both routes attempt 1,000 jobs. The current route has $800 of provider cost, $200 of shared cost, 900 accepted results, and 4 hours of correction work at $60 per hour. The proposed route has $500 of provider cost, $200 of shared cost, 700 accepted results, and 15 hours of correction work at $60 per hour. All stated costs cover the same period and scope.",
+      "claims": [
+        {"claim_id": "provider_bill_lower", "text": "The proposed route has the lower provider bill."},
+        {"claim_id": "proposed_recurring_cheaper", "text": "The proposed route is cheaper after shared cost and required correction work are included."}
+      ]
+    },
+    {
+      "case_id": "allocated-vs-reported",
+      "decision_question": "Can finance describe $4,800 as Route B's provider-reported cost from the supplied evidence?",
+      "required_metric": {"label": "token-share allocation to Route B", "unit": "USD_ALLOCATED", "nullable": false},
+      "situation": "The organization received one $12,000 provider invoice. Usage telemetry attributes 60% of input and output tokens to Route A and 40% to Route B. The invoice also contains shared infrastructure, storage, and batch adjustments that are not assigned to either route. The team multiplies the total invoice by Route B's 40% token share and records $4,800. No provider-reported route-level cost is available.",
+      "claims": [
+        {"claim_id": "token_share", "text": "Route B represents 40% of the measured input and output tokens."},
+        {"claim_id": "reported_route_cost", "text": "$4,800 is Route B's provider-reported cost."}
+      ]
+    },
+    {
+      "case_id": "cache-share-boundary",
+      "decision_question": "Should finance approve a claim that the entire workflow became 49.5% cheaper?",
+      "required_metric": {"label": "bounded input cost reduction", "unit": "PERCENT", "nullable": false},
+      "situation": "A workload processes 1,000,000,000 input tokens in each period. Uncached input costs $2.00 per million tokens and cache reads cost $0.20 per million. Cache reads rise from 10% of input tokens to 60%. Cache-write charges, output, tools, retries, shared infrastructure, and human correction are not supplied. For this bounded comparison, treat the stated cache-read and uncached-input rates as the only input charges.",
+      "claims": [
+        {"claim_id": "input_cost_reduction", "text": "The bounded input charge falls from $1,820 to $920, a reduction of about 49.5%."},
+        {"claim_id": "whole_workflow_reduction", "text": "The entire workflow becomes 49.5% cheaper."}
+      ]
+    },
+    {
+      "case_id": "break-even-yield",
+      "decision_question": "Should finance approve the proposed route as cheaper at its observed ready-result rate?",
+      "required_metric": {"label": "proposed break-even ready-result rate", "unit": "PERCENT", "nullable": false},
+      "situation": "The current route costs $10,000 per period and produces 900 ready results from 1,000 attempts. The proposed route costs $8,000 per period and produces 680 ready results from 1,000 attempts. Both totals include provider, shared, and measured human correction cost on the same basis. No one-time change cost applies. Finance wants the proposed route's minimum ready-result rate needed to match the current route's cost per ready result.",
+      "claims": [
+        {"claim_id": "recurring_total_lower", "text": "The proposed route has the lower recurring total."},
+        {"claim_id": "proposed_unit_cheaper", "text": "At a 68% ready-result rate, the proposed route is cheaper per ready result."}
+      ]
+    },
+    {
+      "case_id": "payback-horizon",
+      "decision_question": "Should finance approve the migration as cheaper within the remaining four-month contract horizon?",
+      "required_metric": {"label": "migration payback period", "unit": "MONTHS", "nullable": false},
+      "situation": "The current route costs $50,000 per month. The proposed route costs $43,000 per month after all recurring provider, shared, and human costs. Migration requires $42,000 of one-time work. Quality, policy, and evidence gates pass, but only four months remain in the current contract horizon and there is no approved value beyond that date.",
+      "claims": [
+        {"claim_id": "monthly_cost_lower", "text": "The proposed route lowers recurring cost by $7,000 per month."},
+        {"claim_id": "four_month_savings", "text": "The migration is cheaper within the remaining four-month contract horizon."}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="AI Cost Lens compares model cost, correctness, review risk, and evidence before approving a finance route." />
+    <title>Model Route Decision | AI Cost Lens</title>
+    <link rel="stylesheet" href="model-route-decision.css" />
+  </head>
+  <body>
+    <div class="decision-shell">
+      <header class="masthead">
+        <a class="wordmark" href="index.html" aria-label="Open AI Cost Lens workload review">
+          <span>CLOUD &amp; CAPITAL</span><small>AI COST LENS</small>
+        </a>
+        <div class="header-context"><p>MODEL ROUTE DECISION</p><span aria-hidden="true"></span><p id="as-of-label"></p></div>
+        <div class="header-actions">
+          <button class="text-action" id="story-toggle" type="button">Story view</button>
+          <label class="file-action" for="decision-file">Open decision JSON</label>
+          <input id="decision-file" type="file" accept="application/json,.json" />
+        </div>
+      </header>
+
+      <nav class="section-nav" aria-label="Decision sections">
+        <a href="#decision">The decision</a><a href="#tradeoff">Cost and quality</a><a href="#risk">Where trust broke</a><a href="#evidence">Evidence check</a><a href="#next-test">Next test</a>
+      </nav>
+
+      <main>
+        <section class="decision-hero" id="decision" aria-labelledby="page-title">
+          <div class="hero-copy">
+            <div class="eyebrow-line"><p class="kicker">MODEL ROUTE DECISION</p><span class="mode-label" id="mode-label"></span></div>
+            <p class="decision-question" id="decision-question"></p>
+            <h1 id="page-title"></h1>
+            <p class="workload-copy" id="workload-copy"></p>
+          </div>
+          <article class="decision-panel" aria-labelledby="decision-label">
+            <div class="decision-panel-top"><p class="kicker inverse">APPROVAL</p><span class="decision-mark" aria-hidden="true">↙</span></div>
+            <h2 id="decision-label"></h2>
+            <p id="decision-reason"></p>
+            <div class="decision-states">
+              <div><span>Provider savings</span><strong id="provider-state"></strong></div>
+              <div><span>All-in savings</span><strong id="all-in-state"></strong></div>
+              <div><span>Drop-in replacement</span><strong id="replacement-state"></strong></div>
+            </div>
+          </article>
+        </section>
+
+        <section class="tradeoff-section" id="tradeoff" aria-labelledby="tradeoff-title">
+          <div class="section-heading">
+            <div><p class="kicker">THE TRADEOFF</p><h2 id="tradeoff-title">The provider bill was only one part of the decision.</h2></div>
+            <p id="comparison-limit"></p>
+          </div>
+          <div class="headline-ledger">
+            <article><span>PROVIDER BILL</span><strong id="headline-cost"></strong><p>for the same ten-case input workload</p></article>
+            <article><span>OBJECTIVE CORRECTNESS</span><strong id="headline-quality"></strong><p>against the locked answer key</p></article>
+          </div>
+          <div class="route-comparison" id="route-comparison"></div>
+        </section>
+
+        <section class="risk-section" id="risk" aria-labelledby="risk-title">
+          <div class="risk-intro">
+            <p class="kicker">WHERE TRUST BROKE</p>
+            <h2 id="risk-title">Two answers looked finished. Their own numbers did not agree.</h2>
+            <p>Structured output kept every response in the right shape. It did not make the financial record internally consistent.</p>
+          </div>
+          <div class="risk-ledger" id="risk-ledger"></div>
+        </section>
+
+        <section class="control-section" aria-labelledby="control-title">
+          <div><p class="kicker">WHAT THE PRODUCT SHOULD DO</p><h2 id="control-title">Do the math again before finance sees the answer.</h2></div>
+          <ol id="control-list"></ol>
+        </section>
+
+        <section class="evidence-section" id="evidence" aria-labelledby="evidence-title">
+          <div class="section-heading evidence-heading">
+            <div><p class="kicker">EVIDENCE CHECK</p><h2 id="evidence-title">What did this test actually prove?</h2></div>
+            <p>Each conclusion keeps its evidence state. A verified provider bill does not silently become verified total savings.</p>
+          </div>
+          <div class="evidence-ledger" id="evidence-ledger"></div>
+        </section>
+
+        <section class="next-test-section" id="next-test" aria-labelledby="next-test-title">
+          <div>
+            <p class="kicker">WHAT IS STILL MISSING</p>
+            <h2 id="next-test-title">One smaller test can answer the part we do not know yet.</h2>
+            <p id="next-test-question"></p>
+          </div>
+          <article>
+            <p id="next-test-copy"></p>
+            <ul id="next-test-metrics"></ul>
+            <strong id="next-test-cost"></strong>
+          </article>
+        </section>
+
+        <section class="method-section" aria-labelledby="method-title">
+          <div><p class="kicker">TEST CONDITIONS</p><h2 id="method-title">Small enough to inspect. Strict enough to learn from.</h2></div>
+          <ul id="condition-list"></ul>
+        </section>
+      </main>
+
+      <footer>
+        <div><span>CLOUD &amp; CAPITAL</span><p>AI Cost Lens · Model Route Decision</p></div>
+        <p id="source-line"></p>
+      </footer>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="data/model-route-decision-v1.js"></script>
+    <script src="model-route-decision.js"></script>
+  </body>
+</html>

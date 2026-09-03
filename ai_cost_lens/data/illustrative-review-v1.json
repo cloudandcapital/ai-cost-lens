@@ -1,0 +1,78 @@
+{
+  "schema_version": "ai-cost-lens-review/1.0",
+  "mode": "illustrative",
+  "currency": "USD",
+  "period": {"start": "2026-07-31", "end": "2026-08-31", "timezone": "UTC"},
+  "workload": {
+    "name": "Customer due diligence case summaries",
+    "description": "Synthetic bank-grade stress test. The provider bill falls, but more correction and escalation make each usable result cost more.",
+    "outcome_unit": "ready result",
+    "accepted_quality_threshold": 0.9
+  },
+  "planning": {
+    "label": "Approved plan for the current route",
+    "plan": {
+      "provider_cost": 95000,
+      "shared_infrastructure_cost": 25000,
+      "human_review_cost": 9000,
+      "completed_results": 1000,
+      "ready_result_rate": 0.92
+    },
+    "expected_ready_results_per_month": 940,
+    "decision_horizon_months": 12
+  },
+  "baseline": {
+    "id": "current-route",
+    "label": "Current route",
+    "model": {"provider": "Model API", "name": "Current reasoning model", "route": "Current production route"},
+    "costs": {"model_cost": 100000, "shared_infrastructure_cost": 25000, "human_review_cost": 9940, "one_time_change_cost": 0},
+    "usage": {"requests": 1000, "retries": 60, "unique_input_tokens": null, "processed_input_tokens": 120000000, "cached_input_tokens": 20000000, "cache_write_input_tokens": 0, "output_tokens": 8000000},
+    "outcomes": {
+      "basis": "illustrative",
+      "completed_results": 1000,
+      "usable_results": 940,
+      "status_counts": {"ready_to_use": 940, "needs_correction": 50, "needs_escalation": 10},
+      "human_review_minutes": 4970,
+      "verifier": "Synthetic independent quality review",
+      "acceptance_rule": "Accurate against the source record, evidence cited, and no material rewrite required"
+    },
+    "policy": {"approved": true, "retention_mode": "Approved in the synthetic scenario"},
+    "evidence": {
+      "cost_basis": "observed",
+      "outcome_basis": "illustrative",
+      "source": "Synthetic bank-grade decision case",
+      "observed_at": "2026-07-31",
+      "coverage": "Complete synthetic outcome log for the illustrative period",
+      "coverage_status": "illustrative",
+      "reconciliation_issues": [],
+      "cost_boundary": "provider cost + shared infrastructure + human review and correction"
+    }
+  },
+  "proposed": {
+    "id": "proposed-route",
+    "label": "Proposed route",
+    "model": {"provider": "Model API", "name": "Smaller routed model", "route": "Proposed production route"},
+    "costs": {"model_cost": 35000, "shared_infrastructure_cost": 25000, "human_review_cost": 52800, "one_time_change_cost": 0},
+    "usage": {"requests": 1000, "retries": 250, "unique_input_tokens": null, "processed_input_tokens": 105000000, "cached_input_tokens": 50000000, "cache_write_input_tokens": 0, "output_tokens": 7000000},
+    "outcomes": {
+      "basis": "illustrative",
+      "completed_results": 1000,
+      "usable_results": 750,
+      "status_counts": {"ready_to_use": 750, "needs_correction": 180, "needs_escalation": 70},
+      "human_review_minutes": 26400,
+      "verifier": "Synthetic independent quality review",
+      "acceptance_rule": "Accurate against the source record, evidence cited, and no material rewrite required"
+    },
+    "policy": {"approved": true, "retention_mode": "Approved in the synthetic scenario"},
+    "evidence": {
+      "cost_basis": "observed",
+      "outcome_basis": "illustrative",
+      "source": "Synthetic bank-grade decision case",
+      "observed_at": "2026-08-31",
+      "coverage": "Complete synthetic outcome log for the illustrative period",
+      "coverage_status": "illustrative",
+      "reconciliation_issues": [],
+      "cost_boundary": "provider cost + shared infrastructure + human review and correction"
+    }
+  }
+}

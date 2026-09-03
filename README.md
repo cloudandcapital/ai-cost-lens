@@ -1,12 +1,14 @@
 # AI Cost Lens
 
-AI Cost Lens is an open-source, file-first AI usage cost analyzer. It separates provider-reported cost from independently calculated token cost, preserves pricing provenance, attributes usage to organizational dimensions, and emits a versioned Cloud & Capital Analysis Contract result.
+AI Cost Lens is a free, open-source financial review layer for AI work. It helps a finance, FinOps, or operating team understand what the work cost, why the cost moved, whether the result was usable, and what evidence is still missing.
+
+The strict file-first engine separates provider-reported cost from independently calculated token cost, preserves pricing provenance, attributes usage to organizational dimensions, and emits a versioned Cloud & Capital Analysis Contract result. The Workload Review adds outcome, behavior, human review, policy, and change-cost evidence so two setups can be compared on cost per usable result rather than total spend alone.
 
 For the complete six-tool demo and roadmap, see [Tech Spend Command Center](https://github.com/cloudandcapital/tech-spend-command-center).
 
-It does not connect to provider APIs, fetch live prices, certify invoices, or identify redundant models from names alone. Its canonical result now feeds the validated illustrative pipeline; Cloud Cost Guard itself remains unchanged.
+It does not connect to provider APIs, fetch live prices, certify invoices, enforce production budgets, or identify redundant models from names alone. Review files stay local. The browser interface does not upload them. The OpenAI importer reads response files that the user saved locally; it never receives an Admin API key.
 
-## What v0.2 supports
+## What current main supports
 
 - Strict `ai-cost-lens/2.0` canonical CSV input
 - Provider, model, project, team, environment, and task allocation
@@ -20,6 +22,20 @@ It does not connect to provider APIs, fetch live prices, certify invoices, or id
 - Explicit Bedrock/cloud-billing overlap protection
 - Unattributed AI cost findings that are never called savings
 - Reconciled `ccac/1.0.0` output by default, with explicit `ccac/1.1.0` direct-AI scope output
+- Evidence-aware workload reviews with baseline and proposed setups
+- Model, shared infrastructure, human review, and one-time change cost
+- Usable-result, retry, cache-reuse, and human-review measures
+- Optional Plan vs Actual for provider cost, shared cost, human work, output, yield, and unit cost
+- Time-based payback against an explicit monthly ready result volume and decision horizon
+- A fail-closed savings gate that requires real evidence, equivalent work, and compatible cost bases
+- A local browser interface with a three-path start, Review, Bill, Evidence, and Share views
+- A printable finance memo generated from the same decision record as the on-screen review
+- A portable `ai-cost-lens-decision-record/0.1` contract with a strict first
+  `model_route/0.1` profile
+- Deterministic decision validation that recomputes route arithmetic, checks
+  evidence references, and blocks unsupported all-in savings or route changes
+- A strict OpenAI evidence importer for saved organization completions usage and cost API responses
+- Visible pagination, period, attribution, and model-cost join limitations
 
 The public demo is credential-free and uses entirely illustrative data.
 
@@ -61,7 +77,126 @@ The 1.1 public scenario explicitly classifies OpenAI and Anthropic usage as `dir
 
 The deterministic demo uses the same parser, price calculator, reconciliation, and CCAC producer as local user files.
 
+## OpenAI saved-export bill review
+
+Use the same date range for the completions-usage and cost CSV exports:
+
+```bash
+ai-cost-lens review-openai-csv \
+  --usage completions_usage.csv \
+  --costs cost.csv \
+  --mode real \
+  --output openai-bill-review.json
+```
+
+This path reconciles the provider total and usage mix without inventing billed
+cost by model. Cost per usable result and savings remain unavailable until a
+workload outcome record is added. See the
+[saved-export runbook](docs/openai-saved-export-runbook.md).
+
+## Workload Review
+
+The current finance-first wedge has been stress-tested with four fully
+synthetic enterprise cases. See the
+[bank-grade acceptance test](docs/bank-grade-acceptance-test-2026-09-02.md)
+for the decision logic, results, and remaining limits.
+
+Generate the deterministic illustrative decision record:
+
+```bash
+ai-cost-lens review --demo --output workload-review.json
+```
+
+The review compares a current support workflow with a routed alternative. It includes recurring model cost, shared infrastructure, human review, a one-time change cost, retries, cache reuse, an explicit usable-result definition, policy status, evidence basis, Plan vs Actual, and a time-based decision horizon.
+
+The demo is a synthetic false-economy stress test. Its provider bill falls, but the ready result yield and human work move enough to make each usable result more expensive. Every synthetic input is labeled illustrative and no result is presented as customer evidence.
+
+To open the browser interface from a clone:
+
+```bash
+python -m http.server 8000 --directory web
+```
+
+Then open `http://localhost:8000`. Choose **See the worked example**, **Check an OpenAI bill**, or **Test a model or route change**. Use **Open saved review** to inspect another `ai-cost-lens-review-result/1.0` file. The file is parsed in the browser and is not uploaded. **Print finance memo** creates a compact handoff from the same decision record; the browser's print dialog can save it as a PDF.
+
+The OpenAI CSV path is a convenience importer, not the boundary of the tool. Claude, Bedrock, Gemini, gateways, and other AI tools use the universal spend and outcome templates for provider-neutral comparisons.
+
+See the [product brief](docs/product-brief.md), [competitive landscape](docs/competitive-landscape.md), and [web interface notes](web/README.md) for the design and evidence model.
+
+## Decision Record 0.1
+
+Validate the bundled Sol-versus-Luna finance decision:
+
+```bash
+ai-cost-lens validate-decision \
+  --input examples/decision-records/openai-model-route-002.json
+```
+
+The record keeps provider cost, objective correctness, human-review evidence,
+and all-in economics separate. It refuses a `CHANGE_ROUTE` conclusion until
+equivalent work, compatible cost bases, an accepted outcome definition, and
+valid human cost all pass. See the
+[Decision Record 0.1 contract](docs/decision-record-0.1.md).
+
 ## Analyze local usage
+
+### Inventory official OpenAI evidence
+
+Save complete responses from OpenAI's organization completions usage and costs endpoints, then run:
+
+```bash
+ai-cost-lens import-openai \
+  --usage openai-usage.json \
+  --costs openai-costs.json \
+  --mode real \
+  --output openai-evidence.json
+```
+
+The importer preserves uncached input, cache reads, cache writes, output tokens, requests, provider-reported cost, source hashes, and attribution coverage. It fails if a supplied response still has another page. `--mode` is an explicit user declaration; it does not authenticate the file or certify an invoice. OpenAI's cost endpoint does not group observed dollars directly by model, so AI Cost Lens does not manufacture model-level billed cost. The output is an evidence inventory, not yet a Workload Review or savings claim.
+
+The parser is tested against the documented response contract. A sanitized response from a real organization is still required before raw-provider compatibility is described as production validated.
+
+Use the [real OpenAI evidence pilot](docs/real-openai-evidence-pilot.md) to capture one complete UTC day, sanitize private identifiers locally, and run the first provider-compatibility check. ChatGPT subscription activity is not OpenAI API organization evidence, and the Admin API key must never be shared with AI Cost Lens.
+
+The locked [OpenAI model route pilot](experiments/openai-model-route-002/README.md) compares the same ten bounded AI finance decisions on Sol and Luna. It preserves requests, responses, token usage, exact scoring, and a separate human outcome log, with no automatic retries or model-only acceptance claim. Pilot 001 is retained as an audit of how an ambiguous rubric produced a misleading score.
+
+### Join cost to a usable result
+
+Provider reporting can establish usage and billed cost. It cannot establish that the work was ready, how much correction it required, or who verified it. AI Cost Lens supports two local outcome paths. The quick path extrapolates a visibly labeled estimate from reviewed sample counts and human minutes. The detailed path uses a minimum four-column log:
+
+```csv
+period,result_id,outcome_status,human_minutes
+baseline,result-001,ready_to_use,2.5
+baseline,result-002,needs_correction,7.0
+```
+
+Use `ready_to_use`, `needs_correction`, or `needs_escalation`. Older logs with an
+`accepted` boolean and the earlier detailed columns remain supported. Dates,
+workload, request counts, retries, and separate review/correction minutes are
+optional evidence. A sampled result never becomes a proven savings claim. A
+browser spend template also requires `cost_basis` on every row. Use
+`provider_reported`, `calculated`, or `allocated`; each route must use one basis.
+Calculated and allocated route costs remain test evidence and cannot be presented
+as booked savings until provider-reported spend confirms the comparison. A
+versioned `ai-cost-lens-review-build/1.0`
+manifest points to baseline and proposed provider-evidence files and outcome
+logs. It also declares the project scope, cost boundary, hourly review rate,
+shared infrastructure, one-time change cost, acceptance rule, verifier, and
+policy status. An optional `planning` block adds the approved current-route
+plan, expected monthly ready result volume, and decision horizon. Build the
+review with:
+
+```bash
+ai-cost-lens build-review \
+  --manifest review-build.json \
+  --output workload-review.json
+```
+
+The first bridge supports OpenAI evidence and requires the cost boundary to be declared as `all_project_provider_cost`. It calculates human cost from review plus correction minutes. A request mismatch, period mismatch, unattributed model, partial evidence, or policy failure stays visible and blocks a savings claim. OpenAI does not report unique repeated context in the organization usage response, so AI Cost Lens leaves the context-reprocessing measure unavailable instead of estimating it.
+
+Start from [`examples/review-build-manifest-template.json`](examples/review-build-manifest-template.json) and [`examples/outcome-log-template.csv`](examples/outcome-log-template.csv). The manifest is intentionally explicit: it cannot infer that two files describe equivalent work, that a human accepted the result, or that the selected project is the correct accounting boundary.
+
+### Produce the canonical CCAC analysis
 
 ```bash
 ai-cost-lens ccac \
@@ -106,7 +241,7 @@ Prices are supplied by the user because provider rates, model names, regions, ti
 - Bedrock usage may already exist in FinOps Lite’s AWS cost total. Its dimensions explicitly declare potential overlap so Command Center must reconcile it before aggregation.
 - Unattributed project/team cost is an allocation finding, not an optimization opportunity.
 
-AI Cost Lens emits no remediation commands or savings opportunities in v0.2.
+AI Cost Lens emits no remediation commands. Workload Review only permits a savings claim when the declared comparison uses real data, compatible cost bases, an accepted outcome definition, adequate quality, and approved policy status.
 
 ## Legacy compatibility
 

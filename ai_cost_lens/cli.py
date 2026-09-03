@@ -1,4 +1,4 @@
-"""AI Cost Lens CLI — FOCUS-style cost analysis for OpenAI, Anthropic, and AWS Bedrock."""
+"""AI Cost Lens CLI — provider-neutral AI cost and decision analysis."""
 
 from __future__ import annotations
 
@@ -15,7 +15,16 @@ import click
 from . import __version__
 from .canonical import CanonicalError
 from .ccac import build_result as build_ccac_result
+from .decision_record import DecisionRecordError, load_decision_record
+from .importers.openai import OpenAIImportError, build_openai_evidence
+from .importers.openai_csv import (
+    OpenAICsvImportError,
+    build_openai_csv_bill_review,
+)
 from .providers.detector import FocusRecord, load_and_normalize
+from .review import ReviewError, build_review, load_review
+from .review_builder import ReviewBuildError, build_review_from_manifest
+from .sanitize import OpenAISanitizeError, sanitize_openai_bundle
 
 SCHEMA_VERSION = "1.0"
 EXIT_SUCCESS = 0
@@ -36,7 +45,7 @@ class SchemaDataError(Exception):
 @click.group()
 @click.version_option(version=__version__, prog_name="ai-cost-lens")
 def cli() -> None:
-    """AI Cost Lens — FOCUS-style cost analysis for OpenAI, Anthropic, and AWS Bedrock."""
+    """AI Cost Lens — provider-neutral AI cost and decision analysis."""
 
 
 @cli.command("ccac")
@@ -116,6 +125,214 @@ def ccac_command(
     else:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(rendered, encoding="utf-8")
+
+
+@cli.command("review")
+@click.option(
+    "--input",
+    "input_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    help="Evidence-aware ai-cost-lens-review/1.0 JSON declaration.",
+)
+@click.option(
+    "--demo", is_flag=True, help="Use the deterministic illustrative workload review."
+)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path, dir_okay=False),
+    help="Write review result JSON instead of stdout.",
+)
+def review_command(input_path: Path | None, demo: bool, output: Path | None) -> None:
+    """Compare workload economics using cost, behavior, outcome, and policy evidence."""
+    if demo and input_path is not None or not demo and input_path is None:
+        raise click.UsageError("provide either --demo or --input")
+    if demo:
+        input_path = (
+            Path(__file__).resolve().parent / "data" / "illustrative-review-v1.json"
+        )
+    try:
+        payload = build_review(load_review(input_path))  # type: ignore[arg-type]
+    except ReviewError as exc:
+        raise click.ClickException(str(exc)) from exc
+    rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    if output is None:
+        click.echo(rendered, nl=False)
+    else:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered, encoding="utf-8")
+
+
+@cli.command("import-openai")
+@click.option(
+    "--usage",
+    "usage_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="Saved OpenAI organization completions usage JSON response.",
+)
+@click.option(
+    "--costs",
+    "cost_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="Saved OpenAI organization costs JSON response.",
+)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path, dir_okay=False),
+    help="Write provider evidence JSON instead of stdout.",
+)
+@click.option(
+    "--mode",
+    type=click.Choice(["illustrative", "real"]),
+    required=True,
+    help="Declare whether the saved API responses are illustrative or real evidence.",
+)
+def import_openai_command(
+    usage_path: Path, cost_path: Path, output: Path | None, mode: str
+) -> None:
+    """Inventory official OpenAI usage and cost evidence without inventing joins."""
+    try:
+        payload = build_openai_evidence(usage_path, cost_path, mode=mode)
+    except OpenAIImportError as exc:
+        raise click.ClickException(str(exc)) from exc
+    rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    if output is None:
+        click.echo(rendered, nl=False)
+    else:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered, encoding="utf-8")
+
+
+@cli.command("review-openai-csv")
+@click.option(
+    "--usage",
+    "usage_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="Saved OpenAI Usage dashboard completions CSV.",
+)
+@click.option(
+    "--costs",
+    "cost_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="Saved OpenAI Usage dashboard cost CSV.",
+)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path, dir_okay=False),
+    help="Write bill-review JSON instead of stdout.",
+)
+@click.option(
+    "--mode",
+    type=click.Choice(["illustrative", "real"]),
+    default="real",
+    show_default=True,
+)
+def review_openai_csv_command(
+    usage_path: Path, cost_path: Path, output: Path | None, mode: str
+) -> None:
+    """Review saved OpenAI dashboard exports without inventing cost allocation."""
+    try:
+        payload = build_openai_csv_bill_review(usage_path, cost_path, mode=mode)
+    except OpenAICsvImportError as exc:
+        raise click.ClickException(str(exc)) from exc
+    rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    if output is None:
+        click.echo(rendered, nl=False)
+    else:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered, encoding="utf-8")
+
+
+@cli.command("sanitize-openai")
+@click.option(
+    "--usage",
+    "usage_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="Saved OpenAI organization completions usage JSON response.",
+)
+@click.option(
+    "--costs",
+    "cost_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="Saved OpenAI organization costs JSON response.",
+)
+@click.option(
+    "--output-dir",
+    type=click.Path(path_type=Path, file_okay=False),
+    required=True,
+    help="Create a new directory containing sanitized response copies.",
+)
+def sanitize_openai_command(
+    usage_path: Path, cost_path: Path, output_dir: Path
+) -> None:
+    """Replace private identifiers while preserving financial evidence."""
+    try:
+        report = sanitize_openai_bundle(usage_path, cost_path, output_dir)
+    except OpenAISanitizeError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(report, indent=2, sort_keys=True))
+
+
+@cli.command("build-review")
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="Review build manifest joining provider evidence and outcome logs.",
+)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path, dir_okay=False),
+    help="Write Workload Review result JSON instead of stdout.",
+)
+def build_review_command(manifest_path: Path, output: Path | None) -> None:
+    """Join provider, cost, and human outcome evidence into a Workload Review."""
+    try:
+        payload = build_review_from_manifest(manifest_path)
+    except ReviewBuildError as exc:
+        raise click.ClickException(str(exc)) from exc
+    rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    if output is None:
+        click.echo(rendered, nl=False)
+    else:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered, encoding="utf-8")
+
+
+@cli.command("validate-decision")
+@click.option(
+    "--input",
+    "input_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="Portable ai-cost-lens-decision-record/0.1 JSON file.",
+)
+def validate_decision_command(input_path: Path) -> None:
+    """Validate the arithmetic, evidence references, and blocked claims in a decision record."""
+
+    try:
+        payload = load_decision_record(input_path)
+    except DecisionRecordError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        json.dumps(
+            {
+                "decision_id": payload["decision_id"],
+                "decision": payload["decision"]["code"],
+                "record_profile": payload["record_profile"],
+                "schema_version": payload["schema_version"],
+                "status": "valid",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------

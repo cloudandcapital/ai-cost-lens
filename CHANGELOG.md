@@ -2,12 +2,35 @@
 
 All notable changes to AI Cost Lens are documented here.
 
-## [0.3.0] — unreleased
+## [0.3.0] — 2026-09-03
 
 ### Added
 - Explicit `ccac/1.1.0` selection with one canonical direct-AI technology-spend scope.
 - Separate versioned usage, pricing, and analysis declarations for billing provenance, net-cost basis, period, and completeness.
 - Fail-closed separation of direct AI-vendor billing from provider-billed native AI.
+- An `ai-cost-lens review` command that joins cost, usage behavior, outcome, human review, policy, and change-cost evidence.
+- Cost per usable result, usable-result rate, retry rate, cache-reuse rate, normalized comparison, and modeled payback calculations.
+- A savings-claim gate that requires real mode, compatible cost bases, quality, and policy evidence.
+- A local, static Workload Review interface with Operator and Story views.
+- Product positioning and primary-source competitive research for the financial-review layer.
+- A local OpenAI Admin API evidence importer for saved organization completions usage and cost responses.
+- Separate cache-write token evidence plus pagination, period, attribution, and model-cost reconciliation limits.
+- Explicit documented-schema coverage that remains unvalidated against a sanitized real-organization response.
+- A versioned outcome log and review-build manifest that join provider evidence to accepted results, retries, review time, and correction time.
+- Coverage-aware savings gates plus an Evidence Check that keeps request, period, attribution, and cost-basis gaps visible.
+- A local OpenAI response sanitizer and bounded real-evidence pilot that preserve financial fields while replacing private identifiers.
+- A screenshot ready cost of one ready result view that joins model, shared,
+  and human cost to the work that cleared the quality bar.
+- Three-state outcome yield (`ready_to_use`, `needs_correction`, and
+  `needs_escalation`) with backward compatibility for boolean accepted logs.
+- A finance-first product wedge and evidence-backed boundary separating AI Cost
+  Lens from provider dashboards, gateways, observability, and generic price
+  calculators.
+- Four synthetic enterprise decision cases covering a false economy, true
+  savings, a policy gate, and a weak sample.
+- Separate policy approval for the current and proposed routes, plus explicit
+  failed-gate and leave-it-alone explanations.
+- A bank-grade acceptance report and repeatable decision-engine tests.
 
 ### Compatibility
 - Default and explicit `ccac/1.0.0` demo artifacts remain byte-identical to the 0.2.0 baseline.

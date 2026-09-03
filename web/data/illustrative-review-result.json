@@ -1,0 +1,225 @@
+{
+  "schema_version": "ai-cost-lens-review-result/1.0",
+  "mode": "illustrative",
+  "currency": "USD",
+  "period": {
+    "start": "2026-07-31",
+    "end": "2026-08-31",
+    "timezone": "UTC"
+  },
+  "workload": {
+    "name": "Customer due diligence case summaries",
+    "description": "Synthetic bank-grade stress test. The provider bill falls, but more correction and escalation make each usable result cost more.",
+    "outcome_unit": "ready result",
+    "accepted_quality_threshold": 0.9
+  },
+  "baseline": {
+    "id": "current-route",
+    "label": "Current route",
+    "model": {
+      "provider": "Model API",
+      "name": "Current reasoning model",
+      "route": "Current production route"
+    },
+    "costs": {
+      "model_cost": 100000.0,
+      "shared_infrastructure_cost": 25000.0,
+      "human_review_cost": 9940.0,
+      "one_time_change_cost": 0.0,
+      "recurring_operating_cost": 134940.0,
+      "all_in_pilot_cost": 134940.0
+    },
+    "usage": {
+      "requests": 1000,
+      "retries": 60,
+      "unique_input_tokens": null,
+      "processed_input_tokens": 120000000,
+      "cached_input_tokens": 20000000,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 8000000
+    },
+    "outcomes": {
+      "basis": "illustrative",
+      "completed_results": 1000,
+      "usable_results": 940,
+      "status_counts": {
+        "ready_to_use": 940,
+        "needs_correction": 50,
+        "needs_escalation": 10
+      },
+      "human_review_minutes": 4970.0,
+      "review_minutes": 4970.0,
+      "correction_minutes": 0.0,
+      "verifier": "Synthetic independent quality review",
+      "acceptance_rule": "Accurate against the source record, evidence cited, and no material rewrite required"
+    },
+    "policy": {
+      "approved": true,
+      "retention_mode": "Approved in the synthetic scenario"
+    },
+    "evidence": {
+      "cost_basis": "observed",
+      "outcome_basis": "illustrative",
+      "source": "Synthetic bank-grade decision case",
+      "observed_at": "2026-07-31",
+      "coverage": "Complete synthetic outcome log for the illustrative period",
+      "coverage_status": "illustrative",
+      "reconciliation_issues": [],
+      "cost_boundary": "provider cost + shared infrastructure + human review and correction",
+      "provider_usage_sha256": null,
+      "provider_cost_sha256": null,
+      "outcome_log_sha256": null
+    },
+    "measures": {
+      "cost_per_usable_result": 143.553191,
+      "all_in_cost_per_usable_result": 143.553191,
+      "usable_result_rate": 0.94,
+      "retry_rate": 0.06,
+      "cache_reuse_rate": 0.166667,
+      "cache_write_rate": 0.0,
+      "context_reprocessing_ratio": null,
+      "human_review_minutes_per_usable_result": 5.287234
+    }
+  },
+  "proposed": {
+    "id": "proposed-route",
+    "label": "Proposed route",
+    "model": {
+      "provider": "Model API",
+      "name": "Smaller routed model",
+      "route": "Proposed production route"
+    },
+    "costs": {
+      "model_cost": 35000.0,
+      "shared_infrastructure_cost": 25000.0,
+      "human_review_cost": 52800.0,
+      "one_time_change_cost": 0.0,
+      "recurring_operating_cost": 112800.0,
+      "all_in_pilot_cost": 112800.0
+    },
+    "usage": {
+      "requests": 1000,
+      "retries": 250,
+      "unique_input_tokens": null,
+      "processed_input_tokens": 105000000,
+      "cached_input_tokens": 50000000,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 7000000
+    },
+    "outcomes": {
+      "basis": "illustrative",
+      "completed_results": 1000,
+      "usable_results": 750,
+      "status_counts": {
+        "ready_to_use": 750,
+        "needs_correction": 180,
+        "needs_escalation": 70
+      },
+      "human_review_minutes": 26400.0,
+      "review_minutes": 26400.0,
+      "correction_minutes": 0.0,
+      "verifier": "Synthetic independent quality review",
+      "acceptance_rule": "Accurate against the source record, evidence cited, and no material rewrite required"
+    },
+    "policy": {
+      "approved": true,
+      "retention_mode": "Approved in the synthetic scenario"
+    },
+    "evidence": {
+      "cost_basis": "observed",
+      "outcome_basis": "illustrative",
+      "source": "Synthetic bank-grade decision case",
+      "observed_at": "2026-08-31",
+      "coverage": "Complete synthetic outcome log for the illustrative period",
+      "coverage_status": "illustrative",
+      "reconciliation_issues": [],
+      "cost_boundary": "provider cost + shared infrastructure + human review and correction",
+      "provider_usage_sha256": null,
+      "provider_cost_sha256": null,
+      "outcome_log_sha256": null
+    },
+    "measures": {
+      "cost_per_usable_result": 150.4,
+      "all_in_cost_per_usable_result": 150.4,
+      "usable_result_rate": 0.75,
+      "retry_rate": 0.25,
+      "cache_reuse_rate": 0.47619,
+      "cache_write_rate": 0.0,
+      "context_reprocessing_ratio": null,
+      "human_review_minutes_per_usable_result": 35.2
+    }
+  },
+  "comparison": {
+    "status": "no_modeled_improvement",
+    "finding": "The proposed route does not lower recurring cost per ready result under the declared assumptions.",
+    "limitation": "This is a synthetic stress test, not bank or customer data. It demonstrates the decision logic; no savings or performance claim extends beyond these inputs.",
+    "recommendation": "Leave the current route in place. The cheaper model bill does not offset the lower ready result yield and additional human work.",
+    "savings_claim_allowed": false,
+    "same_cost_basis": true,
+    "provider_cost_reported": true,
+    "quality_holds": false,
+    "both_policy_approved": true,
+    "evidence_complete": false,
+    "recurring_cost_difference": -22140.0,
+    "cost_per_usable_result_difference": 6.846809,
+    "cost_per_usable_result_change_pct": 4.8,
+    "usable_result_rate_change_points": -19.0,
+    "normalized_proposed_cost_at_baseline_volume": 141376.0,
+    "normalized_cost_difference": 6436.0,
+    "payback_usable_results": null
+  },
+  "planning": {
+    "label": "Approved plan for the current route",
+    "plan": {
+      "provider_cost": 95000.0,
+      "shared_infrastructure_cost": 25000.0,
+      "human_review_cost": 9000.0,
+      "recurring_operating_cost": 129000.0,
+      "completed_results": 1000,
+      "ready_result_rate": 0.92,
+      "ready_results": 920.0,
+      "cost_per_ready_result": 140.217391
+    },
+    "actual": {
+      "provider_cost": 100000.0,
+      "shared_infrastructure_cost": 25000.0,
+      "human_review_cost": 9940.0,
+      "recurring_operating_cost": 134940.0,
+      "completed_results": 1000,
+      "ready_result_rate": 0.94,
+      "ready_results": 940.0,
+      "cost_per_ready_result": 143.553191
+    },
+    "variance": {
+      "provider_cost": 5000.0,
+      "shared_infrastructure_cost": 0.0,
+      "human_review_cost": 940.0,
+      "recurring_operating_cost": 5940.0,
+      "ready_results": 20.0,
+      "ready_result_rate_points": 2.0,
+      "cost_per_ready_result": 3.3358,
+      "primary_cost_drivers": [
+        {
+          "label": "Provider cost",
+          "amount": 5000.0,
+          "direction": "unfavorable"
+        },
+        {
+          "label": "Human review and correction",
+          "amount": 940.0,
+          "direction": "unfavorable"
+        }
+      ]
+    },
+    "payback": {
+      "expected_ready_results_per_month": 940,
+      "decision_horizon_months": 12,
+      "monthly_operating_savings": -6436.00046,
+      "one_time_change_cost": 0.0,
+      "payback_months": null,
+      "within_decision_horizon": false,
+      "horizon_net_savings": -77232.00552,
+      "status": "no_operating_payback"
+    }
+  }
+}

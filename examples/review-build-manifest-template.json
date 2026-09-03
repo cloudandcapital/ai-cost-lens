@@ -1,0 +1,71 @@
+{
+  "schema_version": "ai-cost-lens-review-build/1.0",
+  "mode": "real",
+  "currency": "USD",
+  "workload": {
+    "name": "Support response drafting",
+    "description": "Draft one support response for a human reviewer to accept or reject.",
+    "outcome_unit": "usable result",
+    "accepted_quality_threshold": 0.8
+  },
+  "planning": {
+    "label": "Approved plan for the current route",
+    "plan": {
+      "provider_cost": 1000,
+      "shared_infrastructure_cost": 250,
+      "human_review_cost": 300,
+      "completed_results": 100,
+      "ready_result_rate": 0.9
+    },
+    "expected_ready_results_per_month": 90,
+    "decision_horizon_months": 12
+  },
+  "baseline": {
+    "id": "baseline",
+    "label": "Current workflow",
+    "provider_evidence": "baseline-openai-evidence.json",
+    "outcome_log": "baseline-outcomes.csv",
+    "scope": {
+      "project": "replace-with-openai-project-id",
+      "cost_boundary": "all_project_provider_cost"
+    },
+    "model": {
+      "route": "Describe the current model route"
+    },
+    "costs": {
+      "shared_infrastructure_cost": 0,
+      "human_hourly_rate": 50,
+      "one_time_change_cost": 0
+    },
+    "verifier": "Named human review role",
+    "acceptance_rule": "Accepted without a material factual or policy correction",
+    "policy": {
+      "approved": true,
+      "retention_mode": "Describe the approved data-retention mode"
+    }
+  },
+  "proposed": {
+    "id": "proposed",
+    "label": "Proposed workflow",
+    "provider_evidence": "proposed-openai-evidence.json",
+    "outcome_log": "proposed-outcomes.csv",
+    "scope": {
+      "project": "replace-with-openai-project-id",
+      "cost_boundary": "all_project_provider_cost"
+    },
+    "model": {
+      "route": "Describe the proposed model route"
+    },
+    "costs": {
+      "shared_infrastructure_cost": 0,
+      "human_hourly_rate": 50,
+      "one_time_change_cost": 0
+    },
+    "verifier": "Named human review role",
+    "acceptance_rule": "Accepted without a material factual or policy correction",
+    "policy": {
+      "approved": true,
+      "retention_mode": "Describe the approved data-retention mode"
+    }
+  }
+}

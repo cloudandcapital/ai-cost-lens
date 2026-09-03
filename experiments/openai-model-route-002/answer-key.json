@@ -1,0 +1,86 @@
+{
+  "schema_version": "ai-cost-lens-model-route-answer-key/2.0",
+  "experiment_id": "openai-model-route-002",
+  "answers": {
+    "rate-vs-tokenizer": {
+      "decision": "INVESTIGATE",
+      "metric_label": "candidate input cost for the equivalent workload",
+      "metric_label_exact": true,
+      "metric_value": 2.6,
+      "metric_unit": "USD_PER_WORKLOAD",
+      "claim_states": {"lower_rate": "VERIFIED_FACT", "one_third_all_in_savings": "UNKNOWN"}
+    },
+    "cache-reuse": {
+      "decision": "INVESTIGATE",
+      "metric_label": "bounded repeated-input cost reduction",
+      "metric_label_exact": true,
+      "metric_value": 32.5,
+      "metric_unit": "PERCENT",
+      "claim_states": {"bounded_reduction": "VERIFIED_FACT", "whole_workflow_reduction": "UNKNOWN"}
+    },
+    "action-vs-outcome": {
+      "decision": "REJECT",
+      "metric_label": "action charge at the historical average actions per resolution",
+      "metric_label_exact": true,
+      "metric_value": 0.3,
+      "metric_unit": "USD_PER_HISTORICAL_RESOLUTION",
+      "claim_states": {"vendor_outcome_language": "COMPANY_CLAIM", "action_equals_resolution": "CONTRADICTED"}
+    },
+    "commitment-exposure": {
+      "decision": "REJECT",
+      "metric_label": "commitment premium over current on-demand cost",
+      "metric_label_exact": true,
+      "metric_value": 2000,
+      "metric_unit": "USD_PER_MONTH",
+      "claim_states": {"discount_exists": "VERIFIED_FACT", "commitment_still_saves": "CONTRADICTED"}
+    },
+    "cap-vs-value": {
+      "decision": "INVESTIGATE",
+      "metric_label": "recurring cost per accepted result",
+      "metric_label_exact": true,
+      "metric_value": 46.6667,
+      "metric_unit": "USD_PER_ACCEPTED_RESULT",
+      "claim_states": {"under_cap": "VERIFIED_FACT", "work_was_worth_running": "UNKNOWN"}
+    },
+    "retention-gate": {
+      "decision": "REJECT",
+      "metric_label": "retention period above the policy allowance",
+      "metric_label_exact": true,
+      "metric_value": 30,
+      "metric_unit": "DAYS",
+      "claim_states": {"rate_lower": "VERIFIED_FACT", "policy_eligible": "CONTRADICTED"}
+    },
+    "benchmark-scope": {
+      "decision": "INVESTIGATE",
+      "metric_label": "target-to-benchmark input-token ratio",
+      "metric_label_exact": true,
+      "metric_value": 15,
+      "metric_unit": "MULTIPLIER",
+      "claim_states": {"vendor_result": "COMPANY_CLAIM", "target_result": "UNKNOWN"}
+    },
+    "human-cost-reversal": {
+      "decision": "REJECT",
+      "metric_label": "Route A recurring cost premium for 100 accepted results",
+      "metric_label_exact": true,
+      "metric_value": 1200,
+      "metric_unit": "USD_PER_100_ACCEPTED_RESULTS",
+      "claim_states": {"a_model_cheaper": "VERIFIED_FACT", "a_recurring_cheaper": "CONTRADICTED"}
+    },
+    "retry-economics": {
+      "decision": "INVESTIGATE",
+      "metric_label": "Route A provider cost per accepted result",
+      "metric_label_exact": true,
+      "metric_value": 0.0289,
+      "metric_unit": "USD_PER_ACCEPTED_RESULT",
+      "claim_states": {"a_provider_unit_cost": "VERIFIED_FACT", "a_all_in_cheaper": "UNKNOWN"}
+    },
+    "currency-boundary": {
+      "decision": "INVESTIGATE",
+      "metric_label": "normalized provider cost difference",
+      "metric_label_exact": true,
+      "metric_value": null,
+      "metric_unit": "UNAVAILABLE",
+      "claim_states": {"two_observed_costs": "VERIFIED_FACT", "b_cheaper": "UNKNOWN"}
+    }
+  }
+}

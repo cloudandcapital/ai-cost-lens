@@ -1,0 +1,11 @@
+{
+  "name": "ai-cost-lens-site",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-static-site.mjs",
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "vite": "8.2.2"
+  }
+}

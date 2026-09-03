@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A local, blinded human review for the AI Cost Lens model route pilot."
+    />
+    <title>Model Route Review | AI Cost Lens</title>
+    <link rel="stylesheet" href="model-route-review.css" />
+  </head>
+  <body>
+    <div class="review-shell">
+      <header class="review-masthead">
+        <a class="review-wordmark" href="index.html" aria-label="AI Cost Lens home">
+          <span>CLOUD &amp; CAPITAL</span>
+          <small>AI COST LENS</small>
+        </a>
+        <p>Human review · local only</p>
+      </header>
+
+      <main>
+        <section class="screen active" id="intro-screen" aria-labelledby="intro-title">
+          <div class="intro-grid">
+            <div>
+              <p class="kicker" id="pilot-label">BLINDED REVIEW</p>
+              <h1 id="intro-title">Would you trust the cheaper answer?</h1>
+            </div>
+            <div class="intro-note">
+              <p>
+                You will review <span id="intro-response-count">the anonymous</span> finance responses. The model names stay
+                hidden until every answer has a decision.
+              </p>
+              <p>
+                Accept a response only if you could use it without changing its
+                decision, number, unit, or evidence states.
+              </p>
+              <p>
+                You do not need to know the correction. If you would want a second
+                set of eyes before relying on it, choose Needs expert review.
+              </p>
+            </div>
+          </div>
+
+          <div class="evidence-strip" aria-label="Review controls">
+            <div><span id="response-count">—</span><small>responses</small></div>
+            <div><span id="decision-count">—</span><small>finance decisions</small></div>
+            <div><span>0</span><small>automatic retries</small></div>
+            <div><span>LOCAL</span><small>nothing uploaded</small></div>
+          </div>
+
+          <article class="review-rule">
+            <p class="kicker">THE RULE</p>
+            <h2>Read it like the number is going into a finance review.</h2>
+            <p>
+              The timer counts only active review. If the tab is hidden, the review
+              pauses. Record a correction only when you know exactly what should
+              change. Otherwise, flag it for expert review and keep going.
+            </p>
+          </article>
+
+          <button class="primary-action" id="begin-review" type="button">
+            Begin the blinded review
+          </button>
+          <p class="privacy-note" id="storage-note">
+            Progress is saved in this browser. The original responses are never edited.
+          </p>
+        </section>
+
+        <section class="screen" id="review-screen" aria-labelledby="case-title">
+          <div class="review-status">
+            <div>
+              <p class="kicker" id="response-label">RESPONSE 01</p>
+              <strong id="progress-label">1 of —</strong>
+            </div>
+            <div class="timer-block">
+              <span id="phase-label">REVIEW TIME</span>
+              <strong id="timer-display">00:00</strong>
+            </div>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div id="progress-fill"></div>
+          </div>
+
+          <div class="case-layout">
+            <aside class="case-brief">
+              <p class="kicker">THE DECISION</p>
+              <h2 id="case-title"></h2>
+              <p id="case-situation"></p>
+              <div class="claim-box">
+                <p class="kicker">CLAIMS TO ASSESS</p>
+                <ul id="case-claims"></ul>
+              </div>
+            </aside>
+
+            <article class="response-card">
+              <div class="response-ledger">
+                <div>
+                  <span>Decision</span>
+                  <strong id="answer-decision"></strong>
+                </div>
+                <div>
+                  <span id="metric-label"></span>
+                  <strong id="metric-value"></strong>
+                </div>
+              </div>
+
+              <div class="answer-section">
+                <p class="kicker">EVIDENCE STATES</p>
+                <dl id="answer-claims"></dl>
+              </div>
+
+              <div class="answer-section memo-section">
+                <p class="kicker">FINANCE MEMO</p>
+                <p id="answer-memo"></p>
+              </div>
+
+              <div class="answer-section next-section">
+                <p class="kicker">NEXT QUESTION</p>
+                <p id="answer-next"></p>
+              </div>
+
+              <div class="decision-actions" id="decision-actions">
+                <button class="accept-action" id="accept-response" type="button">
+                  Usable unchanged
+                </button>
+                <button class="unsure-action" id="unsure-response" type="button">
+                  Needs expert review
+                  <small>I wouldn't rely on this yet</small>
+                </button>
+                <button class="correct-action" id="correct-response" type="button">
+                  I know the correction
+                </button>
+              </div>
+
+              <form class="correction-panel" id="correction-panel">
+                <div>
+                  <p class="kicker">WHAT NEEDS TO CHANGE?</p>
+                  <div class="correction-options" id="correction-options">
+                    <label><input type="checkbox" value="decision" /> Decision</label>
+                    <label><input type="checkbox" value="metric" /> Number or metric</label>
+                    <label><input type="checkbox" value="unit" /> Unit</label>
+                    <label><input type="checkbox" value="evidence" /> Evidence state</label>
+                    <label><input type="checkbox" value="memo" /> Memo</label>
+                    <label><input type="checkbox" value="next_question" /> Next question</label>
+                  </div>
+                </div>
+                <label class="correction-note" for="correction-note">
+                  <span>Make or describe the smallest correction required</span>
+                  <textarea
+                    id="correction-note"
+                    rows="5"
+                    placeholder="Example: Change the decision to INVESTIGATE because the all-in cost is still unknown."
+                  ></textarea>
+                </label>
+                <div class="correction-actions">
+                  <button class="text-action" id="back-to-decision" type="button">
+                    Back
+                  </button>
+                  <button class="primary-action compact" id="save-correction" type="submit">
+                    Save correction and continue
+                  </button>
+                </div>
+                <p class="form-error" id="correction-error" role="alert"></p>
+              </form>
+            </article>
+          </div>
+
+          <div class="pause-panel" id="pause-panel" role="dialog" aria-modal="true">
+            <div>
+              <p class="kicker">TIMER PAUSED</p>
+              <h2>Your place is saved.</h2>
+              <p>Resume when you are ready to keep reading.</p>
+              <button class="primary-action compact" id="resume-review" type="button">
+                Resume
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" id="complete-screen" aria-labelledby="complete-title">
+          <div class="complete-heading">
+            <div>
+              <p class="kicker">REVIEW COMPLETE</p>
+              <h1 id="complete-title">Now we can count the human work.</h1>
+            </div>
+            <p>
+              The routes are revealed below. Provider cost stays separate from review
+              and correction time so a cheap rate cannot quietly become a savings claim.
+            </p>
+          </div>
+
+          <div class="route-results" id="route-results"></div>
+
+          <section class="labor-section">
+            <div>
+              <p class="kicker">OPTIONAL ALL-IN VIEW</p>
+              <h2>What is your review time worth?</h2>
+              <p>
+                Enter an hourly labor value to see the model estimate and measured human
+                work in the same cost boundary. This does not alter the saved responses.
+              </p>
+            </div>
+            <label for="labor-rate">
+              <span>Reviewer cost per hour</span>
+              <div class="money-input"><i>$</i><input id="labor-rate" type="number" min="0" step="1" /></div>
+            </label>
+          </section>
+
+          <div class="all-in-results" id="all-in-results"></div>
+
+          <article class="finding-note" id="finding-note"></article>
+
+          <div class="download-actions">
+            <button class="primary-action compact" id="download-json" type="button">
+              Download review JSON
+            </button>
+            <button class="secondary-action" id="download-csv" type="button">
+              Download review CSV
+            </button>
+            <button class="secondary-action" id="show-json" type="button">
+              Show JSON to copy
+            </button>
+            <button class="text-action" id="reset-review" type="button">
+              Reset this review
+            </button>
+          </div>
+
+          <section class="json-fallback" id="json-fallback" hidden>
+            <div>
+              <p class="kicker">DOWNLOAD BLOCKED?</p>
+              <h2>Copy the completed review instead.</h2>
+              <p>Click inside the box, press Command+A, then Command+C and paste it into ChatGPT.</p>
+            </div>
+            <textarea id="json-output" rows="16" readonly></textarea>
+          </section>
+        </section>
+      </main>
+
+      <footer>
+        <p>AI Cost Lens is free, open source, and local first.</p>
+        <p>Synthetic evidence is never presented as customer data.</p>
+      </footer>
+    </div>
+
+    <script src="data/model-route-review-packet.js"></script>
+    <script src="model-route-review.js"></script>
+  </body>
+</html>

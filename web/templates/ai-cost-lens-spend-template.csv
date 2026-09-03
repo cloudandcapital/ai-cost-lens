@@ -1,0 +1,3 @@
+period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,cost_basis,currency
+baseline,2026-08-01,Invoice extraction,Model API,Current model,Current production route,2,240000,40000,0,32000,18.40,provider_reported,USD
+proposed,2026-08-15,Invoice extraction,Model API,Smaller routed model,Proposed pilot route,2,210000,70000,0,30000,11.20,calculated,USD

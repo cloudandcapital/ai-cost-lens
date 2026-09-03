@@ -7,3 +7,7 @@ build/
 .venv_test/
 .pytest_cache/
 *.egg
+private-openai-capture/
+sanitized-openai-evidence/
+artifacts/
+node_modules/

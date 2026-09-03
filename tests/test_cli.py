@@ -43,6 +43,13 @@ def test_version_option(runner):
     assert result.output.strip() == "ai-cost-lens, version 0.3.0"
 
 
+def test_help_describes_the_provider_neutral_product(runner):
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "provider-neutral AI cost and decision analysis" in result.output
+    assert "OpenAI, Anthropic, and AWS Bedrock" not in result.output
+
+
 def test_analyze_table(runner, tmp_path):
     p = _write_csv(tmp_path, "openai.csv", OPENAI_CSV)
     result = runner.invoke(

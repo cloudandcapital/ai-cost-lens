@@ -1,0 +1,3 @@
+start_time,end_time,start_time_iso,end_time_iso,amount_value,amount_currency,quantity,quantity_unit,line_item,user_id,api_key_id,project_id,organization_id,project_name,organization_name,user_email
+1788220800,1788307200,2026-09-01T00:00:00Z,2026-09-02T00:00:00Z,,,,,,,,,,,,
+1788307200,1788393600,2026-09-02T00:00:00Z,2026-09-03T00:00:00Z,12.75,usd,,,,,,,,,,

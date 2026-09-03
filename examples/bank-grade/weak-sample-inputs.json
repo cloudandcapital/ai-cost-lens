@@ -1,0 +1,31 @@
+{
+  "samples": {
+    "baseline": {
+      "population": 100000,
+      "ready": 376,
+      "correction": 20,
+      "escalation": 4,
+      "humanMinutes": 856
+    },
+    "proposed": {
+      "population": 100000,
+      "ready": 38,
+      "correction": 2,
+      "escalation": 0,
+      "humanMinutes": 52
+    }
+  },
+  "config": {
+    "acceptanceRule": "Accurate against the source record, evidence cited, and no material rewrite required",
+    "verifier": "Independent operations quality review",
+    "qualityFloor": 0.9,
+    "hourlyRate": 120,
+    "baselinePolicyApproved": true,
+    "proposedPolicyApproved": true,
+    "baselineShared": 25000,
+    "proposedShared": 25000,
+    "changeCost": 0,
+    "outcomeLogComplete": true,
+    "sampleRandom": false
+  }
+}

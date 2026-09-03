@@ -1,0 +1,106 @@
+{
+  "schema_version": "ai-cost-lens-model-route-cases/2.0",
+  "experiment_id": "openai-model-route-002",
+  "cases": [
+    {
+      "case_id": "rate-vs-tokenizer",
+      "decision_question": "Should finance approve a forecast claiming that the candidate will reduce the equivalent workload's all-in cost by one third?",
+      "required_metric": {"label": "candidate input cost for the equivalent workload", "unit": "USD_PER_WORKLOAD", "nullable": false},
+      "situation": "The current model processes 1,000,000 input tokens for an equivalent monthly workload at $3.00 per million input tokens. A candidate model charges $2.00 per million, but its tokenizer produces 30% more input tokens for the same work. Output volume, quality, retries, and correction time have not been tested.",
+      "claims": [
+        {"claim_id": "lower_rate", "text": "The candidate input-token rate is lower."},
+        {"claim_id": "one_third_all_in_savings", "text": "The equivalent workload's all-in cost will be one third lower."}
+      ]
+    },
+    {
+      "case_id": "cache-reuse",
+      "decision_question": "Should finance approve a claim that caching makes the entire workflow 32.5% cheaper?",
+      "required_metric": {"label": "bounded repeated-input cost reduction", "unit": "PERCENT", "nullable": false},
+      "situation": "A stable 100,000-token prefix is used in two requests inside the cache time-to-live. Standard input costs $2.00 per million tokens. A cache write costs $2.50 per million and a cache read costs $0.20 per million. Output, tools, retries, and human correction are excluded from this bounded calculation.",
+      "claims": [
+        {"claim_id": "bounded_reduction", "text": "Caching lowers the repeated-input portion from $0.40 to $0.27."},
+        {"claim_id": "whole_workflow_reduction", "text": "The entire workflow becomes 32.5% cheaper."}
+      ]
+    },
+    {
+      "case_id": "action-vs-outcome",
+      "decision_question": "Should procurement treat each billed standard action as a verified customer resolution when comparing costs?",
+      "required_metric": {"label": "action charge at the historical average actions per resolution", "unit": "USD_PER_HISTORICAL_RESOLUTION", "nullable": false},
+      "situation": "A vendor sells 100,000 flex credits for $500 and describes the plan as outcome pricing. One standard agent action consumes 20 credits. Historical cases use three actions before resolution on average. Retry and dispute treatment is not published.",
+      "claims": [
+        {"claim_id": "vendor_outcome_language", "text": "The vendor describes the plan as outcome pricing."},
+        {"claim_id": "action_equals_resolution", "text": "Every billed standard action is a verified customer resolution."}
+      ]
+    },
+    {
+      "case_id": "commitment-exposure",
+      "decision_question": "Should finance continue describing the commitment as savings compared with the workload's current on-demand cost?",
+      "required_metric": {"label": "commitment premium over current on-demand cost", "unit": "USD_PER_MONTH", "nullable": false},
+      "situation": "A team expects $10,000 of monthly on-demand agent usage and accepts a three-year commitment priced 20% below on-demand, creating an $8,000 monthly committed spend. Six months later, the same workload would cost $6,000 per month on demand. The commitment cannot be reduced during the term.",
+      "claims": [
+        {"claim_id": "discount_exists", "text": "The original committed price was 20% below the original on-demand forecast."},
+        {"claim_id": "commitment_still_saves", "text": "The commitment is still saving money compared with the workload's current on-demand cost."}
+      ]
+    },
+    {
+      "case_id": "cap-vs-value",
+      "decision_question": "Should finance approve the project as value-positive from the supplied evidence?",
+      "required_metric": {"label": "recurring cost per accepted result", "unit": "USD_PER_ACCEPTED_RESULT", "nullable": false},
+      "situation": "A project ran 100 jobs. Provider cost was $800, 30 results were accepted, and reviewers spent 10 hours at $60 per hour. The project had a $1,000 provider-spend cap and did not cross it. Shared infrastructure was zero. No value per accepted result or approved cost threshold was supplied.",
+      "claims": [
+        {"claim_id": "under_cap", "text": "Provider spend remained below the project cap."},
+        {"claim_id": "work_was_worth_running", "text": "The project was worth running."}
+      ]
+    },
+    {
+      "case_id": "retention-gate",
+      "decision_question": "Should the candidate model be approved for this workload under the current policy?",
+      "required_metric": {"label": "retention period above the policy allowance", "unit": "DAYS", "nullable": false},
+      "situation": "The workload policy permits zero-day provider retention. A candidate model has a mandatory 30-day retention period and a model rate 40% below the approved route. No policy exception has been granted.",
+      "claims": [
+        {"claim_id": "rate_lower", "text": "The candidate model rate is 40% lower."},
+        {"claim_id": "policy_eligible", "text": "The candidate is eligible for this workload under the stated policy."}
+      ]
+    },
+    {
+      "case_id": "benchmark-scope",
+      "decision_question": "Should finance approve the vendor's 3x result for the target-workload forecast now?",
+      "required_metric": {"label": "target-to-benchmark input-token ratio", "unit": "MULTIPLIER", "nullable": false},
+      "situation": "A vendor reports that its system is 3 times faster in an official 8,000-input-token, 1,000-output-token benchmark using a warm cache and vendor-selected hardware. The target workload uses 120,000-token agent sessions with cold starts. No independent reproduction is available.",
+      "claims": [
+        {"claim_id": "vendor_result", "text": "The vendor reported a 3 times result in the stated benchmark."},
+        {"claim_id": "target_result", "text": "The target long-context workload will also run 3 times faster."}
+      ]
+    },
+    {
+      "case_id": "human-cost-reversal",
+      "decision_question": "Should finance choose Route A over Route B on recurring cost per accepted result?",
+      "required_metric": {"label": "Route A recurring cost premium for 100 accepted results", "unit": "USD_PER_100_ACCEPTED_RESULTS", "nullable": false},
+      "situation": "Route A has $100 of model cost and requires 30 reviewer hours at $60 per hour. Route B has $400 of model cost and requires 5 reviewer hours at the same rate. Both routes produce 100 accepted results. Shared infrastructure is zero.",
+      "claims": [
+        {"claim_id": "a_model_cheaper", "text": "Route A has the lower model bill."},
+        {"claim_id": "a_recurring_cheaper", "text": "Route A has the lower recurring cost after required review."}
+      ]
+    },
+    {
+      "case_id": "retry-economics",
+      "decision_question": "Can finance approve Route A as the cheaper all-in route from the supplied evidence?",
+      "required_metric": {"label": "Route A provider cost per accepted result", "unit": "USD_PER_ACCEPTED_RESULT", "nullable": false},
+      "situation": "Route A attempts 100 jobs using 130 total model requests at $0.02 per request and produces 90 accepted results. Route B attempts the same 100 jobs using 105 requests at $0.03 per request and produces 95 accepted results. Human correction time was not measured.",
+      "claims": [
+        {"claim_id": "a_provider_unit_cost", "text": "Route A's observed provider cost per accepted result is about $0.0289."},
+        {"claim_id": "a_all_in_cheaper", "text": "Route A is cheaper after all required human work."}
+      ]
+    },
+    {
+      "case_id": "currency-boundary",
+      "decision_question": "Can finance approve Route B as cheaper than Route A from the supplied evidence?",
+      "required_metric": {"label": "normalized provider cost difference", "unit": "UNAVAILABLE", "nullable": true},
+      "situation": "Route A cost $900 USD. Route B cost EUR 800. No exchange-rate source, rate, or effective date was recorded. Work volume and accepted-result counts were equal.",
+      "claims": [
+        {"claim_id": "two_observed_costs", "text": "The two observed provider amounts are 900 USD and 800 EUR."},
+        {"claim_id": "b_cheaper", "text": "Route B is cheaper after converting both observed costs to one currency."}
+      ]
+    }
+  ]
+}

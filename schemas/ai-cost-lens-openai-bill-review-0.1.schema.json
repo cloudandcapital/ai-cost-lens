@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudandcapital.com/schemas/ai-cost-lens-openai-bill-review-0.1.schema.json",
+  "title": "AI Cost Lens OpenAI saved-export bill review",
+  "type": "object",
+  "required": ["schema_version", "provider", "mode", "period", "bill", "usage", "coverage", "reconciliation", "limitations", "source"],
+  "properties": {
+    "schema_version": {"const": "ai-cost-lens-openai-bill-review/0.1"},
+    "provider": {"const": "openai"},
+    "mode": {"enum": ["illustrative", "real"]},
+    "period": {
+      "type": "object",
+      "required": ["start", "end", "timezone", "aligned"],
+      "properties": {
+        "start": {"type": "string", "format": "date"},
+        "end": {"type": "string", "format": "date"},
+        "timezone": {"const": "UTC"},
+        "aligned": {"type": "boolean"}
+      }
+    },
+    "bill": {
+      "type": "object",
+      "required": ["basis", "currency", "total"],
+      "properties": {
+        "basis": {"const": "provider_reported"},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "total": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$"}]}
+      }
+    },
+    "usage": {"type": "object", "required": ["totals", "by_model", "by_project"]},
+    "coverage": {"type": "object"},
+    "reconciliation": {
+      "type": "object",
+      "required": ["model_cost_allocation_supported", "outcome_cost_supported", "savings_claim_allowed"],
+      "properties": {
+        "model_cost_allocation_supported": {"const": false},
+        "outcome_cost_supported": {"const": false},
+        "savings_claim_allowed": {"const": false}
+      }
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}, "minItems": 2},
+    "source": {"type": "object", "required": ["usage_sha256", "cost_sha256"]}
+  }
+}
