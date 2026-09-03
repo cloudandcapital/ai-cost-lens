@@ -1,4 +1,4 @@
-# AI Cost Lens bank-grade acceptance test
+# AI Cost Lens synthetic acceptance test
 
 Date: 2026-09-02  
 Status: automated and independent browser validation passed; the tool is not
@@ -31,7 +31,7 @@ AI Cost Lens must answer one bounded question:
 
 1. **Policy approval was shared across both routes.** The review now records current-route and proposed-route approval separately. A cheaper route cannot inherit the current route's approval.
 2. **The “leave it alone” row hid the most important negative result.** It now says plainly when the proposed route costs more per ready result, even if the provider bill is lower.
-3. **The default example was too small and generic.** The opening review now uses the synthetic false-economy bank case and labels it as illustrative, not customer data.
+3. **The default example was too small and generic.** The opening review now uses the synthetic false economy case and labels it as illustrative, not customer data.
 4. **Failed decision gates were vague.** The test-first explanation now names the blocking gate: quality floor, policy approval, complete outcome evidence, or matching cost boundary.
 
 ## What passed
@@ -54,7 +54,7 @@ AI Cost Lens must answer one bounded question:
 
 ## Release decision
 
-The finance-first wedge is worth continuing. It catches the exact mistake an enterprise buyer worries about: mistaking a lower model bill for lower cost of useful work.
+The finance review is worth continuing. It catches a costly mistake: treating a lower model bill as a lower cost of useful work.
 
 Automated checks and an independent browser walkthrough passed. Do not publish
 the tool as customer-validated, bank-validated, invoice-certified, or

@@ -13,7 +13,7 @@ When an approved plan is supplied, it also answers two finance questions that
 do not belong in a token dashboard: where did actual performance miss plan, and
 does a proposed change pay back inside the decision horizon?
 
-The tool is free, open source, local first, and evidence aware. It does not require provider credentials, upload prompts, or claim to enforce production budgets. It reviews exported evidence and keeps observed, calculated, and allocated costs visibly separate.
+The tool is free, open source, and runs locally. It does not require provider credentials, upload prompts, or claim to enforce production budgets. It reviews exported evidence and keeps observed, calculated, and allocated costs visibly separate.
 
 ## Positioning
 
@@ -26,8 +26,6 @@ That is the Cloud & Capital lane.
 ## Primary user
 
 A finance, FinOps, cloud economics, product operations, or engineering leader who needs to review AI spend but does not want to become an LLM infrastructure specialist.
-
-The first release should also work as a portfolio artifact. A reviewer should be able to see Diana's judgment in the product: accounting boundaries, cost provenance, normalized comparisons, evidence labels, and honest limitations.
 
 ## Product principles
 
@@ -55,12 +53,12 @@ Total spend alone is not a fair comparison when volume or usable output changed.
 
 The visual language is editorial rather than cybernetic: warm Cloud & Capital beige, charcoal type, muted sage, one clay accent, generous space, and restrained charts. Avoid neon gradients, dense card grids, and decorative AI imagery.
 
-### Make every screen publishable
+### Make every screen clear
 
 The product has two modes:
 
 - **Operator view:** complete decision record with inputs, calculations, assumptions, and evidence.
-- **Story view:** one finding, one visual, one limitation, and its sources. Story view is designed for a clean screenshot without pretending illustrative data is customer data.
+- **Story view:** one finding, one visual, one limitation, and its sources.
 
 ## First release: Workload Review
 

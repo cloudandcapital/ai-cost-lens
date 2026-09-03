@@ -1,4 +1,4 @@
-# AI Cost Lens validation report — September 2, 2026
+# AI Cost Lens validation report: September 2, 2026
 
 ## Release candidate
 
@@ -60,7 +60,7 @@ operating payback and produces a modeled twelve-month shortfall of $77,232.
 
 ## Remaining boundary
 
-This is a tested beta and portfolio artifact, not an invoice certification,
+This is a tested beta, not an invoice certification,
 production observability system, or customer deployment. The sample proves the
 method and implementation against declared inputs. It does not prove savings or
 performance for a live company workload.

@@ -1,4 +1,4 @@
-# Synthetic bank-grade decision cases
+# Synthetic decision cases
 
 These cases are entirely synthetic. They are designed to test whether AI Cost Lens makes a defensible finance decision at realistic enterprise scale without presenting invented customer data.
 
