@@ -30,8 +30,10 @@ interface continues to load its sample JSON and templates as separate files.
 The opening presents three paths:
 
 - **See the worked example** opens the synthetic false-economy case with no files.
-- **Check an OpenAI bill** is a convenience importer for matching Completions usage and Cost CSV exports.
-- **Test a model or route change** uses universal templates for Claude, Bedrock, Gemini, gateways, and other AI tools.
+- **Review OpenAI exports** accepts matching Activity data for Completions and Cost data CSV exports. It produces a bill and usage review.
+- **Compare cost per ready result** uses universal spend and work templates for any provider, including OpenAI.
+
+The direct OpenAI import does not include business outcomes, so it cannot produce cost per ready result on its own. Use the universal path when you have a work log or reviewed sample. Anthropic, Bedrock, Gemini, gateway, and other provider reports must currently be transferred into the universal spend template.
 
 The route-change builder accepts:
 
@@ -46,6 +48,8 @@ It validates dates, workloads, currency, request reconciliation, token totals,
 and accepted results before producing a review. Cost differences remain
 separate from supported savings until the bill, work, quality, and policy gates
 all pass.
+
+For each completed result, `model_requests` counts every model call and `retry_requests` counts only the additional calls after the first attempt. A result produced with three calls has three model requests and two retries. Retry rate is total retry requests divided by total provider requests. The provider bill already includes those calls, so retry cost is never added a second time.
 
 ## Finance memo
 

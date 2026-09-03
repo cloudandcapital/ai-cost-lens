@@ -3567,31 +3567,31 @@ body.story-mode .cockpit-grid {
             <em>BEST PLACE TO START</em>
           </button>
           <button class="builder-mode" data-builder-mode="openai" type="button" aria-pressed="false">
-            <small>OPENAI CONVENIENCE IMPORTER</small>
-            <strong>Check an OpenAI bill</strong>
-            <span>Use saved OpenAI exports to reconcile the provider total and usage mix.</span>
+            <small>OPENAI BILL AND USAGE</small>
+            <strong>Review OpenAI exports</strong>
+            <span>Use matching Activity and Cost CSVs for a bill and usage review.</span>
           </button>
           <button class="builder-mode" data-builder-mode="workload" type="button" aria-pressed="false">
             <small>ANY PROVIDER OR AI TOOL</small>
-            <strong>Test a model or route change</strong>
-            <span>Use universal templates for Claude, Bedrock, Gemini, gateways, or other AI tools.</span>
+            <strong>Compare cost per ready result</strong>
+            <span>Use universal spend and work templates for any provider, including OpenAI.</span>
           </button>
         </div>
 
-        <p class="builder-path-help" id="builder-path-help">Not sure? Open the worked example first. The universal path works across providers and AI tools.</p>
+        <p class="builder-path-help" id="builder-path-help">Want the full cost per ready result comparison? Choose the universal path, including for OpenAI. Open the worked example first if you want to see the finished review.</p>
 
         <div id="workload-builder-fields" hidden>
         <div class="path-requirements">
           <strong>What you need</strong>
-          <span>One universal spend file, plus either a small reviewed sample or a work log. We will keep assumptions and missing proof visible.</span>
+          <span>Transfer cost and usage from your provider reports into one universal spend file, then add either a small reviewed sample or a work log.</span>
         </div>
         <section class="builder-step" aria-labelledby="builder-files-title">
           <div class="step-number">01</div>
           <div>
-            <h3 id="builder-files-title">Add the bill</h3>
-            <p>The spend file holds the current and proposed routes in one place. Each cost stays labeled as provider reported, calculated, or allocated.</p>
+            <h3 id="builder-files-title">Add cost and usage</h3>
+            <p>The universal spend file holds the current and proposed routes in one place. Copy the relevant totals from your provider reports and label each cost as provider reported, calculated, or allocated.</p>
             <div class="template-links">
-              <a href="data:text/csv;base64,cGVyaW9kLGRhdGUsd29ya2xvYWQscHJvdmlkZXIsbW9kZWwscm91dGUscmVxdWVzdHMsaW5wdXRfdG9rZW5zLGNhY2hlZF9pbnB1dF90b2tlbnMsY2FjaGVfd3JpdGVfaW5wdXRfdG9rZW5zLG91dHB1dF90b2tlbnMscHJvdmlkZXJfY29zdCxjb3N0X2Jhc2lzLGN1cnJlbmN5CmJhc2VsaW5lLDIwMjYtMDgtMDEsSW52b2ljZSBleHRyYWN0aW9uLE1vZGVsIEFQSSxDdXJyZW50IG1vZGVsLEN1cnJlbnQgcHJvZHVjdGlvbiByb3V0ZSwyLDI0MDAwMCw0MDAwMCwwLDMyMDAwLDE4LjQwLHByb3ZpZGVyX3JlcG9ydGVkLFVTRApwcm9wb3NlZCwyMDI2LTA4LTE1LEludm9pY2UgZXh0cmFjdGlvbixNb2RlbCBBUEksU21hbGxlciByb3V0ZWQgbW9kZWwsUHJvcG9zZWQgcGlsb3Qgcm91dGUsMiwyMTAwMDAsNzAwMDAsMCwzMDAwMCwxMS4yMCxjYWxjdWxhdGVkLFVTRAo=" download>Download spend template</a>
+              <a href="data:text/csv;base64,cGVyaW9kLGRhdGUsd29ya2xvYWQscHJvdmlkZXIsbW9kZWwscm91dGUscmVxdWVzdHMsaW5wdXRfdG9rZW5zLGNhY2hlZF9pbnB1dF90b2tlbnMsY2FjaGVfd3JpdGVfaW5wdXRfdG9rZW5zLG91dHB1dF90b2tlbnMscHJvdmlkZXJfY29zdCxjb3N0X2Jhc2lzLGN1cnJlbmN5CmJhc2VsaW5lLDIwMjYtMDgtMDEsSW52b2ljZSBleHRyYWN0aW9uLE1vZGVsIEFQSSxDdXJyZW50IG1vZGVsLEN1cnJlbnQgcHJvZHVjdGlvbiByb3V0ZSwzLDI0MDAwMCw0MDAwMCwwLDMyMDAwLDE4LjQwLHByb3ZpZGVyX3JlcG9ydGVkLFVTRApwcm9wb3NlZCwyMDI2LTA4LTE1LEludm9pY2UgZXh0cmFjdGlvbixNb2RlbCBBUEksU21hbGxlciByb3V0ZWQgbW9kZWwsUHJvcG9zZWQgcGlsb3Qgcm91dGUsMiwyMTAwMDAsNzAwMDAsMCwzMDAwMCwxMS4yMCxjYWxjdWxhdGVkLFVTRAo=" download>Download spend template</a>
             </div>
             <div class="file-pair single-file-row">
               <label class="field-wide">
@@ -3611,7 +3611,7 @@ body.story-mode .cockpit-grid {
             <div class="outcome-mode-choice" role="group" aria-label="Choose outcome evidence">
               <button class="outcome-mode active" data-outcome-mode="sample" type="button" aria-pressed="true">
                 <strong>Quick sample</strong>
-                <span>Count 20–30 reviewed outputs from each route. No outcome CSV required.</span>
+                <span>Count 20 to 30 reviewed outputs from each route. No outcome CSV required.</span>
               </button>
               <button class="outcome-mode" data-outcome-mode="detailed" type="button" aria-pressed="false">
                 <strong>Detailed log</strong>
@@ -3654,14 +3654,15 @@ body.story-mode .cockpit-grid {
             </div>
 
             <div id="detailed-outcome-fields" hidden>
+              <p class="sample-caveat">For each result, model_requests counts every model call. retry_requests counts only the extra calls after the first attempt. A result produced with three calls has three model requests and two retries.</p>
               <div class="template-links detailed-template-link">
-                <a href="data:text/csv;base64,cGVyaW9kLHJlc3VsdF9pZCxvdXRjb21lX3N0YXR1cyxodW1hbl9taW51dGVzCmJhc2VsaW5lLGJhc2UtMDAxLHJlYWR5X3RvX3VzZSwxLjAKYmFzZWxpbmUsYmFzZS0wMDIsbmVlZHNfY29ycmVjdGlvbiwzLjAKcHJvcG9zZWQscGlsb3QtMDAxLHJlYWR5X3RvX3VzZSwwLjUKcHJvcG9zZWQscGlsb3QtMDAyLHJlYWR5X3RvX3VzZSwwLjUK" download>Download work log</a>
+                <a href="data:text/csv;base64,cGVyaW9kLHJlc3VsdF9pZCxvdXRjb21lX3N0YXR1cyxtb2RlbF9yZXF1ZXN0cyxyZXRyeV9yZXF1ZXN0cyxodW1hbl9taW51dGVzCmJhc2VsaW5lLGJhc2UtMDAxLHJlYWR5X3RvX3VzZSwxLDAsMS4wCmJhc2VsaW5lLGJhc2UtMDAyLG5lZWRzX2NvcnJlY3Rpb24sMiwxLDMuMApwcm9wb3NlZCxwaWxvdC0wMDEscmVhZHlfdG9fdXNlLDEsMCwwLjUKcHJvcG9zZWQscGlsb3QtMDAyLHJlYWR5X3RvX3VzZSwxLDAsMC41Cg==" download>Download work log</a>
               </div>
               <div class="file-pair single-file-row">
                 <label class="field-wide">
                   <span>Work log CSV</span>
                   <input id="work-file" type="file" accept=".csv,text/csv" />
-                  <small id="work-file-name">Minimum columns: period, result_id, outcome_status, human_minutes.</small>
+                  <small id="work-file-name">The downloaded template includes model_requests and retry_requests so the review can reconcile requests and calculate retry rate.</small>
                 </label>
               </div>
               <label class="check-field detailed-log-check">
@@ -3743,24 +3744,24 @@ body.story-mode .cockpit-grid {
         <div id="openai-builder-fields" hidden>
           <div class="path-requirements">
             <strong>What you need</strong>
-            <span>The Completions usage CSV and Cost CSV exported from the same date range in the OpenAI Usage dashboard.</span>
+            <span>One Activity data CSV for Completions and one Cost data CSV, exported for the same date range in the OpenAI Usage dashboard.</span>
           </div>
           <section class="builder-step" aria-labelledby="openai-files-title">
             <div class="step-number">01</div>
             <div>
-              <h3 id="openai-files-title">Add the two saved OpenAI reports</h3>
+              <h3 id="openai-files-title">Add the two OpenAI exports</h3>
               <p>
-                Export completions usage and cost from the same date range in the OpenAI
-                Usage dashboard. Blank daily buckets are fine; the review checks the period.
+                Export Activity data for Completions and Cost data from the same date range
+                in the OpenAI Usage dashboard. Blank daily buckets are fine; the review checks the period.
               </p>
               <div class="file-pair">
                 <label>
-                  <span>Completions usage CSV</span>
+                  <span>Completions activity CSV</span>
                   <input id="openai-usage-file" type="file" accept=".csv,text/csv" />
                   <small id="openai-usage-file-name">Requests, models, projects, tokens, and cache fields.</small>
                 </label>
                 <label>
-                  <span>Cost CSV</span>
+                  <span>Cost data CSV</span>
                   <input id="openai-cost-file" type="file" accept=".csv,text/csv" />
                   <small id="openai-cost-file-name">Provider reported organization cost.</small>
                 </label>
@@ -3773,9 +3774,8 @@ body.story-mode .cockpit-grid {
             <div>
               <h3 id="openai-boundary-title">Keep the financial grain honest</h3>
               <p>
-                This review will show the observed total bill and usage mix. It will not
-                manufacture cost by model or savings per outcome when the exports do not
-                contain those joins.
+                This path shows the observed total bill and usage mix. For cost per ready
+                result, use the universal path with a work log or reviewed sample.
               </p>
             </div>
           </section>
@@ -4174,8 +4174,8 @@ body.story-mode .cockpit-grid {
           retriesKnown = false;
         } else {
           const retryRequests = finiteNumber(row.retry_requests, `Work ${period} row ${rowNumber} retry_requests`, { integer: true });
-          if (retryRequests > modelRequests) {
-            throw new Error(`Work ${period} row ${rowNumber} retries cannot exceed model requests.`);
+          if (retryRequests > Math.max(modelRequests - 1, 0)) {
+            throw new Error(`Work ${period} row ${rowNumber} retries cannot exceed the additional model requests after the first request.`);
           }
           retries += retryRequests;
         }

@@ -142,9 +142,9 @@ def _outcomes(path: Path) -> dict[str, Any]:
         retry_requests = _integer(
             row.get("retry_requests"), f"outcome row {row_number} retry_requests"
         )
-        if retry_requests > model_requests:
+        if retry_requests > max(model_requests - 1, 0):
             raise ReviewBuildError(
-                f"outcome row {row_number} retry_requests cannot exceed model_requests"
+                f"outcome row {row_number} retry_requests cannot exceed the additional model requests after the first request"
             )
         rows.append(
             {

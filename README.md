@@ -116,9 +116,9 @@ To open the browser interface from a clone:
 python -m http.server 8000 --directory web
 ```
 
-Then open `http://localhost:8000`. Choose **See the worked example**, **Check an OpenAI bill**, or **Test a model or route change**. Use **Open saved review** to inspect another `ai-cost-lens-review-result/1.0` file. The file is parsed in the browser and is not uploaded. **Print finance memo** creates a compact handoff from the same decision record; the browser's print dialog can save it as a PDF.
+Then open `http://localhost:8000`. Choose **See the worked example**, **Review OpenAI exports**, or **Compare cost per ready result**. Use **Open saved review** to inspect another `ai-cost-lens-review-result/1.0` file. The file is parsed in the browser and is not uploaded. **Print finance memo** creates a compact handoff from the same decision record; the browser's print dialog can save it as a PDF.
 
-The OpenAI CSV path is a convenience importer, not the boundary of the tool. Claude, Bedrock, Gemini, gateways, and other AI tools use the universal spend and outcome templates for provider neutral comparisons.
+The OpenAI CSV path accepts matching Activity data for Completions and Cost data exports for a bill and usage review. It does not contain the business outcome evidence needed for cost per ready result. Use the universal spend and work templates for the full comparison, including for OpenAI. Anthropic, Bedrock, Gemini, gateways, and other AI tools currently use those universal templates.
 
 See the [product brief](docs/product-brief.md), [research notes](docs/competitive-landscape.md), and [web interface notes](web/README.md) for the design and evidence model.
 

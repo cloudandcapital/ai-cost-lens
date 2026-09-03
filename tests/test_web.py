@@ -28,19 +28,22 @@ def test_web_assets_and_brand_contract_are_present():
     assert "Illustrative data is never presented as customer evidence" in html
     assert "What would you like to check?" in html
     assert "See the worked example" in html
-    assert "Check an OpenAI bill" in html
-    assert "Test a model or route change" in html
+    assert "Review OpenAI exports" in html
+    assert "Compare cost per ready result" in html
     assert "BEST PLACE TO START" in html
-    assert "OPENAI CONVENIENCE IMPORTER" in html
+    assert "OPENAI BILL AND USAGE" in html
     assert "ANY PROVIDER OR AI TOOL" in html
     assert (
-        "universal templates for Claude, Bedrock, Gemini, gateways, or other AI tools"
+        "universal spend and work templates for any provider, including OpenAI" in html
+    )
+    assert "Choose the universal path, including for OpenAI" in html
+    assert "Transfer cost and usage from your provider reports" in html
+    assert "Add cost and usage" in html
+    assert "Add what happened to the work" in html
+    assert (
+        "A result produced with three calls has three model requests and two retries"
         in html
     )
-    assert "The universal path works across providers and AI tools" in html
-    assert "One universal spend file" in html
-    assert "Add the bill" in html
-    assert "Add what happened to the work" in html
     assert "Set the decision rules" in html
     assert html.count("data-builder-mode=") == 3
     assert 'id="workload-builder-fields" hidden' in html
@@ -73,6 +76,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert 'id="policy-approved"' not in html
     app = (WEB / "app.js").read_text()
     assert "builderMode: null" in app
+    assert "retryRequests > Math.max(modelRequests - 1, 0)" in app
     assert "state.demoData = cloneData(state.data)" in app
     assert 'state.builderMode === "example"' in app
     assert "renderFinanceMemo" in app
@@ -145,7 +149,11 @@ def test_universal_templates_preserve_finance_join_fields():
     assert "provider_cost,cost_basis,currency" in spend
     assert "provider_reported" in spend
     assert "calculated" in spend
-    assert "period,result_id,outcome_status,human_minutes" in work
+    assert (
+        "period,result_id,outcome_status,model_requests,retry_requests,human_minutes"
+        in work
+    )
+    assert "baseline,base-002,needs_correction,2,1,3.0" in work
     assert "ready_to_use" in work
     assert "needs_correction" in work
 
@@ -394,6 +402,11 @@ eval(source);
     assert payload["proposed"]["outcomes"]["status_counts"]["ready_to_use"] == 2
     assert payload["baseline"]["evidence"]["cost_basis"] == "observed"
     assert payload["proposed"]["evidence"]["cost_basis"] == "calculated"
+    assert payload["baseline"]["usage"]["requests"] == 3
+    assert payload["baseline"]["usage"]["retries"] == 1
+    assert payload["baseline"]["measures"]["retry_rate"] == pytest.approx(1 / 3)
+    assert payload["proposed"]["usage"]["retries"] == 0
+    assert payload["baseline"]["evidence"]["reconciliation_issues"] == []
     assert payload["comparison"]["same_cost_basis"] is False
     assert payload["comparison"]["provider_cost_reported"] is False
     assert payload["comparison"]["savings_claim_allowed"] is False

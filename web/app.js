@@ -360,8 +360,8 @@
           retriesKnown = false;
         } else {
           const retryRequests = finiteNumber(row.retry_requests, `Work ${period} row ${rowNumber} retry_requests`, { integer: true });
-          if (retryRequests > modelRequests) {
-            throw new Error(`Work ${period} row ${rowNumber} retries cannot exceed model requests.`);
+          if (retryRequests > Math.max(modelRequests - 1, 0)) {
+            throw new Error(`Work ${period} row ${rowNumber} retries cannot exceed the additional model requests after the first request.`);
           }
           retries += retryRequests;
         }
