@@ -1657,6 +1657,9 @@
     const issueCount = (baseline.evidence.reconciliation_issues || []).length +
       (proposed.evidence.reconciliation_issues || []).length;
     const providerTerm = providerCostTerm(baseline, proposed);
+    const failedGateText = failedSavingsGateText(comparison, baseline, proposed);
+    const failedGateSentence = sentenceCase(failedGateText);
+    const failedGateVerb = /,| and /.test(failedGateText) ? "block" : "blocks";
     const planning = state.data.planning;
     const planCostPosition = planning
       ? planning.variance.recurring_operating_cost > 0
@@ -1682,10 +1685,12 @@
         ? `The math is complete, but the inputs are illustrative. Before finance relies on this, use the real provider bill and outcome log for one specific workload. Apply the same definition of "ready" to both routes, measure the human correction time, and enter the real cost of making the change. ${issueCount ? `${issueCount} file or math issue${issueCount === 1 ? " is" : "s are"} also open.` : "The synthetic files match each other."}`
         : comparison.savings_claim_allowed
           ? "The bill, work volume, quality rule, policy approval, and included costs all match for this review. That supports this decision for this workload and period, not a claim about the model everywhere."
-          : `${failedSavingsGateText(comparison, baseline, proposed)} still blocks a savings claim.${issueCount ? ` Open The evidence for the ${issueCount} reconciliation issue${issueCount === 1 ? "" : "s"}.` : ""}`,
+          : issueCount
+            ? `${failedGateSentence} still ${failedGateVerb} a savings claim. Open The evidence for the ${issueCount} reconciliation issue${issueCount === 1 ? "" : "s"}.`
+            : `The files match, but ${failedGateText} still ${failedGateVerb} a savings claim.`,
       cfo: comparison.cost_per_usable_result_change_pct > 0
         ? `The proposed route reduces ${providerTerm}, but not the cost of usable work. After shared infrastructure and human correction, each ready result costs ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. Keep the current route and test whether the proposed route can reach at least ${facts.requiredRate?.toFixed(1) ?? "the required"}% ready results before changing the default.`
-        : `The proposed route produces a ready result for ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. ${comparison.savings_claim_allowed ? "The evidence supports the difference for this workload and period." : `${failedSavingsGateText(comparison, baseline, proposed)} still blocks a savings claim.`}`,
+        : `The proposed route produces a ready result for ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. ${comparison.savings_claim_allowed ? "The evidence supports the difference for this workload and period." : `${failedGateSentence} still ${failedGateVerb} a savings claim.`}`,
       plan: planning
         ? `The current route finished ${money(Math.abs(planning.variance.recurring_operating_cost))} ${planCostPosition} its recurring cost plan. ${planning.variance.primary_cost_drivers.map((driver) => `${sentenceCase(driver.label)} was ${money(Math.abs(driver.amount))} ${driver.amount > 0 ? "over plan" : driver.amount < 0 ? "under plan" : "on plan"}`).join(". ")}. Ready result yield was ${Math.abs(planning.variance.ready_result_rate_points).toFixed(1)} points ${planYieldPosition} plan.`
         : "No approved plan was supplied with this review. Add the planned provider, infrastructure, human work, volume, and ready result assumptions to create a Plan vs Actual check.",

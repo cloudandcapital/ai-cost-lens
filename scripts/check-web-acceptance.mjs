@@ -169,10 +169,10 @@ await assert.rejects(api.buildSingleBillReview(singleSpend, singleWork, { ...sin
 const reportedSpend = spend.replace(',calculated,USD', ',provider_reported,USD');
 const qualityFailWork = work.replace('pilot-002,ready_to_use', 'pilot-002,needs_correction');
 const gateCases = [
-  [await api.buildLocalReview(reportedSpend, work, { ...config, proposedPolicyApproved: false }), /policy approval/],
-  [await api.buildLocalReview(reportedSpend, qualityFailWork, { ...config, qualityFloor: 0.75 }), /declared quality requirement/],
-  [await api.buildLocalReview(reportedSpend, work, { ...config, outcomeLogComplete: false }), /complete outcome evidence/],
-  [await api.buildLocalReview(reportedSpend, qualityFailWork, { ...config, qualityFloor: 0.75, proposedPolicyApproved: false }), /declared quality requirement and policy approval/],
+  [await api.buildLocalReview(reportedSpend, work, { ...config, proposedPolicyApproved: false }), /policy approval/i],
+  [await api.buildLocalReview(reportedSpend, qualityFailWork, { ...config, qualityFloor: 0.75 }), /declared quality requirement/i],
+  [await api.buildLocalReview(reportedSpend, work, { ...config, outcomeLogComplete: false }), /complete outcome evidence/i],
+  [await api.buildLocalReview(reportedSpend, qualityFailWork, { ...config, qualityFloor: 0.75, proposedPolicyApproved: false }), /declared quality requirement and policy approval/i],
 ];
 for (const [review, expected] of gateCases) {
   assert.equal(review.comparison.savings_claim_allowed, false);
@@ -185,6 +185,15 @@ for (const [review, expected] of gateCases) {
   assert.match(element('opportunity-ledger').innerHTML, expected);
   assert.match(api.lumenResponse('evidence'), expected);
   assert.match(api.lumenResponse('cfo'), expected);
+}
+api.state.data = gateCases[0][0];
+assert.equal(api.lumenResponse('evidence'), 'The files match, but policy approval still blocks a savings claim.');
+assert.match(api.lumenResponse('cfo'), /\. Policy approval still blocks a savings claim\.$/);
+api.state.data = gateCases[3][0];
+assert.equal(api.lumenResponse('evidence'), 'The files match, but the declared quality requirement and policy approval still block a savings claim.');
+assert.match(api.lumenResponse('cfo'), /\. The declared quality requirement and policy approval still block a savings claim\.$/);
+for (const response of [api.lumenResponse('evidence'), api.lumenResponse('cfo')]) {
+  assert.doesNotMatch(response, /(?:^|[.!?]\s+)[a-z]/);
 }
 const allGatesPass = await api.buildLocalReview(reportedSpend, work, config);
 assert.equal(allGatesPass.comparison.savings_claim_allowed, true);
