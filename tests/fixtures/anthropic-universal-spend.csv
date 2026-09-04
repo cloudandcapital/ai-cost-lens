@@ -1,0 +1,3 @@
+period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,cost_basis,currency
+baseline,2026-08-01,Customer due diligence summaries,Anthropic,Claude current model,Current production route,,80000,12000,,10000,20.00,provider_reported,USD
+proposed,2026-08-15,Customer due diligence summaries,Anthropic,Claude smaller model,Proposed pilot route,,60000,10000,,9000,12.00,provider_reported,USD

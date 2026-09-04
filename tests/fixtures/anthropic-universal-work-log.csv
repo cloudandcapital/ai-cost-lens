@@ -1,0 +1,11 @@
+period,result_id,outcome_status,model_requests,retry_requests,human_minutes
+baseline,base-001,ready_to_use,1,0,1
+baseline,base-002,ready_to_use,2,1,5
+baseline,base-003,ready_to_use,1,0,1
+baseline,base-004,ready_to_use,1,0,1
+baseline,base-005,needs_escalation,2,1,2
+proposed,pilot-001,ready_to_use,1,0,1
+proposed,pilot-002,ready_to_use,2,1,4
+proposed,pilot-003,ready_to_use,2,1,4
+proposed,pilot-004,needs_correction,2,1,8
+proposed,pilot-005,needs_escalation,2,1,8

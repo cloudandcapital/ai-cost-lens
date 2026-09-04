@@ -31,11 +31,11 @@ app = app.replace(
 );
 html = html
   .replace('<link rel="stylesheet" href="styles.css" />', `<style>${css}</style>`)
-  .replace(
+  .replaceAll(
     'href="templates/ai-cost-lens-spend-template.csv"',
     `href="data:text/csv;base64,${spendTemplate.toString("base64")}"`,
   )
-  .replace(
+  .replaceAll(
     'href="templates/ai-cost-lens-work-log-template.csv"',
     `href="data:text/csv;base64,${workTemplate.toString("base64")}"`,
   )

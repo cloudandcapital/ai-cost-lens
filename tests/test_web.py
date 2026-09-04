@@ -28,21 +28,25 @@ def test_web_assets_and_brand_contract_are_present():
     assert "Illustrative data is never presented as customer evidence" in html
     assert "What would you like to check?" in html
     assert "See the worked example" in html
-    assert "Check an OpenAI bill" in html
-    assert "Test a model or route change" in html
+    assert "Review OpenAI exports" in html
+    assert "Compare cost per ready result" in html
     assert "BEST PLACE TO START" in html
-    assert "OPENAI CONVENIENCE IMPORTER" in html
+    assert "OPENAI BILL AND USAGE" in html
     assert "ANY PROVIDER OR AI TOOL" in html
     assert (
-        "universal templates for Claude, Bedrock, Gemini, gateways, or other AI tools"
+        "universal spend and work templates for any provider, including OpenAI" in html
+    )
+    assert "Choose the universal path, including for OpenAI" in html
+    assert "Start with the reports you already have" in html
+    assert "Put both routes in one spend file" in html
+    assert "Add what happened to the work" in html
+    assert (
+        "A result produced with three calls has three model requests and two retries"
         in html
     )
-    assert "The universal path works across providers and AI tools" in html
-    assert "One universal spend file" in html
-    assert "Add the bill" in html
-    assert "Add what happened to the work" in html
     assert "Set the decision rules" in html
-    assert html.count("data-builder-mode=") == 3
+    assert html.count("data-builder-mode=") == 4
+    assert 'data-builder-mode="single"' in html
     assert 'id="workload-builder-fields" hidden' in html
     assert 'id="openai-builder-fields" hidden' in html
     assert 'id="builder-actions" hidden' in html
@@ -73,15 +77,14 @@ def test_web_assets_and_brand_contract_are_present():
     assert 'id="policy-approved"' not in html
     app = (WEB / "app.js").read_text()
     assert "builderMode: null" in app
+    assert "retryRequests > Math.max(modelRequests - 1, 0)" in app
     assert "state.demoData = cloneData(state.data)" in app
     assert 'state.builderMode === "example"' in app
     assert "renderFinanceMemo" in app
     assert 'document.body.classList.add("printing-memo")' in app
-    assert app.count('document.body.classList.remove("printing-memo")') == 2
-    assert (
-        'window.setTimeout(() => document.body.classList.remove("printing-memo"), 1500)'
-        in app
-    )
+    assert 'window.addEventListener("afterprint"' in app
+    assert 'window.matchMedia?.("print")' in app
+    assert 'document.body.classList.remove("printing-memo"), 1500' not in app
     assert "The provider bill fell" in app
     assert "The cost of a ready result rose" in app
     assert "buildPlanningRecord" in app
@@ -145,9 +148,46 @@ def test_universal_templates_preserve_finance_join_fields():
     assert "provider_cost,cost_basis,currency" in spend
     assert "provider_reported" in spend
     assert "calculated" in spend
-    assert "period,result_id,outcome_status,human_minutes" in work
+    assert (
+        "period,result_id,outcome_status,model_requests,retry_requests,human_minutes"
+        in work
+    )
+    assert "baseline,base-002,needs_correction,2,1,3.0" in work
     assert "ready_to_use" in work
     assert "needs_correction" in work
+
+
+def test_universal_path_explains_provider_transfer_and_source_boundaries():
+    html = (WEB / "index.html").read_text()
+    for label in (
+        "OpenAI API",
+        "Claude API",
+        "Amazon Bedrock",
+        "Gemini or Vertex AI",
+        "Gateway or another tool",
+    ):
+        assert label in html
+    assert "Show me exactly what to put in each column" in html
+    assert "Upload the completed template, not the original provider report." in html
+    assert "PDFs, or screenshots directly" in html
+    assert "Invoice or subscription only?" in html
+    assert (
+        "Choose Review one bill to record a subscription amount without usage or outcomes"
+        in html
+    )
+    assert "including after any correction you completed" in html
+    assert "If correction made the result ready, use ready_to_use" in html
+    assert "One result is one unit of finished work" in html
+    assert "Show me exactly what to put in the work log" in html
+    assert "Three model calls means two retries" in html
+
+
+def test_universal_path_distinguishes_missing_token_data_from_zero():
+    html = (WEB / "index.html").read_text()
+    app = (WEB / "app.js").read_text()
+    assert "Leave blank if the source does not report them." in html
+    assert "Zero means the source reported zero" in html
+    assert 'value === null || value === undefined ? "Not available"' in app
 
 
 def test_javascript_element_references_exist_in_html():
@@ -394,6 +434,11 @@ eval(source);
     assert payload["proposed"]["outcomes"]["status_counts"]["ready_to_use"] == 2
     assert payload["baseline"]["evidence"]["cost_basis"] == "observed"
     assert payload["proposed"]["evidence"]["cost_basis"] == "calculated"
+    assert payload["baseline"]["usage"]["requests"] == 3
+    assert payload["baseline"]["usage"]["retries"] == 1
+    assert payload["baseline"]["measures"]["retry_rate"] == pytest.approx(1 / 3)
+    assert payload["proposed"]["usage"]["retries"] == 0
+    assert payload["baseline"]["evidence"]["reconciliation_issues"] == []
     assert payload["comparison"]["same_cost_basis"] is False
     assert payload["comparison"]["provider_cost_reported"] is False
     assert payload["comparison"]["savings_claim_allowed"] is False
@@ -401,6 +446,66 @@ eval(source);
     assert payload["planning"]["actual"]["provider_cost"] == 18.4
     assert payload["planning"]["variance"]["provider_cost"] == 13.4
     assert payload["planning"]["payback"]["decision_horizon_months"] == 6
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_browser_customer_can_build_anthropic_universal_review():
+    script = r"""
+const fs = require("fs");
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function validateResult(data) {",
+  "  globalThis.__buildLocalReview = buildLocalReview; return;\n  function validateResult(data) {",
+);
+eval(source);
+(async () => {
+  const result = await globalThis.__buildLocalReview(
+    fs.readFileSync(process.argv[2], "utf8"),
+    fs.readFileSync(process.argv[3], "utf8"),
+    {
+      acceptanceRule: "Accurate against the source record",
+      verifier: "Finance reviewer",
+      qualityFloor: 0.5,
+      hourlyRate: 60,
+      baselinePolicyApproved: true,
+      proposedPolicyApproved: true,
+      baselineShared: 0,
+      proposedShared: 0,
+      changeCost: 0,
+      outcomeLogComplete: true,
+    },
+  );
+  console.log(JSON.stringify(result));
+})();
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "app.js"),
+            str(WEB.parent / "tests" / "fixtures" / "anthropic-universal-spend.csv"),
+            str(WEB.parent / "tests" / "fixtures" / "anthropic-universal-work-log.csv"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = __import__("json").loads(result.stdout)
+    assert payload["baseline"]["model"]["provider"] == "Anthropic"
+    assert payload["baseline"]["usage"]["requests"] == 7
+    assert payload["proposed"]["usage"]["requests"] == 9
+    assert payload["baseline"]["usage"]["retries"] == 2
+    assert payload["proposed"]["usage"]["retries"] == 4
+    assert payload["baseline"]["measures"]["cost_per_usable_result"] == 7.5
+    assert payload["proposed"]["measures"]["cost_per_usable_result"] == pytest.approx(
+        12.333333
+    )
+    assert payload["comparison"]["provider_cost_reported"] is True
+    assert payload["comparison"]["evidence_complete"] is True
+    assert payload["comparison"]["savings_claim_allowed"] is False
+    assert payload["baseline"]["measures"]["cache_write_rate"] is None
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -463,3 +568,55 @@ eval(source);
     assert payload["comparison"]["same_cost_basis"] is False
     assert payload["baseline"]["outcomes"]["ready_rate_interval_95"][0] < 20 / 30
     assert payload["baseline"]["outcomes"]["ready_rate_interval_95"][1] > 20 / 30
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_browser_universal_builder_allows_unreported_token_fields():
+    script = r"""
+const fs = require("fs");
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function validateResult(data) {",
+  "  globalThis.__buildSampledReview = buildSampledReview; return;\n  function validateResult(data) {",
+);
+eval(source);
+const spend = `period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,cost_basis,currency
+baseline,2026-08-01,Support summaries,Anthropic,Claude Sonnet,Current route,,,,,,12.50,provider_reported,USD
+proposed,2026-08-15,Support summaries,Anthropic,Claude Haiku,Pilot route,,,,,,8.25,provider_reported,USD`;
+(async () => {
+  const result = await globalThis.__buildSampledReview(
+    spend,
+    {
+      baseline: { population: 2, ready: 1, correction: 1, escalation: 0, humanMinutes: 2 },
+      proposed: { population: 2, ready: 2, correction: 0, escalation: 0, humanMinutes: 1 },
+    },
+    {
+      acceptanceRule: "Accurate without a material rewrite",
+      verifier: "Human review",
+      qualityFloor: 0.5,
+      hourlyRate: 60,
+      baselinePolicyApproved: true,
+      proposedPolicyApproved: true,
+      baselineShared: 0,
+      proposedShared: 0,
+      changeCost: 0,
+      sampleRandom: true,
+    },
+  );
+  console.log(JSON.stringify(result));
+})();
+"""
+    result = subprocess.run(
+        ["node", "-e", script, str(WEB / "app.js")],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = __import__("json").loads(result.stdout)
+    assert payload["baseline"]["usage"]["requests"] is None
+    assert payload["baseline"]["usage"]["processed_input_tokens"] is None
+    assert payload["baseline"]["usage"]["cached_input_tokens"] is None
+    assert payload["baseline"]["usage"]["output_tokens"] is None
+    assert payload["baseline"]["measures"]["cache_reuse_rate"] is None
+    assert payload["baseline"]["costs"]["model_cost"] == 12.5

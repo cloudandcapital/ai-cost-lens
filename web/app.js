@@ -23,6 +23,8 @@
     new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(
       value,
     );
+  const compactOrMissing = (value) =>
+    value === null || value === undefined ? "Not available" : compact(value);
   const wholeNumber = (value) =>
     new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
 
@@ -45,6 +47,9 @@
   const cloneData = (value) => JSON.parse(JSON.stringify(value));
 
   function parseCsv(text, label) {
+    if (new TextEncoder().encode(text).length > 5 * 1024 * 1024) {
+      throw new Error(`${label} exceeds the 5 MiB local file limit. Split it into smaller, matching review periods.`);
+    }
     const rows = [];
     let row = [];
     let field = "";
@@ -79,7 +84,16 @@
     row.push(field.trim());
     if (row.some((value) => value !== "")) rows.push(row);
     if (rows.length < 2) throw new Error(`${label} needs a header and at least one data row.`);
+    if (rows.length > 20001) throw new Error(`${label} exceeds 20,000 data rows. Split it into smaller, matching review periods.`);
     const headers = rows[0];
+    if (/spend|cost export|usage export/i.test(label)) {
+      const seen = new Set();
+      rows.slice(1).forEach((values, index) => {
+        const key = JSON.stringify(values);
+        if (seen.has(key)) throw new Error(`${label} row ${index + 2} duplicates an earlier row. Check the source and consolidate genuinely separate identical charges before retrying; no rows were removed automatically.`);
+        seen.add(key);
+      });
+    }
     if (new Set(headers).size !== headers.length) throw new Error(`${label} has a duplicate column name.`);
     return rows.slice(1).map((values, rowIndex) => {
       if (values.length !== headers.length) {
@@ -98,7 +112,7 @@
   function finiteNumber(value, field, { integer = false } = {}) {
     if (value === "" || value === null || value === undefined) throw new Error(`${field} is required.`);
     const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed < 0 || (integer && !Number.isInteger(parsed))) {
+    if (!Number.isFinite(parsed) || parsed < 0 || (integer && !Number.isSafeInteger(parsed))) {
       throw new Error(`${field} must be a non-negative${integer ? " whole" : ""} number.`);
     }
     return parsed;
@@ -108,11 +122,29 @@
     return String(value ?? "").trim() === "" ? null : finiteNumber(value, field, options);
   }
 
+  function costNumber(value, field) {
+    if (Number(value) < 0) throw new Error(`${field}: negative cost rows (credits or refunds) are not supported. Reconcile adjustments to a non-negative workload cost in the source; do not silently discard them.`);
+    return finiteNumber(value, field);
+  }
+
   function validDate(value, field) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) {
-      throw new Error(`${field} must use YYYY-MM-DD.`);
+    const timestamp = Date.parse(`${value}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== value) {
+      throw new Error(`${field} must be a real calendar date in YYYY-MM-DD format.`);
     }
     return value;
+  }
+
+  function requireMatchingDurations(baseline, proposed) {
+    const span = (dates) => (Date.parse([...dates].sort().at(-1)) - Date.parse([...dates].sort()[0])) / 86400000 + 1;
+    if (span(baseline.dates) !== span(proposed.dates)) {
+      throw new Error("Baseline and proposed date spans have different durations. Use equally long, complete periods before comparing totals; no automatic normalization is applied.");
+    }
+  }
+
+  async function readLocalFile(file) {
+    if (file.size > 5 * 1024 * 1024) throw new Error("The file exceeds the 5 MiB local limit. Choose a smaller file.");
+    return file.text();
   }
 
   async function sha256(text) {
@@ -159,6 +191,175 @@
     if (basis === "calculated") return "Calculated cost";
     if (basis === "allocated") return "Allocated cost";
     return "Cost basis not supplied";
+  }
+
+  function summarizeSpendRows(spend, period, { allowZeroRequests = false } = {}) {
+    const tokenFields = {
+      input_tokens: { total: 0, complete: true, label: "input_tokens" },
+      cached_input_tokens: { total: 0, complete: true, label: "cached_input_tokens" },
+      cache_write_input_tokens: { total: 0, complete: true, label: "cache_write_input_tokens" },
+      output_tokens: { total: 0, complete: true, label: "output_tokens" },
+    };
+    let requests = 0;
+    let requestsComplete = true;
+    let providerCost = 0;
+
+    spend.forEach((row, index) => {
+      const rowNumber = index + 2;
+      const rowRequests = optionalNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
+      if (rowRequests === null) requestsComplete = false;
+      else requests += rowRequests;
+      providerCost += costNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
+
+      const supplied = {};
+      Object.entries(tokenFields).forEach(([field, aggregate]) => {
+        const value = optionalNumber(row[field], `Spend ${period} row ${rowNumber} ${aggregate.label}`, { integer: true });
+        supplied[field] = value;
+        if (value === null) aggregate.complete = false;
+        else aggregate.total += value;
+      });
+
+      if (supplied.input_tokens === null && (supplied.cached_input_tokens !== null || supplied.cache_write_input_tokens !== null)) {
+        throw new Error(`Spend ${period} row ${rowNumber} needs input_tokens when cache tokens are supplied.`);
+      }
+      if (
+        supplied.input_tokens !== null &&
+        supplied.cached_input_tokens !== null &&
+        supplied.cache_write_input_tokens !== null &&
+        supplied.cached_input_tokens + supplied.cache_write_input_tokens > supplied.input_tokens
+      ) {
+        throw new Error(`Spend ${period} row ${rowNumber} has more cached and cache-write tokens than input tokens.`);
+      }
+    });
+
+    if (!allowZeroRequests && requestsComplete && requests === 0) {
+      throw new Error(`Spend ${period} requests must be greater than zero when supplied.`);
+    }
+    const totalOrMissing = (field) => tokenFields[field].complete ? tokenFields[field].total : null;
+    return {
+      requests: requestsComplete ? requests : null,
+      providerCost,
+      processedInput: totalOrMissing("input_tokens"),
+      cachedInput: totalOrMissing("cached_input_tokens"),
+      cacheWriteInput: totalOrMissing("cache_write_input_tokens"),
+      outputTokens: totalOrMissing("output_tokens"),
+    };
+  }
+
+  const singleBillSchema = "ai-cost-lens-single-bill-review/0.1";
+  const singleSpendColumns = "period date workload provider model route requests input_tokens cached_input_tokens cache_write_input_tokens output_tokens provider_cost cost_basis currency".split(" ");
+  const singleWorkColumns = "period result_id outcome_status model_requests retry_requests human_minutes".split(" ");
+
+  // Saved single-bill reviews retain the supplied rows. Recompute, never trust
+  // saved financial claims or derived values when opening them again.
+  function summarizeSingleBill(data) {
+    const { spend, work } = data.source;
+    const { config } = data;
+    if (!spend.length || spend.length > 20000 || work.length > 20000) throw new Error("Supply 1 to 20,000 spend rows and at most 20,000 outcome rows.");
+    const seen = new Set();
+    spend.forEach((row) => {
+      if (row.period.trim().toLowerCase() !== "baseline") throw new Error("For one bill, use baseline on every row and remove proposed example rows.");
+      validDate(row.date, "Spend date");
+      const key = JSON.stringify(singleSpendColumns.map((column) => row[column].trim()));
+      if (seen.has(key)) throw new Error("Duplicate spend row: review the source, do not repeat invoice totals.");
+      seen.add(key);
+    });
+    const workload = spend[0].workload.trim();
+    const currency = spend[0].currency.trim().toUpperCase();
+    if (!workload || spend.some((row) => row.workload.trim() !== workload)) throw new Error("Use one workload or subscription name per single-bill review.");
+    if (!/^[A-Z]{3}$/.test(currency) || spend.some((row) => row.currency.trim().toUpperCase() !== currency)) throw new Error("Use one three-letter currency per review.");
+    const dates = spend.map((row) => row.date).sort();
+    const period = { start: dates[0], end: dates.at(-1), timezone: "UTC" };
+    const basis = spendCostBasis(spend, "single bill");
+    const totals = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true });
+    const hasUsage = spend.some((row) => ["requests", "input_tokens", "output_tokens"].some((field) => row[field].trim() !== ""));
+    const missing = [];
+    for (const [field, label] of [["requests", "Requests"], ["processedInput", "Input tokens"], ["cachedInput", "Cache-read tokens"], ["cacheWriteInput", "Cache-write tokens"], ["outputTokens", "Output tokens"]]) {
+      if (totals[field] === null) missing.push(`${label}: not supplied for every row; the total is unavailable.`);
+    }
+    const groups = new Map();
+    spend.forEach((row) => {
+      const key = JSON.stringify([row.provider, row.model, row.route]);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    });
+    const mix = [...groups.values()].map((rows) => ({
+      label: [rows[0].provider || "Provider not supplied", rows[0].model || "Model not supplied", rows[0].route || "Route not supplied"].join(" / "),
+      ...summarizeSpendRows(rows, "model/route group", { allowZeroRequests: true }),
+    }));
+    let ready = 0;
+    let minutes = 0;
+    let minutesKnown = true;
+    let calls = 0;
+    let callsKnown = true;
+    let retries = 0;
+    let retriesKnown = true;
+    const resultIds = new Set();
+    work.forEach((row) => {
+      if (row.period.trim().toLowerCase() !== "baseline") throw new Error("Outcome rows must use baseline and cover the same bill period.");
+      if (!row.result_id.trim() || resultIds.has(row.result_id.trim())) throw new Error("Each outcome needs a unique, non-blank result_id.");
+      resultIds.add(row.result_id.trim());
+      if (row.date && (validDate(row.date, "Outcome date") < period.start || row.date > period.end)) throw new Error("Outcome date is outside the spend date buckets.");
+      if (row.workload && row.workload.trim() !== workload) throw new Error("Outcome workload does not match the bill.");
+      if (!["ready_to_use", "needs_correction", "needs_escalation"].includes(row.outcome_status)) throw new Error("Use ready_to_use, needs_correction, or needs_escalation for outcome_status.");
+      if (row.outcome_status === "ready_to_use") ready++;
+      const humanMinutes = optionalNumber(row.human_minutes, "Outcome human_minutes");
+      if (humanMinutes === null) minutesKnown = false;
+      else minutes += humanMinutes;
+      const requests = optionalNumber(row.model_requests, "Outcome model_requests", { integer: true });
+      const retry = optionalNumber(row.retry_requests, "Outcome retry_requests", { integer: true });
+      if (requests === null) callsKnown = false;
+      else calls += requests;
+      if (retry === null) retriesKnown = false;
+      else {
+        if (requests === null || retry > Math.max(requests - 1, 0)) throw new Error("Retry requests require model_requests and cannot exceed additional attempts.");
+        retries += retry;
+      }
+    });
+    if (work.length && (!config.acceptanceRule.trim() || !config.verifier.trim())) throw new Error("With outcomes, supply the ready rule and who verified the results.");
+    const requestsComparable = totals.requests !== null && callsKnown;
+    const requestMismatch = requestsComparable && totals.requests !== calls;
+    const outcomeSupported = Boolean(work.length && hasUsage && config.complete && !requestMismatch);
+    if (!work.length) missing.push("No outcome records: readiness, cost per ready result and quality are unknown.");
+    else if (!outcomeSupported) missing.push("Outcome unit cost withheld: supply usage, declare a complete matching workload/period and resolve any mismatch between spend requests and outcome model_requests.");
+    if (work.length && !requestsComparable) missing.push("Request reconciliation is unavailable. Any displayed outcome unit cost relies on your declaration that the full log matches the cost and usage boundary; it is not independently verified.");
+    if (!hasUsage) missing.push("Invoice/subscription only: no evidence of utilization, model efficiency, waste, readiness, or savings. Do not allocate a shared subscription to one workload without a documented allocation basis.");
+    const hourlyRate = optionalNumber(config.hourlyRate, "Human hourly rate");
+    const shared = optionalNumber(config.sharedCost, "Shared infrastructure cost");
+    const humanCost = hourlyRate === null || !minutesKnown ? null : minutes / 60 * hourlyRate;
+    const fullCost = humanCost === null || shared === null ? null : totals.providerCost + humanCost + shared;
+    if (shared === null || hourlyRate === null || !minutesKnown) missing.push("Full operating cost is unavailable until shared infrastructure, all human minutes and the human hourly rate are supplied. Provider-only unit cost excludes these costs.");
+    if (outcomeSupported && !ready) missing.push("No ready results: cost per ready result cannot be calculated and is not displayed as a number.");
+    missing.push("Single-bill evidence does not establish savings. To test a change, use Compare cost per ready result with two comparable routes and the existing cost, quality, coverage and policy gates.");
+    const result = { workload, currency, period, basis, totals, mix, missing, ready, completed: work.length, minutes: minutesKnown && work.length ? minutes : null,
+      retries: retriesKnown && work.length ? retries : null,
+      level: outcomeSupported ? "Cost, usage and outcomes" : hasUsage ? "Cost and usage" : "Invoice or subscription only",
+      providerUnit: outcomeSupported && ready ? totals.providerCost / ready : null,
+      fullUnit: outcomeSupported && ready && fullCost !== null ? fullCost / ready : null,
+      humanCost, shared, fullCost,
+    };
+    const checkNumbers = (value) => {
+      if (typeof value === "number" && (!Number.isFinite(value) || Math.abs(value) > 1e15)) throw new Error("Review totals exceed the supported numeric range.");
+      if (value && typeof value === "object") Object.values(value).forEach(checkNumbers);
+    };
+    checkNumbers(result);
+    return result;
+  }
+
+  async function buildSingleBillReview(spendText, workText = "", config = {}) {
+    const spend = parseCsv(spendText, "Universal spend");
+    requireColumns(spend, singleSpendColumns, "Universal spend");
+    const work = workText.trim() ? parseCsv(workText, "Outcome log") : [];
+    if (work.length) requireColumns(work, singleWorkColumns, "Outcome log");
+    const data = { schema_version: singleBillSchema, mode: "real", source: { spend, work }, config: {
+      acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", ...config,
+    } };
+    const summary = summarizeSingleBill(data);
+    data.period = summary.period;
+    data.currency = summary.currency;
+    if (new TextEncoder().encode(JSON.stringify(data, null, 2)).length > 5 * 1024 * 1024) throw new Error("The saved review would exceed the 5 MiB JSON limit. Aggregate spend buckets or use a smaller complete workload before importing.");
+    validateResult(data);
+    return data;
   }
 
   function providerCostTerm(baseline, proposed) {
@@ -281,29 +482,14 @@
     }
     const basis = spendCostBasis(spend, period);
 
-    let requests = 0;
-    let processedInput = 0;
-    let cachedInput = 0;
-    let cacheWriteInput = 0;
-    let outputTokens = 0;
-    let providerCost = 0;
-    spend.forEach((row, index) => {
-      const rowNumber = index + 2;
-      const rowRequests = finiteNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
-      const rowInput = finiteNumber(row.input_tokens, `Spend ${period} row ${rowNumber} input_tokens`, { integer: true });
-      const rowCached = finiteNumber(row.cached_input_tokens, `Spend ${period} row ${rowNumber} cached_input_tokens`, { integer: true });
-      const rowCacheWrite = finiteNumber(row.cache_write_input_tokens, `Spend ${period} row ${rowNumber} cache_write_input_tokens`, { integer: true });
-      if (rowCached + rowCacheWrite > rowInput) {
-        throw new Error(`Spend ${period} row ${rowNumber} has more cached and cache-write tokens than input tokens.`);
-      }
-      requests += rowRequests;
-      processedInput += rowInput;
-      cachedInput += rowCached;
-      cacheWriteInput += rowCacheWrite;
-      outputTokens += finiteNumber(row.output_tokens, `Spend ${period} row ${rowNumber} output_tokens`, { integer: true });
-      providerCost += finiteNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
-    });
-    if (requests === 0) throw new Error(`Spend ${period} requests must be greater than zero.`);
+    const {
+      requests,
+      processedInput,
+      cachedInput,
+      cacheWriteInput,
+      outputTokens,
+      providerCost,
+    } = summarizeSpendRows(spend, period);
 
     const seen = new Set();
     let accepted = 0;
@@ -360,8 +546,8 @@
           retriesKnown = false;
         } else {
           const retryRequests = finiteNumber(row.retry_requests, `Work ${period} row ${rowNumber} retry_requests`, { integer: true });
-          if (retryRequests > modelRequests) {
-            throw new Error(`Work ${period} row ${rowNumber} retries cannot exceed model requests.`);
+          if (retryRequests > Math.max(modelRequests - 1, 0)) {
+            throw new Error(`Work ${period} row ${rowNumber} retries cannot exceed the additional model requests after the first request.`);
           }
           retries += retryRequests;
         }
@@ -378,12 +564,13 @@
     if (accepted === 0) throw new Error(`The ${period} work log has no accepted results.`);
 
     const issues = [];
-    if (workRequestsKnown && requests !== workRequests) {
+    if (workRequestsKnown && requests !== null && requests !== workRequests) {
       issues.push(`The spend file reports ${requests.toLocaleString()} requests while the work log accounts for ${workRequests.toLocaleString()}.`);
     }
     if (config.outcomeLogComplete === false) {
       issues.push("The reviewer did not confirm that the outcome log covers the full workload and period.");
     }
+    const measuredRequests = requests ?? (workRequestsKnown ? workRequests : null);
     const route = [...new Set(spend.map((row) => row.route.trim()).filter(Boolean))].join(", ") || `${period} route`;
     const models = [...new Set(spend.map((row) => row.model.trim()).filter(Boolean))];
     const providers = [...new Set(spend.map((row) => row.provider.trim()).filter(Boolean))];
@@ -402,6 +589,7 @@
       workload,
       scenario: {
         id: period,
+        period: { start: minDate, end: maxDate },
         label: period === "baseline" ? "Current route" : "Proposed route",
         model: {
           provider: providers.join(", ") || "Provider not named",
@@ -417,7 +605,7 @@
           all_in_pilot_cost: round(allIn),
         },
         usage: {
-          requests,
+          requests: measuredRequests,
           retries: retriesKnown && workRequestsKnown ? retries : null,
           unique_input_tokens: null,
           processed_input_tokens: processedInput,
@@ -446,7 +634,7 @@
           source: `${costBasisLabel(basis)} from the universal spend template + detailed outcome log`,
           observed_at: maxDate,
           coverage: coverageComplete
-            ? `Complete ${period} outcome log declared for the spend period${workRequestsKnown ? "; request counts supplied" : "; request counts not supplied"}`
+            ? `Complete ${period} outcome log declared for the spend period${requests !== null && workRequestsKnown ? "; requests reconcile to provider usage" : workRequestsKnown ? "; request counts come from the work log" : "; request counts not supplied"}`
             : `Partial ${period} workload evidence`,
           coverage_status: coverageComplete ? "complete" : "partial",
           reconciliation_issues: issues,
@@ -459,9 +647,15 @@
           cost_per_usable_result: round(recurring / accepted),
           all_in_cost_per_usable_result: round(allIn / accepted),
           usable_result_rate: round(accepted / completed),
-          retry_rate: retriesKnown && workRequestsKnown ? round(retries / requests) : null,
-          cache_reuse_rate: processedInput ? round(cachedInput / processedInput) : 0,
-          cache_write_rate: processedInput ? round(cacheWriteInput / processedInput) : 0,
+          retry_rate: retriesKnown && workRequestsKnown && workRequests
+            ? round(retries / workRequests)
+            : null,
+          cache_reuse_rate: processedInput === null || cachedInput === null
+            ? null
+            : processedInput ? round(cachedInput / processedInput) : 0,
+          cache_write_rate: processedInput === null || cacheWriteInput === null
+            ? null
+            : processedInput ? round(cacheWriteInput / processedInput) : 0,
           context_reprocessing_ratio: null,
           human_review_minutes_per_usable_result: round((reviewMinutes + correctionMinutes) / accepted),
         },
@@ -499,6 +693,7 @@
     const hashes = { spend: await sha256(spendText), work: await sha256(workText) };
     const baselineBuild = buildScenario("baseline", spendRows, workRows, config, hashes);
     const proposedBuild = buildScenario("proposed", spendRows, workRows, config, hashes);
+    requireMatchingDurations(baselineBuild, proposedBuild);
     if (baselineBuild.currency !== proposedBuild.currency) {
       throw new Error("Baseline and proposed spend use different currencies.");
     }
@@ -613,28 +808,14 @@
     }
     const basis = spendCostBasis(spend, period);
 
-    let requests = 0;
-    let processedInput = 0;
-    let cachedInput = 0;
-    let cacheWriteInput = 0;
-    let outputTokens = 0;
-    let providerCost = 0;
-    spend.forEach((row, index) => {
-      const rowNumber = index + 2;
-      const rowInput = finiteNumber(row.input_tokens, `Spend ${period} row ${rowNumber} input_tokens`, { integer: true });
-      const rowCached = finiteNumber(row.cached_input_tokens, `Spend ${period} row ${rowNumber} cached_input_tokens`, { integer: true });
-      const rowCacheWrite = finiteNumber(row.cache_write_input_tokens, `Spend ${period} row ${rowNumber} cache_write_input_tokens`, { integer: true });
-      if (rowCached + rowCacheWrite > rowInput) {
-        throw new Error(`Spend ${period} row ${rowNumber} has more cached and cache-write tokens than input tokens.`);
-      }
-      requests += finiteNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
-      processedInput += rowInput;
-      cachedInput += rowCached;
-      cacheWriteInput += rowCacheWrite;
-      outputTokens += finiteNumber(row.output_tokens, `Spend ${period} row ${rowNumber} output_tokens`, { integer: true });
-      providerCost += finiteNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
-    });
-    if (requests === 0) throw new Error(`Spend ${period} requests must be greater than zero.`);
+    const {
+      requests,
+      processedInput,
+      cachedInput,
+      cacheWriteInput,
+      outputTokens,
+      providerCost,
+    } = summarizeSpendRows(spend, period);
 
     const population = finiteNumber(sample.population, `${period} results in period`, { integer: true });
     const ready = finiteNumber(sample.ready, `${period} ready sample`, { integer: true });
@@ -669,6 +850,7 @@
       workload,
       scenario: {
         id: period,
+        period: { start: [...dates].sort()[0], end: [...dates].sort().at(-1) },
         label: period === "baseline" ? "Current route" : "Proposed route",
         model: {
           provider: providers.join(", ") || "Provider not named",
@@ -738,8 +920,12 @@
           all_in_cost_per_usable_result: round(allIn / estimatedReady),
           usable_result_rate: round(readyRate),
           retry_rate: null,
-          cache_reuse_rate: processedInput ? round(cachedInput / processedInput) : 0,
-          cache_write_rate: processedInput ? round(cacheWriteInput / processedInput) : 0,
+          cache_reuse_rate: processedInput === null || cachedInput === null
+            ? null
+            : processedInput ? round(cachedInput / processedInput) : 0,
+          cache_write_rate: processedInput === null || cacheWriteInput === null
+            ? null
+            : processedInput ? round(cacheWriteInput / processedInput) : 0,
           context_reprocessing_ratio: null,
           human_review_minutes_per_usable_result: round(projectedHumanMinutes / estimatedReady),
         },
@@ -762,6 +948,7 @@
     const hashes = { spend: await sha256(spendText), sample: await sha256(sampleText) };
     const baselineBuild = buildSampledScenario("baseline", spendRows, samples.baseline, config, hashes);
     const proposedBuild = buildSampledScenario("proposed", spendRows, samples.proposed, config, hashes);
+    requireMatchingDurations(baselineBuild, proposedBuild);
     if (baselineBuild.currency !== proposedBuild.currency) {
       throw new Error("Baseline and proposed spend use different currencies.");
     }
@@ -831,14 +1018,16 @@
   }
 
   function openAIBucketDay(row, label) {
+    const start = finiteNumber(row.start_time, `${label} start_time`, { integer: true });
+    const end = finiteNumber(row.end_time, `${label} end_time`, { integer: true });
+    if (end <= start || end > 253402300799) throw new Error(`${label} has an invalid time range.`);
+    if (row.end_time_iso) validDate(row.end_time_iso.slice(0, 10), `${label} end_time_iso`);
     if (row.start_time_iso) {
       const day = row.start_time_iso.slice(0, 10);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`))) {
-        throw new Error(`${label} start_time_iso is invalid.`);
-      }
-      return day;
+      return validDate(day, `${label} start_time_iso`);
     }
-    const seconds = finiteNumber(row.start_time, `${label} start_time`, { integer: true });
+    const seconds = start;
+    if (seconds > 253402300799) throw new Error(`${label} start_time is outside the supported calendar range.`);
     return new Date(seconds * 1000).toISOString().slice(0, 10);
   }
 
@@ -925,7 +1114,7 @@
       if (!/^[A-Z]{3}$/.test(currency)) throw new Error(`${label} amount_currency must be a three-letter code.`);
       return [{
         date: openAIBucketDay(row, label),
-        amount: finiteNumber(row.amount_value, `${label} amount_value`),
+        amount: costNumber(row.amount_value, `${label} amount_value`),
         currency,
         project: row.project_id || "unattributed",
         api_key: row.api_key_id || "unattributed",
@@ -1001,17 +1190,128 @@
   }
 
   function validateResult(data) {
-    if (data?.schema_version === "ai-cost-lens-openai-bill-review/0.1") {
-      if (!data.bill || !data.usage || !data.coverage || !data.reconciliation) {
-        throw new Error("The OpenAI bill review is missing required sections.");
+    const fail = (path) => { throw new Error(`Review validation failed at ${path}. Rebuild the review from the original files.`); };
+    const shape = (value, spec, path = "review") => {
+      if (typeof spec === "string") {
+        if (spec.endsWith("?") && value === null) return;
+        const kind = spec.replace("?", "");
+        if (kind === "number" && (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > 1e15)) fail(path);
+        if (kind === "string" && (typeof value !== "string" || value.length > 10000)) fail(path);
+        if (kind === "boolean" && typeof value !== "boolean") fail(path);
+      } else if (Array.isArray(spec)) {
+        if (!Array.isArray(value) || value.length > 20000) fail(path);
+        value.forEach((item, index) => shape(item, spec[0], `${path}[${index}]`));
+      } else {
+        if (!value || typeof value !== "object" || Array.isArray(value)) fail(path);
+        Object.entries(spec).forEach(([key, child]) => shape(value[key], child, `${path}.${key}`));
       }
+    };
+    const fields = (names, type = "number") => Object.fromEntries(names.split(" ").map((key) => [key, type]));
+    const close = (a, b, path) => { if (Math.abs(a - b) > Math.max(0.00002, Math.abs(b) * 0.000002)) fail(path); };
+    // Bound even unknown fields: JSON may encode non-finite numbers as 1e999,
+    // and deeply nested input must not reach recursive rendering or cloning.
+    const walk = (value, depth = 0) => {
+      if (depth > 20) fail("nesting depth");
+      if (typeof value === "number" && (!Number.isFinite(value) || Math.abs(value) > 1e15)) fail("numeric range");
+      if (value && typeof value === "object") Object.values(value).forEach((v) => walk(v, depth + 1));
+    };
+    walk(data);
+    shape(data, { schema_version: "string", mode: "string", period: { start: "string", end: "string", timezone: "string" } });
+    validDate(data.period.start, "Review period start");
+    validDate(data.period.end, "Review period end");
+    if (data.period.start > data.period.end || data.period.timezone !== "UTC") fail("period");
+    const currency = (value) => { if (!/^[A-Z]{3}$/.test(value)) fail("currency"); };
+    if (data.schema_version === singleBillSchema) {
+      shape(data, { currency: "string", source: {
+        spend: [fields(singleSpendColumns.join(" "), "string")], work: [fields(singleWorkColumns.join(" "), "string")],
+      }, config: { acceptanceRule: "string", verifier: "string", complete: "boolean", hourlyRate: "string", sharedCost: "string" } });
+      for (const row of [...data.source.spend, ...data.source.work]) {
+        Object.values(row).forEach((value) => shape(value, "string", "source row"));
+      }
+      const summary = summarizeSingleBill(data);
+      if (data.mode !== "real" || data.currency !== summary.currency || data.period.start !== summary.period.start || data.period.end !== summary.period.end) fail("single bill metadata");
+      return data;
+    }
+    if (data?.schema_version === "ai-cost-lens-openai-bill-review/0.1") {
+      const usage = fields("requests input_tokens uncached_input_tokens cached_input_tokens cache_write_input_tokens output_tokens");
+      shape(data, {
+        provider: "string", finding: "string", next_step: "string", limitations: ["string"],
+        bill: { basis: "string", currency: "string", total: "number", ...fields("populated_rows days_with_cost") },
+        period: { aligned: "boolean", usage_dates: ["string"], cost_dates: ["string"] },
+        usage: { totals: usage, ...fields("populated_rows days_with_usage"), by_model: [{ model: "string", ...usage }], by_project: [{ project: "string", ...usage }] },
+        coverage: Object.fromEntries("usage_model usage_project usage_api_key usage_service_tier cost_project cost_api_key cost_line_item".split(" ").map((key) => [key, fields("attributed_rows total_rows row_coverage_pct")])),
+        reconciliation: { status: "string", ...fields("periods_aligned project_cost_join_supported model_cost_allocation_supported outcome_cost_supported savings_claim_allowed", "boolean") },
+        source: { usage_export: "string", cost_export: "string", usage_sha256: "string?", cost_sha256: "string?" },
+      });
+      currency(data.bill.currency);
+      if (!data.limitations.length || data.bill.total < 0 || data.provider !== "openai" || data.reconciliation.savings_claim_allowed || data.reconciliation.model_cost_allocation_supported || data.reconciliation.outcome_cost_supported) fail("bill evidence boundary");
       return;
     }
     if (!data || data.schema_version !== "ai-cost-lens-review-result/1.0") {
       throw new Error("That file is not an AI Cost Lens review result.");
     }
-    if (!data.baseline || !data.proposed || !data.comparison || !data.workload) {
-      throw new Error("The review result is missing required sections.");
+    currency(data.currency);
+    shape(data, {
+      currency: "string",
+      workload: { ...fields("name description outcome_unit", "string"), accepted_quality_threshold: "number" },
+      comparison: {
+        ...fields("status finding limitation recommendation", "string"),
+        ...fields("savings_claim_allowed same_cost_basis provider_cost_reported quality_holds both_policy_approved evidence_complete", "boolean"),
+        ...fields("recurring_cost_difference cost_per_usable_result_difference cost_per_usable_result_change_pct usable_result_rate_change_points normalized_proposed_cost_at_baseline_volume normalized_cost_difference"),
+        payback_usable_results: "number?",
+      },
+    });
+    if (!["real", "sampled", "illustrative"].includes(data.mode)) fail("mode");
+    if (data.workload.accepted_quality_threshold <= 0 || data.workload.accepted_quality_threshold > 1) fail("quality threshold");
+    const counts = fields("ready_to_use needs_correction needs_escalation");
+    for (const key of ["baseline", "proposed"]) {
+      const scenario = data[key];
+      shape(scenario, {
+        id: "string", label: "string", model: fields("provider name route", "string"),
+        costs: fields("model_cost shared_infrastructure_cost human_review_cost one_time_change_cost recurring_operating_cost all_in_pilot_cost"),
+        usage: fields("requests retries unique_input_tokens processed_input_tokens cached_input_tokens cache_write_input_tokens output_tokens", "number?"),
+        outcomes: { ...fields("basis verifier acceptance_rule", "string"), ...fields("completed_results usable_results human_review_minutes review_minutes correction_minutes"), status_counts: counts },
+        policy: { approved: "boolean", retention_mode: "string" },
+        evidence: { ...fields("cost_basis outcome_basis source observed_at coverage coverage_status cost_boundary", "string"), reconciliation_issues: ["string"], ...fields("provider_usage_sha256 provider_cost_sha256 outcome_log_sha256", "string?") },
+        measures: { ...fields("cost_per_usable_result all_in_cost_per_usable_result usable_result_rate human_review_minutes_per_usable_result"), ...fields("retry_rate cache_reuse_rate cache_write_rate context_reprocessing_ratio", "number?") },
+      }, key);
+      if (Object.values(scenario.costs).some((n) => n < 0) || scenario.costs.recurring_operating_cost <= 0 || scenario.outcomes.usable_results < 0.000001 || scenario.outcomes.completed_results < scenario.outcomes.usable_results || scenario.measures.cost_per_usable_result < 0.000001) fail(`${key} costs or outcomes`);
+      if (Object.values(scenario.usage).some((n) => n !== null && n < 0) || Object.values(scenario.outcomes.status_counts).some((n) => n < 0)) fail(`${key} counts`);
+      close(scenario.costs.recurring_operating_cost, scenario.costs.model_cost + scenario.costs.shared_infrastructure_cost + scenario.costs.human_review_cost, `${key} recurring cost`);
+      close(scenario.costs.all_in_pilot_cost, scenario.costs.recurring_operating_cost + scenario.costs.one_time_change_cost, `${key} pilot cost`);
+      close(scenario.measures.cost_per_usable_result, scenario.costs.recurring_operating_cost / scenario.outcomes.usable_results, `${key} unit cost`);
+      close(scenario.measures.usable_result_rate, scenario.outcomes.usable_results / scenario.outcomes.completed_results, `${key} yield`);
+      close(Object.values(scenario.outcomes.status_counts).reduce((a, b) => a + b, 0), scenario.outcomes.completed_results, `${key} outcome counts`);
+      for (const rate of [scenario.measures.usable_result_rate, scenario.measures.retry_rate, scenario.measures.cache_reuse_rate, scenario.measures.cache_write_rate]) {
+        if (rate !== null && (rate < 0 || rate > 1)) fail(`${key} rates`);
+      }
+      validDate(scenario.evidence.observed_at, `${key} observed date`);
+      if (scenario.outcomes.basis === "sampled" || scenario.outcomes.sample_counts !== undefined) {
+        shape(scenario.outcomes, { sample_counts: counts, ...fields("sample_size sample_human_minutes"), sample_method: "string", ready_rate_interval_95: ["number"] }, `${key}.sample`);
+        if (scenario.outcomes.sample_size <= 0 || scenario.outcomes.ready_rate_interval_95.length !== 2) fail(`${key}.sample`);
+      }
+    }
+    if (data.mode !== "illustrative") {
+      const periods = [data.baseline, data.proposed].map((scenario) => {
+        shape(scenario.period, { start: "string", end: "string" }, "route period");
+        validDate(scenario.period.start, "Route start");
+        validDate(scenario.period.end, "Route end");
+        if (scenario.period.start > scenario.period.end) fail("route period");
+        return { dates: [scenario.period.start, scenario.period.end] };
+      });
+      requireMatchingDurations(...periods);
+    }
+    const a = data.baseline, b = data.proposed, comparison = data.comparison;
+    close(comparison.recurring_cost_difference, b.costs.recurring_operating_cost - a.costs.recurring_operating_cost, "comparison recurring cost");
+    close(comparison.cost_per_usable_result_difference, b.measures.cost_per_usable_result - a.measures.cost_per_usable_result, "comparison unit cost");
+    const sameBasis = a.evidence.cost_basis === b.evidence.cost_basis;
+    const reported = [a, b].every((s) => s.evidence.cost_basis === "observed");
+    if (comparison.same_cost_basis !== sameBasis || comparison.provider_cost_reported !== reported) fail("comparison cost basis");
+    if (comparison.savings_claim_allowed && (data.mode !== "real" || !sameBasis || !reported || !comparison.evidence_complete || !comparison.quality_holds || !comparison.both_policy_approved || !a.policy.approved || !b.policy.approved || b.measures.usable_result_rate < data.workload.accepted_quality_threshold || comparison.cost_per_usable_result_difference >= 0 || [a,b].some((s) => s.evidence.coverage_status !== "complete" || s.evidence.reconciliation_issues.length))) fail("savings evidence");
+    if (data.planning !== undefined && data.planning !== null) {
+      const plan = fields("provider_cost shared_infrastructure_cost human_review_cost recurring_operating_cost completed_results ready_result_rate ready_results cost_per_ready_result");
+      shape(data.planning, { label: "string", plan, actual: plan, variance: { ...fields("provider_cost shared_infrastructure_cost human_review_cost recurring_operating_cost ready_results ready_result_rate_points cost_per_ready_result"), primary_cost_drivers: [{ label: "string", amount: "number", direction: "string" }] }, payback: { ...fields("expected_ready_results_per_month decision_horizon_months monthly_operating_savings one_time_change_cost horizon_net_savings"), payback_months: "number?", within_decision_horizon: "boolean", status: "string" } }, "planning");
+      if (["within_horizon", "outside_horizon"].includes(data.planning.payback.status) && data.planning.payback.payback_months === null) fail("planning payback");
     }
   }
 
@@ -1656,15 +1956,19 @@
     const rows = [
       {
         label: "Cache reuse (all input)",
-        base: pct(baseline.measures.cache_reuse_rate),
-        proposed: pct(proposed.measures.cache_reuse_rate),
-        note: "Share of processed input read from cache across all provider requests, including retries.",
+        base: pctOrMissing(baseline.measures.cache_reuse_rate),
+        proposed: pctOrMissing(proposed.measures.cache_reuse_rate),
+        note: baseline.measures.cache_reuse_rate === null || proposed.measures.cache_reuse_rate === null
+          ? "At least one source report did not supply the token fields needed for this measure."
+          : "Share of processed input read from cache across all provider requests, including retries.",
       },
       {
         label: "Cache writes",
-        base: pct(baseline.measures.cache_write_rate),
-        proposed: pct(proposed.measures.cache_write_rate),
-        note: "Context written to cache. This can carry a different rate from an ordinary input or cache read.",
+        base: pctOrMissing(baseline.measures.cache_write_rate),
+        proposed: pctOrMissing(proposed.measures.cache_write_rate),
+        note: baseline.measures.cache_write_rate === null || proposed.measures.cache_write_rate === null
+          ? "At least one source report did not supply cache-write tokens."
+          : "Context written to cache. This can carry a different rate from an ordinary input or cache read.",
       },
       {
         label: "Context reprocessed",
@@ -1684,10 +1988,12 @@
       },
       {
         label: "Processed input (all attempts)",
-        base: compact(baseline.usage.processed_input_tokens),
-        proposed: compact(proposed.usage.processed_input_tokens),
+        base: compactOrMissing(baseline.usage.processed_input_tokens),
+        proposed: compactOrMissing(proposed.usage.processed_input_tokens),
         note:
-          baseline.usage.unique_input_tokens === null
+          baseline.usage.processed_input_tokens === null || proposed.usage.processed_input_tokens === null
+            ? "At least one source report did not supply processed input tokens."
+            : baseline.usage.unique_input_tokens === null
             ? "Unique context is not exposed by this provider report."
             : `Both scenarios began with ${compact(baseline.usage.unique_input_tokens)} unique input tokens.`,
       },
@@ -1780,15 +2086,69 @@
         : "At least one side has incomplete or mismatched evidence. The review can show the modeled difference, but it cannot turn that difference into a savings claim.";
   }
 
+  function renderSingleBill() {
+    const review = summarizeSingleBill(state.data);
+    const { totals, period } = review;
+    const count = (value) => value === null ? "Not supplied" : compact(value);
+    const cost = (value) => value === null ? "Unavailable" : money(value, value < 1 ? 4 : 2);
+    const headline = `${cost(totals.providerCost)} declared for ${review.workload}. ${review.level}; no savings claim.`;
+    const metrics = [
+      [costBasisLabel(review.basis), cost(totals.providerCost), "Declared in the universal template; not independently verified"],
+      ["Requests", count(totals.requests), "Includes additional attempts when reported"],
+      ["Input tokens", count(totals.processedInput), `Cache read: ${count(totals.cachedInput)} · Cache write: ${count(totals.cacheWriteInput)}`],
+      ["Output tokens", count(totals.outputTokens), "Unknown fields are not zero"],
+      ["Ready results in supplied log", review.completed ? count(review.ready) : "Not supplied", `${review.completed} outcome rows · retries: ${count(review.retries)}`],
+      ["Provider cost per ready result", cost(review.providerUnit), "Excludes shared infrastructure and human effort"],
+      ["Full operating cost per ready result", cost(review.fullUnit), "Provider + declared shared infrastructure + recorded human effort"],
+    ];
+    document.getElementById("bill-review-kicker").textContent = "UNIVERSAL SINGLE-BILL REVIEW";
+    document.getElementById("bill-source-title").textContent = "Your completed universal template";
+    document.getElementById("bill-source-copy").textContent = "Declared evidence, not an independently verified invoice. Missing measures stay unavailable.";
+    document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · supplied date buckets, not proof of service-period coverage`;
+    document.getElementById("bill-mode-tag").textContent = review.level.toUpperCase();
+    document.getElementById("bill-finding-title").textContent = headline;
+    document.getElementById("bill-finding-limit").textContent = review.missing.join(" ");
+    document.getElementById("bill-metric-ledger").innerHTML = metrics.map(([label, value, note]) => `<div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`).join("");
+    document.getElementById("model-mix-title").textContent = "Declared bill drivers and available usage";
+    document.getElementById("bill-mix-note").textContent = `Amounts use ${costBasisLabel(review.basis).toLowerCase()}. This is the supplied attribution, not an inferred allocation or savings estimate. Cache values are token counts.`;
+    document.getElementById("bill-model-head").innerHTML = "<tr><th>Provider / model / route</th><th>Requests</th><th>Input / output</th><th>Cache read / write</th><th>Cost basis</th><th>Declared cost</th></tr>";
+    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${count(row.requests)}</td><td>${count(row.processedInput)} / ${count(row.outputTokens)}</td><td>${count(row.cachedInput)} / ${count(row.cacheWriteInput)}</td><td>${escapeHtml(costBasisLabel(review.basis))}</td><td>${cost(row.providerCost)}</td></tr>`).join("");
+    document.getElementById("bill-opportunity-ledger").innerHTML = review.missing.map((note) => `<article class="opportunity-row state-fix"><span class="opportunity-state">EVIDENCE BOUNDARY</span><div><p>${escapeHtml(note)}</p></div><em>Review</em></article>`).join("");
+    document.getElementById("bill-next-step").textContent = "Keep the source bill; add matching evidence before drawing stronger conclusions.";
+    document.getElementById("bill-boundary-copy").textContent = "To compare routes, use the comparison path. Single-bill reviews do not bypass its matching-period, cost-basis, coverage, quality or policy gates.";
+    document.getElementById("memo-title").textContent = "Single-bill evidence review";
+    document.getElementById("memo-meta").textContent = `${review.workload} · ${period.start} to ${period.end} · ${review.currency}`;
+    document.getElementById("memo-decision-code").textContent = "NO SAVINGS CLAIM";
+    document.getElementById("memo-decision-title").textContent = headline;
+    document.getElementById("memo-decision-limit").textContent = review.missing.join(" ");
+    document.getElementById("memo-numbers-title").textContent = "What the supplied evidence supports";
+    document.getElementById("memo-table-head").innerHTML = "<tr><th>Measure</th><th>Value</th><th>Boundary</th></tr>";
+    document.getElementById("memo-table-body").innerHTML = metrics.map((cells) => `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("");
+    document.getElementById("memo-rules").innerHTML = memoList([["Ready means", state.data.config.acceptanceRule || "Not supplied"], ["Verified by", state.data.config.verifier || "Not supplied"], ["Cost basis", costBasisLabel(review.basis)]]);
+    document.getElementById("memo-evidence").innerHTML = memoList([["Evidence level", review.level], ["Coverage", "Service period and completeness are user declarations, not independently verified"], ["Savings", "Not supported by one bill"]]);
+    document.getElementById("memo-planning").hidden = true;
+    document.getElementById("memo-next-step").textContent = "Add matching evidence or start a gated comparison.";
+    document.getElementById("memo-footer-status").textContent = "Calculated locally from supplied records · no AI API";
+  }
+
   function renderOpenAIBill() {
+    document.getElementById("bill-review-kicker").textContent = "OPENAI BILL REVIEW";
+    document.getElementById("bill-source-title").textContent = "Saved dashboard exports";
+    document.getElementById("bill-source-copy").textContent = "Total cost and usage mix are real evidence. Unsupported allocations stay blank.";
+    document.getElementById("model-mix-title").textContent = "Where the requests and tokens went";
+    document.getElementById("bill-mix-note").textContent = "These are observed usage measures. They are not billed dollars by model.";
+    document.getElementById("bill-model-head").innerHTML = "<tr><th>Model</th><th>Requests</th><th>Input</th><th>Output</th><th>Cache share</th><th>Billed cost</th></tr>";
     const { bill, usage, period, reconciliation, limitations, next_step: nextStep } = state.data;
     const totalInput = usage.totals.input_tokens;
     const cacheShare = totalInput ? usage.totals.cached_input_tokens / totalInput : 0;
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
-    document.getElementById("bill-mode-tag").textContent = state.data.mode === "illustrative" ? "ILLUSTRATIVE EXPORT" : "REAL PROVIDER EXPORT";
+    document.getElementById("bill-mode-tag").textContent = !period.aligned ? "PERIOD MISMATCH" : state.data.mode === "illustrative" ? "ILLUSTRATIVE EXPORT" : "REAL PROVIDER EXPORT";
     document.getElementById("bill-finding-title").textContent =
-      `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(usage.totals.requests)} requests. The export shows which models handled the traffic, but not what each model cost.`;
-    document.getElementById("bill-finding-limit").textContent = limitations[0];
+      period.aligned
+        ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(usage.totals.requests)} requests. The export shows which models handled the traffic, but not what each model cost.`
+        : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} in the cost export. Usage covers different daily buckets; these totals are not a matched financial review.`;
+    document.getElementById("bill-finding-limit").textContent = period.aligned ? limitations[0]
+      : "PERIOD MISMATCH: usage and cost exports cover different daily buckets. Export the same date range again before using this review for a financial decision.";
     const metrics = [
       ["Provider reported cost", money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2), `${bill.populated_rows} populated cost row${bill.populated_rows === 1 ? "" : "s"}`],
       ["Requests", compact(usage.totals.requests), `${usage.by_model.length} model${usage.by_model.length === 1 ? "" : "s"} observed`],
@@ -1842,6 +2202,7 @@
 
   function renderFinanceMemo() {
     if (!state.data) return;
+    if (state.data.schema_version === singleBillSchema) return;
     const isBill = state.data.schema_version === "ai-cost-lens-openai-bill-review/0.1";
     const memoPlanning = document.getElementById("memo-planning");
     if (isBill) {
@@ -1849,10 +2210,11 @@
       const total = Number(bill.total);
       document.getElementById("memo-title").textContent = "OpenAI bill review";
       document.getElementById("memo-meta").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
-      document.getElementById("memo-decision-code").textContent = "RECONCILE FIRST";
+      document.getElementById("memo-decision-code").textContent = period.aligned ? "RECONCILE FIRST" : "PERIOD MISMATCH";
       document.getElementById("memo-decision-title").textContent =
         `The bill proves ${money(total, total < 1 ? 4 : 2)} of provider spend. It does not prove cost by model or savings by outcome.`;
-      document.getElementById("memo-decision-limit").textContent = limitations[0];
+      document.getElementById("memo-decision-limit").textContent = period.aligned ? limitations[0]
+        : "Usage and cost exports cover different daily buckets. Export the same date range again before using this review for a financial decision.";
       document.getElementById("memo-numbers-title").textContent = "What the provider export shows";
       document.getElementById("memo-table-head").innerHTML = "<tr><th>Measure</th><th>Observed</th><th>What it proves</th></tr>";
       const billRows = [
@@ -1955,7 +2317,9 @@
 
   function renderAll() {
     validateResult(state.data);
-    const isBill = state.data.schema_version === "ai-cost-lens-openai-bill-review/0.1";
+    document.getElementById("lumen-conversation").replaceChildren();
+    const isSingle = state.data.schema_version === singleBillSchema;
+    const isBill = isSingle || state.data.schema_version === "ai-cost-lens-openai-bill-review/0.1";
     const reviewNav = document.querySelector(".question-nav");
     reviewNav.hidden = isBill;
     reviewNav.setAttribute("aria-hidden", String(isBill));
@@ -1969,6 +2333,10 @@
     });
     document.getElementById("story-toggle").hidden = isBill;
     renderFinanceMemo();
+    if (isSingle) {
+      renderSingleBill();
+      return;
+    }
     if (isBill) {
       renderOpenAIBill();
       return;
@@ -1981,7 +2349,7 @@
   }
 
   function setView(view) {
-    if (state.data?.schema_version === "ai-cost-lens-openai-bill-review/0.1") return;
+    if ([singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version)) return;
     state.view = view;
     document.querySelectorAll(".nav-item").forEach((item) => {
       item.classList.toggle("active", item.dataset.view === view);
@@ -2011,18 +2379,54 @@
   });
 
   const reviewDialog = document.getElementById("review-dialog");
+  const builderForm = document.getElementById("review-builder");
+  const filenameDefaults = new Map(
+    ["spend-file-name", "work-file-name", "openai-usage-file-name", "openai-cost-file-name"]
+      .map((id) => [id, document.getElementById(id).textContent]),
+  );
+
+  function syncBuilderControls() {
+    for (const mode of ["single", "workload", "openai"]) {
+      document.getElementById(`${mode}-builder-fields`).querySelectorAll("input, select, textarea").forEach((input) => {
+        input.disabled = state.builderMode !== mode;
+      });
+    }
+    for (const [id, mode] of [["sample-outcome-fields", "sample"], ["detailed-outcome-fields", "detailed"]]) {
+      document.getElementById(id).querySelectorAll("input, select, textarea").forEach((input) => {
+        input.disabled = state.builderMode !== "workload" || state.outcomeMode !== mode;
+      });
+    }
+  }
 
   function resetBuilderStart() {
+    // Reset only when beginning a new draft, never on submit or its failure.
+    // Native reset restores declared defaults and empties every file input.
+    builderForm.reset();
+    document.getElementById("review-file").value = "";
+    filenameDefaults.forEach((text, id) => { document.getElementById(id).textContent = text; });
+    const error = document.getElementById("builder-error");
+    error.textContent = "";
+    error.classList.remove("visible");
     state.builderMode = null;
+    state.outcomeMode = "sample";
+    document.querySelectorAll(".outcome-mode").forEach((item) => {
+      const active = item.dataset.outcomeMode === "sample";
+      item.classList.toggle("active", active);
+      item.setAttribute("aria-pressed", String(active));
+    });
+    document.getElementById("sample-outcome-fields").hidden = false;
+    document.getElementById("detailed-outcome-fields").hidden = true;
     document.querySelectorAll(".builder-mode").forEach((item) => {
       item.classList.remove("active");
       item.setAttribute("aria-pressed", "false");
     });
     document.getElementById("workload-builder-fields").hidden = true;
     document.getElementById("openai-builder-fields").hidden = true;
+    document.getElementById("single-builder-fields").hidden = true;
     document.getElementById("builder-actions").hidden = true;
     document.getElementById("builder-path-help").hidden = false;
     document.getElementById("review-dialog-title").textContent = "What would you like to check?";
+    syncBuilderControls();
   }
 
   document.getElementById("start-review").addEventListener("click", () => {
@@ -2060,20 +2464,23 @@
         item.setAttribute("aria-pressed", String(active));
       });
       const isOpenAI = state.builderMode === "openai";
-      document.getElementById("workload-builder-fields").hidden = isOpenAI;
+      const isSingle = state.builderMode === "single";
+      document.getElementById("single-builder-fields").hidden = !isSingle;
+      document.getElementById("workload-builder-fields").hidden = isOpenAI || isSingle;
       document.getElementById("openai-builder-fields").hidden = !isOpenAI;
       document.getElementById("builder-actions").hidden = false;
       document.getElementById("builder-path-help").hidden = true;
-      document.getElementById("review-dialog-title").textContent = isOpenAI
+      document.getElementById("review-dialog-title").textContent = isSingle ? "What can your one bill support?" : isOpenAI
         ? "Check what the OpenAI bill can actually prove."
         : "Test whether the proposed change is actually cheaper.";
-      document.getElementById("builder-action-note").textContent = isOpenAI
+      document.getElementById("builder-action-note").textContent = isSingle ? "Only supported measures are calculated. A single bill never proves savings." : isOpenAI
         ? "The provider total and usage mix stay separate when the exports do not support a join."
         : state.outcomeMode === "sample"
           ? "The quick path produces a sampled estimate. It never becomes booked savings."
           : "Use the detailed log when you have one row per completed result.";
-      document.getElementById("build-review").textContent = isOpenAI ? "Review the OpenAI bill" : "Build the finance review";
+      document.getElementById("build-review").textContent = isSingle ? "Review one bill" : isOpenAI ? "Review the OpenAI bill" : "Build the finance review";
       document.getElementById("builder-error").classList.remove("visible");
+      syncBuilderControls();
     });
   });
 
@@ -2088,6 +2495,7 @@
       const sampled = state.outcomeMode === "sample";
       document.getElementById("sample-outcome-fields").hidden = !sampled;
       document.getElementById("detailed-outcome-fields").hidden = sampled;
+      syncBuilderControls();
       document.getElementById("builder-action-note").textContent = sampled
         ? "The quick path produces a sampled estimate. It never becomes booked savings."
         : "Use the detailed log when you have one row per completed result.";
@@ -2111,12 +2519,29 @@
     const submit = document.getElementById("build-review");
     submit.disabled = true;
     submit.textContent = "Checking the evidence…";
+    const previousData = state.data;
     try {
+      if (state.builderMode === "single") {
+        const [spendFile] = document.getElementById("single-spend-file").files;
+        const [workFile] = document.getElementById("single-work-file").files;
+        if (!spendFile) throw new Error("Add the completed universal spend template.");
+        state.data = await buildSingleBillReview(await readLocalFile(spendFile), workFile ? await readLocalFile(workFile) : "", {
+          acceptanceRule: document.getElementById("single-ready-rule").value.trim(),
+          verifier: document.getElementById("single-verifier").value.trim(),
+          complete: document.getElementById("single-complete").checked,
+          hourlyRate: document.getElementById("single-hourly-rate").value,
+          sharedCost: document.getElementById("single-shared-cost").value,
+        });
+        renderAll();
+        reviewDialog.close();
+        showToast("Single bill reviewed locally. No savings claimed.");
+        return;
+      }
       if (state.builderMode === "openai") {
         const [usageFile] = document.getElementById("openai-usage-file").files;
         const [costFile] = document.getElementById("openai-cost-file").files;
         if (!usageFile || !costFile) throw new Error("Add both OpenAI CSV exports before building the bill review.");
-        state.data = await buildOpenAIBillReview(await usageFile.text(), await costFile.text());
+        state.data = await buildOpenAIBillReview(await readLocalFile(usageFile), await readLocalFile(costFile));
         validateResult(state.data);
         renderAll();
         reviewDialog.close();
@@ -2190,11 +2615,11 @@
             humanMinutes: sampleValue("proposed-human-minutes", "Proposed sample human minutes"),
           },
         };
-        state.data = await buildSampledReview(await spendFile.text(), samples, config);
+        state.data = await buildSampledReview(await readLocalFile(spendFile), samples, config);
       } else {
         const [workFile] = document.getElementById("work-file").files;
         if (!workFile) throw new Error("Add the detailed work log before building this review.");
-        state.data = await buildLocalReview(await spendFile.text(), await workFile.text(), config);
+        state.data = await buildLocalReview(await readLocalFile(spendFile), await readLocalFile(workFile), config);
       }
       validateResult(state.data);
       renderAll();
@@ -2202,11 +2627,13 @@
       reviewDialog.close();
       showToast("Finance review built locally. Your files never left the browser.");
     } catch (error) {
-      errorBox.textContent = error.message || "The review could not be built.";
+      state.data = previousData;
+      if (previousData) renderAll();
+      errorBox.textContent = error instanceof TypeError || error instanceof RangeError ? "The review could not be built. Check the file structure and numeric values." : error.message || "The review could not be built.";
       errorBox.classList.add("visible");
     } finally {
       submit.disabled = false;
-      submit.textContent = state.builderMode === "openai"
+      submit.textContent = state.builderMode === "single" ? "Review one bill" : state.builderMode === "openai"
         ? "Review the OpenAI bill"
         : state.builderMode === "workload"
           ? "Build the finance review"
@@ -2230,21 +2657,35 @@
     if (!state.data) return;
     renderFinanceMemo();
     document.body.classList.add("printing-memo");
-    window.print();
-    window.setTimeout(() => document.body.classList.remove("printing-memo"), 1500);
+    try {
+      window.print();
+    } catch (error) {
+      document.body.classList.remove("printing-memo");
+      showToast("Printing could not start. Try Print finance memo again.");
+    }
   });
 
   window.addEventListener("afterprint", () => {
     document.body.classList.remove("printing-memo");
   });
+  // Some browsers signal print-media exit instead of afterprint. Do not clean
+  // up merely because non-blocking window.print() has returned.
+  const printMedia = window.matchMedia?.("print");
+  const onPrintMediaChange = () => {
+    if (!printMedia.matches) document.body.classList.remove("printing-memo");
+  };
+  if (printMedia?.addEventListener) printMedia.addEventListener("change", onPrintMediaChange);
+  else printMedia?.addListener(onPrintMediaChange);
 
   document.getElementById("review-file").addEventListener("change", async (event) => {
     const [file] = event.target.files;
     if (!file) return;
+    const previousData = state.data;
     try {
+      const text = await readLocalFile(file);
       let data;
       try {
-        data = JSON.parse(await file.text());
+        data = JSON.parse(text);
       } catch (_error) {
         throw new Error("That file isn't valid JSON. Choose a saved AI Cost Lens review.");
       }
@@ -2254,7 +2695,9 @@
       setView("review");
       showToast(`${file.name} is open. Nothing was uploaded.`);
     } catch (error) {
-      showToast(error.message || "That file could not be opened.");
+      state.data = previousData;
+      if (previousData) renderAll();
+      showToast(error instanceof TypeError || error instanceof RangeError ? "That review is incomplete or has invalid values. Rebuild it from the original files." : error.message || "That file could not be opened.");
     } finally {
       event.target.value = "";
     }

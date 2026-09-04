@@ -9,11 +9,11 @@ import pytest
 
 ROOT = Path(__file__).parents[1]
 WEB = ROOT / "web"
-CASES = ROOT / "examples" / "bank-grade"
+CASES = ROOT / "examples" / "synthetic-cases"
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
-def test_bank_grade_cases_produce_the_expected_finance_decisions():
+def test_synthetic_cases_produce_the_expected_finance_decisions():
     script = r"""
 const fs = require("fs");
 let source = fs.readFileSync(process.argv[1], "utf8");

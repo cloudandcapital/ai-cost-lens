@@ -5,7 +5,7 @@
   "period": {"start": "2026-07-31", "end": "2026-08-31", "timezone": "UTC"},
   "workload": {
     "name": "Customer due diligence case summaries",
-    "description": "Synthetic bank-grade stress test. The provider bill falls, but more correction and escalation make each usable result cost more.",
+    "description": "Synthetic decision review. The provider bill falls, but more correction and escalation make each usable result cost more.",
     "outcome_unit": "ready result",
     "accepted_quality_threshold": 0.9
   },
@@ -40,7 +40,7 @@
     "evidence": {
       "cost_basis": "observed",
       "outcome_basis": "illustrative",
-      "source": "Synthetic bank-grade decision case",
+      "source": "Synthetic decision case",
       "observed_at": "2026-07-31",
       "coverage": "Complete synthetic outcome log for the illustrative period",
       "coverage_status": "illustrative",
@@ -67,7 +67,7 @@
     "evidence": {
       "cost_basis": "observed",
       "outcome_basis": "illustrative",
-      "source": "Synthetic bank-grade decision case",
+      "source": "Synthetic decision case",
       "observed_at": "2026-08-31",
       "coverage": "Complete synthetic outcome log for the illustrative period",
       "coverage_status": "illustrative",

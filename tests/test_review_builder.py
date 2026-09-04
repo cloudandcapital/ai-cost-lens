@@ -9,7 +9,11 @@ import pytest
 from click.testing import CliRunner
 
 from ai_cost_lens.cli import cli
-from ai_cost_lens.review_builder import ReviewBuildError, build_review_from_manifest
+from ai_cost_lens.review_builder import (
+    ReviewBuildError,
+    _outcomes,
+    build_review_from_manifest,
+)
 
 
 def _evidence(day: str, cost: str, requests: int, cached: int = 100) -> dict:
@@ -197,6 +201,33 @@ def test_request_mismatch_remains_visible_and_blocks_savings(tmp_path: Path):
     assert result["proposed"]["evidence"]["coverage_status"] == "partial"
     assert "3 requests" in result["proposed"]["evidence"]["reconciliation_issues"][0]
     assert result["comparison"]["savings_claim_allowed"] is False
+
+
+def test_retry_requests_exclude_the_first_model_request(tmp_path: Path):
+    outcome_path = tmp_path / "outcomes.csv"
+    outcome_path.write_text(
+        "result_id,date,accepted,model_requests,retry_requests,human_review_minutes,correction_minutes\n"
+        "result-1,2026-08-01,true,1,1,2,0\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        ReviewBuildError,
+        match="cannot exceed the additional model requests after the first request",
+    ):
+        _outcomes(outcome_path)
+
+
+def test_builder_rejects_unequal_period_durations(tmp_path: Path):
+    manifest = _manifest(tmp_path)
+    evidence_path = tmp_path / "baseline-evidence.json"
+    evidence = json.loads(evidence_path.read_text())
+    for section in ("usage", "cost"):
+        extra = deepcopy(evidence[section]["rows"][0])
+        extra["date"] = "2026-08-02"
+        evidence[section]["rows"].append(extra)
+    _write_json(evidence_path, evidence)
+    with pytest.raises(ReviewBuildError, match="different durations"):
+        build_review_from_manifest(manifest)
 
 
 def test_evidence_mode_must_match_review_mode(tmp_path: Path):

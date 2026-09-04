@@ -142,9 +142,9 @@ def _outcomes(path: Path) -> dict[str, Any]:
         retry_requests = _integer(
             row.get("retry_requests"), f"outcome row {row_number} retry_requests"
         )
-        if retry_requests > model_requests:
+        if retry_requests > max(model_requests - 1, 0):
             raise ReviewBuildError(
-                f"outcome row {row_number} retry_requests cannot exceed model_requests"
+                f"outcome row {row_number} retry_requests cannot exceed the additional model requests after the first request"
             )
         rows.append(
             {
@@ -482,6 +482,17 @@ def build_review_from_manifest(path: Path) -> dict[str, Any]:
     proposed, proposed_dates = _scenario(
         proposed_raw, "proposed", path.parent, currency, mode
     )
+    baseline_span = date.fromisoformat(max(baseline_dates)) - date.fromisoformat(
+        min(baseline_dates)
+    )
+    proposed_span = date.fromisoformat(max(proposed_dates)) - date.fromisoformat(
+        min(proposed_dates)
+    )
+    if baseline_span != proposed_span:
+        raise ReviewBuildError(
+            "baseline and proposed date spans have different durations; "
+            "use equally long, complete periods before comparing totals"
+        )
     dates = sorted(set(baseline_dates + proposed_dates))
     declaration = {
         "schema_version": "ai-cost-lens-review/1.0",
@@ -495,6 +506,9 @@ def build_review_from_manifest(path: Path) -> dict[str, Any]:
     if manifest.get("planning") is not None:
         declaration["planning"] = manifest["planning"]
     try:
-        return build_review(declaration)
+        result = build_review(declaration)
+        for key, days in (("baseline", baseline_dates), ("proposed", proposed_dates)):
+            result[key]["period"] = {"start": min(days), "end": max(days)}
+        return result
     except ReviewError as exc:
         raise ReviewBuildError(str(exc)) from exc

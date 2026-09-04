@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const target = resolve(root, "examples", "bank-grade");
+const target = resolve(root, "examples", "synthetic-cases");
 await mkdir(target, { recursive: true });
 
 const spendHeader = "period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,currency";
@@ -106,4 +106,4 @@ for (const [name, contents] of cases) {
   await writeFile(resolve(target, name), contents, "utf8");
 }
 
-console.log(`Wrote ${cases.length} bank-grade synthetic case files to ${target}`);
+console.log(`Wrote ${cases.length} synthetic case files to ${target}`);
