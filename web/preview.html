@@ -3846,9 +3846,9 @@ body.story-mode .cockpit-grid {
             <span>Get a cost baseline and practical next steps. Usage, outcomes, retries, and human effort are optional.</span>
           </button>
           <button class="builder-mode" data-builder-mode="openai" type="button" aria-pressed="false">
-            <small>OPENAI BILL AND USAGE</small>
-            <strong>Review OpenAI exports</strong>
-            <span>Use matching Activity and Cost CSVs for a bill and usage review.</span>
+            <small>OPENAI OR CLAUDE</small>
+            <strong>Review OpenAI or Claude exports</strong>
+            <span>Use supported provider exports for a local bill and usage review.</span>
           </button>
           <button class="builder-mode" data-builder-mode="workload" type="button" aria-pressed="false">
             <small>ANY PROVIDER OR AI TOOL</small>
@@ -3868,6 +3868,18 @@ body.story-mode .cockpit-grid {
             <div class="step-number">01</div>
             <div>
               <h3>Start with one bill</h3>
+              <p>For a simple subscription or invoice, enter the bill below. No CSV is required.</p>
+              <div class="field-grid compact-fields invoice-entry">
+                <label><span>Provider</span><input id="invoice-provider" type="text" placeholder="Claude, ChatGPT, or another provider" /></label>
+                <label><span>Subscription or workload name</span><input id="invoice-workload" type="text" /></label>
+                <label><span>Invoice date</span><input id="invoice-date" type="date" /></label>
+                <label><span>Optional service-period start</span><input id="invoice-period-start" type="date" /></label>
+                <label><span>Optional service-period end</span><input id="invoice-period-end" type="date" /></label>
+                <label><span>Billed amount</span><input id="invoice-amount" type="number" min="0" step="any" /></label>
+                <label><span>Currency</span><input id="invoice-currency" type="text" maxlength="3" placeholder="USD" /></label>
+              </div>
+              <p>An invoice proves cost, not usage or outcomes. Missing requests, tokens, retries, and human effort stay unavailable. One bill cannot establish savings. Add detailed usage later only when it is useful.</p>
+              <p><strong>More detail?</strong> Upload the universal CSV instead.</p>
               <p>Download the template, delete every example row, and keep the column headers. Use <strong>baseline</strong> on every new row; no proposed period is needed.</p>
               <div class="template-links"><a href="data:text/csv;base64,cGVyaW9kLGRhdGUsd29ya2xvYWQscHJvdmlkZXIsbW9kZWwscm91dGUscmVxdWVzdHMsaW5wdXRfdG9rZW5zLGNhY2hlZF9pbnB1dF90b2tlbnMsY2FjaGVfd3JpdGVfaW5wdXRfdG9rZW5zLG91dHB1dF90b2tlbnMscHJvdmlkZXJfY29zdCxjb3N0X2Jhc2lzLGN1cnJlbmN5CmJhc2VsaW5lLDIwMjYtMDgtMDEsSW52b2ljZSBleHRyYWN0aW9uLE1vZGVsIEFQSSxDdXJyZW50IG1vZGVsLEN1cnJlbnQgcHJvZHVjdGlvbiByb3V0ZSwzLDI0MDAwMCw0MDAwMCwwLDMyMDAwLDE4LjQwLHByb3ZpZGVyX3JlcG9ydGVkLFVTRApwcm9wb3NlZCwyMDI2LTA4LTE1LEludm9pY2UgZXh0cmFjdGlvbixNb2RlbCBBUEksU21hbGxlciByb3V0ZWQgbW9kZWwsUHJvcG9zZWQgcGlsb3Qgcm91dGUsMiwyMTAwMDAsNzAwMDAsMCwzMDAwMCwxMS4yMCxjYWxjdWxhdGVkLFVTRAo=" download>Download spend template</a></div>
               <p>For an invoice or subscription, enter one row with <code>period=baseline</code>, the invoice date in <code>date</code> (YYYY-MM-DD), the subscription or workload name in <code>workload</code>, the billed amount in <code>provider_cost</code>, <code>cost_basis=provider_reported</code>, and a three-letter <code>currency</code>. Enter <code>provider</code> if known. Leave model, route, requests and tokens blank unless the source supports them. An invoice date is not evidence of the service-period duration.</p>
@@ -4138,6 +4150,11 @@ body.story-mode .cockpit-grid {
         </div>
 
         <div id="openai-builder-fields" hidden>
+          <div class="outcome-mode-choice" role="group" aria-label="Choose provider export">
+            <button class="outcome-mode import-provider active" data-import-provider="openai" type="button" aria-pressed="true"><strong>OpenAI</strong><span>Activity and Cost CSVs</span></button>
+            <button class="outcome-mode import-provider" data-import-provider="claude" type="button" aria-pressed="false"><strong>Claude</strong><span>Team/Enterprise spend CSV or Admin API JSON</span></button>
+          </div>
+          <div id="openai-import-fields">
           <div class="path-requirements">
             <strong>What you need</strong>
             <span>One Activity data CSV for Completions and one Cost data CSV, exported for the same date range in the OpenAI Usage dashboard.</span>
@@ -4175,6 +4192,23 @@ body.story-mode .cockpit-grid {
               </p>
             </div>
           </section>
+          </div>
+          <div id="claude-import-fields" hidden>
+            <div class="path-requirements"><strong>What you need</strong><span>A Claude Team/Enterprise spend-report CSV, or complete Messages Usage and Cost Admin API JSON exports. AI Cost Lens never asks for an API key.</span></div>
+            <section class="builder-step"><div class="step-number">01</div><div>
+              <h3>Add a documented Claude export</h3>
+              <p>Team and Enterprise spend reports include user email and account UUID. Those identifiers are discarded before the review is built and never appear in the review, JSON download, Share view, memo, browser storage, console, or errors.</p>
+              <div class="file-pair">
+                <label><span>Team/Enterprise spend CSV</span><input id="claude-spend-file" type="file" accept=".csv,text/csv" /><small id="claude-spend-file-name">Export from Settings → Analytics → How much is Claude costing?</small></label>
+                <label><span>Messages Usage API JSON</span><input id="claude-usage-file" type="file" accept=".json,application/json" /><small id="claude-usage-file-name">Optional when using the spend CSV; otherwise pair with Cost JSON.</small></label>
+                <label><span>Cost API JSON</span><input id="claude-cost-file" type="file" accept=".json,application/json" /><small id="claude-cost-file-name">Required with Messages Usage JSON.</small></label>
+              </div>
+              <div class="field-grid compact-fields"><label><span>Reporting-period start</span><input id="claude-period-start" type="date" /></label><label><span>Reporting-period end</span><input id="claude-period-end" type="date" /></label></div>
+              <p>Claude Console Usage and Cost CSV headers are not published by Anthropic, so those native CSVs are not claimed as supported without an authentic current sample. Export complete Admin API JSON pages yourself; do not paste an Admin API key here.</p>
+              <p>Provider reports count calls, but they do not identify which calls were retries for the same finished result. Add application, gateway, or work-log data only when available.</p>
+            </div></section>
+            <section class="builder-step"><div class="step-number">02</div><div><h3>Confirm the normalized review</h3><div id="claude-confirmation" class="path-requirements" hidden></div><p>Review the provider, period, products, models, totals, missing fields, row count, and identifier-removal confirmation before building the review.</p></div></section>
+          </div>
         </div>
 
         <div class="builder-error" id="builder-error" role="alert"></div>
@@ -4218,6 +4252,8 @@ body.story-mode .cockpit-grid {
     story: false,
     builderMode: null,
     outcomeMode: "sample",
+    importProvider: "openai",
+    pendingClaudeImport: null,
     breakEvenReady: false,
   };
 
@@ -4479,7 +4515,11 @@ body.story-mode .cockpit-grid {
     if (!workload || spend.some((row) => row.workload.trim() !== workload)) throw new Error("Use one workload or subscription name per single-bill review.");
     if (!/^[A-Z]{3}$/.test(currency) || spend.some((row) => row.currency.trim().toUpperCase() !== currency)) throw new Error("Use one three-letter currency per review.");
     const dates = spend.map((row) => row.date).sort();
-    const period = { start: dates[0], end: dates.at(-1), timezone: "UTC" };
+    const declaredStart = config.serviceStart ? validDate(config.serviceStart, "Service-period start") : null;
+    const declaredEnd = config.serviceEnd ? validDate(config.serviceEnd, "Service-period end") : null;
+    if (Boolean(declaredStart) !== Boolean(declaredEnd)) throw new Error("Supply both service-period dates or leave both blank.");
+    if (declaredStart && declaredEnd < declaredStart) throw new Error("Service-period end cannot be before its start.");
+    const period = { start: declaredStart || dates[0], end: declaredEnd || dates.at(-1), timezone: "UTC" };
     const basis = spendCostBasis(spend, "single bill");
     const totals = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true });
     const hasUsage = spend.some((row) => ["requests", "input_tokens", "output_tokens"].some((field) => row[field].trim() !== ""));
@@ -5496,6 +5536,144 @@ body.story-mode .cockpit-grid {
     };
   }
 
+  const claudeSpendColumns = [
+    "user_email", "account_uuid", "product", "model", "model_family", "total_requests",
+    "total_prompt_tokens", "total_completion_tokens", "total_net_spend_usd", "total_gross_spend_usd",
+  ];
+
+  function safeImportedLabel(value, label) {
+    const text = String(value || "").trim();
+    if (!text || /^[=+@-]/.test(text) || /<\/?[a-z][^>]*>/i.test(text)) throw new Error(`${label} contains unsupported formula or markup text.`);
+    return text;
+  }
+
+  function rowsToCsv(rows) {
+    const quote = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    return [singleSpendColumns.join(","), ...rows.map((row) => singleSpendColumns.map((column) => quote(row[column])).join(","))].join("\n");
+  }
+
+  function claudePeriod(start, end) {
+    const from = validDate(start, "Claude reporting-period start");
+    const to = validDate(end, "Claude reporting-period end");
+    if (to < from) throw new Error("Claude reporting-period end cannot be before its start.");
+    return { start: from, end: to };
+  }
+
+  async function buildClaudeSpendReview(text, start, end) {
+    const period = claudePeriod(start, end);
+    const parsed = parseCsv(text, "Claude spend report");
+    const raw = parsed.map((source) => {
+      const normalized = {};
+      Object.entries(source).forEach(([header, value]) => {
+        const key = header.trim().toLowerCase().replace(/[\s-]+/g, "_");
+        if (Object.hasOwn(normalized, key)) throw new Error(`Claude spend report has duplicate normalized column ${key}.`);
+        normalized[key] = value;
+      });
+      return normalized;
+    });
+    requireColumns(raw, claudeSpendColumns, "Claude Team/Enterprise spend report");
+    const rows = raw.map((row, index) => {
+      const label = `Claude spend row ${index + 2}`;
+      const product = safeImportedLabel(row.product, `${label} product`);
+      const model = safeImportedLabel(row.model || row.model_family, `${label} model`);
+      const net = costNumber(row.total_net_spend_usd, `${label} total_net_spend_usd`);
+      costNumber(row.total_gross_spend_usd, `${label} total_gross_spend_usd`);
+      const requests = optionalNumber(row.total_requests, `${label} total_requests`, { integer: true });
+      const promptTokens = optionalNumber(row.total_prompt_tokens, `${label} total_prompt_tokens`, { integer: true });
+      const completionTokens = optionalNumber(row.total_completion_tokens, `${label} total_completion_tokens`, { integer: true });
+      return {
+        period: "baseline", date: period.start, workload: "Claude organization spend", provider: "Anthropic",
+        model, route: product, requests: requests === null ? "" : String(requests),
+        input_tokens: promptTokens === null ? "" : String(promptTokens),
+        cached_input_tokens: "", cache_write_input_tokens: "",
+        output_tokens: completionTokens === null ? "" : String(completionTokens),
+        provider_cost: String(net), cost_basis: "provider_reported", currency: "USD",
+      };
+    });
+    const review = await buildSingleBillReview(rowsToCsv(rows), "", { acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", serviceStart: period.start, serviceEnd: period.end, reviewSource: "claude_spend_report" });
+    const summary = summarizeSingleBill(review);
+    return { review, confirmation: {
+      provider: "Anthropic", period, products: [...new Set(rows.map((row) => row.route))], models: [...new Set(rows.map((row) => row.model))],
+      providerCost: summary.totals.providerCost, requests: summary.totals.requests, inputTokens: summary.totals.processedInput,
+      outputTokens: summary.totals.outputTokens, missing: ["Cache values", "Retries", "Human effort", "Outcomes"],
+      sourceRows: raw.length, identifiersDiscarded: true,
+    } };
+  }
+
+  function parseClaudeApiJson(text, label) {
+    if (new TextEncoder().encode(text).length > 5 * 1024 * 1024) throw new Error(`${label} exceeds the 5 MiB local file limit.`);
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error(`${label} is not valid JSON.`); }
+    if (!data || !Array.isArray(data.data) || typeof data.has_more !== "boolean") throw new Error(`${label} does not match the published Anthropic Admin API schema.`);
+    if (data.has_more || data.next_page) throw new Error(`${label} is a partial API page. Export every page and combine complete results before review.`);
+    return data;
+  }
+
+  function claudeDailyBucket(bucket, label) {
+    if (!bucket || typeof bucket !== "object" || Array.isArray(bucket)) throw new Error(`${label} is not an object.`);
+    if (typeof bucket.starting_at !== "string" || typeof bucket.ending_at !== "string") throw new Error(`${label} is missing its time boundary.`);
+    const startTime = Date.parse(bucket.starting_at);
+    const endTime = Date.parse(bucket.ending_at);
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime - startTime !== 86400000) throw new Error(`${label} must be one complete daily bucket.`);
+    return validDate(bucket.starting_at.slice(0, 10), `${label} start`);
+  }
+
+  async function buildClaudeApiReview(usageText, costText, start, end) {
+    const period = claudePeriod(start, end);
+    const usage = parseClaudeApiJson(usageText, "Claude Messages Usage JSON");
+    const costs = parseClaudeApiJson(costText, "Claude Cost JSON");
+    const groups = new Map();
+    const add = (date, model) => {
+      const key = `${date}\u0000${model}`;
+      if (!groups.has(key)) groups.set(key, { date, model, cost: 0, input: 0, cached: 0, cacheWrite: 0, output: 0, usage: false });
+      return groups.get(key);
+    };
+    const usageDates = [];
+    usage.data.forEach((bucket, bucketIndex) => {
+      const date = claudeDailyBucket(bucket, `Usage bucket ${bucketIndex + 1}`); usageDates.push(date);
+      if (!Array.isArray(bucket.results)) throw new Error("Claude Messages Usage JSON has an invalid results list.");
+      const seen = new Set();
+      bucket.results.forEach((item, index) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(`Usage result ${index + 1} is not an object.`);
+        const signature = JSON.stringify(item);
+        if (seen.has(signature)) throw new Error(`Usage result ${index + 1} duplicates an earlier result in the same daily bucket.`);
+        seen.add(signature);
+        const model = safeImportedLabel(item.model || "Mixed models", `Usage result ${index + 1} model`);
+        const row = add(date, model); row.usage = true;
+        const uncached = finiteNumber(item.uncached_input_tokens, "uncached_input_tokens", { integer: true });
+        const cached = finiteNumber(item.cache_read_input_tokens, "cache_read_input_tokens", { integer: true });
+        if (!item.cache_creation || typeof item.cache_creation !== "object" || Array.isArray(item.cache_creation)) throw new Error("cache_creation must contain the published cache token fields.");
+        const cacheWrite = finiteNumber(item.cache_creation.ephemeral_1h_input_tokens, "ephemeral_1h_input_tokens", { integer: true }) + finiteNumber(item.cache_creation.ephemeral_5m_input_tokens, "ephemeral_5m_input_tokens", { integer: true });
+        row.input += uncached + cached + cacheWrite;
+        row.cached += cached;
+        row.cacheWrite += cacheWrite;
+        row.output += finiteNumber(item.output_tokens, "output_tokens", { integer: true });
+      });
+    });
+    const costDates = [];
+    costs.data.forEach((bucket, bucketIndex) => {
+      const date = claudeDailyBucket(bucket, `Cost bucket ${bucketIndex + 1}`); costDates.push(date);
+      if (!Array.isArray(bucket.results)) throw new Error("Claude Cost JSON has an invalid results list.");
+      const seen = new Set();
+      bucket.results.forEach((item, index) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(`Cost result ${index + 1} is not an object.`);
+        const signature = JSON.stringify(item);
+        if (seen.has(signature)) throw new Error(`Cost result ${index + 1} duplicates an earlier result in the same daily bucket.`);
+        seen.add(signature);
+        if (item.currency !== "USD") throw new Error(`Cost result ${index + 1} currency must be USD.`);
+        const model = safeImportedLabel(item.model || "Mixed models", `Cost result ${index + 1} model`);
+        add(date, model).cost += costNumber(item.amount, `Cost result ${index + 1} amount`) / 100;
+      });
+    });
+    if (JSON.stringify([...new Set(usageDates)].sort()) !== JSON.stringify([...new Set(costDates)].sort())) throw new Error("PERIOD MISMATCH: Claude usage and cost JSON do not cover the same daily buckets.");
+    const visibleDates = [...new Set(usageDates)].sort();
+    if (visibleDates[0] !== period.start || visibleDates.at(-1) !== period.end) throw new Error("PERIOD MISMATCH: the declared Claude period does not match the exported daily buckets.");
+    const rows = [...groups.values()].map((item) => ({ period: "baseline", date: item.date, workload: "Claude API usage", provider: "Anthropic", model: item.model, route: "Claude API", requests: "", input_tokens: item.usage ? String(item.input) : "", cached_input_tokens: item.usage ? String(item.cached) : "", cache_write_input_tokens: item.usage ? String(item.cacheWrite) : "", output_tokens: item.usage ? String(item.output) : "", provider_cost: String(round(item.cost)), cost_basis: "provider_reported", currency: "USD" }));
+    const review = await buildSingleBillReview(rowsToCsv(rows), "", { acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", serviceStart: period.start, serviceEnd: period.end, reviewSource: "claude_admin_api" });
+    const summary = summarizeSingleBill(review);
+    return { review, confirmation: { provider: "Anthropic", period, products: ["Claude API"], models: [...new Set(rows.map((row) => row.model))], providerCost: summary.totals.providerCost, requests: null, inputTokens: summary.totals.processedInput, outputTokens: summary.totals.outputTokens, missing: ["Request count", "Retries", "Human effort", "Outcomes"], sourceRows: usage.data.length + costs.data.length, identifiersDiscarded: true } };
+  }
+
   function validateResult(data) {
     const fail = (path) => { throw new Error(`Review validation failed at ${path}. Rebuild the review from the original files.`); };
     const shape = (value, spec, path = "review") => {
@@ -6431,7 +6609,12 @@ body.story-mode .cockpit-grid {
           ];
     document.getElementById("bill-review-kicker").textContent = stage.kicker;
     document.getElementById("bill-review-title").textContent = stage.title;
-    document.getElementById("bill-source-title").textContent = "Your completed universal template";
+    const sourceTitles = {
+      invoice_form: "Your invoice details",
+      claude_spend_report: "Your Claude Team or Enterprise spend report",
+      claude_admin_api: "Your saved Claude Admin API reports",
+    };
+    document.getElementById("bill-source-title").textContent = sourceTitles[state.data.config.reviewSource] || "Your completed universal template";
     document.getElementById("bill-source-copy").textContent = "Start with the records you already have. Each additional layer deepens the review without replacing the bill.";
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · supplied date buckets, not proof of service-period coverage`;
     document.getElementById("bill-mode-tag").textContent = stage.tag;
@@ -6768,7 +6951,7 @@ body.story-mode .cockpit-grid {
   const reviewDialog = document.getElementById("review-dialog");
   const builderForm = document.getElementById("review-builder");
   const filenameDefaults = new Map(
-    ["spend-file-name", "work-file-name", "openai-usage-file-name", "openai-cost-file-name"]
+    ["spend-file-name", "work-file-name", "openai-usage-file-name", "openai-cost-file-name", "claude-spend-file-name", "claude-usage-file-name", "claude-cost-file-name"]
       .map((id) => [id, document.getElementById(id).textContent]),
   );
 
@@ -6778,6 +6961,8 @@ body.story-mode .cockpit-grid {
         input.disabled = state.builderMode !== mode;
       });
     }
+    document.getElementById("openai-import-fields").querySelectorAll("input").forEach((input) => { input.disabled = state.builderMode !== "openai" || state.importProvider !== "openai"; });
+    document.getElementById("claude-import-fields").querySelectorAll("input").forEach((input) => { input.disabled = state.builderMode !== "openai" || state.importProvider !== "claude"; });
     for (const [id, mode] of [["sample-outcome-fields", "sample"], ["detailed-outcome-fields", "detailed"]]) {
       document.getElementById(id).querySelectorAll("input, select, textarea").forEach((input) => {
         input.disabled = state.builderMode !== "workload" || state.outcomeMode !== mode;
@@ -6796,6 +6981,12 @@ body.story-mode .cockpit-grid {
     error.classList.remove("visible");
     state.builderMode = null;
     state.outcomeMode = "sample";
+    state.importProvider = "openai";
+    state.pendingClaudeImport = null;
+    document.querySelectorAll(".import-provider").forEach((item) => { const active = item.dataset.importProvider === "openai"; item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active)); });
+    document.getElementById("openai-import-fields").hidden = false;
+    document.getElementById("claude-import-fields").hidden = true;
+    document.getElementById("claude-confirmation").hidden = true;
     document.querySelectorAll(".outcome-mode").forEach((item) => {
       const active = item.dataset.outcomeMode === "sample";
       item.classList.toggle("active", active);
@@ -6858,15 +7049,28 @@ body.story-mode .cockpit-grid {
       document.getElementById("builder-actions").hidden = false;
       document.getElementById("builder-path-help").hidden = true;
       document.getElementById("review-dialog-title").textContent = isSingle ? "Start with the records you already have." : isOpenAI
-        ? "See what is driving the OpenAI bill."
+        ? "See what is driving the provider bill."
         : "Test whether the proposed change is actually cheaper.";
       document.getElementById("builder-action-note").textContent = isSingle ? "Cost is enough to start. Usage and outcomes deepen the review when available; human effort and retries are optional." : isOpenAI
         ? "The result will show a useful cost and usage baseline without requiring outcome or human-review data."
         : state.outcomeMode === "sample"
           ? "The quick path produces a sampled estimate. It never becomes booked savings."
           : "Use the detailed log when you have one row per completed result.";
-      document.getElementById("build-review").textContent = isSingle ? "Understand this bill" : isOpenAI ? "Review the OpenAI bill" : "Build the finance review";
+      document.getElementById("build-review").textContent = isSingle ? "Understand this bill" : isOpenAI ? "Review the provider export" : "Build the finance review";
       document.getElementById("builder-error").classList.remove("visible");
+      syncBuilderControls();
+    });
+  });
+
+  document.querySelectorAll(".import-provider").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.importProvider = button.dataset.importProvider;
+      state.pendingClaudeImport = null;
+      document.querySelectorAll(".import-provider").forEach((item) => { const active = item === button; item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active)); });
+      document.getElementById("openai-import-fields").hidden = state.importProvider !== "openai";
+      document.getElementById("claude-import-fields").hidden = state.importProvider !== "claude";
+      document.getElementById("claude-confirmation").hidden = true;
+      document.getElementById("build-review").textContent = state.importProvider === "openai" ? "Review the OpenAI bill" : "Check the Claude export";
       syncBuilderControls();
     });
   });
@@ -6890,14 +7094,24 @@ body.story-mode .cockpit-grid {
     });
   });
 
-  [["spend-file", "spend-file-name"], ["work-file", "work-file-name"], ["openai-usage-file", "openai-usage-file-name"], ["openai-cost-file", "openai-cost-file-name"]].forEach(
+  function clearPendingClaudeImport() {
+    state.pendingClaudeImport = null;
+    const confirmation = document.getElementById("claude-confirmation");
+    confirmation.textContent = "";
+    confirmation.hidden = true;
+    if (state.builderMode === "openai" && state.importProvider === "claude") document.getElementById("build-review").textContent = "Check the Claude export";
+  }
+
+  [["spend-file", "spend-file-name"], ["work-file", "work-file-name"], ["openai-usage-file", "openai-usage-file-name"], ["openai-cost-file", "openai-cost-file-name"], ["claude-spend-file", "claude-spend-file-name"], ["claude-usage-file", "claude-usage-file-name"], ["claude-cost-file", "claude-cost-file-name"]].forEach(
     ([inputId, labelId]) => {
       document.getElementById(inputId).addEventListener("change", (event) => {
+        if (inputId.startsWith("claude-")) clearPendingClaudeImport();
         const [file] = event.target.files;
         if (file) document.getElementById(labelId).textContent = file.name;
       });
     },
   );
+  ["claude-period-start", "claude-period-end"].forEach((id) => document.getElementById(id).addEventListener("change", clearPendingClaudeImport));
 
   document.getElementById("review-builder").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -6911,13 +7125,25 @@ body.story-mode .cockpit-grid {
       if (state.builderMode === "single") {
         const [spendFile] = document.getElementById("single-spend-file").files;
         const [workFile] = document.getElementById("single-work-file").files;
-        if (!spendFile) throw new Error("Add the completed universal spend template.");
-        state.data = await buildSingleBillReview(await readLocalFile(spendFile), workFile ? await readLocalFile(workFile) : "", {
+        let spendText = spendFile ? await readLocalFile(spendFile) : "";
+        if (!spendFile) {
+          const provider = safeImportedLabel(document.getElementById("invoice-provider").value, "Provider");
+          const workload = safeImportedLabel(document.getElementById("invoice-workload").value, "Subscription or workload name");
+          const invoiceDate = validDate(document.getElementById("invoice-date").value, "Invoice date");
+          const amount = costNumber(document.getElementById("invoice-amount").value, "Billed amount");
+          const currency = document.getElementById("invoice-currency").value.trim().toUpperCase();
+          if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a three-letter code.");
+          spendText = rowsToCsv([{ period: "baseline", date: invoiceDate, workload, provider, model: "", route: "Subscription or invoice", requests: "", input_tokens: "", cached_input_tokens: "", cache_write_input_tokens: "", output_tokens: "", provider_cost: String(amount), cost_basis: "provider_reported", currency }]);
+        }
+        state.data = await buildSingleBillReview(spendText, workFile ? await readLocalFile(workFile) : "", {
           acceptanceRule: document.getElementById("single-ready-rule").value.trim(),
           verifier: document.getElementById("single-verifier").value.trim(),
           complete: document.getElementById("single-complete").checked,
           hourlyRate: document.getElementById("single-hourly-rate").value,
           sharedCost: document.getElementById("single-shared-cost").value,
+          serviceStart: spendFile ? "" : document.getElementById("invoice-period-start").value,
+          serviceEnd: spendFile ? "" : document.getElementById("invoice-period-end").value,
+          reviewSource: spendFile ? "universal_template" : "invoice_form",
         });
         renderAll();
         reviewDialog.close();
@@ -6925,6 +7151,28 @@ body.story-mode .cockpit-grid {
         return;
       }
       if (state.builderMode === "openai") {
+        if (state.importProvider === "claude") {
+          if (state.pendingClaudeImport) {
+            state.data = state.pendingClaudeImport.review;
+            validateResult(state.data);
+            renderAll(); reviewDialog.close(); showToast("Claude bill reviewed locally. Personal identifiers were discarded."); return;
+          }
+          const [spendFile] = document.getElementById("claude-spend-file").files;
+          const [usageFile] = document.getElementById("claude-usage-file").files;
+          const [costFile] = document.getElementById("claude-cost-file").files;
+          const start = document.getElementById("claude-period-start").value;
+          const end = document.getElementById("claude-period-end").value;
+          if (spendFile && (usageFile || costFile)) throw new Error("Choose the spend CSV or the Admin API JSON pair, not both.");
+          if (spendFile) state.pendingClaudeImport = await buildClaudeSpendReview(await readLocalFile(spendFile), start, end);
+          else {
+            if (!usageFile || !costFile) throw new Error("Add a Claude spend CSV or both complete Admin API JSON files.");
+            state.pendingClaudeImport = await buildClaudeApiReview(await readLocalFile(usageFile), await readLocalFile(costFile), start, end);
+          }
+          const summary = state.pendingClaudeImport.confirmation;
+          const box = document.getElementById("claude-confirmation");
+          box.textContent = `Provider: ${summary.provider}. Period: ${summary.period.start} to ${summary.period.end}. Products: ${summary.products.join(", ")}. Models: ${summary.models.join(", ")}. Provider-reported cost: ${summary.providerCost.toFixed(2)}. Requests: ${summary.requests === null ? "unavailable" : summary.requests}. Input tokens: ${summary.inputTokens === null ? "unavailable" : summary.inputTokens}. Output tokens: ${summary.outputTokens === null ? "unavailable" : summary.outputTokens}. Not included: ${summary.missing.join(", ")}. Source rows: ${summary.sourceRows}. Personal identifiers were discarded.`;
+          box.hidden = false; submit.textContent = "Confirm and build Claude review"; return;
+        }
         const [usageFile] = document.getElementById("openai-usage-file").files;
         const [costFile] = document.getElementById("openai-cost-file").files;
         if (!usageFile || !costFile) throw new Error("Add both OpenAI CSV exports before building the bill review.");
@@ -7021,7 +7269,7 @@ body.story-mode .cockpit-grid {
     } finally {
       submit.disabled = false;
       submit.textContent = state.builderMode === "single" ? "Understand this bill" : state.builderMode === "openai"
-        ? "Review the OpenAI bill"
+        ? state.importProvider === "claude" && state.pendingClaudeImport ? "Confirm and build Claude review" : state.importProvider === "claude" ? "Check the Claude export" : "Review the OpenAI bill"
         : state.builderMode === "workload"
           ? "Build the finance review"
           : "Continue";

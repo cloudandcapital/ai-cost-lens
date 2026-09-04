@@ -72,6 +72,7 @@ const {api} = context;
 const el = id => document.getElementById(id);
 const click = id => el(id).emit('click');
 const mode = value => document.querySelectorAll('.builder-mode').find(n => n.dataset.builderMode === value).emit('click');
+const provider = value => document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === value).emit('click');
 const outcome = value => document.querySelectorAll('.outcome-mode').find(n => n.dataset.outcomeMode === value).emit('click');
 const file = async (id, text, name = id + '.csv') => { el(id).files = [{name,size:Buffer.byteLength(text),text:async()=>text}]; await el(id).emit('change'); };
 const submit = () => el('review-builder').emit('submit');
@@ -110,7 +111,7 @@ assert.match(el('bill-mode-tag').textContent, /BILL FOUNDATION · NO SAVINGS CLA
 assert.doesNotMatch(el('bill-finding-limit').textContent, /Outcome unit cost withheld|Request reconciliation is unavailable/);
 
 // Every path transition starts fresh, using native HTML defaults.
-const fileLabels = ['spend-file-name','work-file-name','openai-usage-file-name','openai-cost-file-name'];
+const fileLabels = ['spend-file-name','work-file-name','openai-usage-file-name','openai-cost-file-name','claude-spend-file-name','claude-usage-file-name','claude-cost-file-name'];
 const labelDefaults = Object.fromEntries(fileLabels.map(id => [id,el(id).textContent]));
 async function assertFresh(nextMode) {
   const previous = api.state.data;
@@ -155,6 +156,24 @@ assert.match(el('bill-finding-limit').textContent,/Export the same date range/);
 assert.match(el('bill-finding-title').textContent,/not a matched financial review/);
 assert.equal(el('memo-decision-code').textContent,'PERIOD MISMATCH');
 assert.match(el('bill-boundary-copy').textContent,/before using this review for a financial decision/);
+await assertFresh('openai');
+await provider('claude');
+await file('claude-spend-file',read('tests/fixtures/synthetic-claude-team-spend.csv'));
+el('claude-period-start').value = '2026-08-01'; el('claude-period-end').value = '2026-08-31';
+const beforeClaudeConfirmation = api.state.data;
+await submit();
+assert.equal(api.state.data,beforeClaudeConfirmation,'Claude confirmation does not replace the displayed review');
+assert.equal(el('claude-confirmation').hidden,false);
+assert.match(el('claude-confirmation').textContent,/Provider: Anthropic/);
+assert.match(el('claude-confirmation').textContent,/Personal identifiers were discarded/);
+el('claude-period-end').value = '2026-09-01'; await el('claude-period-end').emit('change');
+assert.equal(api.state.pendingClaudeImport,null,'Changing a confirmed period invalidates the pending import');
+assert.equal(el('claude-confirmation').hidden,true);
+el('claude-period-end').value = '2026-08-31';
+await submit();
+await submit();
+assert.equal(api.state.data.schema_version,'ai-cost-lens-single-bill-review/0.1');
+assert.doesNotMatch(JSON.stringify(api.state.data),/example\.invalid|acct-synthetic/);
 await assertFresh('single');
 await file('single-spend-file',invoice.replace('2026-08-01','2026-02-31'));
 el('single-verifier').value = 'Preserve while correcting';

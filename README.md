@@ -8,7 +8,7 @@ This supports the same progression FinOps teams make from Crawl to Walk to Run: 
 
 The calculations are deterministic. Costs reported by a provider stay separate from costs calculated from a price book, and the tool shows when missing or mismatched evidence prevents a savings claim.
 
-It does not connect to provider APIs, fetch live prices, certify invoices, enforce production budgets, or identify redundant models from names alone. Review files stay local. The browser interface does not upload them. The OpenAI importer reads response files that the user saved locally; it never receives an Admin API key.
+It does not connect to provider APIs, fetch live prices, certify invoices, enforce production budgets, or identify redundant models from names alone. Review files stay local. The browser interface does not upload them. The OpenAI and Claude importers read files that the user saved locally; they never receive an API key.
 
 ## What it does
 
@@ -37,7 +37,7 @@ It does not connect to provider APIs, fetch live prices, certify invoices, enfor
   `model_route/0.1` profile
 - Deterministic decision validation that recomputes route arithmetic, checks
   evidence references, and blocks unsupported all-in savings or route changes
-- A strict OpenAI evidence importer for saved organization completions usage and cost API responses
+- Strict local importers for supported OpenAI CSV exports and documented Claude spend CSV or Admin API JSON exports
 - Visible pagination, period, attribution, and model-cost join limitations
 
 The public demo needs no credentials and uses entirely illustrative data.
@@ -46,10 +46,10 @@ The public demo needs no credentials and uses entirely illustrative data.
 
 Python 3.10 or newer is required.
 
-The latest tagged release is v0.3.1. This branch prepares the v0.3.2 review-depth update.
+The latest tagged release is v0.3.2. This branch prepares the v0.3.3 Claude-import update.
 
 ```bash
-pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v0.3.1"
+pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v0.3.2"
 ai-cost-lens --help
 ```
 
@@ -122,13 +122,17 @@ To open the browser interface from a clone:
 python -m http.server 8000 --directory web
 ```
 
-Then open `http://localhost:8000`. Choose **See the worked example**, **Review OpenAI exports**, or **Compare cost per ready result**. Use **Open saved review** to inspect another `ai-cost-lens-review-result/1.0` file. The file is parsed in the browser and is not uploaded. **Print finance memo** creates a compact handoff from the same decision record; the browser's print dialog can save it as a PDF.
+Then open `http://localhost:8000`. Choose **See the worked example**, **Understand one bill**, **Review OpenAI or Claude exports**, or **Compare cost per ready result**. The one-bill path accepts a simple invoice form or the more detailed universal spend CSV. Use **Open saved review** to inspect another `ai-cost-lens-review-result/1.0` file. The file is parsed in the browser and is not uploaded. **Print finance memo** creates a compact handoff from the same decision record; the browser's print dialog can save it as a PDF.
 
-The OpenAI CSV path accepts matching Activity data for Completions and Cost data exports for a bill and usage review. It does not contain the business outcome evidence needed for cost per ready result. Use the universal spend and work templates for the full comparison, including for OpenAI. Anthropic, Bedrock, Gemini, gateways, and other AI tools currently use those universal templates.
+The OpenAI path accepts matching Activity data for Completions and Cost data CSV exports. The Claude path accepts the documented Team or Enterprise spend-report CSV, or a pair of complete Messages Usage and Cost Admin API JSON responses saved by the user. Both create a bill and usage review without inventing business outcomes. Use the universal spend and work templates for a route comparison or cost per ready result.
+
+Claude Team and Enterprise spend import uses `total_net_spend_usd` as the provider-reported cost, aggregates the supplied product and model rows, and discards `user_email` and `account_uuid` before building the review record. Blank request or token values remain unavailable. The Admin API usage schema does not publish a request count, so that measure remains unavailable. The user must confirm the reporting period, and usage and cost daily buckets must match. Partial API pages are rejected.
+
+Anthropic documents CSV export from the Claude Console Usage and Cost pages but does not publish the current native CSV headers. AI Cost Lens therefore does not claim direct support for those Console CSVs without an authentic current sample. Console users can save complete Admin API JSON responses or transfer supported fields into the universal template. No API key is requested or stored.
 
 ### How to use another provider report
 
-The universal upload reads the AI Cost Lens template. It does not read a raw Anthropic report, AWS CUR file, Google billing export, invoice PDF, or screenshot.
+The universal upload reads the AI Cost Lens template. It does not read an arbitrary Anthropic report, AWS CUR file, Google billing export, invoice PDF, or screenshot. The supported Claude direct-import formats are the separately identified Team or Enterprise spend-report CSV and complete Admin API JSON pair.
 
 1. Download the spend template from **Start a review**.
 2. Open it in Excel or Sheets. Replace the examples with rows from the current route (`baseline`) and the route being tested (`proposed`).
@@ -141,6 +145,8 @@ For Claude API, tokens come from the Anthropic Messages Usage Report and cost co
 Official source instructions:
 
 - [Export OpenAI API usage and cost CSVs](https://help.openai.com/en/articles/20001072-how-do-i-export-monthly-usage-details-from-the-api-usage-dashboard)
+- [Export Claude Team and Enterprise spend reports](https://support.claude.com/en/articles/12883420-view-usage-analytics-for-team-and-enterprise-plans)
+- [Export Claude Console usage and cost CSVs](https://support.claude.com/en/articles/9534590-cost-and-usage-reporting-in-the-claude-console)
 - [Anthropic Messages Usage Report](https://docs.anthropic.com/en/api/admin-api/usage-cost/get-messages-usage-report) and [Cost Report](https://docs.anthropic.com/en/api/admin-api/usage-cost/get-cost-report)
 - [Track Bedrock usage and cost](https://docs.aws.amazon.com/bedrock/latest/userguide/cost-management.html) and [enable model invocation logging](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html)
 - [Google Cloud detailed billing export fields](https://docs.cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/detailed-usage)

@@ -1,0 +1,4 @@
+user_email,account_uuid,product,model,model_family,total_requests,total_prompt_tokens,total_completion_tokens,total_net_spend_usd,total_gross_spend_usd
+alex@example.invalid,acct-synthetic-1,Chat,claude-sonnet-4-5,Sonnet,10,1000,200,1.20,1.50
+"casey, test@example.invalid",acct-synthetic-2,Chat,claude-sonnet-4-5,Sonnet,5,500,100,0.60,0.75
+dev@example.invalid,acct-synthetic-3,Claude Code,claude-opus-4-1,Opus,2,800,300,2.20,2.80

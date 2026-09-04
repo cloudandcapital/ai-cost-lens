@@ -457,9 +457,9 @@
             <span>Get a cost baseline and practical next steps. Usage, outcomes, retries, and human effort are optional.</span>
           </button>
           <button class="builder-mode" data-builder-mode="openai" type="button" aria-pressed="false">
-            <small>OPENAI BILL AND USAGE</small>
-            <strong>Review OpenAI exports</strong>
-            <span>Use matching Activity and Cost CSVs for a bill and usage review.</span>
+            <small>OPENAI OR CLAUDE</small>
+            <strong>Review OpenAI or Claude exports</strong>
+            <span>Use supported provider exports for a local bill and usage review.</span>
           </button>
           <button class="builder-mode" data-builder-mode="workload" type="button" aria-pressed="false">
             <small>ANY PROVIDER OR AI TOOL</small>
@@ -479,6 +479,18 @@
             <div class="step-number">01</div>
             <div>
               <h3>Start with one bill</h3>
+              <p>For a simple subscription or invoice, enter the bill below. No CSV is required.</p>
+              <div class="field-grid compact-fields invoice-entry">
+                <label><span>Provider</span><input id="invoice-provider" type="text" placeholder="Claude, ChatGPT, or another provider" /></label>
+                <label><span>Subscription or workload name</span><input id="invoice-workload" type="text" /></label>
+                <label><span>Invoice date</span><input id="invoice-date" type="date" /></label>
+                <label><span>Optional service-period start</span><input id="invoice-period-start" type="date" /></label>
+                <label><span>Optional service-period end</span><input id="invoice-period-end" type="date" /></label>
+                <label><span>Billed amount</span><input id="invoice-amount" type="number" min="0" step="any" /></label>
+                <label><span>Currency</span><input id="invoice-currency" type="text" maxlength="3" placeholder="USD" /></label>
+              </div>
+              <p>An invoice proves cost, not usage or outcomes. Missing requests, tokens, retries, and human effort stay unavailable. One bill cannot establish savings. Add detailed usage later only when it is useful.</p>
+              <p><strong>More detail?</strong> Upload the universal CSV instead.</p>
               <p>Download the template, delete every example row, and keep the column headers. Use <strong>baseline</strong> on every new row; no proposed period is needed.</p>
               <div class="template-links"><a href="templates/ai-cost-lens-spend-template.csv" download>Download spend template</a></div>
               <p>For an invoice or subscription, enter one row with <code>period=baseline</code>, the invoice date in <code>date</code> (YYYY-MM-DD), the subscription or workload name in <code>workload</code>, the billed amount in <code>provider_cost</code>, <code>cost_basis=provider_reported</code>, and a three-letter <code>currency</code>. Enter <code>provider</code> if known. Leave model, route, requests and tokens blank unless the source supports them. An invoice date is not evidence of the service-period duration.</p>
@@ -749,6 +761,11 @@
         </div>
 
         <div id="openai-builder-fields" hidden>
+          <div class="outcome-mode-choice" role="group" aria-label="Choose provider export">
+            <button class="outcome-mode import-provider active" data-import-provider="openai" type="button" aria-pressed="true"><strong>OpenAI</strong><span>Activity and Cost CSVs</span></button>
+            <button class="outcome-mode import-provider" data-import-provider="claude" type="button" aria-pressed="false"><strong>Claude</strong><span>Team/Enterprise spend CSV or Admin API JSON</span></button>
+          </div>
+          <div id="openai-import-fields">
           <div class="path-requirements">
             <strong>What you need</strong>
             <span>One Activity data CSV for Completions and one Cost data CSV, exported for the same date range in the OpenAI Usage dashboard.</span>
@@ -786,6 +803,23 @@
               </p>
             </div>
           </section>
+          </div>
+          <div id="claude-import-fields" hidden>
+            <div class="path-requirements"><strong>What you need</strong><span>A Claude Team/Enterprise spend-report CSV, or complete Messages Usage and Cost Admin API JSON exports. AI Cost Lens never asks for an API key.</span></div>
+            <section class="builder-step"><div class="step-number">01</div><div>
+              <h3>Add a documented Claude export</h3>
+              <p>Team and Enterprise spend reports include user email and account UUID. Those identifiers are discarded before the review is built and never appear in the review, JSON download, Share view, memo, browser storage, console, or errors.</p>
+              <div class="file-pair">
+                <label><span>Team/Enterprise spend CSV</span><input id="claude-spend-file" type="file" accept=".csv,text/csv" /><small id="claude-spend-file-name">Export from Settings → Analytics → How much is Claude costing?</small></label>
+                <label><span>Messages Usage API JSON</span><input id="claude-usage-file" type="file" accept=".json,application/json" /><small id="claude-usage-file-name">Optional when using the spend CSV; otherwise pair with Cost JSON.</small></label>
+                <label><span>Cost API JSON</span><input id="claude-cost-file" type="file" accept=".json,application/json" /><small id="claude-cost-file-name">Required with Messages Usage JSON.</small></label>
+              </div>
+              <div class="field-grid compact-fields"><label><span>Reporting-period start</span><input id="claude-period-start" type="date" /></label><label><span>Reporting-period end</span><input id="claude-period-end" type="date" /></label></div>
+              <p>Claude Console Usage and Cost CSV headers are not published by Anthropic, so those native CSVs are not claimed as supported without an authentic current sample. Export complete Admin API JSON pages yourself; do not paste an Admin API key here.</p>
+              <p>Provider reports count calls, but they do not identify which calls were retries for the same finished result. Add application, gateway, or work-log data only when available.</p>
+            </div></section>
+            <section class="builder-step"><div class="step-number">02</div><div><h3>Confirm the normalized review</h3><div id="claude-confirmation" class="path-requirements" hidden></div><p>Review the provider, period, products, models, totals, missing fields, row count, and identifier-removal confirmation before building the review.</p></div></section>
+          </div>
         </div>
 
         <div class="builder-error" id="builder-error" role="alert"></div>
