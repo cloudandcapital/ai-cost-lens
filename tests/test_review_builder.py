@@ -217,6 +217,19 @@ def test_retry_requests_exclude_the_first_model_request(tmp_path: Path):
         _outcomes(outcome_path)
 
 
+def test_builder_rejects_unequal_period_durations(tmp_path: Path):
+    manifest = _manifest(tmp_path)
+    evidence_path = tmp_path / "baseline-evidence.json"
+    evidence = json.loads(evidence_path.read_text())
+    for section in ("usage", "cost"):
+        extra = deepcopy(evidence[section]["rows"][0])
+        extra["date"] = "2026-08-02"
+        evidence[section]["rows"].append(extra)
+    _write_json(evidence_path, evidence)
+    with pytest.raises(ReviewBuildError, match="different durations"):
+        build_review_from_manifest(manifest)
+
+
 def test_evidence_mode_must_match_review_mode(tmp_path: Path):
     manifest = _manifest(tmp_path)
     evidence_path = tmp_path / "proposed-evidence.json"

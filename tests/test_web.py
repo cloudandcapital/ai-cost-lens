@@ -45,7 +45,8 @@ def test_web_assets_and_brand_contract_are_present():
         in html
     )
     assert "Set the decision rules" in html
-    assert html.count("data-builder-mode=") == 3
+    assert html.count("data-builder-mode=") == 4
+    assert 'data-builder-mode="single"' in html
     assert 'id="workload-builder-fields" hidden' in html
     assert 'id="openai-builder-fields" hidden' in html
     assert 'id="builder-actions" hidden' in html
@@ -172,7 +173,10 @@ def test_universal_path_explains_provider_transfer_and_source_boundaries():
     assert "Upload the completed template, not the original provider report." in html
     assert "PDFs, or screenshots directly" in html
     assert "Invoice or subscription only?" in html
-    assert "A flat ChatGPT or Claude subscription receipt" in html
+    assert (
+        "Choose Review one bill to record a subscription amount without usage or outcomes"
+        in html
+    )
     assert "including after any correction you completed" in html
     assert "If correction made the result ready, use ready_to_use" in html
     assert "One result is one unit of finished work" in html
