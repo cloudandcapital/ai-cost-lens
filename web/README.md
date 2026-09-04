@@ -27,13 +27,16 @@ interface continues to load its sample JSON and templates as separate files.
 
 ## Start a review
 
-The opening presents three paths:
+The opening presents four paths:
 
 - **See the worked example** opens the synthetic false-economy case with no files.
+- **Understand one bill** accepts a universal spend template from any provider. Cost is enough to start; request, token, retry, outcome, and human-effort fields are optional.
 - **Review OpenAI exports** accepts matching Activity data for Completions and Cost data CSV exports. It produces a bill and usage review.
 - **Compare cost per ready result** uses universal spend and work templates for any provider, including OpenAI.
 
-The direct OpenAI import does not include business outcomes, so it cannot produce cost per ready result on its own. Use the universal path when you have a work log or reviewed sample. Anthropic, Bedrock, Gemini, gateway, and other provider reports must currently be transferred into the universal spend template.
+The interface uses a simple review-depth ladder: Crawl understands the bill, Walk explains the usage, and Run connects cost to outcomes. These labels describe the available evidence, not a formal FinOps maturity score. A bill-only review still returns a cost baseline, visible limits, and practical next steps.
+
+The direct OpenAI import does not include business outcomes, so it cannot produce cost per ready result on its own. Use the universal paths when you have a bill, work log, or reviewed sample. Anthropic, Bedrock, Gemini, gateway, and other provider reports must currently be transferred into the universal spend template.
 
 The setup screen explains that transfer. It identifies the cost and usage sources for OpenAI, Claude API, Bedrock, Gemini or Vertex AI, and gateways; defines every template column; distinguishes missing data from a reported zero; and warns that raw provider exports, PDFs, and screenshots are not accepted by the universal upload.
 

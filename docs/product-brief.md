@@ -60,11 +60,21 @@ The product has two modes:
 - **Operator view:** complete decision record with inputs, calculations, assumptions, and evidence.
 - **Story view:** one finding, one visual, one limitation, and its sources.
 
-## First release: Workload Review
+## Progressive review depth
 
-The first release reviews one workload across a baseline and a proposed setup.
+AI Cost Lens starts with the evidence a team already has:
 
-### Required review fields
+- **Crawl: Understand the bill.** Provider cost is enough to establish a baseline. Missing usage, retries, outcomes, and human effort remain unavailable.
+- **Walk: Explain the usage.** Requests, tokens, models, routes, or cache data show where to investigate. They do not prove savings.
+- **Run: Connect cost to outcomes.** A reviewed sample or work log can add cost per ready result. Human effort is included only when people actively review or correct the work.
+
+These labels describe the depth of one review, not a formal maturity rating. A team does not need to supply every field before the tool is useful.
+
+## Route comparison
+
+The comparison path reviews one workload across a baseline and a proposed setup.
+
+### Comparison fields
 
 #### Identity
 

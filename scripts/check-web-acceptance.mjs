@@ -152,13 +152,22 @@ for (const [column, value, message] of [[1, '2026-02-31', /calendar/], [11, '-20
 await assert.rejects(api.buildSingleBillReview(singleSpend, singleWork + '\n' + singleWork.split('\n')[1], singleConfig), /unique/);
 await assert.rejects(api.buildSingleBillReview(singleSpend, singleWork.replace('base-001,ready_to_use,1,0', 'base-001,ready_to_use,1,2'), singleConfig), /Retry/);
 await assert.rejects(api.buildSingleBillReview(singleSpend, singleWork, { ...singleConfig, verifier: '' }), /verified/);
-for (const review of [invoice, usageOnly, completeSingle, noOverheads]) {
+const stagedReviews = [
+  [invoice, 'Start with the bill.', 'CRAWL · UNDERSTAND THE BILL', 'Use this bill as the cost baseline'],
+  [usageOnly, 'Where is the AI cost going?', 'WALK · EXPLAIN THE USAGE', 'blended cost per request'],
+  [completeSingle, 'What did the work actually cost?', 'RUN · CONNECT COST TO OUTCOMES', 'The provider cost per ready result is visible'],
+  [noOverheads, 'What did the work actually cost?', 'RUN · CONNECT COST TO OUTCOMES', 'Human and shared cost are optional depth'],
+];
+for (const [review, title, kicker, guidance] of stagedReviews) {
   api.validateResult(JSON.parse(JSON.stringify(review)));
   api.state.data = review;
   api.renderAll();
   assert.equal(element('.question-nav').hidden, true);
-  assert.match(element('bill-finding-title').textContent, /no savings claim/);
-  assert.match(element('memo-decision-code').textContent, /NO SAVINGS/);
+  assert.equal(element('bill-review-title').textContent, title);
+  assert.equal(element('bill-review-kicker').textContent, kicker);
+  assert.match(element('bill-opportunity-ledger').innerHTML, new RegExp(guidance));
+  assert.match(element('bill-mode-tag').textContent, /NO SAVINGS CLAIM/);
+  assert.match(element('memo-decision-limit').textContent, /does not claim savings/);
   for (const el of elements.values()) assert.doesNotMatch(el.innerHTML + el.textContent, /\b(?:NaN|Infinity|undefined)\b/);
   for (const path of requiredLeaves(review)) {
     const copy = structuredClone(review); let parent = copy;
@@ -186,6 +195,12 @@ for (const review of [demo, built, bill]) {
   api.renderAll();
   for (const el of elements.values()) assert.doesNotMatch(el.innerHTML + el.textContent, /\b(?:NaN|Infinity|undefined)\b/, el.id);
 }
+api.state.data = bill;
+api.renderAll();
+assert.equal(element('bill-review-title').textContent, 'Where is the AI cost going?');
+assert.match(element('bill-opportunity-ledger').innerHTML, /Most requests went to gpt-economy/);
+assert.match(element('bill-metric-ledger').innerHTML, /Blended cost per request/);
+assert.match(element('bill-finding-limit').textContent, /useful cost and usage baseline/);
 assert.equal(element('.question-nav').hidden, true);
 assert.ok(navButtons.every((button) => button.disabled && button.tabIndex === -1));
 api.state.data = demo;

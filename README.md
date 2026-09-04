@@ -1,8 +1,10 @@
 # AI Cost Lens
 
-AI Cost Lens is a free, open source tool for answering a simple finance question: what did one usable result actually cost?
+AI Cost Lens is a free, open source tool that starts with a simple question: where is the AI cost going?
 
-It brings together provider charges, usage, shared infrastructure, human review, and outcome evidence. That makes it possible to compare two providers or model routes without treating a cheaper AI bill as automatic savings.
+Start with one provider bill. Add requests, tokens, models, routes, or cache usage when those records exist. Add outcomes when the decision needs cost per ready result. Human effort and retries are optional; missing fields stay unavailable rather than becoming zero.
+
+This supports the same progression FinOps teams make from Crawl to Walk to Run: understand the bill, explain the usage, then connect cost to business outcomes. The labels describe the depth of the review, not a formal maturity assessment.
 
 The calculations are deterministic. Costs reported by a provider stay separate from costs calculated from a price book, and the tool shows when missing or mismatched evidence prevents a savings claim.
 
@@ -23,12 +25,13 @@ It does not connect to provider APIs, fetch live prices, certify invoices, enfor
 - Unattributed AI cost findings that are never called savings
 - Reconciled `ccac/1.0.0` output by default, with explicit `ccac/1.1.0` direct-AI scope output
 - Workload reviews with clearly labeled evidence for current and proposed routes
-- Model, shared infrastructure, human review, and one-time change cost
-- Usable-result, retry, cache-reuse, and human-review measures
+- Progressive bill, usage, and outcome reviews for different levels of available evidence
+- Optional model, shared infrastructure, human review, and one-time change cost
+- Usable-result, retry, cache-reuse, and human-review measures when supplied
 - Optional Plan vs Actual for provider cost, shared cost, human work, output, yield, and unit cost
 - Time-based payback against an explicit monthly ready result volume and decision horizon
 - A savings gate that requires real evidence, equivalent work, and compatible cost bases
-- A local browser interface with a three-path start, Review, Bill, Evidence, and Share views
+- A local browser interface with four starting paths, Review, Bill, Evidence, and Share views
 - A printable finance memo generated from the same decision record as the on-screen review
 - A portable `ai-cost-lens-decision-record/0.1` contract with a strict first
   `model_route/0.1` profile
@@ -43,9 +46,7 @@ The public demo needs no credentials and uses entirely illustrative data.
 
 Python 3.10 or newer is required.
 
-This branch prepares v0.3.1. Its release tag has not been published yet; the
-tagged install command below is for use after release approval. Until then,
-use the development install from this review branch.
+The latest tagged release is v0.3.1. This branch prepares the v0.3.2 review-depth update.
 
 ```bash
 pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v0.3.1"
@@ -94,8 +95,9 @@ ai-cost-lens review-openai-csv \
 ```
 
 This path reconciles the provider total and usage mix without inventing billed
-cost by model. Cost per usable result and savings remain unavailable until a
-workload outcome record is added. See the
+cost by model. It shows request and token patterns, a blended cost-per-request
+baseline, and practical places to investigate. Add an outcome record only when
+the decision needs cost per ready result or a savings test. See the
 [saved-export runbook](docs/openai-saved-export-runbook.md).
 
 ## Workload Review
