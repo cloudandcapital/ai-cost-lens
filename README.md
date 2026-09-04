@@ -39,12 +39,16 @@ It does not connect to provider APIs, fetch live prices, certify invoices, enfor
 
 The public demo needs no credentials and uses entirely illustrative data.
 
-## Install the released CLI
+## Install the CLI
 
 Python 3.10 or newer is required.
 
+This branch prepares v0.3.1. Its release tag has not been published yet; the
+tagged install command below is for use after release approval. Until then,
+use the development install from this review branch.
+
 ```bash
-pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v0.3.0"
+pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v0.3.1"
 ai-cost-lens --help
 ```
 

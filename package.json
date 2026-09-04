@@ -1,5 +1,6 @@
 {
   "name": "ai-cost-lens-site",
+  "version": "0.3.1",
   "private": true,
   "scripts": {
     "build": "node scripts/build-static-site.mjs",

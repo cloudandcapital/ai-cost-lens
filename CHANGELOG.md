@@ -2,6 +2,17 @@
 
 All notable changes to AI Cost Lens are documented here.
 
+## [0.3.1]: release candidate, not yet tagged
+
+- Provider-neutral single-bill reviews, from declared invoice cost through usage and ready-result evidence.
+- Clearer provider-to-template transfer guidance, retry accounting and missing-data handling.
+- Strict calendar-date and comparable-period checks, plus deep saved-review validation.
+- Local file/row limits, duplicate-row warnings, and explicit credit, refund and discount treatment.
+- Explicit local, deterministic Lumen boundary: no AI API or external file uploads.
+- Branded social metadata and favicon.
+- Fresh builder state for every new review, including files, declarations, planning and inactive paths; failed submissions retain editable inputs.
+- Print cleanup follows the print lifecycle rather than a timer; OpenAI period mismatches are prominent at the top of the review.
+
 ## [0.3.0]: 2026-09-03
 
 ### Added

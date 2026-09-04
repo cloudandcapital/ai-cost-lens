@@ -6263,10 +6263,13 @@ body.story-mode .cockpit-grid {
     const totalInput = usage.totals.input_tokens;
     const cacheShare = totalInput ? usage.totals.cached_input_tokens / totalInput : 0;
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
-    document.getElementById("bill-mode-tag").textContent = state.data.mode === "illustrative" ? "ILLUSTRATIVE EXPORT" : "REAL PROVIDER EXPORT";
+    document.getElementById("bill-mode-tag").textContent = !period.aligned ? "PERIOD MISMATCH" : state.data.mode === "illustrative" ? "ILLUSTRATIVE EXPORT" : "REAL PROVIDER EXPORT";
     document.getElementById("bill-finding-title").textContent =
-      `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(usage.totals.requests)} requests. The export shows which models handled the traffic, but not what each model cost.`;
-    document.getElementById("bill-finding-limit").textContent = limitations[0];
+      period.aligned
+        ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(usage.totals.requests)} requests. The export shows which models handled the traffic, but not what each model cost.`
+        : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} in the cost export. Usage covers different daily buckets; these totals are not a matched financial review.`;
+    document.getElementById("bill-finding-limit").textContent = period.aligned ? limitations[0]
+      : "PERIOD MISMATCH: usage and cost exports cover different daily buckets. Export the same date range again before using this review for a financial decision.";
     const metrics = [
       ["Provider reported cost", money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2), `${bill.populated_rows} populated cost row${bill.populated_rows === 1 ? "" : "s"}`],
       ["Requests", compact(usage.totals.requests), `${usage.by_model.length} model${usage.by_model.length === 1 ? "" : "s"} observed`],
@@ -6328,10 +6331,11 @@ body.story-mode .cockpit-grid {
       const total = Number(bill.total);
       document.getElementById("memo-title").textContent = "OpenAI bill review";
       document.getElementById("memo-meta").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
-      document.getElementById("memo-decision-code").textContent = "RECONCILE FIRST";
+      document.getElementById("memo-decision-code").textContent = period.aligned ? "RECONCILE FIRST" : "PERIOD MISMATCH";
       document.getElementById("memo-decision-title").textContent =
         `The bill proves ${money(total, total < 1 ? 4 : 2)} of provider spend. It does not prove cost by model or savings by outcome.`;
-      document.getElementById("memo-decision-limit").textContent = limitations[0];
+      document.getElementById("memo-decision-limit").textContent = period.aligned ? limitations[0]
+        : "Usage and cost exports cover different daily buckets. Export the same date range again before using this review for a financial decision.";
       document.getElementById("memo-numbers-title").textContent = "What the provider export shows";
       document.getElementById("memo-table-head").innerHTML = "<tr><th>Measure</th><th>Observed</th><th>What it proves</th></tr>";
       const billRows = [
@@ -6496,9 +6500,43 @@ body.story-mode .cockpit-grid {
   });
 
   const reviewDialog = document.getElementById("review-dialog");
+  const builderForm = document.getElementById("review-builder");
+  const filenameDefaults = new Map(
+    ["spend-file-name", "work-file-name", "openai-usage-file-name", "openai-cost-file-name"]
+      .map((id) => [id, document.getElementById(id).textContent]),
+  );
+
+  function syncBuilderControls() {
+    for (const mode of ["single", "workload", "openai"]) {
+      document.getElementById(`${mode}-builder-fields`).querySelectorAll("input, select, textarea").forEach((input) => {
+        input.disabled = state.builderMode !== mode;
+      });
+    }
+    for (const [id, mode] of [["sample-outcome-fields", "sample"], ["detailed-outcome-fields", "detailed"]]) {
+      document.getElementById(id).querySelectorAll("input, select, textarea").forEach((input) => {
+        input.disabled = state.builderMode !== "workload" || state.outcomeMode !== mode;
+      });
+    }
+  }
 
   function resetBuilderStart() {
+    // Reset only when beginning a new draft, never on submit or its failure.
+    // Native reset restores declared defaults and empties every file input.
+    builderForm.reset();
+    document.getElementById("review-file").value = "";
+    filenameDefaults.forEach((text, id) => { document.getElementById(id).textContent = text; });
+    const error = document.getElementById("builder-error");
+    error.textContent = "";
+    error.classList.remove("visible");
     state.builderMode = null;
+    state.outcomeMode = "sample";
+    document.querySelectorAll(".outcome-mode").forEach((item) => {
+      const active = item.dataset.outcomeMode === "sample";
+      item.classList.toggle("active", active);
+      item.setAttribute("aria-pressed", String(active));
+    });
+    document.getElementById("sample-outcome-fields").hidden = false;
+    document.getElementById("detailed-outcome-fields").hidden = true;
     document.querySelectorAll(".builder-mode").forEach((item) => {
       item.classList.remove("active");
       item.setAttribute("aria-pressed", "false");
@@ -6509,6 +6547,7 @@ body.story-mode .cockpit-grid {
     document.getElementById("builder-actions").hidden = true;
     document.getElementById("builder-path-help").hidden = false;
     document.getElementById("review-dialog-title").textContent = "What would you like to check?";
+    syncBuilderControls();
   }
 
   document.getElementById("start-review").addEventListener("click", () => {
@@ -6562,6 +6601,7 @@ body.story-mode .cockpit-grid {
           : "Use the detailed log when you have one row per completed result.";
       document.getElementById("build-review").textContent = isSingle ? "Review one bill" : isOpenAI ? "Review the OpenAI bill" : "Build the finance review";
       document.getElementById("builder-error").classList.remove("visible");
+      syncBuilderControls();
     });
   });
 
@@ -6576,6 +6616,7 @@ body.story-mode .cockpit-grid {
       const sampled = state.outcomeMode === "sample";
       document.getElementById("sample-outcome-fields").hidden = !sampled;
       document.getElementById("detailed-outcome-fields").hidden = sampled;
+      syncBuilderControls();
       document.getElementById("builder-action-note").textContent = sampled
         ? "The quick path produces a sampled estimate. It never becomes booked savings."
         : "Use the detailed log when you have one row per completed result.";
@@ -6737,13 +6778,25 @@ body.story-mode .cockpit-grid {
     if (!state.data) return;
     renderFinanceMemo();
     document.body.classList.add("printing-memo");
-    window.print();
-    window.setTimeout(() => document.body.classList.remove("printing-memo"), 1500);
+    try {
+      window.print();
+    } catch (error) {
+      document.body.classList.remove("printing-memo");
+      showToast("Printing could not start. Try Print finance memo again.");
+    }
   });
 
   window.addEventListener("afterprint", () => {
     document.body.classList.remove("printing-memo");
   });
+  // Some browsers signal print-media exit instead of afterprint. Do not clean
+  // up merely because non-blocking window.print() has returned.
+  const printMedia = window.matchMedia?.("print");
+  const onPrintMediaChange = () => {
+    if (!printMedia.matches) document.body.classList.remove("printing-memo");
+  };
+  if (printMedia?.addEventListener) printMedia.addEventListener("change", onPrintMediaChange);
+  else printMedia?.addListener(onPrintMediaChange);
 
   document.getElementById("review-file").addEventListener("change", async (event) => {
     const [file] = event.target.files;

@@ -32,3 +32,15 @@ def test_static_html_asset_paths_exist():
 
     for page in web.glob("*.html"):
         Links().feed(page.read_text())
+
+
+def test_builder_state_and_nonblocking_print_lifecycle():
+    root = Path(__file__).parents[1]
+    result = subprocess.run(
+        ["node", "scripts/check-builder-state.mjs"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

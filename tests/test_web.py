@@ -82,11 +82,9 @@ def test_web_assets_and_brand_contract_are_present():
     assert 'state.builderMode === "example"' in app
     assert "renderFinanceMemo" in app
     assert 'document.body.classList.add("printing-memo")' in app
-    assert app.count('document.body.classList.remove("printing-memo")') == 2
-    assert (
-        'window.setTimeout(() => document.body.classList.remove("printing-memo"), 1500)'
-        in app
-    )
+    assert 'window.addEventListener("afterprint"' in app
+    assert 'window.matchMedia?.("print")' in app
+    assert 'document.body.classList.remove("printing-memo"), 1500' not in app
     assert "The provider bill fell" in app
     assert "The cost of a ready result rose" in app
     assert "buildPlanningRecord" in app
