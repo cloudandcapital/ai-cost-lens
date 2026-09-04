@@ -19,7 +19,7 @@ const element = (id) => {
 navButtons.push(element('review-tab'), element('anatomy-tab'), element('evidence-tab'));
 const document = { getElementById: element, querySelector: element, querySelectorAll() { return []; }, body: element('body') };
 const context = { TextEncoder, crypto: webcrypto, document, window: { scrollTo() {} } };
-runInNewContext(source.slice(0, boundary) + 'globalThis.api = {parseCsv, validDate, validateResult, buildLocalReview, buildSampledReview, buildOpenAIBillReview, buildSingleBillReview, summarizeSingleBill, renderAll, state};})();', context);
+runInNewContext(source.slice(0, boundary) + 'globalThis.api = {parseCsv, validDate, validateResult, buildLocalReview, buildSampledReview, buildOpenAIBillReview, buildSingleBillReview, summarizeSingleBill, failedSavingsGateText, lumenResponse, renderAll, state};})();', context);
 const api = context.api;
 for (const date of ['2026-02-31', '2026-02-29', '2026-04-31', '2026-13-01', 'not-a-date']) assert.throws(() => api.validDate(date, 'Date'));
 for (const date of ['2024-02-29', '2026-02-28', '2026-12-31']) assert.equal(api.validDate(date, 'Date'), date);
@@ -138,6 +138,18 @@ const partialRow = [...invoiceRow]; partialRow[1] = '2026-08-02'; partialRow[6] 
 const partialUsage = api.summarizeSingleBill(await api.buildSingleBillReview(singleRows([invoiceRow, partialRow])));
 assert.equal(partialUsage.totals.requests, null);
 assert.equal(partialUsage.level, 'Cost and usage');
+const missingRequests = await api.buildSingleBillReview(singleSpend.replace(',3,240000', ',,240000'));
+const zeroRequests = await api.buildSingleBillReview(singleSpend.replace(',3,240000', ',0,240000'));
+for (const [review, expected] of [
+  [missingRequests, /Requests were not supplied for every cost row/],
+  [zeroRequests, /No requests were recorded for this period, so cost per request is unavailable/],
+  [usageOnly, /provider cost divided by all supplied requests/],
+  [await api.buildSingleBillReview(singleRows([invoiceRow, partialRow])), /Requests were not supplied for every cost row/],
+]) {
+  api.state.data = review;
+  api.renderAll();
+  assert.match(element('bill-opportunity-ledger').innerHTML, expected);
+}
 for (const basis of ['allocated', 'calculated']) {
   const row = [...invoiceRow]; row[12] = basis;
   assert.equal(api.summarizeSingleBill(await api.buildSingleBillReview(singleRows([row]))).basis, basis);
@@ -152,13 +164,56 @@ for (const [column, value, message] of [[1, '2026-02-31', /calendar/], [11, '-20
 await assert.rejects(api.buildSingleBillReview(singleSpend, singleWork + '\n' + singleWork.split('\n')[1], singleConfig), /unique/);
 await assert.rejects(api.buildSingleBillReview(singleSpend, singleWork.replace('base-001,ready_to_use,1,0', 'base-001,ready_to_use,1,2'), singleConfig), /Retry/);
 await assert.rejects(api.buildSingleBillReview(singleSpend, singleWork, { ...singleConfig, verifier: '' }), /verified/);
-for (const review of [invoice, usageOnly, completeSingle, noOverheads]) {
+
+// Every route-comparison surface must use the same actual failed-gate explanation.
+const reportedSpend = spend.replace(',calculated,USD', ',provider_reported,USD');
+const qualityFailWork = work.replace('pilot-002,ready_to_use', 'pilot-002,needs_correction');
+const gateCases = [
+  [await api.buildLocalReview(reportedSpend, work, { ...config, proposedPolicyApproved: false }), /policy approval/i],
+  [await api.buildLocalReview(reportedSpend, qualityFailWork, { ...config, qualityFloor: 0.75 }), /declared quality requirement/i],
+  [await api.buildLocalReview(reportedSpend, work, { ...config, outcomeLogComplete: false }), /complete outcome evidence/i],
+  [await api.buildLocalReview(reportedSpend, qualityFailWork, { ...config, qualityFloor: 0.75, proposedPolicyApproved: false }), /declared quality requirement and policy approval/i],
+];
+for (const [review, expected] of gateCases) {
+  assert.equal(review.comparison.savings_claim_allowed, false);
+  assert.match(review.comparison.recommendation, expected);
+  api.state.data = review;
+  api.renderAll();
+  assert.match(element('finding-title').textContent, expected);
+  assert.match(element('decision-title').textContent, expected);
+  assert.match(element('memo-decision-title').textContent, expected);
+  assert.match(element('opportunity-ledger').innerHTML, expected);
+  assert.match(api.lumenResponse('evidence'), expected);
+  assert.match(api.lumenResponse('cfo'), expected);
+}
+api.state.data = gateCases[0][0];
+assert.equal(api.lumenResponse('evidence'), 'The files match, but policy approval still blocks a savings claim.');
+assert.match(api.lumenResponse('cfo'), /\. Policy approval still blocks a savings claim\.$/);
+api.state.data = gateCases[3][0];
+assert.equal(api.lumenResponse('evidence'), 'The files match, but the declared quality requirement and policy approval still block a savings claim.');
+assert.match(api.lumenResponse('cfo'), /\. The declared quality requirement and policy approval still block a savings claim\.$/);
+for (const response of [api.lumenResponse('evidence'), api.lumenResponse('cfo')]) {
+  assert.doesNotMatch(response, /(?:^|[.!?]\s+)[a-z]/);
+}
+const allGatesPass = await api.buildLocalReview(reportedSpend, work, config);
+assert.equal(allGatesPass.comparison.savings_claim_allowed, true);
+assert.doesNotMatch(allGatesPass.comparison.recommendation, /blocks a savings claim/);
+const stagedReviews = [
+  [invoice, 'Start with the bill.', 'CRAWL · UNDERSTAND THE BILL', 'Use this bill as the cost baseline'],
+  [usageOnly, 'Where is the AI cost going?', 'WALK · EXPLAIN THE USAGE', 'blended cost per request'],
+  [completeSingle, 'What did the work actually cost?', 'RUN · CONNECT COST TO OUTCOMES', 'The provider cost per ready result is visible'],
+  [noOverheads, 'What did the work actually cost?', 'RUN · CONNECT COST TO OUTCOMES', 'Human and shared cost are optional depth'],
+];
+for (const [review, title, kicker, guidance] of stagedReviews) {
   api.validateResult(JSON.parse(JSON.stringify(review)));
   api.state.data = review;
   api.renderAll();
   assert.equal(element('.question-nav').hidden, true);
-  assert.match(element('bill-finding-title').textContent, /no savings claim/);
-  assert.match(element('memo-decision-code').textContent, /NO SAVINGS/);
+  assert.equal(element('bill-review-title').textContent, title);
+  assert.equal(element('bill-review-kicker').textContent, kicker);
+  assert.match(element('bill-opportunity-ledger').innerHTML, new RegExp(guidance));
+  assert.match(element('bill-mode-tag').textContent, /NO SAVINGS CLAIM/);
+  assert.match(element('memo-decision-limit').textContent, /does not claim savings/);
   for (const el of elements.values()) assert.doesNotMatch(el.innerHTML + el.textContent, /\b(?:NaN|Infinity|undefined)\b/);
   for (const path of requiredLeaves(review)) {
     const copy = structuredClone(review); let parent = copy;
@@ -186,6 +241,12 @@ for (const review of [demo, built, bill]) {
   api.renderAll();
   for (const el of elements.values()) assert.doesNotMatch(el.innerHTML + el.textContent, /\b(?:NaN|Infinity|undefined)\b/, el.id);
 }
+api.state.data = bill;
+api.renderAll();
+assert.equal(element('bill-review-title').textContent, 'Where is the AI cost going?');
+assert.match(element('bill-opportunity-ledger').innerHTML, /Most requests went to gpt-economy/);
+assert.match(element('bill-metric-ledger').innerHTML, /Blended cost per request/);
+assert.match(element('bill-finding-limit').textContent, /useful cost and usage baseline/);
 assert.equal(element('.question-nav').hidden, true);
 assert.ok(navButtons.every((button) => button.disabled && button.tabIndex === -1));
 api.state.data = demo;

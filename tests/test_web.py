@@ -36,7 +36,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert (
         "universal spend and work templates for any provider, including OpenAI" in html
     )
-    assert "Choose the universal path, including for OpenAI" in html
+    assert "Start with the records you already have" in html
     assert "Start with the reports you already have" in html
     assert "Put both routes in one spend file" in html
     assert "Add what happened to the work" in html
@@ -47,6 +47,16 @@ def test_web_assets_and_brand_contract_are_present():
     assert "Set the decision rules" in html
     assert html.count("data-builder-mode=") == 4
     assert 'data-builder-mode="single"' in html
+    assert "CRAWL" in html
+    assert "WALK" in html
+    assert "RUN" in html
+    assert "Understand the bill" in html
+    assert "Explain the usage" in html
+    assert "Connect cost to outcomes" in html
+    assert "Understand one bill" in html
+    assert "Human effort is optional" in html
+    assert "No human review record? Leave it blank" in (WEB / "app.js").read_text()
+    assert "Blended cost per request" in (WEB / "app.js").read_text()
     assert 'id="workload-builder-fields" hidden' in html
     assert 'id="openai-builder-fields" hidden' in html
     assert 'id="builder-actions" hidden' in html
@@ -71,7 +81,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert 'id="print-memo"' in html
     assert 'id="finance-memo"' in html
     assert "Print finance memo" in html
-    assert "Choose the path that matches the evidence you have" in html
+    assert "What would help you today?" in html
     assert 'id="baseline-policy-approved"' in html
     assert 'id="proposed-policy-approved"' in html
     assert 'id="policy-approved"' not in html
@@ -172,7 +182,7 @@ def test_universal_path_explains_provider_transfer_and_source_boundaries():
     assert "PDFs, or screenshots directly" in html
     assert "Invoice or subscription only?" in html
     assert (
-        "Choose Review one bill to record a subscription amount without usage or outcomes"
+        "Choose Understand one bill to record a subscription amount without usage or outcomes"
         in html
     )
     assert "including after any correction you completed" in html
@@ -292,8 +302,10 @@ eval(source);
     )
     assert result.returncode == 0, result.stderr
     memo = __import__("json").loads(result.stdout)
-    assert memo["memo-decision-code"]["textContent"] == "RECONCILE FIRST"
+    assert memo["memo-decision-code"]["textContent"] == "COST AND USAGE"
     assert "$12.75" in memo["memo-table-body"]["innerHTML"]
+    assert "Blended cost per request" in memo["memo-table-body"]["innerHTML"]
+    assert "Start with gpt-economy" in memo["memo-next-step"]["textContent"]
     assert "Unavailable from these exports" in memo["memo-evidence"]["innerHTML"]
     assert "Not supported" in memo["memo-evidence"]["innerHTML"]
     assert memo["memo-planning"]["hidden"] is True

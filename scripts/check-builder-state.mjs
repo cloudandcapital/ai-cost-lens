@@ -106,7 +106,7 @@ assert.equal(el('single-complete').checked, false);
 await submit();
 assert.equal(api.state.data.source.work.length, 0);
 assert.equal(api.state.data.config.sharedCost, '');
-assert.match(el('bill-mode-tag').textContent, /INVOICE OR SUBSCRIPTION ONLY/);
+assert.match(el('bill-mode-tag').textContent, /BILL FOUNDATION · NO SAVINGS CLAIM/);
 assert.doesNotMatch(el('bill-finding-limit').textContent, /Outcome unit cost withheld|Request reconciliation is unavailable/);
 
 // Every path transition starts fresh, using native HTML defaults.

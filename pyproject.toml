@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ai-cost-lens"
-version = "0.3.1"
+version = "0.3.2"
 description = "Strict AI usage cost analysis with pricing provenance and CCAC output"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -2,7 +2,16 @@
 
 All notable changes to AI Cost Lens are documented here.
 
-## [0.3.1]: release candidate, not yet tagged
+## [0.3.2]: release candidate, not yet tagged
+
+- A Crawl, Walk, Run evidence ladder that starts with the records a team already has.
+- Useful bill-only guidance without requiring usage, outcomes, retries, or human review.
+- Blended request cost, prompt-size, output-size, and largest-route signals when usage is available.
+- Evidence-based next actions for bill-only, cost-and-usage, and outcome reviews.
+- Human effort and retry data are explicitly optional and never inferred as zero.
+- OpenAI export reviews now lead with cost and usage findings before deeper outcome evidence.
+
+## [0.3.1]: 2026-09-04
 
 - Provider-neutral single-bill reviews, from declared invoice cost through usage and ready-result evidence.
 - Clearer provider-to-template transfer guidance, retry accounting and missing-data handling.

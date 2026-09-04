@@ -346,6 +346,87 @@
     return result;
   }
 
+  function singleBillStage(review) {
+    if (review.providerUnit !== null) {
+      return {
+        key: "outcome",
+        kicker: "RUN · CONNECT COST TO OUTCOMES",
+        tag: "OUTCOME ECONOMICS · NO SAVINGS CLAIM",
+        title: "What did the work actually cost?",
+      };
+    }
+    if (review.level === "Cost and usage") {
+      return {
+        key: "usage",
+        kicker: "WALK · EXPLAIN THE USAGE",
+        tag: "COST AND USAGE · NO SAVINGS CLAIM",
+        title: "Where is the AI cost going?",
+      };
+    }
+    return {
+      key: "bill",
+      kicker: "CRAWL · UNDERSTAND THE BILL",
+      tag: "BILL FOUNDATION · NO SAVINGS CLAIM",
+      title: "Start with the bill.",
+    };
+  }
+
+  function singleBillGuidance(review) {
+    const { totals } = review;
+    const cost = (value) => money(value, value < 1 ? 4 : 2);
+    const costPerRequest = totals.requests ? totals.providerCost / totals.requests : null;
+    const cacheShare = totals.processedInput && totals.cachedInput !== null
+      ? totals.cachedInput / totals.processedInput
+      : null;
+    const readyRate = review.completed ? review.ready / review.completed : null;
+    const topCost = [...review.mix].sort((a, b) => b.providerCost - a.providerCost)[0];
+    const topCostShare = topCost && totals.providerCost ? topCost.providerCost / totals.providerCost : null;
+    const requestNote = totals.requests === 0
+      ? "No requests were recorded for this period, so cost per request is unavailable."
+      : costPerRequest === null
+        ? "Requests were not supplied for every cost row. Leave the metric blank until the source supports it."
+        : "This is provider cost divided by all supplied requests. It is a workload-level baseline, not a model price.";
+
+    if (review.level === "Invoice or subscription only") {
+      return [
+        ["save", "START HERE", "Use this bill as the cost baseline", cost(totals.providerCost), `The review records ${cost(totals.providerCost)} against ${review.workload}. That is enough to begin tracking the cost over time.`],
+        ["test", "CHECK NEXT", "Find what is using the subscription or API", "Usage", "For a subscription, check active seats and actual use. For API spend, add requests or tokens by workload when the source provides them."],
+        ["leave", "OPTIONAL", "No human review record? Leave it blank", "No penalty", "Human effort belongs in the analysis only when people actively review or correct AI output. It is not required for this bill review."],
+        ["fix", "CONTROL", "Give the cost an owner and a limit", "One owner", "Assign the bill to a team or use case and set a monthly budget or usage alert before the cost grows unnoticed."],
+      ];
+    }
+
+    if (review.providerUnit === null) {
+      const topLabel = topCost?.label || review.workload;
+      const topValue = topCostShare === null ? cost(totals.providerCost) : pct(topCostShare, 1);
+      const cacheTitle = cacheShare === null
+        ? "Caching is a question, not a saving"
+        : cacheShare
+          ? "Cached input is already visible"
+          : "No cached input is visible";
+      const cacheValue = cacheShare === null ? "Not supplied" : pct(cacheShare, 1);
+      const cacheNote = cacheShare === null
+        ? "If this workload repeatedly sends the same context, check whether the provider or gateway can report and discount cached input. Do not assume it is available."
+        : cacheShare
+          ? `${pct(cacheShare, 1)} of processed input was reported as cache reads. Confirm that the billing treatment is actually discounted before calling it a saving.`
+          : "If prompts repeatedly send the same long context, test provider-supported caching on one bounded workload and compare the billed result.";
+      return [
+        ["save", "START HERE", `Start with ${topLabel}`, topValue, topCostShare === null ? "This is the largest visible cost bucket in the supplied file." : `${topLabel} represents ${pct(topCostShare, 1)} of the declared provider cost. Investigate the largest visible bucket before smaller ones.`],
+        ["test", "UNIT COST", costPerRequest === null ? "Add request volume when available" : "Know the blended cost per request", costPerRequest === null ? "Optional" : cost(costPerRequest), requestNote],
+        ["test", "CHECK NEXT", cacheTitle, cacheValue, cacheNote],
+        ["leave", "OPTIONAL DEPTH", "Add outcomes only when the decision needs them", "Later", "You already have a cost and usage review. Add ready results, retries, or human effort only when you need to test quality, value, or a route change."],
+      ];
+    }
+
+    const humanShare = review.fullCost && review.humanCost !== null ? review.humanCost / review.fullCost : null;
+    return [
+      ["save", "UNIT ECONOMICS", "The provider cost per ready result is visible", cost(review.providerUnit), `${review.ready} of ${review.completed} supplied results were ready under the declared rule.`],
+      ["test", "QUALITY", "Keep the ready-result definition stable", pct(readyRate, 1), "Use the same acceptance rule whenever you compare another model or route. A cheaper result is not equivalent if fewer outputs are usable."],
+      ["test", "FULLER COST", review.fullUnit === null ? "Human and shared cost are optional depth" : "The fuller operating unit cost is visible", review.fullUnit === null ? "Optional" : cost(review.fullUnit), review.fullUnit === null ? "If nobody reviews or corrects the output, leave human effort blank. If people do, add observed or sampled active time before making a fully loaded claim." : `Human effort represents ${pct(humanShare, 1)} of the supplied operating cost. Keep the measurement method consistent across future comparisons.`],
+      ["leave", "DECISION RULE", "One bill is a baseline, not a saving", "Compare", "Use this result as the current benchmark. A savings claim still needs a comparable route, period, workload, quality rule, and cost basis."],
+    ];
+  }
+
   async function buildSingleBillReview(spendText, workText = "", config = {}) {
     const spend = parseCsv(spendText, "Universal spend");
     requireColumns(spend, singleSpendColumns, "Universal spend");
@@ -376,6 +457,19 @@
     return comparison.provider_cost_reported ?? [baseline, proposed].every(
       (scenario) => scenario.evidence.cost_basis === "observed",
     );
+  }
+
+  function failedSavingsGateText(comparison, baseline, proposed) {
+    const failures = [
+      !comparison.quality_holds && "the declared quality requirement",
+      !comparison.both_policy_approved && "policy approval",
+      !comparison.evidence_complete && "complete outcome evidence",
+      !comparison.same_cost_basis && "the same kind of cost data on both routes",
+      !providerCostsReported(baseline, proposed, comparison) && "a provider bill for both routes",
+    ].filter(Boolean);
+    return failures.length > 1
+      ? `${failures.slice(0, -1).join(", ")} and ${failures.at(-1)}`
+      : failures[0] || "a decision gate";
   }
 
   function sentenceCase(value) {
@@ -724,6 +818,13 @@
     const payback = savingsPerResult > 0 && proposed.costs.one_time_change_cost > 0
       ? Math.ceil(proposed.costs.one_time_change_cost / savingsPerResult)
       : null;
+    const failedGateText = failedSavingsGateText({
+      quality_holds: qualityHolds,
+      both_policy_approved: bothPolicyApproved,
+      evidence_complete: evidenceComplete,
+      same_cost_basis: sameCostBasis,
+      provider_cost_reported: providerCostReported,
+    }, baseline, proposed);
     let status = "no_improvement";
     let recommendation = "Leave the current route in place. The proposed route does not lower recurring cost per usable result.";
     if (unitDifference < 0 && savingsClaimAllowed) {
@@ -733,9 +834,7 @@
         : "The proposed route has a lower observed cost per usable result and clears the declared quality and policy gates.";
     } else if (unitDifference < 0) {
       status = "needs_evidence";
-      recommendation = providerCostReported
-        ? "Test the proposed route, but fix the evidence gaps before calling the lower number savings."
-        : `The proposed route has a lower ${costBasisLabel(proposed.evidence.cost_basis).toLowerCase()} per usable result. Confirm it with provider-reported spend before calling the difference savings.`;
+      recommendation = `Test the proposed route, but ${failedGateText} still blocks a savings claim.`;
     }
     const allDates = [...baselineBuild.dates, ...proposedBuild.dates].sort();
     return {
@@ -756,9 +855,7 @@
         finding: "",
         limitation: savingsClaimAllowed
           ? "The observed cost and accepted-work records reconcile for the declared boundary. This conclusion does not extend beyond this workload and period."
-          : providerCostReported
-            ? "The lower number does not clear every evidence, quality, and policy gate required for a savings claim."
-            : `${costBasisLabel(proposed.evidence.cost_basis)} is not a provider-reported invoice amount. The comparison can support a test decision, not booked savings.`,
+          : `The lower number is not proven savings because ${failedGateText} still blocks the claim.`,
         recommendation,
         savings_claim_allowed: savingsClaimAllowed,
         same_cost_basis: sameCostBasis,
@@ -1560,6 +1657,9 @@
     const issueCount = (baseline.evidence.reconciliation_issues || []).length +
       (proposed.evidence.reconciliation_issues || []).length;
     const providerTerm = providerCostTerm(baseline, proposed);
+    const failedGateText = failedSavingsGateText(comparison, baseline, proposed);
+    const failedGateSentence = sentenceCase(failedGateText);
+    const failedGateVerb = /,| and /.test(failedGateText) ? "block" : "blocks";
     const planning = state.data.planning;
     const planCostPosition = planning
       ? planning.variance.recurring_operating_cost > 0
@@ -1583,16 +1683,14 @@
         : `At the current proposed cost, at least ${compact(facts.requiredReady)} of ${compact(proposed.outcomes.completed_results)} attempts must be ready to match the current ${unitMoney(baseline.measures.cost_per_usable_result)} unit cost. That is a ${facts.requiredRate.toFixed(1)}% ready result rate, compared with ${pct(proposed.measures.usable_result_rate)} now. The break-even explorer lets you test a different yield, provider bill, or human work cost.`,
       evidence: mode === "illustrative"
         ? `The math is complete, but the inputs are illustrative. Before finance relies on this, use the real provider bill and outcome log for one specific workload. Apply the same definition of "ready" to both routes, measure the human correction time, and enter the real cost of making the change. ${issueCount ? `${issueCount} file or math issue${issueCount === 1 ? " is" : "s are"} also open.` : "The synthetic files match each other."}`
-        : issueCount
-          ? `${issueCount} reconciliation issue${issueCount === 1 ? " is" : "s are"} still open. Open The evidence to see the exact missing or mismatched fields before approving a savings claim.`
-          : comparison.savings_claim_allowed
-            ? "The bill, work volume, quality rule, policy approval, and included costs all match for this review. That supports this decision for this workload and period, not a claim about the model everywhere."
-            : providerCostsReported(baseline, proposed, comparison)
-              ? "The files match, but at least one check still blocks a savings claim. Open The evidence to see whether the problem is quality, policy approval, missing outcomes, or mismatched cost data."
-              : `The files match, but ${providerTerm} does not come from the provider bill for both routes. Treat the result as a test signal until the bill confirms it.`,
+        : comparison.savings_claim_allowed
+          ? "The bill, work volume, quality rule, policy approval, and included costs all match for this review. That supports this decision for this workload and period, not a claim about the model everywhere."
+          : issueCount
+            ? `${failedGateSentence} still ${failedGateVerb} a savings claim. Open The evidence for the ${issueCount} reconciliation issue${issueCount === 1 ? "" : "s"}.`
+            : `The files match, but ${failedGateText} still ${failedGateVerb} a savings claim.`,
       cfo: comparison.cost_per_usable_result_change_pct > 0
         ? `The proposed route reduces ${providerTerm}, but not the cost of usable work. After shared infrastructure and human correction, each ready result costs ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. Keep the current route and test whether the proposed route can reach at least ${facts.requiredRate?.toFixed(1) ?? "the required"}% ready results before changing the default.`
-        : `The proposed route produces a ready result for ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. ${comparison.savings_claim_allowed ? "The evidence supports the difference for this workload and period." : "Treat the difference as a test result until the missing checks are complete."}`,
+        : `The proposed route produces a ready result for ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. ${comparison.savings_claim_allowed ? "The evidence supports the difference for this workload and period." : `${failedGateSentence} still ${failedGateVerb} a savings claim.`}`,
       plan: planning
         ? `The current route finished ${money(Math.abs(planning.variance.recurring_operating_cost))} ${planCostPosition} its recurring cost plan. ${planning.variance.primary_cost_drivers.map((driver) => `${sentenceCase(driver.label)} was ${money(Math.abs(driver.amount))} ${driver.amount > 0 ? "over plan" : driver.amount < 0 ? "under plan" : "on plan"}`).join(". ")}. Ready result yield was ${Math.abs(planning.variance.ready_result_rate_points).toFixed(1)} points ${planYieldPosition} plan.`
         : "No approved plan was supplied with this review. Add the planned provider, infrastructure, human work, volume, and ready result assumptions to create a Plan vs Actual check.",
@@ -1708,7 +1806,7 @@
     } else if (proposedUnit < baselineUnit) {
       document.getElementById("finding-title").textContent =
         `${proposed.label} comes out at ${unitMoney(proposedUnit)} for each result that was ready ` +
-        `to use. ${baseline.label} cost ${unitMoney(baselineUnit)}. It looks better, but ${costBasisLabel(proposed.evidence.cost_basis).toLowerCase()} is not booked provider spend.`;
+        `to use. ${baseline.label} cost ${unitMoney(baselineUnit)}. It looks better, but ${failedSavingsGateText(comparison, baseline, proposed)} still blocks a savings claim.`;
     } else {
       document.getElementById("finding-title").textContent =
         modelCostChange !== null && modelCostChange < 0 && readyResultCostChange !== null && readyResultCostChange > 0
@@ -1820,16 +1918,7 @@
       ...proposed.evidence.reconciliation_issues,
     ];
     const lowerUnitCost = proposed.measures.cost_per_usable_result < baseline.measures.cost_per_usable_result;
-    const gateFailures = [
-      !comparison.quality_holds && "the quality floor",
-      !comparison.both_policy_approved && "policy approval",
-      !comparison.evidence_complete && "complete outcome evidence",
-      !comparison.same_cost_basis && "the same kind of cost data on both routes",
-      !providerCostsReported(baseline, proposed, comparison) && "a provider bill for both routes",
-    ].filter(Boolean);
-    const gateFailureText = gateFailures.length > 1
-      ? `${gateFailures.slice(0, -1).join(", ")} and ${gateFailures.at(-1)}`
-      : gateFailures[0] || "a decision gate";
+    const gateFailureText = failedSavingsGateText(comparison, baseline, proposed);
     const illustrative = mode === "illustrative";
     const opportunityRows = [
       {
@@ -2089,71 +2178,129 @@
   function renderSingleBill() {
     const review = summarizeSingleBill(state.data);
     const { totals, period } = review;
+    const stage = singleBillStage(review);
+    const guidance = singleBillGuidance(review);
     const count = (value) => value === null ? "Not supplied" : compact(value);
     const cost = (value) => value === null ? "Unavailable" : money(value, value < 1 ? 4 : 2);
-    const headline = `${cost(totals.providerCost)} declared for ${review.workload}. ${review.level}; no savings claim.`;
-    const metrics = [
-      [costBasisLabel(review.basis), cost(totals.providerCost), "Declared in the universal template; not independently verified"],
-      ["Requests", count(totals.requests), "Includes additional attempts when reported"],
-      ["Input tokens", count(totals.processedInput), `Cache read: ${count(totals.cachedInput)} · Cache write: ${count(totals.cacheWriteInput)}`],
-      ["Output tokens", count(totals.outputTokens), "Unknown fields are not zero"],
-      ["Ready results in supplied log", review.completed ? count(review.ready) : "Not supplied", `${review.completed} outcome rows · retries: ${count(review.retries)}`],
-      ["Provider cost per ready result", cost(review.providerUnit), "Excludes shared infrastructure and human effort"],
-      ["Full operating cost per ready result", cost(review.fullUnit), "Provider + declared shared infrastructure + recorded human effort"],
-    ];
-    document.getElementById("bill-review-kicker").textContent = "UNIVERSAL SINGLE-BILL REVIEW";
+    const costPerRequest = totals.requests ? totals.providerCost / totals.requests : null;
+    const cacheShare = totals.processedInput && totals.cachedInput !== null ? totals.cachedInput / totals.processedInput : null;
+    const headline = stage.key === "bill"
+      ? `${cost(totals.providerCost)} is the starting cost for ${review.workload}.`
+      : stage.key === "usage"
+        ? totals.requests
+          ? `${cost(totals.providerCost)} across ${count(totals.requests)} requests for ${review.workload}.`
+          : `${cost(totals.providerCost)} with usage recorded for ${review.workload}.`
+        : `${cost(totals.providerCost)} produced ${count(review.ready)} ready result${review.ready === 1 ? "" : "s"} at ${cost(review.providerUnit)} each.`;
+    const metrics = stage.key === "bill"
+      ? [
+          [costBasisLabel(review.basis), cost(totals.providerCost), "The declared starting point for this review"],
+          ["Review depth", "Bill only", "Useful for a cost baseline; usage and outcomes are optional next layers"],
+          ["Usage detail", "Not supplied", "Add requests or tokens only when the source supports them"],
+          ["Human effort", "Optional", "Leave blank when nobody reviews or corrects the output"],
+        ]
+      : stage.key === "usage"
+        ? [
+            [costBasisLabel(review.basis), cost(totals.providerCost), "The declared cost for this workload and period"],
+            ["Requests", count(totals.requests), "Includes additional attempts when reported"],
+            ["Blended cost per request", cost(costPerRequest), "Provider cost divided by supplied requests; not a model price"],
+            ["Input tokens", count(totals.processedInput), `Cache read: ${count(totals.cachedInput)} · Cache write: ${count(totals.cacheWriteInput)}`],
+            ["Output tokens", count(totals.outputTokens), "Unknown fields are not zero"],
+            ["Cache-read share", cacheShare === null ? "Not supplied" : pct(cacheShare, 1), "Use only the cache fields reported by the source"],
+            ["Outcome economics", "Optional", "Add results only when you need to test value or a route change"],
+            ["Human effort", "Optional", "Add only when people actively review or correct the output"],
+          ]
+        : [
+            [costBasisLabel(review.basis), cost(totals.providerCost), "The declared cost for this workload and period"],
+            ["Requests", count(totals.requests), "Includes additional attempts when reported"],
+            ["Ready results", count(review.ready), `${review.completed} outcome rows under the declared ready rule`],
+            ["Provider cost per ready result", cost(review.providerUnit), "Excludes shared infrastructure and human effort"],
+            ["Full operating cost per ready result", review.fullUnit === null ? "Optional" : cost(review.fullUnit), "Available only when relevant human and shared costs are supplied"],
+            ["Retries", count(review.retries), "Optional; missing retry records do not block the unit cost"],
+            ["Human minutes", count(review.minutes), "Optional; include only active review and correction time"],
+            ["Cache-read share", cacheShare === null ? "Not supplied" : pct(cacheShare, 1), "Use only the cache fields reported by the source"],
+          ];
+    document.getElementById("bill-review-kicker").textContent = stage.kicker;
+    document.getElementById("bill-review-title").textContent = stage.title;
     document.getElementById("bill-source-title").textContent = "Your completed universal template";
-    document.getElementById("bill-source-copy").textContent = "Declared evidence, not an independently verified invoice. Missing measures stay unavailable.";
+    document.getElementById("bill-source-copy").textContent = "Start with the records you already have. Each additional layer deepens the review without replacing the bill.";
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · supplied date buckets, not proof of service-period coverage`;
-    document.getElementById("bill-mode-tag").textContent = review.level.toUpperCase();
+    document.getElementById("bill-mode-tag").textContent = stage.tag;
     document.getElementById("bill-finding-title").textContent = headline;
-    document.getElementById("bill-finding-limit").textContent = review.missing.join(" ");
+    document.getElementById("bill-finding-limit").textContent = stage.key === "bill"
+      ? "This is enough to establish a cost baseline. Add usage when it is available. Human effort and retries are optional."
+      : stage.key === "usage"
+        ? "This review explains the technical cost drivers supplied in the file. Add outcomes only when you need to test value or compare a change."
+        : review.fullUnit === null
+          ? "The bill is connected to completed work. Human and shared costs remain optional and are not treated as zero."
+          : "The bill, completed work, and supplied operating costs are connected. One bill still establishes a baseline, not savings.";
     document.getElementById("bill-metric-ledger").innerHTML = metrics.map(([label, value, note]) => `<div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`).join("");
     document.getElementById("model-mix-title").textContent = "Declared bill drivers and available usage";
     document.getElementById("bill-mix-note").textContent = `Amounts use ${costBasisLabel(review.basis).toLowerCase()}. This is the supplied attribution, not an inferred allocation or savings estimate. Cache values are token counts.`;
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Provider / model / route</th><th>Requests</th><th>Input / output</th><th>Cache read / write</th><th>Cost basis</th><th>Declared cost</th></tr>";
     document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${count(row.requests)}</td><td>${count(row.processedInput)} / ${count(row.outputTokens)}</td><td>${count(row.cachedInput)} / ${count(row.cacheWriteInput)}</td><td>${escapeHtml(costBasisLabel(review.basis))}</td><td>${cost(row.providerCost)}</td></tr>`).join("");
-    document.getElementById("bill-opportunity-ledger").innerHTML = review.missing.map((note) => `<article class="opportunity-row state-fix"><span class="opportunity-state">EVIDENCE BOUNDARY</span><div><p>${escapeHtml(note)}</p></div><em>Review</em></article>`).join("");
-    document.getElementById("bill-next-step").textContent = "Keep the source bill; add matching evidence before drawing stronger conclusions.";
-    document.getElementById("bill-boundary-copy").textContent = "To compare routes, use the comparison path. Single-bill reviews do not bypass its matching-period, cost-basis, coverage, quality or policy gates.";
-    document.getElementById("memo-title").textContent = "Single-bill evidence review";
+    document.getElementById("bill-opportunity-ledger").innerHTML = guidance.map(([kind, label, title, value, note]) => `<article class="opportunity-row state-${kind}"><span class="opportunity-state">${escapeHtml(label)}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(note)}</p></div><em>${escapeHtml(value)}</em></article>`).join("");
+    document.getElementById("bill-next-step").textContent = stage.key === "bill"
+      ? "Keep this baseline. Add the next piece of data only when it answers a real decision."
+      : stage.key === "usage"
+        ? "Investigate the largest visible cost driver, then test one bounded change."
+        : "Use this as the current benchmark before comparing another model or route.";
+    document.getElementById("bill-boundary-copy").textContent = stage.key === "bill"
+      ? "A bill can establish cost without proving utilization or savings. That is a useful starting point, not a failed review."
+      : stage.key === "usage"
+        ? "Cost and usage can reveal where to investigate. They cannot prove that a cheaper model produces equally useful work."
+        : "Human effort is optional. Add it only when people review or correct output. Savings still require two comparable routes and the same quality rule.";
+    document.getElementById("memo-title").textContent = "AI cost review";
     document.getElementById("memo-meta").textContent = `${review.workload} · ${period.start} to ${period.end} · ${review.currency}`;
-    document.getElementById("memo-decision-code").textContent = "NO SAVINGS CLAIM";
+    document.getElementById("memo-decision-code").textContent = stage.key === "bill" ? "COST BASELINE" : stage.key === "usage" ? "USAGE REVIEW" : "OUTCOME ECONOMICS";
     document.getElementById("memo-decision-title").textContent = headline;
-    document.getElementById("memo-decision-limit").textContent = review.missing.join(" ");
+    document.getElementById("memo-decision-limit").textContent = "This single-bill review does not claim savings. Missing measures remain unavailable rather than becoming zero.";
     document.getElementById("memo-numbers-title").textContent = "What the supplied evidence supports";
     document.getElementById("memo-table-head").innerHTML = "<tr><th>Measure</th><th>Value</th><th>Boundary</th></tr>";
     document.getElementById("memo-table-body").innerHTML = metrics.map((cells) => `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("");
     document.getElementById("memo-rules").innerHTML = memoList([["Ready means", state.data.config.acceptanceRule || "Not supplied"], ["Verified by", state.data.config.verifier || "Not supplied"], ["Cost basis", costBasisLabel(review.basis)]]);
-    document.getElementById("memo-evidence").innerHTML = memoList([["Evidence level", review.level], ["Coverage", "Service period and completeness are user declarations, not independently verified"], ["Savings", "Not supported by one bill"]]);
+    document.getElementById("memo-evidence").innerHTML = memoList([["Review depth", stage.title], ["Evidence level", review.level], ["Coverage", "Service period and completeness are user declarations, not independently verified"], ["Savings", "Not supported by one bill"]]);
     document.getElementById("memo-planning").hidden = true;
-    document.getElementById("memo-next-step").textContent = "Add matching evidence or start a gated comparison.";
+    document.getElementById("memo-next-step").textContent = document.getElementById("bill-next-step").textContent;
     document.getElementById("memo-footer-status").textContent = "Calculated locally from supplied records · no AI API";
   }
 
   function renderOpenAIBill() {
-    document.getElementById("bill-review-kicker").textContent = "OPENAI BILL REVIEW";
+    document.getElementById("bill-review-kicker").textContent = "WALK · EXPLAIN THE USAGE";
+    document.getElementById("bill-review-title").textContent = "Where is the AI cost going?";
     document.getElementById("bill-source-title").textContent = "Saved dashboard exports";
-    document.getElementById("bill-source-copy").textContent = "Total cost and usage mix are real evidence. Unsupported allocations stay blank.";
+    document.getElementById("bill-source-copy").textContent = "The matching exports create a cost and usage baseline. Outcomes and human effort are optional next layers.";
     document.getElementById("model-mix-title").textContent = "Where the requests and tokens went";
     document.getElementById("bill-mix-note").textContent = "These are observed usage measures. They are not billed dollars by model.";
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Model</th><th>Requests</th><th>Input</th><th>Output</th><th>Cache share</th><th>Billed cost</th></tr>";
-    const { bill, usage, period, reconciliation, limitations, next_step: nextStep } = state.data;
+    const { bill, usage, period, reconciliation, limitations } = state.data;
     const totalInput = usage.totals.input_tokens;
     const cacheShare = totalInput ? usage.totals.cached_input_tokens / totalInput : 0;
+    const costPerRequest = period.aligned && usage.totals.requests ? Number(bill.total) / usage.totals.requests : null;
+    const averageInput = usage.totals.requests ? totalInput / usage.totals.requests : null;
+    const averageOutput = usage.totals.requests ? usage.totals.output_tokens / usage.totals.requests : null;
+    const topModel = usage.by_model[0];
+    const topRequestShare = topModel && usage.totals.requests ? topModel.requests / usage.totals.requests : null;
+    const costPerRequestLabel = costPerRequest === null ? "Unavailable" : money(costPerRequest, costPerRequest < 1 ? 4 : 2);
+    const topRequestShareLabel = topRequestShare === null ? "Unavailable" : pct(topRequestShare, 1);
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
-    document.getElementById("bill-mode-tag").textContent = !period.aligned ? "PERIOD MISMATCH" : state.data.mode === "illustrative" ? "ILLUSTRATIVE EXPORT" : "REAL PROVIDER EXPORT";
+    document.getElementById("bill-mode-tag").textContent = !period.aligned ? "PERIOD MISMATCH" : state.data.mode === "illustrative" ? "ILLUSTRATIVE COST AND USAGE" : "COST AND USAGE · NO SAVINGS CLAIM";
     document.getElementById("bill-finding-title").textContent =
       period.aligned
-        ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(usage.totals.requests)} requests. The export shows which models handled the traffic, but not what each model cost.`
+        ? costPerRequest === null
+          ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. No nonzero request volume was supplied for a blended unit cost.`
+          : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(usage.totals.requests)} requests, or ${costPerRequestLabel} per observed request.`
         : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} in the cost export. Usage covers different daily buckets; these totals are not a matched financial review.`;
-    document.getElementById("bill-finding-limit").textContent = period.aligned ? limitations[0]
+    document.getElementById("bill-finding-limit").textContent = period.aligned ? `This is a useful cost and usage baseline. ${limitations[0]} Human effort is not required for this review.`
       : "PERIOD MISMATCH: usage and cost exports cover different daily buckets. Export the same date range again before using this review for a financial decision.";
     const metrics = [
       ["Provider reported cost", money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2), `${bill.populated_rows} populated cost row${bill.populated_rows === 1 ? "" : "s"}`],
       ["Requests", compact(usage.totals.requests), `${usage.by_model.length} model${usage.by_model.length === 1 ? "" : "s"} observed`],
+      ["Blended cost per request", costPerRequestLabel, "Full exported cost divided by observed requests; not a model price"],
       ["Input tokens", compact(totalInput), `${pct(cacheShare, 1)} read from cache`],
       ["Output tokens", compact(usage.totals.output_tokens), `${usage.days_with_usage} day${usage.days_with_usage === 1 ? "" : "s"} with usage`],
+      ["Average input per request", averageInput === null ? "Unavailable" : compact(averageInput), "A prompt-size baseline for this exported period"],
+      ["Average output per request", averageOutput === null ? "Unavailable" : compact(averageOutput), "An output-length baseline for this exported period"],
+      ["Human effort", "Optional", "Add only when people actively review or correct the output"],
     ];
     document.getElementById("bill-metric-ledger").innerHTML = metrics.map(([label, value, note]) => `
       <div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>
@@ -2169,11 +2316,15 @@
         <td class="unavailable">Unavailable</td>
       </tr>`;
     }).join("");
-    const ledger = [
-      ["save", "SAVE NOW", "No proven savings item", "—", "A total bill and token mix are not enough to prove that a route, cache policy, or model change saved money."],
-      ["test", "TEST FIRST", "Choose one repeatable workload", "One bounded test", "Compare the same job, quality floor, accepted results, retries, and human correction before changing the route."],
-      ["fix", "FIX THE EVIDENCE", reconciliation.project_cost_join_supported ? "Add the outcome record" : "Add cost attribution and outcomes", reconciliation.project_cost_join_supported ? "1 gap" : "2 gaps", reconciliation.project_cost_join_supported ? "The bill has project attribution, but it still lacks accepted work and human effort." : "The cost export has no supported project join, and the provider report does not say whether the work was usable."],
-      ["leave", "DO NOT ALLOCATE", "Do not spread the total bill across models", "Unsupported", "Token share is usage evidence. It is not a defensible allocation of observed billed dollars."],
+    const ledger = period.aligned ? [
+      ["save", "START HERE", `Most requests went to ${topModel.model}`, topRequestShareLabel, `${topModel.model} handled ${compact(topModel.requests)} of ${compact(usage.totals.requests)} requests. Start with the busiest visible route before smaller ones.`],
+      ["test", "UNIT COST", costPerRequest === null ? "Request unit cost is unavailable" : "Use the blended request cost as a baseline", costPerRequestLabel, costPerRequest === null ? "The export has no nonzero request volume. Keep the unit cost unavailable rather than dividing by zero." : "This is the full exported cost divided by observed requests. Track it over time, but do not treat it as a billed model rate."],
+      ["test", "CHECK NEXT", cacheShare ? "Cached input is already visible" : "Check whether repeated context can be cached", pct(cacheShare, 1), cacheShare ? `${pct(cacheShare, 1)} of input tokens were read from cache. Confirm the provider's billed treatment before calling it a saving.` : "If this workload repeatedly sends the same context, test provider-supported caching on one bounded job and compare the actual bill."],
+      ["test", "TEST FIRST", "Try a cheaper route on one repeatable job", "Bounded test", "Keep the job and quality rule fixed. Outcomes can be a small sample first; human effort is optional unless people actually review the work."],
+      ["leave", "LEAVE ALONE", "Do not spread the total bill across models", "Unsupported", "Token share shows usage. The saved cost export does not support billed dollars by model."],
+    ] : [
+      ["fix", "FIX FIRST", "Match the usage and cost periods", "Required", "Export the same daily buckets again. A blended unit cost would be misleading until the periods align."],
+      ["leave", "LEAVE ALONE", "Do not compare the unmatched totals", "Unsupported", "Keep each export intact and avoid normalizing or allocating the difference by assumption."],
     ];
     document.getElementById("bill-opportunity-ledger").innerHTML = ledger.map(([kind, label, title, value, note]) => `
       <article class="opportunity-row state-${kind}">
@@ -2182,9 +2333,13 @@
         <em>${escapeHtml(value)}</em>
       </article>
     `).join("");
-    document.getElementById("bill-next-step").textContent = nextStep;
+    document.getElementById("bill-next-step").textContent = period.aligned
+      ? topRequestShare === null
+        ? `Start with ${topModel.model}, the busiest visible route in this export.`
+        : `Start with ${topModel.model}, the route handling ${topRequestShareLabel} of requests.`
+      : "Export matching usage and cost periods before investigating optimization.";
     document.getElementById("bill-boundary-copy").textContent = period.aligned
-      ? `${usage.by_model.length} model route${usage.by_model.length === 1 ? "" : "s"} and ${usage.by_project.length} project record${usage.by_project.length === 1 ? "" : "s"} are visible in the usage export. Model cost allocation and cost per usable result remain unavailable until the evidence supports them.`
+      ? `${usage.by_model.length} model route${usage.by_model.length === 1 ? "" : "s"} and ${usage.by_project.length} project record${usage.by_project.length === 1 ? "" : "s"} are visible. Check prompt size, output length, caching, and whether a smaller model meets quality on one repeatable job. Human review is optional; add outcomes only when you need to test value or savings.`
       : "The usage and cost date buckets do not align. Export the same date range again before using this review for a financial decision.";
   }
 
@@ -2206,22 +2361,37 @@
     const isBill = state.data.schema_version === "ai-cost-lens-openai-bill-review/0.1";
     const memoPlanning = document.getElementById("memo-planning");
     if (isBill) {
-      const { bill, usage, period, reconciliation, limitations, next_step: nextStep } = state.data;
+      const { bill, usage, period, reconciliation, limitations } = state.data;
       const total = Number(bill.total);
+      const requests = usage.totals.requests;
+      const costPerRequest = period.aligned && requests ? total / requests : null;
+      const costPerRequestLabel = costPerRequest === null ? "Unavailable" : money(costPerRequest, costPerRequest < 1 ? 4 : 2);
+      const averageInput = requests ? usage.totals.input_tokens / requests : null;
+      const averageOutput = requests ? usage.totals.output_tokens / requests : null;
+      const cacheShare = usage.totals.input_tokens ? usage.totals.cached_input_tokens / usage.totals.input_tokens : 0;
+      const topModel = usage.by_model[0];
+      const topRequestShare = topModel && requests ? topModel.requests / requests : null;
       document.getElementById("memo-title").textContent = "OpenAI bill review";
       document.getElementById("memo-meta").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
-      document.getElementById("memo-decision-code").textContent = period.aligned ? "RECONCILE FIRST" : "PERIOD MISMATCH";
-      document.getElementById("memo-decision-title").textContent =
-        `The bill proves ${money(total, total < 1 ? 4 : 2)} of provider spend. It does not prove cost by model or savings by outcome.`;
-      document.getElementById("memo-decision-limit").textContent = period.aligned ? limitations[0]
+      document.getElementById("memo-decision-code").textContent = period.aligned ? "COST AND USAGE" : "PERIOD MISMATCH";
+      document.getElementById("memo-decision-title").textContent = period.aligned
+        ? costPerRequest === null
+          ? `${money(total, total < 1 ? 4 : 2)} is the cost baseline for this exported period.`
+          : `${money(total, total < 1 ? 4 : 2)} across ${compact(requests)} observed requests creates a ${costPerRequestLabel} blended baseline.`
+        : `${money(total, total < 1 ? 4 : 2)} of provider spend and the supplied usage cover different periods.`;
+      document.getElementById("memo-decision-limit").textContent = period.aligned ? `${limitations[0]} One bill does not prove savings. Outcomes and human effort are optional next layers.`
         : "Usage and cost exports cover different daily buckets. Export the same date range again before using this review for a financial decision.";
-      document.getElementById("memo-numbers-title").textContent = "What the provider export shows";
+      document.getElementById("memo-numbers-title").textContent = "What the cost and usage exports show";
       document.getElementById("memo-table-head").innerHTML = "<tr><th>Measure</th><th>Observed</th><th>What it proves</th></tr>";
       const billRows = [
         ["Provider reported cost", money(total, total < 1 ? 4 : 2), "The organization total for the exported period"],
-        ["Requests", compact(usage.totals.requests), "Observed request volume"],
+        ["Requests", compact(requests), "Observed request volume"],
+        ["Blended cost per request", costPerRequestLabel, "Full exported cost divided by observed requests; not a billed model rate"],
         ["Input tokens", compact(usage.totals.input_tokens), "Observed input usage, including cached input"],
         ["Output tokens", compact(usage.totals.output_tokens), "Observed output usage"],
+        ["Average input per request", averageInput === null ? "Unavailable" : compact(averageInput), "Prompt-size baseline for the exported period"],
+        ["Average output per request", averageOutput === null ? "Unavailable" : compact(averageOutput), "Output-length baseline for the exported period"],
+        ["Cache-read share", pct(cacheShare, 1), "Share of input tokens read from cache"],
       ];
       document.getElementById("memo-table-body").innerHTML = billRows.map(([label, value, meaning]) =>
         `<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td><td>${escapeHtml(meaning)}</td></tr>`,
@@ -2229,7 +2399,8 @@
       document.getElementById("memo-rules").innerHTML = memoList([
         ["Cost boundary", "Provider reported organization cost"],
         ["Allocation rule", "Do not allocate billed dollars by token share"],
-        ["Outcome rule", "No outcome claim without a matching work record"],
+        ["Outcome rule", "Add outcomes only when the decision needs value or savings evidence"],
+        ["Human effort", "Optional; include only active review or correction work"],
       ]);
       document.getElementById("memo-evidence").innerHTML = memoList([
         ["Period", period.aligned ? "Usage and cost periods align" : "Usage and cost periods do not align"],
@@ -2238,9 +2409,15 @@
         ["Savings claim", reconciliation.savings_claim_allowed ? "Supported" : "Not supported"],
       ]);
       memoPlanning.hidden = true;
-      document.getElementById("memo-next-step").textContent = nextStep;
+      document.getElementById("memo-next-step").textContent = period.aligned
+        ? topModel
+          ? topRequestShare === null
+            ? `Start with ${topModel.model}, the busiest visible route, and test one bounded change.`
+            : `Start with ${topModel.model}, which handled ${pct(topRequestShare, 1)} of requests, and test one bounded change.`
+          : "Choose one repeatable workload and establish its request and token baseline."
+        : "Export matching usage and cost periods before investigating optimization.";
       document.getElementById("memo-footer-status").textContent =
-        state.data.mode === "illustrative" ? "Illustrative export" : "Provider reported bill · outcome evidence not supplied";
+        state.data.mode === "illustrative" ? "Illustrative export" : "Provider reported cost and usage · calculated locally · no AI API";
       return;
     }
 
@@ -2470,15 +2647,15 @@
       document.getElementById("openai-builder-fields").hidden = !isOpenAI;
       document.getElementById("builder-actions").hidden = false;
       document.getElementById("builder-path-help").hidden = true;
-      document.getElementById("review-dialog-title").textContent = isSingle ? "What can your one bill support?" : isOpenAI
-        ? "Check what the OpenAI bill can actually prove."
+      document.getElementById("review-dialog-title").textContent = isSingle ? "Start with the records you already have." : isOpenAI
+        ? "See what is driving the OpenAI bill."
         : "Test whether the proposed change is actually cheaper.";
-      document.getElementById("builder-action-note").textContent = isSingle ? "Only supported measures are calculated. A single bill never proves savings." : isOpenAI
-        ? "The provider total and usage mix stay separate when the exports do not support a join."
+      document.getElementById("builder-action-note").textContent = isSingle ? "Cost is enough to start. Usage and outcomes deepen the review when available; human effort and retries are optional." : isOpenAI
+        ? "The result will show a useful cost and usage baseline without requiring outcome or human-review data."
         : state.outcomeMode === "sample"
           ? "The quick path produces a sampled estimate. It never becomes booked savings."
           : "Use the detailed log when you have one row per completed result.";
-      document.getElementById("build-review").textContent = isSingle ? "Review one bill" : isOpenAI ? "Review the OpenAI bill" : "Build the finance review";
+      document.getElementById("build-review").textContent = isSingle ? "Understand this bill" : isOpenAI ? "Review the OpenAI bill" : "Build the finance review";
       document.getElementById("builder-error").classList.remove("visible");
       syncBuilderControls();
     });
@@ -2633,7 +2810,7 @@
       errorBox.classList.add("visible");
     } finally {
       submit.disabled = false;
-      submit.textContent = state.builderMode === "single" ? "Review one bill" : state.builderMode === "openai"
+      submit.textContent = state.builderMode === "single" ? "Understand this bill" : state.builderMode === "openai"
         ? "Review the OpenAI bill"
         : state.builderMode === "workload"
           ? "Build the finance review"

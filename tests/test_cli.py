@@ -40,7 +40,7 @@ def runner():
 def test_version_option(runner):
     result = runner.invoke(cli, ["--version"])
     assert result.exit_code == 0
-    assert result.output.strip() == "ai-cost-lens, version 0.3.1"
+    assert result.output.strip() == "ai-cost-lens, version 0.3.2"
 
 
 def test_help_describes_the_provider_neutral_product(runner):
