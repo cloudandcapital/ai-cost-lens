@@ -403,7 +403,7 @@ window.AI_COST_LENS_REVIEW_PACKET = {
           }
         ],
         "decision": "INVESTIGATE",
-        "memo": "The candidate's listed input-token rate is lower, but tokenizer expansion raises equivalent-workload input volume to 1.3 million tokens. At $2.00 per million, candidate input cost is $2.60 versus $3.00 currently—about 13.3% lower, not enough to establish one-third all-in savings. Because output volume, quality, retries, and correction time remain untested, the all-in forecast is not decision-ready.",
+        "memo": "The candidate's listed input-token rate is lower, but tokenizer expansion raises equivalent-workload input volume to 1.3 million tokens. At $2.00 per million, candidate input cost is $2.60 versus $3.00 currently. That is about 13.3% lower, not enough to establish one-third all-in savings. Because output volume, quality, retries, and correction time remain untested, the all-in forecast is not decision-ready.",
         "next_question": "What are the candidate's measured output-token cost, retry rate, quality-related correction time, and other operating costs for the equivalent workload?",
         "primary_metric": {
           "label": "candidate input cost for the equivalent workload",
@@ -747,7 +747,7 @@ window.AI_COST_LENS_REVIEW_PACKET = {
           }
         ],
         "decision": "INVESTIGATE",
-        "memo": "The vendor's 3x result is a company claim from an 8,000-input-token benchmark using a warm cache and vendor-selected hardware. The target workload is 120,000 input tokens with cold starts—15x the benchmark input size and materially different operating conditions. With no independent reproduction, the benchmark does not establish that the target workload will also be 3x faster. Finance should not approve the forecast until target-like testing or other evidence validates the result.",
+        "memo": "The vendor's 3x result is a company claim from an 8,000-input-token benchmark using a warm cache and vendor-selected hardware. The target workload is 120,000 input tokens with cold starts, 15x the benchmark input size, and materially different operating conditions. With no independent reproduction, the benchmark does not establish that the target workload will also be 3x faster. Finance should not approve the forecast until target-like testing or other evidence validates the result.",
         "next_question": "Can the vendor provide an independent, target-like reproduction using 120,000-token sessions, cold starts, and comparable hardware?",
         "primary_metric": {
           "label": "target-to-benchmark input-token ratio",
@@ -833,7 +833,7 @@ window.AI_COST_LENS_REVIEW_PACKET = {
           }
         ],
         "decision": "REJECT",
-        "memo": "Reject the forecast as stated. The candidate’s rate is lower, but its 30% higher tokenization means the equivalent workload uses 1.3 million input tokens. At $2.00 per million, candidate input cost is $2.60 versus $3.00 currently—only $0.40 lower, or about 13.3%, not one third. Output volume, quality, retries, and correction time are untested, so the all-in claim is not supported and could be worse after those factors.",
+        "memo": "Reject the forecast as stated. The candidate’s rate is lower, but its 30% higher tokenization means the equivalent workload uses 1.3 million input tokens. At $2.00 per million, candidate input cost is $2.60 versus $3.00 currently, only $0.40 lower, or about 13.3%, not one third. Output volume, quality, retries, and correction time are untested, so the all-in claim is not supported and could be worse after those factors.",
         "next_question": "NONE - evidence sufficient",
         "primary_metric": {
           "label": "candidate input cost for the equivalent workload",

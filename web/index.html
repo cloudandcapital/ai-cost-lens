@@ -435,21 +435,81 @@
         <div id="workload-builder-fields" hidden>
         <div class="path-requirements">
           <strong>What you need</strong>
-          <span>Transfer cost and usage from your provider reports into one universal spend file, then add either a small reviewed sample or a work log.</span>
+          <span>Two comparable routes for the same kind of work, the provider cost and usage for each route, and either a small reviewed sample or a complete work log.</span>
         </div>
         <section class="builder-step" aria-labelledby="builder-files-title">
           <div class="step-number">01</div>
           <div>
-            <h3 id="builder-files-title">Add cost and usage</h3>
-            <p>The universal spend file holds the current and proposed routes in one place. Copy the relevant totals from your provider reports and label each cost as provider reported, calculated, or allocated.</p>
+            <h3 id="builder-files-title">Put both routes in one spend file</h3>
+            <p>Download the template, open it in Excel or Sheets, and replace the example rows. Use <strong>baseline</strong> for the route you use now and <strong>proposed</strong> for the route you are testing.</p>
             <div class="template-links">
               <a href="templates/ai-cost-lens-spend-template.csv" download>Download spend template</a>
             </div>
+            <div class="transfer-guide" aria-label="Universal spend template guide">
+              <div class="transfer-guide-head">
+                <strong>Start with the reports you already have</strong>
+                <span>The source differs by provider. The finished universal file always uses the same columns.</span>
+              </div>
+              <div class="provider-source-grid">
+                <article>
+                  <strong>OpenAI API</strong>
+                  <p>Use matching Activity and Cost exports. The direct OpenAI path can review those files. For a route comparison, copy the same totals into the universal file.</p>
+                </article>
+                <article>
+                  <strong>Claude API</strong>
+                  <p>Use the Anthropic Messages Usage Report for tokens and the Cost Report for provider cost. Anthropic’s report does not include a request count, so get that from your application or gateway logs.</p>
+                </article>
+                <article>
+                  <strong>Amazon Bedrock</strong>
+                  <p>Use Cost Explorer or CUR for billed cost and Bedrock invocation logs for requests and tokens. Match them by model and reporting period.</p>
+                </article>
+                <article>
+                  <strong>Gemini or Vertex AI</strong>
+                  <p>Use Cloud Billing reports or a billing export for cost, plus Vertex AI or application logs for requests and tokens. Keep the project and date range aligned.</p>
+                </article>
+                <article>
+                  <strong>Gateway or another tool</strong>
+                  <p>Use its cost and usage export. If cost comes from one system and usage from another, group both to the same route and reporting period before copying the totals.</p>
+                </article>
+                <article>
+                  <strong>Invoice or subscription only?</strong>
+                  <p>A flat ChatGPT or Claude subscription receipt has no request or outcome detail. You can allocate its cost only when you also have your own usage and result records.</p>
+                </article>
+              </div>
+              <details class="column-guide">
+                <summary>Show me exactly what to put in each column</summary>
+                <div class="column-guide-list">
+                  <div><code>period</code><span><strong>baseline</strong> or <strong>proposed</strong>.</span></div>
+                  <div><code>date</code><span>The date of that report bucket in YYYY-MM-DD format. Keep provider cost and usage grouped the same way.</span></div>
+                  <div><code>workload</code><span>Your plain language name for the work. Use the exact same name on both routes.</span></div>
+                  <div><code>provider</code><span>The company or platform that served the model, such as Anthropic, AWS Bedrock, Google Cloud, OpenAI, or your gateway.</span></div>
+                  <div><code>model</code><span>The reported model name. Use “Mixed models” only when the source report does not support a reliable model split.</span></div>
+                  <div><code>route</code><span>Your label for how the work ran, such as “Current production route” or “Proposed pilot route.”</span></div>
+                  <div><code>requests</code><span>Every provider call in the bucket, including additional attempts. Use application or gateway logs when the provider report omits it. Otherwise leave blank.</span></div>
+                  <div><code>input_tokens</code><span>All processed input tokens. When a provider splits uncached, cache read, and cache write tokens, add those parts here and keep the cache columns too. Leave blank if unavailable.</span></div>
+                  <div><code>cached_input_tokens</code><span>Input tokens read from cache. Enter 0 only when the report confirms none; otherwise leave blank.</span></div>
+                  <div><code>cache_write_input_tokens</code><span>Input tokens written to cache. Enter 0 only when the field is reported as zero or does not apply; otherwise leave blank.</span></div>
+                  <div><code>output_tokens</code><span>All output tokens. Leave blank if the source does not report them.</span></div>
+                  <div><code>provider_cost</code><span>The cost for this row. Do not repeat one invoice total across several model rows.</span></div>
+                  <div><code>cost_basis</code><span><strong>provider_reported</strong> for a billed amount, <strong>calculated</strong> for quantity × rate, or <strong>allocated</strong> when you assigned part of a shared bill.</span></div>
+                  <div><code>currency</code><span>A three-letter code such as USD. Both routes must use the same currency.</span></div>
+                </div>
+              </details>
+              <div class="transfer-check">
+                <strong>Before you upload it</strong>
+                <ul>
+                  <li>Both routes describe the same workload and use the same currency.</li>
+                  <li>Each source amount appears once. Do not copy one invoice total onto every usage row.</li>
+                  <li>Blank means the source did not supply the measure. Zero means the source reported zero or the measure does not apply.</li>
+                  <li>The upload cannot read raw Anthropic JSON, AWS CUR files, Google billing exports, PDFs, or screenshots directly.</li>
+                </ul>
+              </div>
+            </div>
             <div class="file-pair single-file-row">
               <label class="field-wide">
-                <span>Spend and usage CSV</span>
+                <span>Completed universal spend file</span>
                 <input id="spend-file" type="file" accept=".csv,text/csv" required />
-                <small id="spend-file-name">Baseline and proposed rows belong in one file. Label each provider cost as provider_reported, calculated, or allocated.</small>
+                <small id="spend-file-name">Upload the completed template, not the original provider report.</small>
               </label>
             </div>
           </div>
@@ -459,7 +519,13 @@
           <div class="step-number">02</div>
           <div>
             <h3 id="builder-work-title">Add what happened to the work</h3>
-            <p>Use the same definition of “ready” for both routes. A quick sample gives you a clearly labeled estimate; a complete work log supports a stronger review.</p>
+            <p>Use the same definition of “ready” for both routes and classify each result at the end of the review. A quick sample gives you a clearly labeled estimate; a complete work log supports a stronger review.</p>
+            <p class="result-unit-note"><strong>One result is one unit of finished work</strong>, such as one reviewed summary, extracted invoice, resolved case, or completed task. It is not one API request. One result may require several model calls.</p>
+            <div class="outcome-definitions">
+              <div><strong>Ready to use</strong><span>The result cleared your rule, including after any correction you completed. Include all time spent.</span></div>
+              <div><strong>Needs correction</strong><span>The result has not cleared the rule and still needs material work.</span></div>
+              <div><strong>Needs escalation</strong><span>The result could not be completed through the normal review path.</span></div>
+            </div>
             <div class="outcome-mode-choice" role="group" aria-label="Choose outcome evidence">
               <button class="outcome-mode active" data-outcome-mode="sample" type="button" aria-pressed="true">
                 <strong>Quick sample</strong>
@@ -482,8 +548,8 @@
                   <div class="sample-field-grid">
                     <label><span>Results in period</span><input id="baseline-population" type="number" min="1" step="1" value="1000" /></label>
                     <label><span>Ready in sample</span><input id="baseline-ready" type="number" min="1" step="1" value="22" /></label>
-                    <label><span>Needed correction</span><input id="baseline-correction" type="number" min="0" step="1" value="6" /></label>
-                    <label><span>Needed escalation</span><input id="baseline-escalation" type="number" min="0" step="1" value="2" /></label>
+                    <label><span>Still needs correction</span><input id="baseline-correction" type="number" min="0" step="1" value="6" /></label>
+                    <label><span>Needs escalation</span><input id="baseline-escalation" type="number" min="0" step="1" value="2" /></label>
                     <label class="field-wide"><span>Total human minutes in sample</span><input id="baseline-human-minutes" type="number" min="0" step="0.1" value="120" /></label>
                   </div>
                 </fieldset>
@@ -492,8 +558,8 @@
                   <div class="sample-field-grid">
                     <label><span>Results in period</span><input id="proposed-population" type="number" min="1" step="1" value="1000" /></label>
                     <label><span>Ready in sample</span><input id="proposed-ready" type="number" min="1" step="1" value="24" /></label>
-                    <label><span>Needed correction</span><input id="proposed-correction" type="number" min="0" step="1" value="5" /></label>
-                    <label><span>Needed escalation</span><input id="proposed-escalation" type="number" min="0" step="1" value="1" /></label>
+                    <label><span>Still needs correction</span><input id="proposed-correction" type="number" min="0" step="1" value="5" /></label>
+                    <label><span>Needs escalation</span><input id="proposed-escalation" type="number" min="0" step="1" value="1" /></label>
                     <label class="field-wide"><span>Total human minutes in sample</span><input id="proposed-human-minutes" type="number" min="0" step="0.1" value="90" /></label>
                   </div>
                 </fieldset>
@@ -506,10 +572,21 @@
             </div>
 
             <div id="detailed-outcome-fields" hidden>
-              <p class="sample-caveat">For each result, model_requests counts every model call. retry_requests counts only the extra calls after the first attempt. A result produced with three calls has three model requests and two retries.</p>
+              <p class="sample-caveat">Classify each row at the end of the review. If correction made the result ready, use ready_to_use and include the correction in human_minutes. model_requests counts every model call. retry_requests counts only the extra calls after the first attempt. A result produced with three calls has three model requests and two retries.</p>
               <div class="template-links detailed-template-link">
                 <a href="templates/ai-cost-lens-work-log-template.csv" download>Download work log</a>
               </div>
+              <details class="column-guide work-log-guide">
+                <summary>Show me exactly what to put in the work log</summary>
+                <div class="column-guide-list">
+                  <div><code>period</code><span><strong>baseline</strong> or <strong>proposed</strong>, matching the spend file.</span></div>
+                  <div><code>result_id</code><span>A unique ID from your application or review record. If none exists, use a stable label such as base-001 or pilot-001.</span></div>
+                  <div><code>outcome_status</code><span><strong>ready_to_use</strong>, <strong>needs_correction</strong>, or <strong>needs_escalation</strong>, assigned at the end of review.</span></div>
+                  <div><code>model_requests</code><span>Every provider call used for that result, including the first call and any additional attempts. Leave blank if your logs do not track it.</span></div>
+                  <div><code>retry_requests</code><span>Only the additional model calls after the first attempt. Three model calls means two retries. Leave blank if your logs do not track it.</span></div>
+                  <div><code>human_minutes</code><span>All human review and correction time already spent on that result.</span></div>
+                </div>
+              </details>
               <div class="file-pair single-file-row">
                 <label class="field-wide">
                   <span>Work log CSV</span>
@@ -529,7 +606,7 @@
           <div class="step-number">03</div>
           <div>
             <h3 id="builder-declarations-title">Set the decision rules</h3>
-            <p>Tell finance what “ready” means, who checked it, the minimum quality you will accept, and whether each route is allowed for this workload.</p>
+            <p>Tell finance what “ready” means, who checked it, the minimum quality you will accept, and whether each route is allowed for this workload. Use the hourly rate your finance team uses for this work.</p>
             <div class="field-grid">
               <label class="field-wide">
                 <span>Ready to use means</span>
@@ -624,7 +701,7 @@
           <section class="builder-step openai-boundary-step" aria-labelledby="openai-boundary-title">
             <div class="step-number">02</div>
             <div>
-              <h3 id="openai-boundary-title">Keep the financial grain honest</h3>
+              <h3 id="openai-boundary-title">Keep the bill and outcome claims separate</h3>
               <p>
                 This path shows the observed total bill and usage mix. For cost per ready
                 result, use the universal path with a work log or reviewed sample.

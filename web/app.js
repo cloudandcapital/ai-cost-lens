@@ -23,6 +23,8 @@
     new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(
       value,
     );
+  const compactOrMissing = (value) =>
+    value === null || value === undefined ? "Not available" : compact(value);
   const wholeNumber = (value) =>
     new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
 
@@ -161,6 +163,59 @@
     return "Cost basis not supplied";
   }
 
+  function summarizeSpendRows(spend, period) {
+    const tokenFields = {
+      input_tokens: { total: 0, complete: true, label: "input_tokens" },
+      cached_input_tokens: { total: 0, complete: true, label: "cached_input_tokens" },
+      cache_write_input_tokens: { total: 0, complete: true, label: "cache_write_input_tokens" },
+      output_tokens: { total: 0, complete: true, label: "output_tokens" },
+    };
+    let requests = 0;
+    let requestsComplete = true;
+    let providerCost = 0;
+
+    spend.forEach((row, index) => {
+      const rowNumber = index + 2;
+      const rowRequests = optionalNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
+      if (rowRequests === null) requestsComplete = false;
+      else requests += rowRequests;
+      providerCost += finiteNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
+
+      const supplied = {};
+      Object.entries(tokenFields).forEach(([field, aggregate]) => {
+        const value = optionalNumber(row[field], `Spend ${period} row ${rowNumber} ${aggregate.label}`, { integer: true });
+        supplied[field] = value;
+        if (value === null) aggregate.complete = false;
+        else aggregate.total += value;
+      });
+
+      if (supplied.input_tokens === null && (supplied.cached_input_tokens !== null || supplied.cache_write_input_tokens !== null)) {
+        throw new Error(`Spend ${period} row ${rowNumber} needs input_tokens when cache tokens are supplied.`);
+      }
+      if (
+        supplied.input_tokens !== null &&
+        supplied.cached_input_tokens !== null &&
+        supplied.cache_write_input_tokens !== null &&
+        supplied.cached_input_tokens + supplied.cache_write_input_tokens > supplied.input_tokens
+      ) {
+        throw new Error(`Spend ${period} row ${rowNumber} has more cached and cache-write tokens than input tokens.`);
+      }
+    });
+
+    if (requestsComplete && requests === 0) {
+      throw new Error(`Spend ${period} requests must be greater than zero when supplied.`);
+    }
+    const totalOrMissing = (field) => tokenFields[field].complete ? tokenFields[field].total : null;
+    return {
+      requests: requestsComplete ? requests : null,
+      providerCost,
+      processedInput: totalOrMissing("input_tokens"),
+      cachedInput: totalOrMissing("cached_input_tokens"),
+      cacheWriteInput: totalOrMissing("cache_write_input_tokens"),
+      outputTokens: totalOrMissing("output_tokens"),
+    };
+  }
+
   function providerCostTerm(baseline, proposed) {
     const bases = new Set([baseline.evidence.cost_basis, proposed.evidence.cost_basis]);
     if (bases.size !== 1) return "provider cost";
@@ -281,29 +336,14 @@
     }
     const basis = spendCostBasis(spend, period);
 
-    let requests = 0;
-    let processedInput = 0;
-    let cachedInput = 0;
-    let cacheWriteInput = 0;
-    let outputTokens = 0;
-    let providerCost = 0;
-    spend.forEach((row, index) => {
-      const rowNumber = index + 2;
-      const rowRequests = finiteNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
-      const rowInput = finiteNumber(row.input_tokens, `Spend ${period} row ${rowNumber} input_tokens`, { integer: true });
-      const rowCached = finiteNumber(row.cached_input_tokens, `Spend ${period} row ${rowNumber} cached_input_tokens`, { integer: true });
-      const rowCacheWrite = finiteNumber(row.cache_write_input_tokens, `Spend ${period} row ${rowNumber} cache_write_input_tokens`, { integer: true });
-      if (rowCached + rowCacheWrite > rowInput) {
-        throw new Error(`Spend ${period} row ${rowNumber} has more cached and cache-write tokens than input tokens.`);
-      }
-      requests += rowRequests;
-      processedInput += rowInput;
-      cachedInput += rowCached;
-      cacheWriteInput += rowCacheWrite;
-      outputTokens += finiteNumber(row.output_tokens, `Spend ${period} row ${rowNumber} output_tokens`, { integer: true });
-      providerCost += finiteNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
-    });
-    if (requests === 0) throw new Error(`Spend ${period} requests must be greater than zero.`);
+    const {
+      requests,
+      processedInput,
+      cachedInput,
+      cacheWriteInput,
+      outputTokens,
+      providerCost,
+    } = summarizeSpendRows(spend, period);
 
     const seen = new Set();
     let accepted = 0;
@@ -378,12 +418,13 @@
     if (accepted === 0) throw new Error(`The ${period} work log has no accepted results.`);
 
     const issues = [];
-    if (workRequestsKnown && requests !== workRequests) {
+    if (workRequestsKnown && requests !== null && requests !== workRequests) {
       issues.push(`The spend file reports ${requests.toLocaleString()} requests while the work log accounts for ${workRequests.toLocaleString()}.`);
     }
     if (config.outcomeLogComplete === false) {
       issues.push("The reviewer did not confirm that the outcome log covers the full workload and period.");
     }
+    const measuredRequests = requests ?? (workRequestsKnown ? workRequests : null);
     const route = [...new Set(spend.map((row) => row.route.trim()).filter(Boolean))].join(", ") || `${period} route`;
     const models = [...new Set(spend.map((row) => row.model.trim()).filter(Boolean))];
     const providers = [...new Set(spend.map((row) => row.provider.trim()).filter(Boolean))];
@@ -417,7 +458,7 @@
           all_in_pilot_cost: round(allIn),
         },
         usage: {
-          requests,
+          requests: measuredRequests,
           retries: retriesKnown && workRequestsKnown ? retries : null,
           unique_input_tokens: null,
           processed_input_tokens: processedInput,
@@ -446,7 +487,7 @@
           source: `${costBasisLabel(basis)} from the universal spend template + detailed outcome log`,
           observed_at: maxDate,
           coverage: coverageComplete
-            ? `Complete ${period} outcome log declared for the spend period${workRequestsKnown ? "; request counts supplied" : "; request counts not supplied"}`
+            ? `Complete ${period} outcome log declared for the spend period${requests !== null && workRequestsKnown ? "; requests reconcile to provider usage" : workRequestsKnown ? "; request counts come from the work log" : "; request counts not supplied"}`
             : `Partial ${period} workload evidence`,
           coverage_status: coverageComplete ? "complete" : "partial",
           reconciliation_issues: issues,
@@ -459,9 +500,15 @@
           cost_per_usable_result: round(recurring / accepted),
           all_in_cost_per_usable_result: round(allIn / accepted),
           usable_result_rate: round(accepted / completed),
-          retry_rate: retriesKnown && workRequestsKnown ? round(retries / requests) : null,
-          cache_reuse_rate: processedInput ? round(cachedInput / processedInput) : 0,
-          cache_write_rate: processedInput ? round(cacheWriteInput / processedInput) : 0,
+          retry_rate: retriesKnown && workRequestsKnown && workRequests
+            ? round(retries / workRequests)
+            : null,
+          cache_reuse_rate: processedInput === null || cachedInput === null
+            ? null
+            : processedInput ? round(cachedInput / processedInput) : 0,
+          cache_write_rate: processedInput === null || cacheWriteInput === null
+            ? null
+            : processedInput ? round(cacheWriteInput / processedInput) : 0,
           context_reprocessing_ratio: null,
           human_review_minutes_per_usable_result: round((reviewMinutes + correctionMinutes) / accepted),
         },
@@ -613,28 +660,14 @@
     }
     const basis = spendCostBasis(spend, period);
 
-    let requests = 0;
-    let processedInput = 0;
-    let cachedInput = 0;
-    let cacheWriteInput = 0;
-    let outputTokens = 0;
-    let providerCost = 0;
-    spend.forEach((row, index) => {
-      const rowNumber = index + 2;
-      const rowInput = finiteNumber(row.input_tokens, `Spend ${period} row ${rowNumber} input_tokens`, { integer: true });
-      const rowCached = finiteNumber(row.cached_input_tokens, `Spend ${period} row ${rowNumber} cached_input_tokens`, { integer: true });
-      const rowCacheWrite = finiteNumber(row.cache_write_input_tokens, `Spend ${period} row ${rowNumber} cache_write_input_tokens`, { integer: true });
-      if (rowCached + rowCacheWrite > rowInput) {
-        throw new Error(`Spend ${period} row ${rowNumber} has more cached and cache-write tokens than input tokens.`);
-      }
-      requests += finiteNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
-      processedInput += rowInput;
-      cachedInput += rowCached;
-      cacheWriteInput += rowCacheWrite;
-      outputTokens += finiteNumber(row.output_tokens, `Spend ${period} row ${rowNumber} output_tokens`, { integer: true });
-      providerCost += finiteNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
-    });
-    if (requests === 0) throw new Error(`Spend ${period} requests must be greater than zero.`);
+    const {
+      requests,
+      processedInput,
+      cachedInput,
+      cacheWriteInput,
+      outputTokens,
+      providerCost,
+    } = summarizeSpendRows(spend, period);
 
     const population = finiteNumber(sample.population, `${period} results in period`, { integer: true });
     const ready = finiteNumber(sample.ready, `${period} ready sample`, { integer: true });
@@ -738,8 +771,12 @@
           all_in_cost_per_usable_result: round(allIn / estimatedReady),
           usable_result_rate: round(readyRate),
           retry_rate: null,
-          cache_reuse_rate: processedInput ? round(cachedInput / processedInput) : 0,
-          cache_write_rate: processedInput ? round(cacheWriteInput / processedInput) : 0,
+          cache_reuse_rate: processedInput === null || cachedInput === null
+            ? null
+            : processedInput ? round(cachedInput / processedInput) : 0,
+          cache_write_rate: processedInput === null || cacheWriteInput === null
+            ? null
+            : processedInput ? round(cacheWriteInput / processedInput) : 0,
           context_reprocessing_ratio: null,
           human_review_minutes_per_usable_result: round(projectedHumanMinutes / estimatedReady),
         },
@@ -1656,15 +1693,19 @@
     const rows = [
       {
         label: "Cache reuse (all input)",
-        base: pct(baseline.measures.cache_reuse_rate),
-        proposed: pct(proposed.measures.cache_reuse_rate),
-        note: "Share of processed input read from cache across all provider requests, including retries.",
+        base: pctOrMissing(baseline.measures.cache_reuse_rate),
+        proposed: pctOrMissing(proposed.measures.cache_reuse_rate),
+        note: baseline.measures.cache_reuse_rate === null || proposed.measures.cache_reuse_rate === null
+          ? "At least one source report did not supply the token fields needed for this measure."
+          : "Share of processed input read from cache across all provider requests, including retries.",
       },
       {
         label: "Cache writes",
-        base: pct(baseline.measures.cache_write_rate),
-        proposed: pct(proposed.measures.cache_write_rate),
-        note: "Context written to cache. This can carry a different rate from an ordinary input or cache read.",
+        base: pctOrMissing(baseline.measures.cache_write_rate),
+        proposed: pctOrMissing(proposed.measures.cache_write_rate),
+        note: baseline.measures.cache_write_rate === null || proposed.measures.cache_write_rate === null
+          ? "At least one source report did not supply cache-write tokens."
+          : "Context written to cache. This can carry a different rate from an ordinary input or cache read.",
       },
       {
         label: "Context reprocessed",
@@ -1684,10 +1725,12 @@
       },
       {
         label: "Processed input (all attempts)",
-        base: compact(baseline.usage.processed_input_tokens),
-        proposed: compact(proposed.usage.processed_input_tokens),
+        base: compactOrMissing(baseline.usage.processed_input_tokens),
+        proposed: compactOrMissing(proposed.usage.processed_input_tokens),
         note:
-          baseline.usage.unique_input_tokens === null
+          baseline.usage.processed_input_tokens === null || proposed.usage.processed_input_tokens === null
+            ? "At least one source report did not supply processed input tokens."
+            : baseline.usage.unique_input_tokens === null
             ? "Unique context is not exposed by this provider report."
             : `Both scenarios began with ${compact(baseline.usage.unique_input_tokens)} unique input tokens.`,
       },

@@ -2043,6 +2043,57 @@ footer {
   margin-top: 18px;
 }
 
+.outcome-definitions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 20px;
+  border: 1px solid var(--line);
+  background: var(--paper-light);
+}
+
+.outcome-definitions > div {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border-right: 1px solid var(--line);
+}
+
+.outcome-definitions > div:last-child {
+  border-right: 0;
+}
+
+.outcome-definitions strong {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.outcome-definitions span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.builder-step > div > .result-unit-note {
+  max-width: none;
+  margin-top: -8px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--sage);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.result-unit-note strong {
+  color: var(--ink);
+}
+
+.work-log-guide {
+  margin-bottom: 18px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-light);
+}
+
 .sample-route-card {
   min-width: 0;
   margin: 0;
@@ -2254,6 +2305,107 @@ footer {
   border-bottom: 1px solid var(--clay);
   font-size: 12px;
   text-decoration: none;
+}
+
+.transfer-guide {
+  margin-bottom: 22px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-light);
+}
+
+.transfer-guide-head {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.42fr) minmax(0, 1fr);
+  gap: 22px;
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.transfer-guide-head strong {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 400;
+}
+
+.transfer-guide-head span,
+.provider-source-grid p,
+.column-guide-list span,
+.transfer-check li {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.provider-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.provider-source-grid article {
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.provider-source-grid article:nth-child(odd) {
+  border-right: 1px solid var(--line);
+}
+
+.provider-source-grid strong {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.provider-source-grid p {
+  margin: 7px 0 0;
+}
+
+.column-guide {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.column-guide summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.column-guide-list {
+  margin-top: 15px;
+  border-top: 1px solid var(--line);
+}
+
+.column-guide-list > div {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.column-guide-list code {
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.transfer-check {
+  padding: 18px;
+}
+
+.transfer-check > strong {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.transfer-check ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.transfer-check li + li {
+  margin-top: 5px;
 }
 
 .file-pair,
@@ -2663,10 +2815,34 @@ body.story-mode .cockpit-grid {
     gap: 4px;
   }
 
+  .transfer-guide-head,
+  .provider-source-grid,
+  .column-guide-list > div {
+    grid-template-columns: 1fr;
+  }
+
+  .provider-source-grid article:nth-child(odd) {
+    border-right: 0;
+  }
+
+  .column-guide-list > div {
+    gap: 4px;
+  }
+
   .outcome-mode-choice,
+  .outcome-definitions,
   .sample-route-grid,
   .sample-field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .outcome-definitions > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .outcome-definitions > div:last-child {
+    border-bottom: 0;
   }
 
   .outcome-mode {
@@ -3583,21 +3759,81 @@ body.story-mode .cockpit-grid {
         <div id="workload-builder-fields" hidden>
         <div class="path-requirements">
           <strong>What you need</strong>
-          <span>Transfer cost and usage from your provider reports into one universal spend file, then add either a small reviewed sample or a work log.</span>
+          <span>Two comparable routes for the same kind of work, the provider cost and usage for each route, and either a small reviewed sample or a complete work log.</span>
         </div>
         <section class="builder-step" aria-labelledby="builder-files-title">
           <div class="step-number">01</div>
           <div>
-            <h3 id="builder-files-title">Add cost and usage</h3>
-            <p>The universal spend file holds the current and proposed routes in one place. Copy the relevant totals from your provider reports and label each cost as provider reported, calculated, or allocated.</p>
+            <h3 id="builder-files-title">Put both routes in one spend file</h3>
+            <p>Download the template, open it in Excel or Sheets, and replace the example rows. Use <strong>baseline</strong> for the route you use now and <strong>proposed</strong> for the route you are testing.</p>
             <div class="template-links">
               <a href="data:text/csv;base64,cGVyaW9kLGRhdGUsd29ya2xvYWQscHJvdmlkZXIsbW9kZWwscm91dGUscmVxdWVzdHMsaW5wdXRfdG9rZW5zLGNhY2hlZF9pbnB1dF90b2tlbnMsY2FjaGVfd3JpdGVfaW5wdXRfdG9rZW5zLG91dHB1dF90b2tlbnMscHJvdmlkZXJfY29zdCxjb3N0X2Jhc2lzLGN1cnJlbmN5CmJhc2VsaW5lLDIwMjYtMDgtMDEsSW52b2ljZSBleHRyYWN0aW9uLE1vZGVsIEFQSSxDdXJyZW50IG1vZGVsLEN1cnJlbnQgcHJvZHVjdGlvbiByb3V0ZSwzLDI0MDAwMCw0MDAwMCwwLDMyMDAwLDE4LjQwLHByb3ZpZGVyX3JlcG9ydGVkLFVTRApwcm9wb3NlZCwyMDI2LTA4LTE1LEludm9pY2UgZXh0cmFjdGlvbixNb2RlbCBBUEksU21hbGxlciByb3V0ZWQgbW9kZWwsUHJvcG9zZWQgcGlsb3Qgcm91dGUsMiwyMTAwMDAsNzAwMDAsMCwzMDAwMCwxMS4yMCxjYWxjdWxhdGVkLFVTRAo=" download>Download spend template</a>
             </div>
+            <div class="transfer-guide" aria-label="Universal spend template guide">
+              <div class="transfer-guide-head">
+                <strong>Start with the reports you already have</strong>
+                <span>The source differs by provider. The finished universal file always uses the same columns.</span>
+              </div>
+              <div class="provider-source-grid">
+                <article>
+                  <strong>OpenAI API</strong>
+                  <p>Use matching Activity and Cost exports. The direct OpenAI path can review those files. For a route comparison, copy the same totals into the universal file.</p>
+                </article>
+                <article>
+                  <strong>Claude API</strong>
+                  <p>Use the Anthropic Messages Usage Report for tokens and the Cost Report for provider cost. Anthropic’s report does not include a request count, so get that from your application or gateway logs.</p>
+                </article>
+                <article>
+                  <strong>Amazon Bedrock</strong>
+                  <p>Use Cost Explorer or CUR for billed cost and Bedrock invocation logs for requests and tokens. Match them by model and reporting period.</p>
+                </article>
+                <article>
+                  <strong>Gemini or Vertex AI</strong>
+                  <p>Use Cloud Billing reports or a billing export for cost, plus Vertex AI or application logs for requests and tokens. Keep the project and date range aligned.</p>
+                </article>
+                <article>
+                  <strong>Gateway or another tool</strong>
+                  <p>Use its cost and usage export. If cost comes from one system and usage from another, group both to the same route and reporting period before copying the totals.</p>
+                </article>
+                <article>
+                  <strong>Invoice or subscription only?</strong>
+                  <p>A flat ChatGPT or Claude subscription receipt has no request or outcome detail. You can allocate its cost only when you also have your own usage and result records.</p>
+                </article>
+              </div>
+              <details class="column-guide">
+                <summary>Show me exactly what to put in each column</summary>
+                <div class="column-guide-list">
+                  <div><code>period</code><span><strong>baseline</strong> or <strong>proposed</strong>.</span></div>
+                  <div><code>date</code><span>The date of that report bucket in YYYY-MM-DD format. Keep provider cost and usage grouped the same way.</span></div>
+                  <div><code>workload</code><span>Your plain language name for the work. Use the exact same name on both routes.</span></div>
+                  <div><code>provider</code><span>The company or platform that served the model, such as Anthropic, AWS Bedrock, Google Cloud, OpenAI, or your gateway.</span></div>
+                  <div><code>model</code><span>The reported model name. Use “Mixed models” only when the source report does not support a reliable model split.</span></div>
+                  <div><code>route</code><span>Your label for how the work ran, such as “Current production route” or “Proposed pilot route.”</span></div>
+                  <div><code>requests</code><span>Every provider call in the bucket, including additional attempts. Use application or gateway logs when the provider report omits it. Otherwise leave blank.</span></div>
+                  <div><code>input_tokens</code><span>All processed input tokens. When a provider splits uncached, cache read, and cache write tokens, add those parts here and keep the cache columns too. Leave blank if unavailable.</span></div>
+                  <div><code>cached_input_tokens</code><span>Input tokens read from cache. Enter 0 only when the report confirms none; otherwise leave blank.</span></div>
+                  <div><code>cache_write_input_tokens</code><span>Input tokens written to cache. Enter 0 only when the field is reported as zero or does not apply; otherwise leave blank.</span></div>
+                  <div><code>output_tokens</code><span>All output tokens. Leave blank if the source does not report them.</span></div>
+                  <div><code>provider_cost</code><span>The cost for this row. Do not repeat one invoice total across several model rows.</span></div>
+                  <div><code>cost_basis</code><span><strong>provider_reported</strong> for a billed amount, <strong>calculated</strong> for quantity × rate, or <strong>allocated</strong> when you assigned part of a shared bill.</span></div>
+                  <div><code>currency</code><span>A three-letter code such as USD. Both routes must use the same currency.</span></div>
+                </div>
+              </details>
+              <div class="transfer-check">
+                <strong>Before you upload it</strong>
+                <ul>
+                  <li>Both routes describe the same workload and use the same currency.</li>
+                  <li>Each source amount appears once. Do not copy one invoice total onto every usage row.</li>
+                  <li>Blank means the source did not supply the measure. Zero means the source reported zero or the measure does not apply.</li>
+                  <li>The upload cannot read raw Anthropic JSON, AWS CUR files, Google billing exports, PDFs, or screenshots directly.</li>
+                </ul>
+              </div>
+            </div>
             <div class="file-pair single-file-row">
               <label class="field-wide">
-                <span>Spend and usage CSV</span>
+                <span>Completed universal spend file</span>
                 <input id="spend-file" type="file" accept=".csv,text/csv" required />
-                <small id="spend-file-name">Baseline and proposed rows belong in one file. Label each provider cost as provider_reported, calculated, or allocated.</small>
+                <small id="spend-file-name">Upload the completed template, not the original provider report.</small>
               </label>
             </div>
           </div>
@@ -3607,7 +3843,13 @@ body.story-mode .cockpit-grid {
           <div class="step-number">02</div>
           <div>
             <h3 id="builder-work-title">Add what happened to the work</h3>
-            <p>Use the same definition of “ready” for both routes. A quick sample gives you a clearly labeled estimate; a complete work log supports a stronger review.</p>
+            <p>Use the same definition of “ready” for both routes and classify each result at the end of the review. A quick sample gives you a clearly labeled estimate; a complete work log supports a stronger review.</p>
+            <p class="result-unit-note"><strong>One result is one unit of finished work</strong>, such as one reviewed summary, extracted invoice, resolved case, or completed task. It is not one API request. One result may require several model calls.</p>
+            <div class="outcome-definitions">
+              <div><strong>Ready to use</strong><span>The result cleared your rule, including after any correction you completed. Include all time spent.</span></div>
+              <div><strong>Needs correction</strong><span>The result has not cleared the rule and still needs material work.</span></div>
+              <div><strong>Needs escalation</strong><span>The result could not be completed through the normal review path.</span></div>
+            </div>
             <div class="outcome-mode-choice" role="group" aria-label="Choose outcome evidence">
               <button class="outcome-mode active" data-outcome-mode="sample" type="button" aria-pressed="true">
                 <strong>Quick sample</strong>
@@ -3630,8 +3872,8 @@ body.story-mode .cockpit-grid {
                   <div class="sample-field-grid">
                     <label><span>Results in period</span><input id="baseline-population" type="number" min="1" step="1" value="1000" /></label>
                     <label><span>Ready in sample</span><input id="baseline-ready" type="number" min="1" step="1" value="22" /></label>
-                    <label><span>Needed correction</span><input id="baseline-correction" type="number" min="0" step="1" value="6" /></label>
-                    <label><span>Needed escalation</span><input id="baseline-escalation" type="number" min="0" step="1" value="2" /></label>
+                    <label><span>Still needs correction</span><input id="baseline-correction" type="number" min="0" step="1" value="6" /></label>
+                    <label><span>Needs escalation</span><input id="baseline-escalation" type="number" min="0" step="1" value="2" /></label>
                     <label class="field-wide"><span>Total human minutes in sample</span><input id="baseline-human-minutes" type="number" min="0" step="0.1" value="120" /></label>
                   </div>
                 </fieldset>
@@ -3640,8 +3882,8 @@ body.story-mode .cockpit-grid {
                   <div class="sample-field-grid">
                     <label><span>Results in period</span><input id="proposed-population" type="number" min="1" step="1" value="1000" /></label>
                     <label><span>Ready in sample</span><input id="proposed-ready" type="number" min="1" step="1" value="24" /></label>
-                    <label><span>Needed correction</span><input id="proposed-correction" type="number" min="0" step="1" value="5" /></label>
-                    <label><span>Needed escalation</span><input id="proposed-escalation" type="number" min="0" step="1" value="1" /></label>
+                    <label><span>Still needs correction</span><input id="proposed-correction" type="number" min="0" step="1" value="5" /></label>
+                    <label><span>Needs escalation</span><input id="proposed-escalation" type="number" min="0" step="1" value="1" /></label>
                     <label class="field-wide"><span>Total human minutes in sample</span><input id="proposed-human-minutes" type="number" min="0" step="0.1" value="90" /></label>
                   </div>
                 </fieldset>
@@ -3654,10 +3896,21 @@ body.story-mode .cockpit-grid {
             </div>
 
             <div id="detailed-outcome-fields" hidden>
-              <p class="sample-caveat">For each result, model_requests counts every model call. retry_requests counts only the extra calls after the first attempt. A result produced with three calls has three model requests and two retries.</p>
+              <p class="sample-caveat">Classify each row at the end of the review. If correction made the result ready, use ready_to_use and include the correction in human_minutes. model_requests counts every model call. retry_requests counts only the extra calls after the first attempt. A result produced with three calls has three model requests and two retries.</p>
               <div class="template-links detailed-template-link">
                 <a href="data:text/csv;base64,cGVyaW9kLHJlc3VsdF9pZCxvdXRjb21lX3N0YXR1cyxtb2RlbF9yZXF1ZXN0cyxyZXRyeV9yZXF1ZXN0cyxodW1hbl9taW51dGVzCmJhc2VsaW5lLGJhc2UtMDAxLHJlYWR5X3RvX3VzZSwxLDAsMS4wCmJhc2VsaW5lLGJhc2UtMDAyLG5lZWRzX2NvcnJlY3Rpb24sMiwxLDMuMApwcm9wb3NlZCxwaWxvdC0wMDEscmVhZHlfdG9fdXNlLDEsMCwwLjUKcHJvcG9zZWQscGlsb3QtMDAyLHJlYWR5X3RvX3VzZSwxLDAsMC41Cg==" download>Download work log</a>
               </div>
+              <details class="column-guide work-log-guide">
+                <summary>Show me exactly what to put in the work log</summary>
+                <div class="column-guide-list">
+                  <div><code>period</code><span><strong>baseline</strong> or <strong>proposed</strong>, matching the spend file.</span></div>
+                  <div><code>result_id</code><span>A unique ID from your application or review record. If none exists, use a stable label such as base-001 or pilot-001.</span></div>
+                  <div><code>outcome_status</code><span><strong>ready_to_use</strong>, <strong>needs_correction</strong>, or <strong>needs_escalation</strong>, assigned at the end of review.</span></div>
+                  <div><code>model_requests</code><span>Every provider call used for that result, including the first call and any additional attempts. Leave blank if your logs do not track it.</span></div>
+                  <div><code>retry_requests</code><span>Only the additional model calls after the first attempt. Three model calls means two retries. Leave blank if your logs do not track it.</span></div>
+                  <div><code>human_minutes</code><span>All human review and correction time already spent on that result.</span></div>
+                </div>
+              </details>
               <div class="file-pair single-file-row">
                 <label class="field-wide">
                   <span>Work log CSV</span>
@@ -3677,7 +3930,7 @@ body.story-mode .cockpit-grid {
           <div class="step-number">03</div>
           <div>
             <h3 id="builder-declarations-title">Set the decision rules</h3>
-            <p>Tell finance what “ready” means, who checked it, the minimum quality you will accept, and whether each route is allowed for this workload.</p>
+            <p>Tell finance what “ready” means, who checked it, the minimum quality you will accept, and whether each route is allowed for this workload. Use the hourly rate your finance team uses for this work.</p>
             <div class="field-grid">
               <label class="field-wide">
                 <span>Ready to use means</span>
@@ -3772,7 +4025,7 @@ body.story-mode .cockpit-grid {
           <section class="builder-step openai-boundary-step" aria-labelledby="openai-boundary-title">
             <div class="step-number">02</div>
             <div>
-              <h3 id="openai-boundary-title">Keep the financial grain honest</h3>
+              <h3 id="openai-boundary-title">Keep the bill and outcome claims separate</h3>
               <p>
                 This path shows the observed total bill and usage mix. For cost per ready
                 result, use the universal path with a work log or reviewed sample.
@@ -3837,6 +4090,8 @@ body.story-mode .cockpit-grid {
     new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(
       value,
     );
+  const compactOrMissing = (value) =>
+    value === null || value === undefined ? "Not available" : compact(value);
   const wholeNumber = (value) =>
     new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
 
@@ -3975,6 +4230,59 @@ body.story-mode .cockpit-grid {
     return "Cost basis not supplied";
   }
 
+  function summarizeSpendRows(spend, period) {
+    const tokenFields = {
+      input_tokens: { total: 0, complete: true, label: "input_tokens" },
+      cached_input_tokens: { total: 0, complete: true, label: "cached_input_tokens" },
+      cache_write_input_tokens: { total: 0, complete: true, label: "cache_write_input_tokens" },
+      output_tokens: { total: 0, complete: true, label: "output_tokens" },
+    };
+    let requests = 0;
+    let requestsComplete = true;
+    let providerCost = 0;
+
+    spend.forEach((row, index) => {
+      const rowNumber = index + 2;
+      const rowRequests = optionalNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
+      if (rowRequests === null) requestsComplete = false;
+      else requests += rowRequests;
+      providerCost += finiteNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
+
+      const supplied = {};
+      Object.entries(tokenFields).forEach(([field, aggregate]) => {
+        const value = optionalNumber(row[field], `Spend ${period} row ${rowNumber} ${aggregate.label}`, { integer: true });
+        supplied[field] = value;
+        if (value === null) aggregate.complete = false;
+        else aggregate.total += value;
+      });
+
+      if (supplied.input_tokens === null && (supplied.cached_input_tokens !== null || supplied.cache_write_input_tokens !== null)) {
+        throw new Error(`Spend ${period} row ${rowNumber} needs input_tokens when cache tokens are supplied.`);
+      }
+      if (
+        supplied.input_tokens !== null &&
+        supplied.cached_input_tokens !== null &&
+        supplied.cache_write_input_tokens !== null &&
+        supplied.cached_input_tokens + supplied.cache_write_input_tokens > supplied.input_tokens
+      ) {
+        throw new Error(`Spend ${period} row ${rowNumber} has more cached and cache-write tokens than input tokens.`);
+      }
+    });
+
+    if (requestsComplete && requests === 0) {
+      throw new Error(`Spend ${period} requests must be greater than zero when supplied.`);
+    }
+    const totalOrMissing = (field) => tokenFields[field].complete ? tokenFields[field].total : null;
+    return {
+      requests: requestsComplete ? requests : null,
+      providerCost,
+      processedInput: totalOrMissing("input_tokens"),
+      cachedInput: totalOrMissing("cached_input_tokens"),
+      cacheWriteInput: totalOrMissing("cache_write_input_tokens"),
+      outputTokens: totalOrMissing("output_tokens"),
+    };
+  }
+
   function providerCostTerm(baseline, proposed) {
     const bases = new Set([baseline.evidence.cost_basis, proposed.evidence.cost_basis]);
     if (bases.size !== 1) return "provider cost";
@@ -4095,29 +4403,14 @@ body.story-mode .cockpit-grid {
     }
     const basis = spendCostBasis(spend, period);
 
-    let requests = 0;
-    let processedInput = 0;
-    let cachedInput = 0;
-    let cacheWriteInput = 0;
-    let outputTokens = 0;
-    let providerCost = 0;
-    spend.forEach((row, index) => {
-      const rowNumber = index + 2;
-      const rowRequests = finiteNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
-      const rowInput = finiteNumber(row.input_tokens, `Spend ${period} row ${rowNumber} input_tokens`, { integer: true });
-      const rowCached = finiteNumber(row.cached_input_tokens, `Spend ${period} row ${rowNumber} cached_input_tokens`, { integer: true });
-      const rowCacheWrite = finiteNumber(row.cache_write_input_tokens, `Spend ${period} row ${rowNumber} cache_write_input_tokens`, { integer: true });
-      if (rowCached + rowCacheWrite > rowInput) {
-        throw new Error(`Spend ${period} row ${rowNumber} has more cached and cache-write tokens than input tokens.`);
-      }
-      requests += rowRequests;
-      processedInput += rowInput;
-      cachedInput += rowCached;
-      cacheWriteInput += rowCacheWrite;
-      outputTokens += finiteNumber(row.output_tokens, `Spend ${period} row ${rowNumber} output_tokens`, { integer: true });
-      providerCost += finiteNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
-    });
-    if (requests === 0) throw new Error(`Spend ${period} requests must be greater than zero.`);
+    const {
+      requests,
+      processedInput,
+      cachedInput,
+      cacheWriteInput,
+      outputTokens,
+      providerCost,
+    } = summarizeSpendRows(spend, period);
 
     const seen = new Set();
     let accepted = 0;
@@ -4192,12 +4485,13 @@ body.story-mode .cockpit-grid {
     if (accepted === 0) throw new Error(`The ${period} work log has no accepted results.`);
 
     const issues = [];
-    if (workRequestsKnown && requests !== workRequests) {
+    if (workRequestsKnown && requests !== null && requests !== workRequests) {
       issues.push(`The spend file reports ${requests.toLocaleString()} requests while the work log accounts for ${workRequests.toLocaleString()}.`);
     }
     if (config.outcomeLogComplete === false) {
       issues.push("The reviewer did not confirm that the outcome log covers the full workload and period.");
     }
+    const measuredRequests = requests ?? (workRequestsKnown ? workRequests : null);
     const route = [...new Set(spend.map((row) => row.route.trim()).filter(Boolean))].join(", ") || `${period} route`;
     const models = [...new Set(spend.map((row) => row.model.trim()).filter(Boolean))];
     const providers = [...new Set(spend.map((row) => row.provider.trim()).filter(Boolean))];
@@ -4231,7 +4525,7 @@ body.story-mode .cockpit-grid {
           all_in_pilot_cost: round(allIn),
         },
         usage: {
-          requests,
+          requests: measuredRequests,
           retries: retriesKnown && workRequestsKnown ? retries : null,
           unique_input_tokens: null,
           processed_input_tokens: processedInput,
@@ -4260,7 +4554,7 @@ body.story-mode .cockpit-grid {
           source: `${costBasisLabel(basis)} from the universal spend template + detailed outcome log`,
           observed_at: maxDate,
           coverage: coverageComplete
-            ? `Complete ${period} outcome log declared for the spend period${workRequestsKnown ? "; request counts supplied" : "; request counts not supplied"}`
+            ? `Complete ${period} outcome log declared for the spend period${requests !== null && workRequestsKnown ? "; requests reconcile to provider usage" : workRequestsKnown ? "; request counts come from the work log" : "; request counts not supplied"}`
             : `Partial ${period} workload evidence`,
           coverage_status: coverageComplete ? "complete" : "partial",
           reconciliation_issues: issues,
@@ -4273,9 +4567,15 @@ body.story-mode .cockpit-grid {
           cost_per_usable_result: round(recurring / accepted),
           all_in_cost_per_usable_result: round(allIn / accepted),
           usable_result_rate: round(accepted / completed),
-          retry_rate: retriesKnown && workRequestsKnown ? round(retries / requests) : null,
-          cache_reuse_rate: processedInput ? round(cachedInput / processedInput) : 0,
-          cache_write_rate: processedInput ? round(cacheWriteInput / processedInput) : 0,
+          retry_rate: retriesKnown && workRequestsKnown && workRequests
+            ? round(retries / workRequests)
+            : null,
+          cache_reuse_rate: processedInput === null || cachedInput === null
+            ? null
+            : processedInput ? round(cachedInput / processedInput) : 0,
+          cache_write_rate: processedInput === null || cacheWriteInput === null
+            ? null
+            : processedInput ? round(cacheWriteInput / processedInput) : 0,
           context_reprocessing_ratio: null,
           human_review_minutes_per_usable_result: round((reviewMinutes + correctionMinutes) / accepted),
         },
@@ -4427,28 +4727,14 @@ body.story-mode .cockpit-grid {
     }
     const basis = spendCostBasis(spend, period);
 
-    let requests = 0;
-    let processedInput = 0;
-    let cachedInput = 0;
-    let cacheWriteInput = 0;
-    let outputTokens = 0;
-    let providerCost = 0;
-    spend.forEach((row, index) => {
-      const rowNumber = index + 2;
-      const rowInput = finiteNumber(row.input_tokens, `Spend ${period} row ${rowNumber} input_tokens`, { integer: true });
-      const rowCached = finiteNumber(row.cached_input_tokens, `Spend ${period} row ${rowNumber} cached_input_tokens`, { integer: true });
-      const rowCacheWrite = finiteNumber(row.cache_write_input_tokens, `Spend ${period} row ${rowNumber} cache_write_input_tokens`, { integer: true });
-      if (rowCached + rowCacheWrite > rowInput) {
-        throw new Error(`Spend ${period} row ${rowNumber} has more cached and cache-write tokens than input tokens.`);
-      }
-      requests += finiteNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
-      processedInput += rowInput;
-      cachedInput += rowCached;
-      cacheWriteInput += rowCacheWrite;
-      outputTokens += finiteNumber(row.output_tokens, `Spend ${period} row ${rowNumber} output_tokens`, { integer: true });
-      providerCost += finiteNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
-    });
-    if (requests === 0) throw new Error(`Spend ${period} requests must be greater than zero.`);
+    const {
+      requests,
+      processedInput,
+      cachedInput,
+      cacheWriteInput,
+      outputTokens,
+      providerCost,
+    } = summarizeSpendRows(spend, period);
 
     const population = finiteNumber(sample.population, `${period} results in period`, { integer: true });
     const ready = finiteNumber(sample.ready, `${period} ready sample`, { integer: true });
@@ -4552,8 +4838,12 @@ body.story-mode .cockpit-grid {
           all_in_cost_per_usable_result: round(allIn / estimatedReady),
           usable_result_rate: round(readyRate),
           retry_rate: null,
-          cache_reuse_rate: processedInput ? round(cachedInput / processedInput) : 0,
-          cache_write_rate: processedInput ? round(cacheWriteInput / processedInput) : 0,
+          cache_reuse_rate: processedInput === null || cachedInput === null
+            ? null
+            : processedInput ? round(cachedInput / processedInput) : 0,
+          cache_write_rate: processedInput === null || cacheWriteInput === null
+            ? null
+            : processedInput ? round(cacheWriteInput / processedInput) : 0,
           context_reprocessing_ratio: null,
           human_review_minutes_per_usable_result: round(projectedHumanMinutes / estimatedReady),
         },
@@ -5470,15 +5760,19 @@ body.story-mode .cockpit-grid {
     const rows = [
       {
         label: "Cache reuse (all input)",
-        base: pct(baseline.measures.cache_reuse_rate),
-        proposed: pct(proposed.measures.cache_reuse_rate),
-        note: "Share of processed input read from cache across all provider requests, including retries.",
+        base: pctOrMissing(baseline.measures.cache_reuse_rate),
+        proposed: pctOrMissing(proposed.measures.cache_reuse_rate),
+        note: baseline.measures.cache_reuse_rate === null || proposed.measures.cache_reuse_rate === null
+          ? "At least one source report did not supply the token fields needed for this measure."
+          : "Share of processed input read from cache across all provider requests, including retries.",
       },
       {
         label: "Cache writes",
-        base: pct(baseline.measures.cache_write_rate),
-        proposed: pct(proposed.measures.cache_write_rate),
-        note: "Context written to cache. This can carry a different rate from an ordinary input or cache read.",
+        base: pctOrMissing(baseline.measures.cache_write_rate),
+        proposed: pctOrMissing(proposed.measures.cache_write_rate),
+        note: baseline.measures.cache_write_rate === null || proposed.measures.cache_write_rate === null
+          ? "At least one source report did not supply cache-write tokens."
+          : "Context written to cache. This can carry a different rate from an ordinary input or cache read.",
       },
       {
         label: "Context reprocessed",
@@ -5498,10 +5792,12 @@ body.story-mode .cockpit-grid {
       },
       {
         label: "Processed input (all attempts)",
-        base: compact(baseline.usage.processed_input_tokens),
-        proposed: compact(proposed.usage.processed_input_tokens),
+        base: compactOrMissing(baseline.usage.processed_input_tokens),
+        proposed: compactOrMissing(proposed.usage.processed_input_tokens),
         note:
-          baseline.usage.unique_input_tokens === null
+          baseline.usage.processed_input_tokens === null || proposed.usage.processed_input_tokens === null
+            ? "At least one source report did not supply processed input tokens."
+            : baseline.usage.unique_input_tokens === null
             ? "Unique context is not exposed by this provider report."
             : `Both scenarios began with ${compact(baseline.usage.unique_input_tokens)} unique input tokens.`,
       },

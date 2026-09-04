@@ -35,6 +35,8 @@ The opening presents three paths:
 
 The direct OpenAI import does not include business outcomes, so it cannot produce cost per ready result on its own. Use the universal path when you have a work log or reviewed sample. Anthropic, Bedrock, Gemini, gateway, and other provider reports must currently be transferred into the universal spend template.
 
+The setup screen explains that transfer. It identifies the cost and usage sources for OpenAI, Claude API, Bedrock, Gemini or Vertex AI, and gateways; defines every template column; distinguishes missing data from a reported zero; and warns that raw provider exports, PDFs, and screenshots are not accepted by the universal upload.
+
 The route-change builder accepts:
 
 - One spend-and-usage CSV containing `baseline` and `proposed` rows.
@@ -49,7 +51,11 @@ and accepted results before producing a review. Cost differences remain
 separate from supported savings until the bill, work, quality, and policy gates
 all pass.
 
+Provider cost is required. Request, token, and cache fields may be left blank when the source report does not supply them. A complete work log can supply model-call and retry counts when the provider report omits request totals. Other missing measures remain unavailable instead of being shown as zero.
+
 For each completed result, `model_requests` counts every model call and `retry_requests` counts only the additional calls after the first attempt. A result produced with three calls has three model requests and two retries. Retry rate is total retry requests divided by total provider requests. The provider bill already includes those calls, so retry cost is never added a second time.
+
+Outcome status is assigned at the end of review. A result that cleared the rule after completed correction is `ready_to_use`, with all correction time included in `human_minutes`. `needs_correction` means the result is still not ready. `needs_escalation` means it could not be completed through the normal review path.
 
 ## Finance memo
 

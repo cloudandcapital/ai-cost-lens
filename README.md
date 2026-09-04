@@ -120,6 +120,29 @@ Then open `http://localhost:8000`. Choose **See the worked example**, **Review O
 
 The OpenAI CSV path accepts matching Activity data for Completions and Cost data exports for a bill and usage review. It does not contain the business outcome evidence needed for cost per ready result. Use the universal spend and work templates for the full comparison, including for OpenAI. Anthropic, Bedrock, Gemini, gateways, and other AI tools currently use those universal templates.
 
+### How to use another provider report
+
+The universal upload reads the AI Cost Lens template. It does not read a raw Anthropic report, AWS CUR file, Google billing export, invoice PDF, or screenshot.
+
+1. Download the spend template from **Start a review**.
+2. Open it in Excel or Sheets. Replace the examples with rows from the current route (`baseline`) and the route being tested (`proposed`).
+3. Copy provider cost and usage using the same date and model grouping. Use the same workload name and currency on both routes.
+4. Mark each cost as `provider_reported`, `calculated`, or `allocated`. Do not repeat one invoice total on multiple usage rows.
+5. Upload the completed template, then add a reviewed sample or a complete work log using the same definition of a ready result.
+
+For Claude API, tokens come from the Anthropic Messages Usage Report and cost comes from the Cost Report. That usage report does not include request counts, so those must come from application or gateway logs. For Bedrock, billed cost comes from Cost Explorer or CUR while requests and tokens come from invocation logs. For Gemini or Vertex AI, cost comes from Cloud Billing and request detail comes from Vertex AI or application logs. Gateways use their own cost and usage exports. The browser setup explains every template column and what to do when a usage field is unavailable.
+
+Official source instructions:
+
+- [Export OpenAI API usage and cost CSVs](https://help.openai.com/en/articles/20001072-how-do-i-export-monthly-usage-details-from-the-api-usage-dashboard)
+- [Anthropic Messages Usage Report](https://docs.anthropic.com/en/api/admin-api/usage-cost/get-messages-usage-report) and [Cost Report](https://docs.anthropic.com/en/api/admin-api/usage-cost/get-cost-report)
+- [Track Bedrock usage and cost](https://docs.aws.amazon.com/bedrock/latest/userguide/cost-management.html) and [enable model invocation logging](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html)
+- [Google Cloud detailed billing export fields](https://docs.cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/detailed-usage)
+
+A provider bill does not contain business outcomes. The ready result status, human time, and retry count come from the application or review process that used the model output. A bill alone cannot prove cost per ready result or savings.
+
+Flat ChatGPT, Claude, or similar subscription receipts do not contain the request and outcome detail needed for this review. A customer may allocate a subscription cost to a workload only when they also have their own usage and result records. Allocated cost remains visibly labeled and cannot become booked savings in the tool.
+
 See the [product brief](docs/product-brief.md), [research notes](docs/competitive-landscape.md), and [web interface notes](web/README.md) for the design and evidence model.
 
 ## Decision Record 0.1
@@ -172,7 +195,13 @@ baseline,result-002,needs_correction,7.0
 Use `ready_to_use`, `needs_correction`, or `needs_escalation`. Older logs with an
 `accepted` boolean and the earlier detailed columns remain supported. Dates,
 workload, request counts, retries, and separate review/correction minutes are
-optional evidence. A sampled result never becomes a proven savings claim. A
+optional evidence. Classify each result at the end of review. Use `ready_to_use`
+when it cleared the acceptance rule, including after completed correction, and
+include every review and correction minute spent. Use `needs_correction` only
+when material work is still required. Use `needs_escalation` when the result
+could not be completed through the normal review path. This keeps corrected work
+in the ready result denominator instead of treating it as lost output. A sampled
+result never becomes a proven savings claim. A
 browser spend template also requires `cost_basis` on every row. Use
 `provider_reported`, `calculated`, or `allocated`; each route must use one basis.
 Calculated and allocated route costs remain test evidence and cannot be presented

@@ -37,8 +37,8 @@ def test_web_assets_and_brand_contract_are_present():
         "universal spend and work templates for any provider, including OpenAI" in html
     )
     assert "Choose the universal path, including for OpenAI" in html
-    assert "Transfer cost and usage from your provider reports" in html
-    assert "Add cost and usage" in html
+    assert "Start with the reports you already have" in html
+    assert "Put both routes in one spend file" in html
     assert "Add what happened to the work" in html
     assert (
         "A result produced with three calls has three model requests and two retries"
@@ -156,6 +156,36 @@ def test_universal_templates_preserve_finance_join_fields():
     assert "baseline,base-002,needs_correction,2,1,3.0" in work
     assert "ready_to_use" in work
     assert "needs_correction" in work
+
+
+def test_universal_path_explains_provider_transfer_and_source_boundaries():
+    html = (WEB / "index.html").read_text()
+    for label in (
+        "OpenAI API",
+        "Claude API",
+        "Amazon Bedrock",
+        "Gemini or Vertex AI",
+        "Gateway or another tool",
+    ):
+        assert label in html
+    assert "Show me exactly what to put in each column" in html
+    assert "Upload the completed template, not the original provider report." in html
+    assert "PDFs, or screenshots directly" in html
+    assert "Invoice or subscription only?" in html
+    assert "A flat ChatGPT or Claude subscription receipt" in html
+    assert "including after any correction you completed" in html
+    assert "If correction made the result ready, use ready_to_use" in html
+    assert "One result is one unit of finished work" in html
+    assert "Show me exactly what to put in the work log" in html
+    assert "Three model calls means two retries" in html
+
+
+def test_universal_path_distinguishes_missing_token_data_from_zero():
+    html = (WEB / "index.html").read_text()
+    app = (WEB / "app.js").read_text()
+    assert "Leave blank if the source does not report them." in html
+    assert "Zero means the source reported zero" in html
+    assert 'value === null || value === undefined ? "Not available"' in app
 
 
 def test_javascript_element_references_exist_in_html():
@@ -417,6 +447,66 @@ eval(source);
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_browser_customer_can_build_anthropic_universal_review():
+    script = r"""
+const fs = require("fs");
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function validateResult(data) {",
+  "  globalThis.__buildLocalReview = buildLocalReview; return;\n  function validateResult(data) {",
+);
+eval(source);
+(async () => {
+  const result = await globalThis.__buildLocalReview(
+    fs.readFileSync(process.argv[2], "utf8"),
+    fs.readFileSync(process.argv[3], "utf8"),
+    {
+      acceptanceRule: "Accurate against the source record",
+      verifier: "Finance reviewer",
+      qualityFloor: 0.5,
+      hourlyRate: 60,
+      baselinePolicyApproved: true,
+      proposedPolicyApproved: true,
+      baselineShared: 0,
+      proposedShared: 0,
+      changeCost: 0,
+      outcomeLogComplete: true,
+    },
+  );
+  console.log(JSON.stringify(result));
+})();
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "app.js"),
+            str(WEB.parent / "tests" / "fixtures" / "anthropic-universal-spend.csv"),
+            str(WEB.parent / "tests" / "fixtures" / "anthropic-universal-work-log.csv"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = __import__("json").loads(result.stdout)
+    assert payload["baseline"]["model"]["provider"] == "Anthropic"
+    assert payload["baseline"]["usage"]["requests"] == 7
+    assert payload["proposed"]["usage"]["requests"] == 9
+    assert payload["baseline"]["usage"]["retries"] == 2
+    assert payload["proposed"]["usage"]["retries"] == 4
+    assert payload["baseline"]["measures"]["cost_per_usable_result"] == 7.5
+    assert payload["proposed"]["measures"]["cost_per_usable_result"] == pytest.approx(
+        12.333333
+    )
+    assert payload["comparison"]["provider_cost_reported"] is True
+    assert payload["comparison"]["evidence_complete"] is True
+    assert payload["comparison"]["savings_claim_allowed"] is False
+    assert payload["baseline"]["measures"]["cache_write_rate"] is None
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_browser_sampled_review_labels_estimates_and_blocks_savings_claim():
     script = r"""
 const fs = require("fs");
@@ -476,3 +566,55 @@ eval(source);
     assert payload["comparison"]["same_cost_basis"] is False
     assert payload["baseline"]["outcomes"]["ready_rate_interval_95"][0] < 20 / 30
     assert payload["baseline"]["outcomes"]["ready_rate_interval_95"][1] > 20 / 30
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_browser_universal_builder_allows_unreported_token_fields():
+    script = r"""
+const fs = require("fs");
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function validateResult(data) {",
+  "  globalThis.__buildSampledReview = buildSampledReview; return;\n  function validateResult(data) {",
+);
+eval(source);
+const spend = `period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,cost_basis,currency
+baseline,2026-08-01,Support summaries,Anthropic,Claude Sonnet,Current route,,,,,,12.50,provider_reported,USD
+proposed,2026-08-15,Support summaries,Anthropic,Claude Haiku,Pilot route,,,,,,8.25,provider_reported,USD`;
+(async () => {
+  const result = await globalThis.__buildSampledReview(
+    spend,
+    {
+      baseline: { population: 2, ready: 1, correction: 1, escalation: 0, humanMinutes: 2 },
+      proposed: { population: 2, ready: 2, correction: 0, escalation: 0, humanMinutes: 1 },
+    },
+    {
+      acceptanceRule: "Accurate without a material rewrite",
+      verifier: "Human review",
+      qualityFloor: 0.5,
+      hourlyRate: 60,
+      baselinePolicyApproved: true,
+      proposedPolicyApproved: true,
+      baselineShared: 0,
+      proposedShared: 0,
+      changeCost: 0,
+      sampleRandom: true,
+    },
+  );
+  console.log(JSON.stringify(result));
+})();
+"""
+    result = subprocess.run(
+        ["node", "-e", script, str(WEB / "app.js")],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = __import__("json").loads(result.stdout)
+    assert payload["baseline"]["usage"]["requests"] is None
+    assert payload["baseline"]["usage"]["processed_input_tokens"] is None
+    assert payload["baseline"]["usage"]["cached_input_tokens"] is None
+    assert payload["baseline"]["usage"]["output_tokens"] is None
+    assert payload["baseline"]["measures"]["cache_reuse_rate"] is None
+    assert payload["baseline"]["costs"]["model_cost"] == 12.5
