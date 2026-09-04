@@ -4591,6 +4591,11 @@ body.story-mode .cockpit-grid {
     const readyRate = review.completed ? review.ready / review.completed : null;
     const topCost = [...review.mix].sort((a, b) => b.providerCost - a.providerCost)[0];
     const topCostShare = topCost && totals.providerCost ? topCost.providerCost / totals.providerCost : null;
+    const requestNote = totals.requests === 0
+      ? "No requests were recorded for this period, so cost per request is unavailable."
+      : costPerRequest === null
+        ? "Requests were not supplied for every cost row. Leave the metric blank until the source supports it."
+        : "This is provider cost divided by all supplied requests. It is a workload-level baseline, not a model price.";
 
     if (review.level === "Invoice or subscription only") {
       return [
@@ -4617,7 +4622,7 @@ body.story-mode .cockpit-grid {
           : "If prompts repeatedly send the same long context, test provider-supported caching on one bounded workload and compare the billed result.";
       return [
         ["save", "START HERE", `Start with ${topLabel}`, topValue, topCostShare === null ? "This is the largest visible cost bucket in the supplied file." : `${topLabel} represents ${pct(topCostShare, 1)} of the declared provider cost. Investigate the largest visible bucket before smaller ones.`],
-        ["test", "UNIT COST", costPerRequest === null ? "Add request volume when available" : "Know the blended cost per request", costPerRequest === null ? "Optional" : cost(costPerRequest), costPerRequest === null ? "Requests were not supplied for every cost row. Leave the metric blank until the source supports it." : "This is provider cost divided by all supplied requests. It is a workload-level baseline, not a model price."],
+        ["test", "UNIT COST", costPerRequest === null ? "Add request volume when available" : "Know the blended cost per request", costPerRequest === null ? "Optional" : cost(costPerRequest), requestNote],
         ["test", "CHECK NEXT", cacheTitle, cacheValue, cacheNote],
         ["leave", "OPTIONAL DEPTH", "Add outcomes only when the decision needs them", "Later", "You already have a cost and usage review. Add ready results, retries, or human effort only when you need to test quality, value, or a route change."],
       ];
@@ -4662,6 +4667,19 @@ body.story-mode .cockpit-grid {
     return comparison.provider_cost_reported ?? [baseline, proposed].every(
       (scenario) => scenario.evidence.cost_basis === "observed",
     );
+  }
+
+  function failedSavingsGateText(comparison, baseline, proposed) {
+    const failures = [
+      !comparison.quality_holds && "the declared quality requirement",
+      !comparison.both_policy_approved && "policy approval",
+      !comparison.evidence_complete && "complete outcome evidence",
+      !comparison.same_cost_basis && "the same kind of cost data on both routes",
+      !providerCostsReported(baseline, proposed, comparison) && "a provider bill for both routes",
+    ].filter(Boolean);
+    return failures.length > 1
+      ? `${failures.slice(0, -1).join(", ")} and ${failures.at(-1)}`
+      : failures[0] || "a decision gate";
   }
 
   function sentenceCase(value) {
@@ -5010,6 +5028,13 @@ body.story-mode .cockpit-grid {
     const payback = savingsPerResult > 0 && proposed.costs.one_time_change_cost > 0
       ? Math.ceil(proposed.costs.one_time_change_cost / savingsPerResult)
       : null;
+    const failedGateText = failedSavingsGateText({
+      quality_holds: qualityHolds,
+      both_policy_approved: bothPolicyApproved,
+      evidence_complete: evidenceComplete,
+      same_cost_basis: sameCostBasis,
+      provider_cost_reported: providerCostReported,
+    }, baseline, proposed);
     let status = "no_improvement";
     let recommendation = "Leave the current route in place. The proposed route does not lower recurring cost per usable result.";
     if (unitDifference < 0 && savingsClaimAllowed) {
@@ -5019,9 +5044,7 @@ body.story-mode .cockpit-grid {
         : "The proposed route has a lower observed cost per usable result and clears the declared quality and policy gates.";
     } else if (unitDifference < 0) {
       status = "needs_evidence";
-      recommendation = providerCostReported
-        ? "Test the proposed route, but fix the evidence gaps before calling the lower number savings."
-        : `The proposed route has a lower ${costBasisLabel(proposed.evidence.cost_basis).toLowerCase()} per usable result. Confirm it with provider-reported spend before calling the difference savings.`;
+      recommendation = `Test the proposed route, but ${failedGateText} still blocks a savings claim.`;
     }
     const allDates = [...baselineBuild.dates, ...proposedBuild.dates].sort();
     return {
@@ -5042,9 +5065,7 @@ body.story-mode .cockpit-grid {
         finding: "",
         limitation: savingsClaimAllowed
           ? "The observed cost and accepted-work records reconcile for the declared boundary. This conclusion does not extend beyond this workload and period."
-          : providerCostReported
-            ? "The lower number does not clear every evidence, quality, and policy gate required for a savings claim."
-            : `${costBasisLabel(proposed.evidence.cost_basis)} is not a provider-reported invoice amount. The comparison can support a test decision, not booked savings.`,
+          : `The lower number is not proven savings because ${failedGateText} still blocks the claim.`,
         recommendation,
         savings_claim_allowed: savingsClaimAllowed,
         same_cost_basis: sameCostBasis,
@@ -5869,16 +5890,12 @@ body.story-mode .cockpit-grid {
         : `At the current proposed cost, at least ${compact(facts.requiredReady)} of ${compact(proposed.outcomes.completed_results)} attempts must be ready to match the current ${unitMoney(baseline.measures.cost_per_usable_result)} unit cost. That is a ${facts.requiredRate.toFixed(1)}% ready result rate, compared with ${pct(proposed.measures.usable_result_rate)} now. The break-even explorer lets you test a different yield, provider bill, or human work cost.`,
       evidence: mode === "illustrative"
         ? `The math is complete, but the inputs are illustrative. Before finance relies on this, use the real provider bill and outcome log for one specific workload. Apply the same definition of "ready" to both routes, measure the human correction time, and enter the real cost of making the change. ${issueCount ? `${issueCount} file or math issue${issueCount === 1 ? " is" : "s are"} also open.` : "The synthetic files match each other."}`
-        : issueCount
-          ? `${issueCount} reconciliation issue${issueCount === 1 ? " is" : "s are"} still open. Open The evidence to see the exact missing or mismatched fields before approving a savings claim.`
-          : comparison.savings_claim_allowed
-            ? "The bill, work volume, quality rule, policy approval, and included costs all match for this review. That supports this decision for this workload and period, not a claim about the model everywhere."
-            : providerCostsReported(baseline, proposed, comparison)
-              ? "The files match, but at least one check still blocks a savings claim. Open The evidence to see whether the problem is quality, policy approval, missing outcomes, or mismatched cost data."
-              : `The files match, but ${providerTerm} does not come from the provider bill for both routes. Treat the result as a test signal until the bill confirms it.`,
+        : comparison.savings_claim_allowed
+          ? "The bill, work volume, quality rule, policy approval, and included costs all match for this review. That supports this decision for this workload and period, not a claim about the model everywhere."
+          : `${failedSavingsGateText(comparison, baseline, proposed)} still blocks a savings claim.${issueCount ? ` Open The evidence for the ${issueCount} reconciliation issue${issueCount === 1 ? "" : "s"}.` : ""}`,
       cfo: comparison.cost_per_usable_result_change_pct > 0
         ? `The proposed route reduces ${providerTerm}, but not the cost of usable work. After shared infrastructure and human correction, each ready result costs ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. Keep the current route and test whether the proposed route can reach at least ${facts.requiredRate?.toFixed(1) ?? "the required"}% ready results before changing the default.`
-        : `The proposed route produces a ready result for ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. ${comparison.savings_claim_allowed ? "The evidence supports the difference for this workload and period." : "Treat the difference as a test result until the missing checks are complete."}`,
+        : `The proposed route produces a ready result for ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. ${comparison.savings_claim_allowed ? "The evidence supports the difference for this workload and period." : `${failedSavingsGateText(comparison, baseline, proposed)} still blocks a savings claim.`}`,
       plan: planning
         ? `The current route finished ${money(Math.abs(planning.variance.recurring_operating_cost))} ${planCostPosition} its recurring cost plan. ${planning.variance.primary_cost_drivers.map((driver) => `${sentenceCase(driver.label)} was ${money(Math.abs(driver.amount))} ${driver.amount > 0 ? "over plan" : driver.amount < 0 ? "under plan" : "on plan"}`).join(". ")}. Ready result yield was ${Math.abs(planning.variance.ready_result_rate_points).toFixed(1)} points ${planYieldPosition} plan.`
         : "No approved plan was supplied with this review. Add the planned provider, infrastructure, human work, volume, and ready result assumptions to create a Plan vs Actual check.",
@@ -5994,7 +6011,7 @@ body.story-mode .cockpit-grid {
     } else if (proposedUnit < baselineUnit) {
       document.getElementById("finding-title").textContent =
         `${proposed.label} comes out at ${unitMoney(proposedUnit)} for each result that was ready ` +
-        `to use. ${baseline.label} cost ${unitMoney(baselineUnit)}. It looks better, but ${costBasisLabel(proposed.evidence.cost_basis).toLowerCase()} is not booked provider spend.`;
+        `to use. ${baseline.label} cost ${unitMoney(baselineUnit)}. It looks better, but ${failedSavingsGateText(comparison, baseline, proposed)} still blocks a savings claim.`;
     } else {
       document.getElementById("finding-title").textContent =
         modelCostChange !== null && modelCostChange < 0 && readyResultCostChange !== null && readyResultCostChange > 0
@@ -6106,16 +6123,7 @@ body.story-mode .cockpit-grid {
       ...proposed.evidence.reconciliation_issues,
     ];
     const lowerUnitCost = proposed.measures.cost_per_usable_result < baseline.measures.cost_per_usable_result;
-    const gateFailures = [
-      !comparison.quality_holds && "the quality floor",
-      !comparison.both_policy_approved && "policy approval",
-      !comparison.evidence_complete && "complete outcome evidence",
-      !comparison.same_cost_basis && "the same kind of cost data on both routes",
-      !providerCostsReported(baseline, proposed, comparison) && "a provider bill for both routes",
-    ].filter(Boolean);
-    const gateFailureText = gateFailures.length > 1
-      ? `${gateFailures.slice(0, -1).join(", ")} and ${gateFailures.at(-1)}`
-      : gateFailures[0] || "a decision gate";
+    const gateFailureText = failedSavingsGateText(comparison, baseline, proposed);
     const illustrative = mode === "illustrative";
     const opportunityRows = [
       {
