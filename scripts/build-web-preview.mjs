@@ -30,7 +30,7 @@ app = app.replace(
   `  state.data = ${data.trim()};\n  state.demoData = cloneData(state.data);\n  renderAll();`,
 );
 html = html
-  .replace('<link rel="stylesheet" href="styles.css" />', `<style>${css}</style>`)
+  .replace('<link rel="stylesheet" href="styles.css" />', () => `<style>${css}</style>`)
   .replaceAll(
     'href="templates/ai-cost-lens-spend-template.csv"',
     `href="data:text/csv;base64,${spendTemplate.toString("base64")}"`,
@@ -39,7 +39,11 @@ html = html
     'href="templates/ai-cost-lens-work-log-template.csv"',
     `href="data:text/csv;base64,${workTemplate.toString("base64")}"`,
   )
-  .replace('<script src="app.js"></script>', `<script>${app}</script>`);
+  .replace('<script src="app.js"></script>', () => `<script>${app}</script>`);
+
+if (!html.includes(`<script>${app}</script>`)) {
+  throw new Error("The browser application was not embedded byte-for-byte.");
+}
 
 await writeFile(resolve(web, "preview.html"), html, "utf8");
 console.log("Built web/preview.html");

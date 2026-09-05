@@ -72,8 +72,10 @@ const {api} = context;
 const el = id => document.getElementById(id);
 const click = id => el(id).emit('click');
 const mode = value => document.querySelectorAll('.builder-mode').find(n => n.dataset.builderMode === value).emit('click');
+const provider = value => document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === value).emit('click');
 const outcome = value => document.querySelectorAll('.outcome-mode').find(n => n.dataset.outcomeMode === value).emit('click');
 const file = async (id, text, name = id + '.csv') => { el(id).files = [{name,size:Buffer.byteLength(text),text:async()=>text}]; await el(id).emit('change'); };
+const files = async (id, values) => { el(id).files = values.map(({name,text,type=''}) => ({name,type,size:Buffer.byteLength(text),text:async()=>text})); await el(id).emit('change'); };
 const submit = () => el('review-builder').emit('submit');
 const spend = read('web/templates/ai-cost-lens-spend-template.csv');
 const work = read('web/templates/ai-cost-lens-work-log-template.csv');
@@ -110,10 +112,13 @@ assert.match(el('bill-mode-tag').textContent, /BILL FOUNDATION · NO SAVINGS CLA
 assert.doesNotMatch(el('bill-finding-limit').textContent, /Outcome unit cost withheld|Request reconciliation is unavailable/);
 
 // Every path transition starts fresh, using native HTML defaults.
-const fileLabels = ['spend-file-name','work-file-name','openai-usage-file-name','openai-cost-file-name'];
+const fileLabels = ['spend-file-name','work-file-name','openai-usage-file-name','openai-cost-file-name','claude-spend-file-name','claude-usage-file-name','claude-cost-file-name'];
 const labelDefaults = Object.fromEntries(fileLabels.map(id => [id,el(id).textContent]));
 async function assertFresh(nextMode) {
   const previous = api.state.data;
+  api.state.uploadRoute = {kind:'stale'};
+  api.state.pendingMappedImport = {review:'stale'};
+  api.state.invoicePdfCandidate = {provider:'stale'};
   for (const input of el('review-builder').querySelectorAll('input')) {
     if (input.attrs.type === 'file') input.files = [{name:'stale.csv'}];
     else if (input.attrs.type === 'checkbox') input.checked = !input.defaultChecked;
@@ -124,6 +129,7 @@ async function assertFresh(nextMode) {
   await click('start-review');
   assert.equal(api.state.data,previous);
   assert.equal(api.state.builderMode,null); assert.equal(api.state.outcomeMode,'sample');
+  assert.equal(api.state.uploadRoute,null); assert.equal(api.state.pendingMappedImport,null); assert.equal(api.state.invoicePdfCandidate,null);
   for (const input of el('review-builder').querySelectorAll('input')) {
     if (input.attrs.type === 'file') assert.equal(input.files.length,0,input.id);
     else { assert.equal(input.value,input.defaultValue,input.id); assert.equal(input.checked,input.defaultChecked,input.id); }
@@ -131,6 +137,9 @@ async function assertFresh(nextMode) {
   for (const id of fileLabels) assert.equal(el(id).textContent,labelDefaults[id],id);
   assert.equal(el('builder-error').textContent,'');
   assert.equal(el('builder-error').classList.contains('visible'),false);
+  assert.equal(el('structured-mapper').hidden,true);
+  assert.equal(el('invoice-pdf-status').hidden,true);
+  assert.equal(el('invoice-amount-choice-label').hidden,true);
   await mode(nextMode);
   for (const name of ['single','workload','openai']) {
     for (const input of el(name + '-builder-fields').querySelectorAll('input')) {
@@ -141,6 +150,23 @@ async function assertFresh(nextMode) {
 await assertFresh('workload');
 await file('spend-file',spend); await file('work-file',work); await outcome('detailed');
 await submit(); assert.equal(api.state.data.schema_version,'ai-cost-lens-review-result/1.0');
+await click('start-review'); await mode('openai');
+const openAIProvider = document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === 'openai');
+const claudeProvider = document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === 'claude');
+assert.equal(openAIProvider.classList.contains('active'),true);
+assert.equal(openAIProvider.getAttribute('aria-pressed'),'true');
+assert.equal(claudeProvider.classList.contains('active'),false);
+assert.equal(claudeProvider.getAttribute('aria-pressed'),'false');
+await provider('claude');
+assert.equal(openAIProvider.classList.contains('active'),false);
+assert.equal(claudeProvider.classList.contains('active'),true);
+await provider('openai');
+assert.equal(openAIProvider.classList.contains('active'),true);
+assert.equal(claudeProvider.classList.contains('active'),false);
+await click('start-review'); await mode('openai');
+assert.equal(openAIProvider.classList.contains('active'),true);
+assert.equal(openAIProvider.getAttribute('aria-pressed'),'true');
+assert.equal(claudeProvider.classList.contains('active'),false);
 await assertFresh('openai');
 await file('openai-usage-file',read('tests/fixtures/openai-dashboard-usage.csv'));
 await file('openai-cost-file',read('tests/fixtures/openai-dashboard-cost.csv'));
@@ -155,6 +181,62 @@ assert.match(el('bill-finding-limit').textContent,/Export the same date range/);
 assert.match(el('bill-finding-title').textContent,/not a matched financial review/);
 assert.equal(el('memo-decision-code').textContent,'PERIOD MISMATCH');
 assert.match(el('bill-boundary-copy').textContent,/before using this review for a financial decision/);
+await assertFresh('openai');
+await provider('claude');
+await files('smart-upload-files', [
+  {name:'activity.csv',text:read('tests/fixtures/openai-dashboard-usage.csv')},
+  {name:'cost.csv',text:read('tests/fixtures/openai-dashboard-cost.csv')},
+]);
+assert.equal(api.state.uploadRoute.kind,'openai');
+assert.equal(api.state.importProvider,'openai');
+assert.equal(document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === 'openai').classList.contains('active'),true);
+assert.equal(el('openai-import-fields').hidden,false);
+assert.equal(el('claude-import-fields').hidden,true);
+assert.equal(el('build-review').textContent,'Review the OpenAI bill');
+assert.equal(el('smart-upload-files').files.length,2);
+await submit();
+assert.equal(api.state.data.schema_version,'ai-cost-lens-openai-bill-review/0.1');
+await assertFresh('openai');
+await provider('openai');
+await files('smart-upload-files', [{name:'claude.csv',text:read('tests/fixtures/synthetic-claude-team-spend.csv')}]);
+assert.equal(api.state.uploadRoute.kind,'claude_spend');
+assert.equal(api.state.importProvider,'claude');
+assert.equal(document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === 'claude').classList.contains('active'),true);
+assert.equal(el('openai-import-fields').hidden,true);
+assert.equal(el('claude-import-fields').hidden,false);
+assert.equal(el('build-review').textContent,'Check the Claude export');
+assert.equal(el('smart-upload-files').files.length,1);
+await assertFresh('openai');
+const mappedText = 'billing_date,vendor,route,spend,currency_code,request_count,private_email\n2026-08-01,Anthropic,Support,12.5,USD,0,private@example.invalid\n2026-08-02,Anthropic,Support,7.5,USD,,other@example.invalid\n';
+await files('smart-upload-files', [{name:'unknown.csv',text:mappedText}]);
+assert.equal(api.state.uploadRoute.kind,'mapping');
+assert.equal(el('structured-mapper').hidden,false);
+assert.match(el('mapping-preview').textContent,/USD 20.00/);
+const beforeMappedConfirmation = api.state.data;
+await submit();
+assert.equal(api.state.data,beforeMappedConfirmation);
+assert.ok(api.state.pendingMappedImport);
+await submit();
+assert.equal(api.state.data.config.reviewSource,'structured_mapping');
+assert.doesNotMatch(JSON.stringify(api.state.data),/private@example|other@example/);
+await assertFresh('openai');
+await provider('claude');
+await file('claude-spend-file',read('tests/fixtures/synthetic-claude-team-spend.csv'));
+el('claude-period-start').value = '2026-08-01'; el('claude-period-end').value = '2026-08-31';
+const beforeClaudeConfirmation = api.state.data;
+await submit();
+assert.equal(api.state.data,beforeClaudeConfirmation,'Claude confirmation does not replace the displayed review');
+assert.equal(el('claude-confirmation').hidden,false);
+assert.match(el('claude-confirmation').textContent,/Provider: Anthropic/);
+assert.match(el('claude-confirmation').textContent,/Personal identifiers were discarded/);
+el('claude-period-end').value = '2026-09-01'; await el('claude-period-end').emit('change');
+assert.equal(api.state.pendingClaudeImport,null,'Changing a confirmed period invalidates the pending import');
+assert.equal(el('claude-confirmation').hidden,true);
+el('claude-period-end').value = '2026-08-31';
+await submit();
+await submit();
+assert.equal(api.state.data.schema_version,'ai-cost-lens-single-bill-review/0.1');
+assert.doesNotMatch(JSON.stringify(api.state.data),/example\.invalid|acct-synthetic/);
 await assertFresh('single');
 await file('single-spend-file',invoice.replace('2026-08-01','2026-02-31'));
 el('single-verifier').value = 'Preserve while correcting';

@@ -1,6 +1,6 @@
 {
   "name": "ai-cost-lens-site",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "scripts": {
     "build": "node scripts/build-static-site.mjs",
@@ -8,5 +8,8 @@
   },
   "devDependencies": {
     "vite": "8.2.2"
+  },
+  "dependencies": {
+    "pdfjs-dist": "6.3.289"
   }
 }

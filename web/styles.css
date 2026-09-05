@@ -2492,7 +2492,9 @@ footer {
 }
 
 .field-grid input[type="text"],
-.field-grid input[type="number"] {
+.field-grid input[type="number"],
+.field-grid input[type="date"],
+.field-grid select {
   width: 100%;
   min-height: 43px;
   border: 1px solid var(--line-strong);

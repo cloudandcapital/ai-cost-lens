@@ -28,10 +28,11 @@ def test_web_assets_and_brand_contract_are_present():
     assert "Illustrative data is never presented as customer evidence" in html
     assert "What would you like to check?" in html
     assert "See the worked example" in html
-    assert "Review OpenAI exports" in html
+    assert "Upload what you have" in html
+    assert "CSV, JSON, or a text-based invoice PDF" in html
     assert "Compare cost per ready result" in html
     assert "BEST PLACE TO START" in html
-    assert "OPENAI BILL AND USAGE" in html
+    assert "OPENAI OR CLAUDE" in html
     assert "ANY PROVIDER OR AI TOOL" in html
     assert (
         "universal spend and work templates for any provider, including OpenAI" in html
@@ -59,6 +60,16 @@ def test_web_assets_and_brand_contract_are_present():
     assert "Blended cost per request" in (WEB / "app.js").read_text()
     assert 'id="workload-builder-fields" hidden' in html
     assert 'id="openai-builder-fields" hidden' in html
+    assert 'data-import-provider="openai"' in html
+    assert 'data-import-provider="claude"' in html
+    assert 'id="invoice-provider"' in html
+    assert 'id="invoice-amount"' in html
+    assert 'id="claude-spend-file"' in html
+    assert 'id="claude-usage-file"' in html
+    assert 'id="claude-cost-file"' in html
+    assert "Claude Console Usage and Cost CSV headers are not published" in html
+    assert "never asks for an API key" in html
+    assert "Personal identifiers were discarded" in (WEB / "app.js").read_text()
     assert 'id="builder-actions" hidden' in html
     assert ".builder-actions[hidden]" in css
     assert 'aria-pressed="false"' in html
@@ -89,7 +100,8 @@ def test_web_assets_and_brand_contract_are_present():
     assert "builderMode: null" in app
     assert "retryRequests > Math.max(modelRequests - 1, 0)" in app
     assert "state.demoData = cloneData(state.data)" in app
-    assert 'state.builderMode === "example"' in app
+    assert 'mode === "example"' in app
+    assert "activateBuilderMode" in app
     assert "renderFinanceMemo" in app
     assert 'document.body.classList.add("printing-memo")' in app
     assert 'window.addEventListener("afterprint"' in app
@@ -179,7 +191,8 @@ def test_universal_path_explains_provider_transfer_and_source_boundaries():
         assert label in html
     assert "Show me exactly what to put in each column" in html
     assert "Upload the completed template, not the original provider report." in html
-    assert "PDFs, or screenshots directly" in html
+    assert "text-based OpenAI or Anthropic invoice PDF" in html
+    assert "Scans and screenshots are not read" in html
     assert "Invoice or subscription only?" in html
     assert (
         "Choose Understand one bill to record a subscription amount without usage or outcomes"

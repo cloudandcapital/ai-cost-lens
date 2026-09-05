@@ -15,6 +15,8 @@ does a proposed change pay back inside the decision horizon?
 
 The tool is free, open source, and runs locally. It does not require provider credentials, upload prompts, or claim to enforce production budgets. It reviews exported evidence and keeps observed, calculated, and allocated costs visibly separate.
 
+The browser can directly review supported OpenAI dashboard CSV exports, the documented Claude Team or Enterprise spend-report CSV, complete Claude Messages Usage and Cost Admin API JSON responses saved by the user, and identifiable text-based OpenAI or Anthropic invoice PDFs. An explicit local mapper can normalize one unknown flat CSV or JSON file when the user confirms its fields. Claude Team and Enterprise personal identifiers and all unmapped source fields are discarded before the decision record is created. The importers never ask for an API key, and invoices or provider exports do not supply business outcomes or prove savings.
+
 ## Positioning
 
 AI Cost Lens is a financial review layer, not another LLM observability platform.

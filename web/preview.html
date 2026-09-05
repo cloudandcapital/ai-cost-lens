@@ -2514,7 +2514,9 @@ footer {
 }
 
 .field-grid input[type="text"],
-.field-grid input[type="number"] {
+.field-grid input[type="number"],
+.field-grid input[type="date"],
+.field-grid select {
   width: 100%;
   min-height: 43px;
   border: 1px solid var(--line-strong);
@@ -3846,9 +3848,9 @@ body.story-mode .cockpit-grid {
             <span>Get a cost baseline and practical next steps. Usage, outcomes, retries, and human effort are optional.</span>
           </button>
           <button class="builder-mode" data-builder-mode="openai" type="button" aria-pressed="false">
-            <small>OPENAI BILL AND USAGE</small>
-            <strong>Review OpenAI exports</strong>
-            <span>Use matching Activity and Cost CSVs for a bill and usage review.</span>
+            <small>OPENAI OR CLAUDE · START HERE</small>
+            <strong>Upload what you have</strong>
+            <span>Choose CSV, JSON, or a text-based invoice PDF. The browser checks it locally.</span>
           </button>
           <button class="builder-mode" data-builder-mode="workload" type="button" aria-pressed="false">
             <small>ANY PROVIDER OR AI TOOL</small>
@@ -3868,12 +3870,26 @@ body.story-mode .cockpit-grid {
             <div class="step-number">01</div>
             <div>
               <h3>Start with one bill</h3>
+              <p>For a simple subscription or invoice, enter the bill below. No CSV is required.</p>
+              <div id="invoice-pdf-status" class="path-requirements" role="status" hidden></div>
+              <label id="invoice-amount-choice-label" hidden><span>Choose the invoice amount to review</span><select id="invoice-amount-choice"><option value="">Review the invoice totals</option></select><small>Choose only after checking the label and amount against the invoice.</small></label>
+              <div class="field-grid compact-fields invoice-entry">
+                <label><span>Provider</span><input id="invoice-provider" type="text" placeholder="Claude, ChatGPT, or another provider" /></label>
+                <label><span>Subscription or workload name</span><input id="invoice-workload" type="text" /></label>
+                <label><span>Invoice date</span><input id="invoice-date" type="date" /></label>
+                <label><span>Optional service-period start</span><input id="invoice-period-start" type="date" /></label>
+                <label><span>Optional service-period end</span><input id="invoice-period-end" type="date" /></label>
+                <label><span>Billed amount</span><input id="invoice-amount" type="number" min="0" step="any" /></label>
+                <label><span>Currency</span><input id="invoice-currency" type="text" maxlength="3" placeholder="USD" /></label>
+              </div>
+              <p>An invoice proves cost, not usage or outcomes. Missing requests, tokens, retries, and human effort stay unavailable. One bill cannot establish savings. Add detailed usage later only when it is useful.</p>
+              <p><strong>More detail?</strong> Upload the universal CSV instead.</p>
               <p>Download the template, delete every example row, and keep the column headers. Use <strong>baseline</strong> on every new row; no proposed period is needed.</p>
               <div class="template-links"><a href="data:text/csv;base64,cGVyaW9kLGRhdGUsd29ya2xvYWQscHJvdmlkZXIsbW9kZWwscm91dGUscmVxdWVzdHMsaW5wdXRfdG9rZW5zLGNhY2hlZF9pbnB1dF90b2tlbnMsY2FjaGVfd3JpdGVfaW5wdXRfdG9rZW5zLG91dHB1dF90b2tlbnMscHJvdmlkZXJfY29zdCxjb3N0X2Jhc2lzLGN1cnJlbmN5CmJhc2VsaW5lLDIwMjYtMDgtMDEsSW52b2ljZSBleHRyYWN0aW9uLE1vZGVsIEFQSSxDdXJyZW50IG1vZGVsLEN1cnJlbnQgcHJvZHVjdGlvbiByb3V0ZSwzLDI0MDAwMCw0MDAwMCwwLDMyMDAwLDE4LjQwLHByb3ZpZGVyX3JlcG9ydGVkLFVTRApwcm9wb3NlZCwyMDI2LTA4LTE1LEludm9pY2UgZXh0cmFjdGlvbixNb2RlbCBBUEksU21hbGxlciByb3V0ZWQgbW9kZWwsUHJvcG9zZWQgcGlsb3Qgcm91dGUsMiwyMTAwMDAsNzAwMDAsMCwzMDAwMCwxMS4yMCxjYWxjdWxhdGVkLFVTRAo=" download>Download spend template</a></div>
               <p>For an invoice or subscription, enter one row with <code>period=baseline</code>, the invoice date in <code>date</code> (YYYY-MM-DD), the subscription or workload name in <code>workload</code>, the billed amount in <code>provider_cost</code>, <code>cost_basis=provider_reported</code>, and a three-letter <code>currency</code>. Enter <code>provider</code> if known. Leave model, route, requests and tokens blank unless the source supports them. An invoice date is not evidence of the service-period duration.</p>
               <p>With usage, transfer matched date/workload/model/route buckets into separate rows: <code>provider</code>, <code>model</code>, <code>route</code>, <code>requests</code>, <code>input_tokens</code>, <code>cached_input_tokens</code>, <code>cache_write_input_tokens</code>, and <code>output_tokens</code>. Input tokens include uncached, cache-read and cache-write tokens. Requests include retries. Blank means unknown; zero means a confirmed zero.</p>
               <p>Each cost amount must appear once. If cost cannot be joined to model-level usage, aggregate usage to the bill boundary in one row and leave model/route blank; do not spread dollars by token share. Use <code>calculated</code> for quantity × rate or <code>allocated</code> for a documented share of a bill, never label those billed evidence. Keep one currency, workload and cost basis per review.</p>
-              <p>Only this completed CSV template is supported here. Manually transfer the supported fields from your source; PDFs, screenshots and arbitrary raw provider exports are not automatically read.</p>
+              <p>This detailed upload expects the completed universal CSV. Use Upload what you have for supported provider exports, structured-file mapping, or a text-based OpenAI or Anthropic invoice PDF. Scans and screenshots are not read.</p>
               <div class="file-pair single-file-row"><label class="field-wide"><span>Universal spend CSV</span><input id="single-spend-file" type="file" accept=".csv,text/csv" /></label></div>
             </div>
           </section>
@@ -3968,7 +3984,7 @@ body.story-mode .cockpit-grid {
                   <li>Both routes describe the same workload and use the same currency.</li>
                   <li>Each source amount appears once. Do not copy one invoice total onto every usage row.</li>
                   <li>Blank means the source did not supply the measure. Zero means the source reported zero or the measure does not apply.</li>
-                  <li>The upload cannot read raw Anthropic JSON, AWS CUR files, Google billing exports, PDFs, or screenshots directly.</li>
+                  <li>The comparison upload reads this universal template. Use Upload what you have for supported Claude JSON, invoice PDFs, or guided structured-file mapping.</li>
                 </ul>
               </div>
             </div>
@@ -4138,12 +4154,50 @@ body.story-mode .cockpit-grid {
         </div>
 
         <div id="openai-builder-fields" hidden>
+          <section class="builder-step upload-entry" aria-labelledby="smart-upload-title">
+            <div class="step-number">01</div>
+            <div>
+              <h3 id="smart-upload-title">Upload what you have</h3>
+              <p>A bill tells us what you paid. A usage report can also help explain where the cost went.</p>
+              <p>Choose one invoice PDF or structured file. For OpenAI dashboard exports or Claude Admin reports, choose the matching pair together.</p>
+              <div class="file-pair single-file-row">
+                <label class="field-wide"><span>CSV, JSON, or text-based PDF</span><input id="smart-upload-files" type="file" multiple accept=".csv,text/csv,.json,application/json,.pdf,application/pdf" /><small id="smart-upload-file-status">Files are inspected only in this browser.</small></label>
+              </div>
+              <div id="smart-upload-status" class="path-requirements" role="status" hidden></div>
+              <div id="structured-mapper" class="sample-outcome-fields" hidden>
+                <div class="sample-intro"><strong>Match the fields you recognize</strong><span>Suggestions use header names only. Check every selection before continuing.</span></div>
+                <div class="field-grid compact-fields" id="mapping-fields">
+                  <label><span>Date or service-period start</span><select id="map-date"></select></label>
+                  <label><span>Optional service-period end</span><select id="map-service-end"></select></label>
+                  <label><span>Provider column</span><select id="map-provider"></select></label>
+                  <label><span>Provider for every row (optional)</span><input id="map-provider-constant" type="text" maxlength="100" placeholder="Anthropic" /><small>Use when the file has no provider column.</small></label>
+                  <label><span>Model or product</span><select id="map-model"></select></label>
+                  <label><span>Workload or route</span><select id="map-workload"></select></label>
+                  <label><span>Provider-reported cost</span><select id="map-cost"></select></label>
+                  <label><span>Currency column</span><select id="map-currency"></select></label>
+                  <label><span>Reported currency for every row</span><input id="map-currency-constant" type="text" maxlength="3" inputmode="text" placeholder="USD" /><small>Required when the file has no currency column. No conversion is applied.</small></label>
+                  <label><span>Requests</span><select id="map-requests"></select></label>
+                  <label><span>Input tokens</span><select id="map-input"></select></label>
+                  <label><span>Output tokens</span><select id="map-output"></select></label>
+                  <label><span>Cache-read tokens</span><select id="map-cache-read"></select></label>
+                  <label><span>Cache-write tokens</span><select id="map-cache-write"></select></label>
+                </div>
+                <div id="mapping-preview" class="path-requirements" role="status"></div>
+              </div>
+            </div>
+          </section>
+          <p class="builder-choice-label">Or use the exact provider steps</p>
+          <div class="outcome-mode-choice" role="group" aria-label="Choose provider export">
+            <button class="outcome-mode import-provider active" data-import-provider="openai" type="button" aria-pressed="true"><strong>OpenAI</strong><span>Activity and Cost CSVs</span></button>
+            <button class="outcome-mode import-provider" data-import-provider="claude" type="button" aria-pressed="false"><strong>Claude</strong><span>Team/Enterprise spend CSV or Admin API JSON</span></button>
+          </div>
+          <div id="openai-import-fields">
           <div class="path-requirements">
             <strong>What you need</strong>
             <span>One Activity data CSV for Completions and one Cost data CSV, exported for the same date range in the OpenAI Usage dashboard.</span>
           </div>
-          <section class="builder-step" aria-labelledby="openai-files-title">
-            <div class="step-number">01</div>
+            <section class="builder-step" aria-labelledby="openai-files-title">
+            <div class="step-number">02</div>
             <div>
               <h3 id="openai-files-title">Add the two OpenAI exports</h3>
               <p>
@@ -4166,7 +4220,7 @@ body.story-mode .cockpit-grid {
           </section>
 
           <section class="builder-step openai-boundary-step" aria-labelledby="openai-boundary-title">
-            <div class="step-number">02</div>
+            <div class="step-number">03</div>
             <div>
               <h3 id="openai-boundary-title">Keep the bill and outcome claims separate</h3>
               <p>
@@ -4175,6 +4229,23 @@ body.story-mode .cockpit-grid {
               </p>
             </div>
           </section>
+          </div>
+          <div id="claude-import-fields" hidden>
+            <div class="path-requirements"><strong>What you need</strong><span>A Claude Team/Enterprise spend-report CSV, or complete Messages Usage and Cost Admin API JSON exports. AI Cost Lens never asks for an API key.</span></div>
+            <section class="builder-step"><div class="step-number">02</div><div>
+              <h3>Add a documented Claude export</h3>
+              <p>Team and Enterprise spend reports include user email and account UUID. Those identifiers are discarded before the review is built and never appear in the review, JSON download, Share view, memo, browser storage, console, or errors.</p>
+              <div class="file-pair">
+                <label><span>Team/Enterprise spend CSV</span><input id="claude-spend-file" type="file" accept=".csv,text/csv" /><small id="claude-spend-file-name">Export from Settings → Analytics → How much is Claude costing?</small></label>
+                <label><span>Messages Usage API JSON</span><input id="claude-usage-file" type="file" accept=".json,application/json" /><small id="claude-usage-file-name">Optional when using the spend CSV; otherwise pair with Cost JSON.</small></label>
+                <label><span>Cost API JSON</span><input id="claude-cost-file" type="file" accept=".json,application/json" /><small id="claude-cost-file-name">Required with Messages Usage JSON.</small></label>
+              </div>
+              <div class="field-grid compact-fields"><label><span>Reporting-period start</span><input id="claude-period-start" type="date" /></label><label><span>Reporting-period end</span><input id="claude-period-end" type="date" /></label></div>
+              <p>Claude Console Usage and Cost CSV headers are not published by Anthropic, so those native CSVs are not claimed as supported without an authentic current sample. Export complete Admin API JSON pages yourself; do not paste an Admin API key here.</p>
+              <p>Provider reports count calls, but they do not identify which calls were retries for the same finished result. Add application, gateway, or work-log data only when available.</p>
+            </div></section>
+            <section class="builder-step"><div class="step-number">03</div><div><h3>Confirm the normalized review</h3><div id="claude-confirmation" class="path-requirements" hidden></div><p>Review the provider, period, products, models, totals, missing fields, row count, and identifier-removal confirmation before building the review.</p></div></section>
+          </div>
         </div>
 
         <div class="builder-error" id="builder-error" role="alert"></div>
@@ -4218,6 +4289,11 @@ body.story-mode .cockpit-grid {
     story: false,
     builderMode: null,
     outcomeMode: "sample",
+    importProvider: "openai",
+    pendingClaudeImport: null,
+    uploadRoute: null,
+    pendingMappedImport: null,
+    invoicePdfCandidate: null,
     breakEvenReady: false,
   };
 
@@ -4405,28 +4481,26 @@ body.story-mode .cockpit-grid {
 
   function summarizeSpendRows(spend, period, { allowZeroRequests = false } = {}) {
     const tokenFields = {
-      input_tokens: { total: 0, complete: true, label: "input_tokens" },
-      cached_input_tokens: { total: 0, complete: true, label: "cached_input_tokens" },
-      cache_write_input_tokens: { total: 0, complete: true, label: "cache_write_input_tokens" },
-      output_tokens: { total: 0, complete: true, label: "output_tokens" },
+      input_tokens: { total: 0, supplied: 0, label: "input_tokens", result: "processedInput" },
+      cached_input_tokens: { total: 0, supplied: 0, label: "cached_input_tokens", result: "cachedInput" },
+      cache_write_input_tokens: { total: 0, supplied: 0, label: "cache_write_input_tokens", result: "cacheWriteInput" },
+      output_tokens: { total: 0, supplied: 0, label: "output_tokens", result: "outputTokens" },
     };
     let requests = 0;
-    let requestsComplete = true;
+    let requestsSupplied = 0;
     let providerCost = 0;
 
     spend.forEach((row, index) => {
       const rowNumber = index + 2;
       const rowRequests = optionalNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
-      if (rowRequests === null) requestsComplete = false;
-      else requests += rowRequests;
+      if (rowRequests !== null) { requests += rowRequests; requestsSupplied++; }
       providerCost += costNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
 
       const supplied = {};
       Object.entries(tokenFields).forEach(([field, aggregate]) => {
         const value = optionalNumber(row[field], `Spend ${period} row ${rowNumber} ${aggregate.label}`, { integer: true });
         supplied[field] = value;
-        if (value === null) aggregate.complete = false;
-        else aggregate.total += value;
+        if (value !== null) { aggregate.total += value; aggregate.supplied++; }
       });
 
       if (supplied.input_tokens === null && (supplied.cached_input_tokens !== null || supplied.cache_write_input_tokens !== null)) {
@@ -4442,17 +4516,31 @@ body.story-mode .cockpit-grid {
       }
     });
 
-    if (!allowZeroRequests && requestsComplete && requests === 0) {
+    if (!allowZeroRequests && requestsSupplied === spend.length && requests === 0) {
       throw new Error(`Spend ${period} requests must be greater than zero when supplied.`);
     }
-    const totalOrMissing = (field) => tokenFields[field].complete ? tokenFields[field].total : null;
+    const coverageEntry = (suppliedRows, reportedSubtotal) => ({
+      suppliedRows,
+      totalRows: spend.length,
+      status: suppliedRows === spend.length ? "complete" : suppliedRows ? "partial" : "missing",
+      reportedSubtotal: suppliedRows ? reportedSubtotal : null,
+    });
+    const coverage = { requests: coverageEntry(requestsSupplied, requests) };
+    const reported = { requests: requestsSupplied ? requests : null };
+    Object.values(tokenFields).forEach((aggregate) => {
+      coverage[aggregate.result] = coverageEntry(aggregate.supplied, aggregate.total);
+      reported[aggregate.result] = aggregate.supplied ? aggregate.total : null;
+    });
+    const totalOrMissing = (field) => tokenFields[field].supplied === spend.length ? tokenFields[field].total : null;
     return {
-      requests: requestsComplete ? requests : null,
+      requests: requestsSupplied === spend.length ? requests : null,
       providerCost,
       processedInput: totalOrMissing("input_tokens"),
       cachedInput: totalOrMissing("cached_input_tokens"),
       cacheWriteInput: totalOrMissing("cache_write_input_tokens"),
       outputTokens: totalOrMissing("output_tokens"),
+      reported,
+      coverage,
     };
   }
 
@@ -4479,7 +4567,11 @@ body.story-mode .cockpit-grid {
     if (!workload || spend.some((row) => row.workload.trim() !== workload)) throw new Error("Use one workload or subscription name per single-bill review.");
     if (!/^[A-Z]{3}$/.test(currency) || spend.some((row) => row.currency.trim().toUpperCase() !== currency)) throw new Error("Use one three-letter currency per review.");
     const dates = spend.map((row) => row.date).sort();
-    const period = { start: dates[0], end: dates.at(-1), timezone: "UTC" };
+    const declaredStart = config.serviceStart ? validDate(config.serviceStart, "Service-period start") : null;
+    const declaredEnd = config.serviceEnd ? validDate(config.serviceEnd, "Service-period end") : null;
+    if (Boolean(declaredStart) !== Boolean(declaredEnd)) throw new Error("Supply both service-period dates or leave both blank.");
+    if (declaredStart && declaredEnd < declaredStart) throw new Error("Service-period end cannot be before its start.");
+    const period = { start: declaredStart || dates[0], end: declaredEnd || dates.at(-1), timezone: "UTC" };
     const basis = spendCostBasis(spend, "single bill");
     const totals = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true });
     const hasUsage = spend.some((row) => ["requests", "input_tokens", "output_tokens"].some((field) => row[field].trim() !== ""));
@@ -4581,6 +4673,20 @@ body.story-mode .cockpit-grid {
     };
   }
 
+  function reportedCoverageValue(totals, field) {
+    const coverage = totals.coverage[field];
+    if (coverage.status === "missing") return "Not supplied";
+    const value = compact(totals.reported[field]);
+    return coverage.status === "partial" ? `${value} reported` : value;
+  }
+
+  function reportedCoverageNote(totals, field, completeNote) {
+    const coverage = totals.coverage[field];
+    if (coverage.status === "partial") return `${coverage.suppliedRows} of ${coverage.totalRows} rows supplied this field; the full total is unavailable.`;
+    if (coverage.status === "missing") return "No rows supplied this field; missing values were not treated as zero.";
+    return completeNote;
+  }
+
   function singleBillGuidance(review) {
     const { totals } = review;
     const cost = (value) => money(value, value < 1 ? 4 : 2);
@@ -4609,14 +4715,19 @@ body.story-mode .cockpit-grid {
     if (review.providerUnit === null) {
       const topLabel = topCost?.label || review.workload;
       const topValue = topCostShare === null ? cost(totals.providerCost) : pct(topCostShare, 1);
-      const cacheTitle = cacheShare === null
-        ? "Caching is a question, not a saving"
+      const cacheCoverage = totals.coverage.cachedInput;
+      const cacheTitle = cacheCoverage.status === "partial"
+        ? "Cache-read coverage is incomplete"
+        : cacheShare === null
+          ? "Caching is a question, not a saving"
         : cacheShare
           ? "Cached input is already visible"
           : "No cached input is visible";
-      const cacheValue = cacheShare === null ? "Not supplied" : pct(cacheShare, 1);
-      const cacheNote = cacheShare === null
-        ? "If this workload repeatedly sends the same context, check whether the provider or gateway can report and discount cached input. Do not assume it is available."
+      const cacheValue = cacheCoverage.status === "partial" ? `${compact(totals.reported.cachedInput)} reported` : cacheShare === null ? "Not supplied" : pct(cacheShare, 1);
+      const cacheNote = cacheCoverage.status === "partial"
+        ? `${cacheCoverage.suppliedRows} of ${cacheCoverage.totalRows} rows supplied cache-read tokens. The known subtotal is preserved, but cache share is unavailable.`
+        : cacheShare === null
+          ? "If this workload repeatedly sends the same context, check whether the provider or gateway can report and discount cached input. Do not assume it is available."
         : cacheShare
           ? `${pct(cacheShare, 1)} of processed input was reported as cache reads. Confirm that the billing treatment is actually discounted before calling it a saving.`
           : "If prompts repeatedly send the same long context, test provider-supported caching on one bounded workload and compare the billed result.";
@@ -5356,9 +5467,21 @@ body.story-mode .cockpit-grid {
       "cache_write_input_tokens",
       "output_tokens",
     ];
-    return Object.fromEntries(
-      fields.map((field) => [field, rows.reduce((total, row) => total + row[field], 0)]),
-    );
+    const totals = {};
+    const reportedSubtotals = {};
+    const coverage = {};
+    fields.forEach((field) => {
+      const supplied = rows.filter((row) => row[field] !== null);
+      const subtotal = supplied.length ? supplied.reduce((total, row) => total + row[field], 0) : null;
+      totals[field] = supplied.length === rows.length ? subtotal : null;
+      reportedSubtotals[field] = subtotal;
+      coverage[field] = {
+        supplied_rows: supplied.length,
+        total_rows: rows.length,
+        status: supplied.length === rows.length ? "complete" : supplied.length ? "partial" : "missing",
+      };
+    });
+    return { totals, reportedSubtotals, coverage };
   }
 
   function groupOpenAIUsage(rows, field) {
@@ -5368,21 +5491,30 @@ body.story-mode .cockpit-grid {
       groups.get(row[field]).push(row);
     });
     return [...groups.entries()]
-      .map(([name, values]) => ({ [field]: name, ...openAIUsageTotals(values) }))
-      .sort((a, b) => b.requests - a.requests || String(a[field]).localeCompare(String(b[field])));
+      .map(([name, values]) => {
+        const aggregate = openAIUsageTotals(values);
+        return { [field]: name, ...aggregate.totals, reported_subtotals: aggregate.reportedSubtotals, field_coverage: aggregate.coverage };
+      })
+      .sort((a, b) => (b.reported_subtotals.requests || 0) - (a.reported_subtotals.requests || 0) || String(a[field]).localeCompare(String(b[field])));
   }
+
+  const openAIUsageColumns = [
+    "start_time", "end_time", "project_id", "num_model_requests", "model", "service_tier",
+    "input_tokens", "output_tokens", "input_cached_tokens", "input_cache_write_tokens", "input_uncached_tokens",
+  ];
+  const openAICostColumns = ["start_time", "end_time", "amount_value", "amount_currency", "line_item", "project_id"];
 
   async function buildOpenAIBillReview(usageText, costText) {
     const rawUsage = parseCsv(usageText, "OpenAI usage export");
     const rawCosts = parseCsv(costText, "OpenAI cost export");
     requireColumns(
       rawUsage,
-      ["start_time", "end_time", "project_id", "num_model_requests", "model", "service_tier", "input_tokens", "output_tokens", "input_cached_tokens", "input_cache_write_tokens", "input_uncached_tokens"],
+      openAIUsageColumns,
       "OpenAI usage export",
     );
     requireColumns(
       rawCosts,
-      ["start_time", "end_time", "amount_value", "amount_currency", "line_item", "project_id"],
+      openAICostColumns,
       "OpenAI cost export",
     );
     const usageDates = [...new Set(rawUsage.map((row, index) => openAIBucketDay(row, `Usage row ${index + 2}`)))].sort();
@@ -5390,13 +5522,15 @@ body.story-mode .cockpit-grid {
     const usageRows = rawUsage.flatMap((row, index) => {
       if (![row.num_model_requests, row.model, row.input_tokens, row.output_tokens].some((value) => value)) return [];
       const label = `Usage row ${index + 2}`;
-      const input = finiteNumber(row.input_tokens || 0, `${label} input_tokens`, { integer: true });
-      const cached = finiteNumber(row.input_cached_tokens || 0, `${label} input_cached_tokens`, { integer: true });
-      const cacheWrite = finiteNumber(row.input_cache_write_tokens || 0, `${label} input_cache_write_tokens`, { integer: true });
-      const uncached = row.input_uncached_tokens === ""
+      const optionalUsageNumber = (value, field) => value === "" ? null : finiteNumber(value, `${label} ${field}`, { integer: true });
+      const input = optionalUsageNumber(row.input_tokens, "input_tokens");
+      const cached = optionalUsageNumber(row.input_cached_tokens, "input_cached_tokens");
+      const cacheWrite = optionalUsageNumber(row.input_cache_write_tokens, "input_cache_write_tokens");
+      const suppliedUncached = optionalUsageNumber(row.input_uncached_tokens, "input_uncached_tokens");
+      const uncached = suppliedUncached === null && input !== null && cached !== null && cacheWrite !== null
         ? input - cached - cacheWrite
-        : finiteNumber(row.input_uncached_tokens, `${label} input_uncached_tokens`, { integer: true });
-      if (uncached < 0 || uncached + cached + cacheWrite !== input) {
+        : suppliedUncached;
+      if (input !== null && cached !== null && cacheWrite !== null && uncached !== null && (uncached < 0 || uncached + cached + cacheWrite !== input)) {
         throw new Error(`${label} input token categories do not reconcile to input_tokens.`);
       }
       return [{
@@ -5405,12 +5539,12 @@ body.story-mode .cockpit-grid {
         project: row.project_id || "unattributed",
         api_key: row.api_key_id || "unattributed",
         service_tier: row.service_tier || "unattributed",
-        requests: finiteNumber(row.num_model_requests || 0, `${label} num_model_requests`, { integer: true }),
+        requests: optionalUsageNumber(row.num_model_requests, "num_model_requests"),
         input_tokens: input,
         uncached_input_tokens: uncached,
         cached_input_tokens: cached,
         cache_write_input_tokens: cacheWrite,
-        output_tokens: finiteNumber(row.output_tokens || 0, `${label} output_tokens`, { integer: true }),
+        output_tokens: optionalUsageNumber(row.output_tokens, "output_tokens"),
       }];
     });
     if (!usageRows.length) throw new Error("The OpenAI usage export has no populated usage rows.");
@@ -5440,6 +5574,7 @@ body.story-mode .cockpit-grid {
     ];
     if (!projectJoin) limitations.splice(1, 0, "The saved cost export does not fully attribute cost to projects, so project-level billed cost is unavailable.");
     if (!aligned) limitations.unshift("The usage and cost exports do not cover the same daily buckets.");
+    const usageAggregate = openAIUsageTotals(usageRows);
     return {
       schema_version: "ai-cost-lens-openai-bill-review/0.1",
       provider: "openai",
@@ -5461,7 +5596,9 @@ body.story-mode .cockpit-grid {
       },
       usage: {
         basis: "provider_reported",
-        totals: openAIUsageTotals(usageRows),
+        totals: usageAggregate.totals,
+        reported_subtotals: usageAggregate.reportedSubtotals,
+        field_coverage: usageAggregate.coverage,
         populated_rows: usageRows.length,
         days_with_usage: new Set(usageRows.map((row) => row.date)).size,
         by_model: groupOpenAIUsage(usageRows, "model"),
@@ -5494,6 +5631,429 @@ body.story-mode .cockpit-grid {
         cost_sha256: await sha256(costText),
       },
     };
+  }
+
+  const claudeSpendColumns = [
+    "user_email", "account_uuid", "product", "model", "model_family", "total_requests",
+    "total_prompt_tokens", "total_completion_tokens", "total_net_spend_usd", "total_gross_spend_usd",
+  ];
+
+  function safeImportedLabel(value, label) {
+    const text = String(value || "").trim();
+    if (!text || /^[=+@-]/.test(text) || /<\/?[a-z][^>]*>/i.test(text)) throw new Error(`${label} contains unsupported formula or markup text.`);
+    return text;
+  }
+
+  function rowsToCsv(rows) {
+    const quote = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    return [singleSpendColumns.join(","), ...rows.map((row) => singleSpendColumns.map((column) => quote(row[column])).join(","))].join("\n");
+  }
+
+  function claudePeriod(start, end) {
+    const from = validDate(start, "Claude reporting-period start");
+    const to = validDate(end, "Claude reporting-period end");
+    if (to < from) throw new Error("Claude reporting-period end cannot be before its start.");
+    return { start: from, end: to };
+  }
+
+  async function buildClaudeSpendReview(text, start, end) {
+    const period = claudePeriod(start, end);
+    const parsed = parseCsv(text, "Claude spend report");
+    const raw = parsed.map((source) => {
+      const normalized = {};
+      Object.entries(source).forEach(([header, value]) => {
+        const key = header.trim().toLowerCase().replace(/[\s-]+/g, "_");
+        if (Object.hasOwn(normalized, key)) throw new Error(`Claude spend report has duplicate normalized column ${key}.`);
+        normalized[key] = value;
+      });
+      return normalized;
+    });
+    requireColumns(raw, claudeSpendColumns, "Claude Team/Enterprise spend report");
+    const rows = raw.map((row, index) => {
+      const label = `Claude spend row ${index + 2}`;
+      const product = safeImportedLabel(row.product, `${label} product`);
+      const model = safeImportedLabel(row.model || row.model_family, `${label} model`);
+      const net = costNumber(row.total_net_spend_usd, `${label} total_net_spend_usd`);
+      costNumber(row.total_gross_spend_usd, `${label} total_gross_spend_usd`);
+      const requests = optionalNumber(row.total_requests, `${label} total_requests`, { integer: true });
+      const promptTokens = optionalNumber(row.total_prompt_tokens, `${label} total_prompt_tokens`, { integer: true });
+      const completionTokens = optionalNumber(row.total_completion_tokens, `${label} total_completion_tokens`, { integer: true });
+      return {
+        period: "baseline", date: period.start, workload: "Claude organization spend", provider: "Anthropic",
+        model, route: product, requests: requests === null ? "" : String(requests),
+        input_tokens: promptTokens === null ? "" : String(promptTokens),
+        cached_input_tokens: "", cache_write_input_tokens: "",
+        output_tokens: completionTokens === null ? "" : String(completionTokens),
+        provider_cost: String(net), cost_basis: "provider_reported", currency: "USD",
+      };
+    });
+    const review = await buildSingleBillReview(rowsToCsv(rows), "", { acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", serviceStart: period.start, serviceEnd: period.end, reviewSource: "claude_spend_report" });
+    const summary = summarizeSingleBill(review);
+    return { review, confirmation: {
+      provider: "Anthropic", period, products: [...new Set(rows.map((row) => row.route))], models: [...new Set(rows.map((row) => row.model))],
+      providerCost: summary.totals.providerCost, requests: summary.totals.reported.requests, inputTokens: summary.totals.reported.processedInput,
+      outputTokens: summary.totals.reported.outputTokens, coverage: summary.totals.coverage, missing: ["Cache values", "Retries", "Human effort", "Outcomes"],
+      sourceRows: raw.length, identifiersDiscarded: true,
+    } };
+  }
+
+  function parseClaudeApiJson(text, label) {
+    if (new TextEncoder().encode(text).length > 5 * 1024 * 1024) throw new Error(`${label} exceeds the 5 MiB local file limit.`);
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error(`${label} is not valid JSON.`); }
+    if (!data || !Array.isArray(data.data) || typeof data.has_more !== "boolean") throw new Error(`${label} does not match the published Anthropic Admin API schema.`);
+    if (data.has_more || data.next_page) throw new Error(`${label} is a partial API page. Export every page and combine complete results before review.`);
+    return data;
+  }
+
+  function claudeDailyBucket(bucket, label) {
+    if (!bucket || typeof bucket !== "object" || Array.isArray(bucket)) throw new Error(`${label} is not an object.`);
+    if (typeof bucket.starting_at !== "string" || typeof bucket.ending_at !== "string") throw new Error(`${label} is missing its time boundary.`);
+    const startTime = Date.parse(bucket.starting_at);
+    const endTime = Date.parse(bucket.ending_at);
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime - startTime !== 86400000) throw new Error(`${label} must be one complete daily bucket.`);
+    return validDate(bucket.starting_at.slice(0, 10), `${label} start`);
+  }
+
+  async function buildClaudeApiReview(usageText, costText, start, end) {
+    const period = claudePeriod(start, end);
+    const usage = parseClaudeApiJson(usageText, "Claude Messages Usage JSON");
+    const costs = parseClaudeApiJson(costText, "Claude Cost JSON");
+    const groups = new Map();
+    const add = (date, model) => {
+      const key = `${date}\u0000${model}`;
+      if (!groups.has(key)) groups.set(key, { date, model, cost: 0, input: 0, cached: 0, cacheWrite: 0, output: 0, usage: false });
+      return groups.get(key);
+    };
+    const usageDates = [];
+    usage.data.forEach((bucket, bucketIndex) => {
+      const date = claudeDailyBucket(bucket, `Usage bucket ${bucketIndex + 1}`); usageDates.push(date);
+      if (!Array.isArray(bucket.results)) throw new Error("Claude Messages Usage JSON has an invalid results list.");
+      const seen = new Set();
+      bucket.results.forEach((item, index) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(`Usage result ${index + 1} is not an object.`);
+        const signature = JSON.stringify(item);
+        if (seen.has(signature)) throw new Error(`Usage result ${index + 1} duplicates an earlier result in the same daily bucket.`);
+        seen.add(signature);
+        const model = safeImportedLabel(item.model || "Mixed models", `Usage result ${index + 1} model`);
+        const row = add(date, model); row.usage = true;
+        const uncached = finiteNumber(item.uncached_input_tokens, "uncached_input_tokens", { integer: true });
+        const cached = finiteNumber(item.cache_read_input_tokens, "cache_read_input_tokens", { integer: true });
+        if (!item.cache_creation || typeof item.cache_creation !== "object" || Array.isArray(item.cache_creation)) throw new Error("cache_creation must contain the published cache token fields.");
+        const cacheWrite = finiteNumber(item.cache_creation.ephemeral_1h_input_tokens, "ephemeral_1h_input_tokens", { integer: true }) + finiteNumber(item.cache_creation.ephemeral_5m_input_tokens, "ephemeral_5m_input_tokens", { integer: true });
+        row.input += uncached + cached + cacheWrite;
+        row.cached += cached;
+        row.cacheWrite += cacheWrite;
+        row.output += finiteNumber(item.output_tokens, "output_tokens", { integer: true });
+      });
+    });
+    const costDates = [];
+    costs.data.forEach((bucket, bucketIndex) => {
+      const date = claudeDailyBucket(bucket, `Cost bucket ${bucketIndex + 1}`); costDates.push(date);
+      if (!Array.isArray(bucket.results)) throw new Error("Claude Cost JSON has an invalid results list.");
+      const seen = new Set();
+      bucket.results.forEach((item, index) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(`Cost result ${index + 1} is not an object.`);
+        const signature = JSON.stringify(item);
+        if (seen.has(signature)) throw new Error(`Cost result ${index + 1} duplicates an earlier result in the same daily bucket.`);
+        seen.add(signature);
+        if (item.currency !== "USD") throw new Error(`Cost result ${index + 1} currency must be USD.`);
+        const model = safeImportedLabel(item.model || "Mixed models", `Cost result ${index + 1} model`);
+        add(date, model).cost += costNumber(item.amount, `Cost result ${index + 1} amount`) / 100;
+      });
+    });
+    if (JSON.stringify([...new Set(usageDates)].sort()) !== JSON.stringify([...new Set(costDates)].sort())) throw new Error("PERIOD MISMATCH: Claude usage and cost JSON do not cover the same daily buckets.");
+    const visibleDates = [...new Set(usageDates)].sort();
+    if (visibleDates[0] !== period.start || visibleDates.at(-1) !== period.end) throw new Error("PERIOD MISMATCH: the declared Claude period does not match the exported daily buckets.");
+    const rows = [...groups.values()].map((item) => ({ period: "baseline", date: item.date, workload: "Claude API usage", provider: "Anthropic", model: item.model, route: "Claude API", requests: "", input_tokens: item.usage ? String(item.input) : "", cached_input_tokens: item.usage ? String(item.cached) : "", cache_write_input_tokens: item.usage ? String(item.cacheWrite) : "", output_tokens: item.usage ? String(item.output) : "", provider_cost: String(round(item.cost)), cost_basis: "provider_reported", currency: "USD" }));
+    const review = await buildSingleBillReview(rowsToCsv(rows), "", { acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", serviceStart: period.start, serviceEnd: period.end, reviewSource: "claude_admin_api" });
+    const summary = summarizeSingleBill(review);
+    return { review, confirmation: { provider: "Anthropic", period, products: ["Claude API"], models: [...new Set(rows.map((row) => row.model))], providerCost: summary.totals.providerCost, requests: null, inputTokens: summary.totals.processedInput, outputTokens: summary.totals.outputTokens, missing: ["Request count", "Retries", "Human effort", "Outcomes"], sourceRows: usage.data.length + costs.data.length, identifiersDiscarded: true } };
+  }
+
+  const mappingFields = ["date", "service_end", "provider", "model", "workload", "cost", "currency", "requests", "input", "output", "cache_read", "cache_write"];
+  const mappingAliases = {
+    date: ["date", "invoice_date", "billing_date", "period_start", "service_period_start", "usage_date"],
+    service_end: ["service_end", "period_end", "service_period_end", "billing_period_end"],
+    provider: ["provider", "vendor"],
+    model: ["model", "model_name"],
+    workload: ["workload", "route", "product", "service", "project"],
+    cost: ["provider_cost", "cost", "amount", "net_cost", "total_cost", "spend", "billed_amount"],
+    currency: ["currency", "currency_code", "amount_currency"],
+    requests: ["requests", "request_count", "total_requests", "num_model_requests"],
+    input: ["input_tokens", "prompt_tokens", "total_prompt_tokens"],
+    output: ["output_tokens", "completion_tokens", "total_completion_tokens"],
+    cache_read: ["cached_input_tokens", "cache_read_tokens", "input_cached_tokens"],
+    cache_write: ["cache_write_input_tokens", "cache_write_tokens", "input_cache_write_tokens"],
+  };
+
+  const normalizeHeader = (value) => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+  function identifyingHeader(value) {
+    const header = normalizeHeader(value);
+    return header === "name" || /(?:^|_)(?:email|e_mail|full_name|first_name|last_name|address|street_address|postal_address|account_uuid|user_uuid|account_id|user_id|customer_id|member_id|employee_id|contact_id)(?:_|$)/.test(header);
+  }
+
+  const mappableHeaders = (parsed) => parsed.headers.filter((header) => !identifyingHeader(header));
+
+  function safeMappedLabel(value, label) {
+    const text = safeImportedLabel(value, label);
+    if (/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(text) || /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i.test(text)) {
+      throw new Error(`${label} looks like a personal identifier. Choose a non-identifying provider, model, workload, or route label.`);
+    }
+    return text;
+  }
+
+  function parseFlatStructured(text, filename = "structured file") {
+    if (new TextEncoder().encode(text).length > 5 * 1024 * 1024) throw new Error("The structured file exceeds the 5 MiB local limit.");
+    let rows;
+    if (/\.json$/i.test(filename) || /^\s*[\[{]/.test(text)) {
+      let parsed;
+      try { parsed = JSON.parse(text); } catch { throw new Error("The structured file is not valid JSON."); }
+      rows = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.data) ? parsed.data : parsed && typeof parsed === "object" ? [parsed] : null;
+      if (!rows?.length) throw new Error("The structured JSON needs at least one flat object.");
+      if (rows.length > 20000) throw new Error("The structured file exceeds 20,000 data rows.");
+      rows.forEach((row, index) => {
+        if (!row || typeof row !== "object" || Array.isArray(row) || Object.values(row).some((value) => value !== null && typeof value === "object")) {
+          throw new Error(`Structured JSON row ${index + 1} must be one flat object.`);
+        }
+      });
+      const headers = Object.keys(rows[0]);
+      if (!headers.length || rows.some((row) => Object.keys(row).length !== headers.length || headers.some((header) => !Object.hasOwn(row, header)))) {
+        throw new Error("Every structured JSON row must use the same flat fields.");
+      }
+      const seen = new Set();
+      rows.forEach((row, index) => {
+        const signature = JSON.stringify(headers.map((header) => row[header]));
+        if (seen.has(signature)) throw new Error(`Structured file row ${index + 1} duplicates an earlier row.`);
+        seen.add(signature);
+      });
+    } else {
+      rows = parseCsv(text, "Structured cost file");
+    }
+    const headers = Object.keys(rows[0]);
+    const normalized = headers.map(normalizeHeader);
+    if (new Set(normalized).size !== normalized.length) throw new Error("The structured file has duplicate normalized column names.");
+    return { rows, headers, normalized };
+  }
+
+  function suggestStructuredMapping(parsed) {
+    const allowed = mappableHeaders(parsed);
+    return Object.fromEntries(mappingFields.map((field) => {
+      const matches = allowed.filter((header) => mappingAliases[field].includes(normalizeHeader(header)));
+      return [field, matches.length === 1 ? matches[0] : ""];
+    }));
+  }
+
+  async function buildMappedReview(text, filename, mapping) {
+    const parsed = parseFlatStructured(text, filename);
+    for (const field of mappingFields) {
+      if (mapping[field] && (!parsed.headers.includes(mapping[field]) || identifyingHeader(mapping[field]))) {
+        throw new Error("Identifying source fields cannot be included in a mapped review.");
+      }
+    }
+    for (const required of ["date", "cost"]) {
+      if (!mapping[required] || !parsed.headers.includes(mapping[required])) throw new Error(`Map ${required === "cost" ? "provider-reported cost" : required} before building the review.`);
+    }
+    const currencyConstant = String(mapping.currencyConstant || "").trim().toUpperCase();
+    const providerConstant = String(mapping.providerConstant || "").trim();
+    if (mapping.currency && currencyConstant) throw new Error("Choose either a mapped currency column or one reported currency, not both.");
+    if (!mapping.currency && !currencyConstant) throw new Error("Map currency or enter the three-letter reported currency before building the review.");
+    if (currencyConstant && !/^[A-Z]{3}$/.test(currencyConstant)) throw new Error("Reported currency must be a three-letter code.");
+    if (mapping.provider && providerConstant) throw new Error("Choose either a mapped provider column or one provider name, not both.");
+    const checkedProviderConstant = providerConstant ? safeMappedLabel(providerConstant, "Provider") : "";
+    const read = (row, field) => mapping[field] ? String(row[mapping[field]] ?? "").trim() : "";
+    const normalized = parsed.rows.map((row, index) => {
+      const label = `Mapped row ${index + 2}`;
+      const date = validDate(read(row, "date"), `${label} date`);
+      const serviceEnd = read(row, "service_end");
+      if (serviceEnd) validDate(serviceEnd, `${label} service end`);
+      const cost = costNumber(read(row, "cost"), `${label} provider-reported cost`);
+      const currency = mapping.currency ? read(row, "currency").toUpperCase() : currencyConstant;
+      if (!/^[A-Z]{3}$/.test(currency)) throw new Error(`${label} currency must be a three-letter code.`);
+      const optionalInteger = (field, name) => {
+        const value = read(row, field);
+        return value === "" ? "" : String(finiteNumber(value, `${label} ${name}`, { integer: true }));
+      };
+      return {
+        period: "baseline", date,
+        workload: read(row, "workload") ? safeMappedLabel(read(row, "workload"), `${label} workload`) : "Imported provider bill",
+        provider: read(row, "provider") ? safeMappedLabel(read(row, "provider"), `${label} provider`) : checkedProviderConstant || "Provider not supplied",
+        model: read(row, "model") ? safeMappedLabel(read(row, "model"), `${label} model`) : "",
+        route: read(row, "workload") ? safeMappedLabel(read(row, "workload"), `${label} route`) : "Mapped structured file",
+        requests: optionalInteger("requests", "requests"),
+        input_tokens: optionalInteger("input", "input tokens"),
+        cached_input_tokens: optionalInteger("cache_read", "cache read tokens"),
+        cache_write_input_tokens: optionalInteger("cache_write", "cache write tokens"),
+        output_tokens: optionalInteger("output", "output tokens"),
+        provider_cost: String(cost), cost_basis: "provider_reported", currency,
+        _serviceEnd: serviceEnd,
+      };
+    });
+    const currencies = new Set(normalized.map((row) => row.currency));
+    if (currencies.size !== 1) throw new Error("One bill review cannot mix currencies. Split the file before review; no currency conversion is applied.");
+    const serviceEnds = normalized.map((row) => row._serviceEnd).filter(Boolean);
+    if (serviceEnds.length && serviceEnds.length !== normalized.length) throw new Error("Service-period end is missing from some mapped rows. Complete it for every row or leave it unmapped.");
+    const sourceTotal = normalized.reduce((total, row) => total + Number(row.provider_cost), 0);
+    const csv = rowsToCsv(normalized);
+    const review = await buildSingleBillReview(csv, "", {
+      acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "",
+      serviceStart: serviceEnds.length ? [...normalized.map((row) => row.date)].sort()[0] : "", serviceEnd: serviceEnds.length ? [...serviceEnds].sort().at(-1) : "", reviewSource: "structured_mapping",
+    });
+    const summary = summarizeSingleBill(review);
+    if (Math.abs(summary.totals.providerCost - sourceTotal) > Math.max(0.00001, Math.abs(sourceTotal) * 0.000001)) {
+      throw new Error("The normalized cost total does not reconcile to the mapped source rows.");
+    }
+    return { review, confirmation: {
+      rows: normalized.length, currency: [...currencies][0], sourceTotal: round(sourceTotal), normalizedTotal: round(summary.totals.providerCost),
+      period: summary.period, missing: mappingFields.filter((field) => !mapping[field] && !mapping[`${field}Constant`]), confirmedFieldsOnly: true,
+    } };
+  }
+
+  async function extractPdfText(file, suppliedPdfModule = null) {
+    if (file.size > 5 * 1024 * 1024) throw new Error("The PDF exceeds the 5 MiB local limit. Enter the invoice fields manually.");
+    let pdf = null;
+    try {
+      const pdfjs = suppliedPdfModule || await import("./vendor/pdf.min.mjs");
+      if (!suppliedPdfModule) pdfjs.GlobalWorkerOptions.workerSrc = new URL("vendor/pdf.worker.min.mjs", document.baseURI).href;
+      const options = { data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false, verbosity: 0 };
+      if (!suppliedPdfModule) {
+        options.wasmUrl = new URL("vendor/wasm/", document.baseURI).href;
+        options.standardFontDataUrl = new URL("vendor/standard_fonts/", document.baseURI).href;
+      }
+      const loadingTask = pdfjs.getDocument(options);
+      pdf = await loadingTask.promise;
+      if (pdf.numPages > 20) throw new Error("This invoice has more than 20 pages. Enter the invoice fields manually.");
+      const lines = [];
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const content = await (await pdf.getPage(pageNumber)).getTextContent();
+        const items = content.items.filter((item) => typeof item.str === "string" && item.str.trim()).map((item) => ({ text: item.str.trim(), x: Number(item.transform?.[4] || 0), y: Number(item.transform?.[5] || 0) }));
+        const bands = [];
+        items.sort((a, b) => b.y - a.y || a.x - b.x).forEach((item) => {
+          let band = bands.find((candidate) => Math.abs(candidate.y - item.y) < 2);
+          if (!band) { band = { y: item.y, items: [] }; bands.push(band); }
+          band.items.push(item);
+        });
+        lines.push(...bands.sort((a, b) => b.y - a.y).map((band) => band.items.sort((a, b) => a.x - b.x).map((item) => item.text).join(" ")));
+      }
+      const text = lines.join("\n").trim();
+      if (text.length < 12) throw new Error("No extractable invoice text was found. The PDF may be scanned; enter the invoice fields manually.");
+      return text;
+    } catch (error) {
+      const message = String(error?.message || "");
+      if (/password|encrypted/i.test(`${error?.name || ""} ${message}`)) throw new Error("This PDF is encrypted. Unlock it first or enter the invoice fields manually.");
+      if (/No extractable|more than 20 pages|5 MiB/.test(message)) throw error;
+      throw new Error("This PDF could not be read as a text invoice. It may be malformed or scanned; enter the invoice fields manually.");
+    } finally {
+      if (pdf?.destroy) await pdf.destroy();
+    }
+  }
+
+  function invoiceDate(value) {
+    const raw = String(value).trim().replace(/,$/, "");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return validDate(raw, "Invoice date");
+    const numeric = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    if (numeric) return validDate(`${numeric[3]}-${numeric[1].padStart(2, "0")}-${numeric[2].padStart(2, "0")}`, "Invoice date");
+    const months = { jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12 };
+    const monthFirst = raw.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+    const dayFirst = raw.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+    const match = monthFirst || dayFirst;
+    if (!match) return null;
+    const monthName = (monthFirst ? match[1] : match[2]).toLowerCase();
+    const month = months[monthName];
+    if (!month) return null;
+    const day = monthFirst ? match[2] : match[1];
+    const year = match[3];
+    return validDate(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, "Invoice date");
+  }
+
+  function extractInvoiceCandidate(text) {
+    const providerSignals = [
+      { provider: "OpenAI", matches: /\b(?:openai|chatgpt)\b/i.test(text) },
+      { provider: "Anthropic", matches: /\b(?:anthropic|claude)\b/i.test(text) },
+    ].filter((item) => item.matches);
+    if (providerSignals.length !== 1) return { supported: false, reason: "The invoice provider could not be confirmed as OpenAI or Anthropic. Enter the invoice fields manually." };
+    const lineList = String(text).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const dateFromLabel = (labels) => {
+      for (const line of lineList) {
+        const match = line.match(new RegExp(`^(?:${labels})\\s*:?\\s*(.+)$`, "i"));
+        if (match) { const date = invoiceDate(match[1]); if (date) return date; }
+      }
+      return "";
+    };
+    const periodLine = lineList.find((line) => /(?:service|billing)\s+period/i.test(line)) || "";
+    const periodDates = [...periodLine.matchAll(/(?:\d{4}-\d{2}-\d{2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{4}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4})/gi)].map((match) => invoiceDate(match[0])).filter(Boolean);
+    const amountPattern = /\b(subtotal|tax|credit|amount\s+due|amount\s+paid|prior\s+balance|invoice\s+total|total\s+due|total)\b\s*:?\s*(?:(USD|EUR|GBP|CAD|AUD|US\$)\s*)?([\$€£])?\s*(-?\d[\d,]*(?:\.\d{1,2})?)/i;
+    const amountCandidates = lineList.flatMap((line) => {
+      const match = line.match(amountPattern);
+      if (!match) return [];
+      const currencyToken = (match[2] || match[3] || "").toUpperCase();
+      const currency = currencyToken === "US$" || currencyToken === "USD" ? "USD" : currencyToken === "EUR" || currencyToken === "€" ? "EUR" : currencyToken === "GBP" || currencyToken === "£" ? "GBP" : ["CAD", "AUD"].includes(currencyToken) ? currencyToken : "";
+      const value = Number(match[4].replaceAll(",", ""));
+      if (!Number.isFinite(value)) return [];
+      return [{ label: match[1].replace(/\s+/g, " ").toLowerCase(), value, currency, dollarSymbolNeedsConfirmation: match[3] === "$" && !match[2] }];
+    });
+    const currencies = new Set(amountCandidates.map((item) => item.currency).filter(Boolean));
+    return {
+      supported: true, provider: providerSignals[0].provider,
+      invoiceDate: dateFromLabel("invoice date|date issued|date of issue|issued on|billing date"),
+      serviceStart: periodDates[0] || "", serviceEnd: periodDates[1] || "",
+      currency: currencies.size === 1 ? [...currencies][0] : "",
+      dollarSymbolNeedsConfirmation: amountCandidates.some((item) => item.dollarSymbolNeedsConfirmation),
+      amountCandidates,
+      suggestedAmount: amountCandidates.length === 1 ? amountCandidates[0] : null,
+    };
+  }
+
+  async function inspectUploadedFiles(files) {
+    const selected = [...files];
+    if (!selected.length) throw new Error("Choose a CSV, JSON, or text-based PDF.");
+    if (selected.length > 2) throw new Error("Choose one file, or one matching provider export pair.");
+    const pdfs = selected.filter((file) => /\.pdf$/i.test(file.name) || file.type === "application/pdf");
+    if (pdfs.length) {
+      if (selected.length !== 1) throw new Error("Review one invoice PDF at a time.");
+      return { kind: "pdf", file: pdfs[0] };
+    }
+    const loaded = await Promise.all(selected.map(async (file) => ({ file, text: await readLocalFile(file) })));
+    const csvs = [];
+    const jsons = [];
+    for (const item of loaded) {
+      if (/\.json$/i.test(item.file.name) || /^\s*[\[{]/.test(item.text)) jsons.push(item);
+      else csvs.push({ ...item, parsed: parseFlatStructured(item.text, item.file.name) });
+    }
+    if (csvs.length === 2 && !jsons.length) {
+      const has = (parsed, required) => required.every((column) => parsed.headers.includes(column));
+      const usage = csvs.find((item) => has(item.parsed, openAIUsageColumns));
+      const cost = csvs.find((item) => has(item.parsed, openAICostColumns));
+      if (usage && cost && usage !== cost) return { kind: "openai", usageText: usage.text, costText: cost.text };
+      throw new Error("These two CSV files are not a recognized matching OpenAI export pair. Choose one unknown structured file at a time for guided mapping.");
+    }
+    if (jsons.length === 2 && !csvs.length) {
+      const parsed = jsons.map((item) => {
+        let value; try { value = JSON.parse(item.text); } catch { throw new Error("One selected JSON file is malformed."); }
+        const results = value?.data?.flatMap((bucket) => Array.isArray(bucket?.results) ? bucket.results : []) || [];
+        return { ...item, value, usage: results.some((row) => Object.hasOwn(row, "uncached_input_tokens")), cost: results.some((row) => Object.hasOwn(row, "amount")) };
+      });
+      const usage = parsed.find((item) => item.usage && !item.cost);
+      const cost = parsed.find((item) => item.cost && !item.usage);
+      if (usage && cost) return { kind: "claude_api", usageText: usage.text, costText: cost.text };
+      throw new Error("These JSON files are not a complete Claude Messages Usage and Cost report pair.");
+    }
+    if (loaded.length !== 1) throw new Error("Choose one structured file, or one recognized matching provider pair.");
+    if (csvs.length) {
+      const item = csvs[0];
+      const normalized = new Set(item.parsed.normalized);
+      if (claudeSpendColumns.every((column) => normalized.has(column))) return { kind: "claude_spend", text: item.text };
+      if (singleSpendColumns.every((column) => item.parsed.headers.includes(column))) {
+        if (item.parsed.rows.some((row) => String(row.period).toLowerCase() !== "baseline")) {
+          throw new Error("This universal file contains a route comparison. Use Compare two routes so the existing evidence gates remain in force.");
+        }
+        return { kind: "universal", text: item.text };
+      }
+      return { kind: "mapping", text: item.text, filename: item.file.name, parsed: item.parsed, mappableHeaders: mappableHeaders(item.parsed), mapping: suggestStructuredMapping(item.parsed) };
+    }
+    const parsed = parseFlatStructured(jsons[0].text, jsons[0].file.name);
+    return { kind: "mapping", text: jsons[0].text, filename: jsons[0].file.name, parsed, mappableHeaders: mappableHeaders(parsed), mapping: suggestStructuredMapping(parsed) };
   }
 
   function validateResult(data) {
@@ -5540,7 +6100,8 @@ body.story-mode .cockpit-grid {
       return data;
     }
     if (data?.schema_version === "ai-cost-lens-openai-bill-review/0.1") {
-      const usage = fields("requests input_tokens uncached_input_tokens cached_input_tokens cache_write_input_tokens output_tokens");
+      const usageFieldNames = "requests input_tokens uncached_input_tokens cached_input_tokens cache_write_input_tokens output_tokens".split(" ");
+      const usage = fields(usageFieldNames.join(" "), "number?");
       shape(data, {
         provider: "string", finding: "string", next_step: "string", limitations: ["string"],
         bill: { basis: "string", currency: "string", total: "number", ...fields("populated_rows days_with_cost") },
@@ -5551,6 +6112,21 @@ body.story-mode .cockpit-grid {
         source: { usage_export: "string", cost_export: "string", usage_sha256: "string?", cost_sha256: "string?" },
       });
       currency(data.bill.currency);
+      const validateUsageCoverage = (totals, reportedSubtotals, coverage, path) => {
+        if (coverage === undefined) return;
+        usageFieldNames.forEach((field) => {
+          shape(coverage[field], { supplied_rows: "number", total_rows: "number", status: "string" }, `${path}.${field}`);
+          const item = coverage[field];
+          if (!Number.isInteger(item.supplied_rows) || !Number.isInteger(item.total_rows) || item.total_rows < 1 || item.supplied_rows < 0 || item.supplied_rows > item.total_rows) fail(`${path}.${field}`);
+          const expected = item.supplied_rows === item.total_rows ? "complete" : item.supplied_rows ? "partial" : "missing";
+          const reported = reportedSubtotals?.[field];
+          if (item.status !== expected || (item.status === "complete") !== (totals[field] !== null) || (item.status === "missing") !== (reported === null)) fail(`${path}.${field}`);
+          if (reported !== null && (typeof reported !== "number" || !Number.isFinite(reported))) fail(`${path}.${field}`);
+        });
+      };
+      validateUsageCoverage(data.usage.totals, data.usage.reported_subtotals, data.usage.field_coverage, "usage.field_coverage");
+      data.usage.by_model.forEach((row, index) => validateUsageCoverage(row, row.reported_subtotals, row.field_coverage, `usage.by_model[${index}].field_coverage`));
+      data.usage.by_project.forEach((row, index) => validateUsageCoverage(row, row.reported_subtotals, row.field_coverage, `usage.by_project[${index}].field_coverage`));
       if (!data.limitations.length || data.bill.total < 0 || data.provider !== "openai" || data.reconciliation.savings_claim_allowed || data.reconciliation.model_cost_allocation_supported || data.reconciliation.outcome_cost_supported) fail("bill evidence boundary");
       return;
     }
@@ -6391,6 +6967,8 @@ body.story-mode .cockpit-grid {
     const stage = singleBillStage(review);
     const guidance = singleBillGuidance(review);
     const count = (value) => value === null ? "Not supplied" : compact(value);
+    const reported = (field) => reportedCoverageValue(totals, field);
+    const coverageNote = (field, completeNote) => reportedCoverageNote(totals, field, completeNote);
     const cost = (value) => value === null ? "Unavailable" : money(value, value < 1 ? 4 : 2);
     const costPerRequest = totals.requests ? totals.providerCost / totals.requests : null;
     const cacheShare = totals.processedInput && totals.cachedInput !== null ? totals.cachedInput / totals.processedInput : null;
@@ -6411,27 +6989,32 @@ body.story-mode .cockpit-grid {
       : stage.key === "usage"
         ? [
             [costBasisLabel(review.basis), cost(totals.providerCost), "The declared cost for this workload and period"],
-            ["Requests", count(totals.requests), "Includes additional attempts when reported"],
+            ["Requests", reported("requests"), coverageNote("requests", "Includes additional attempts when reported")],
             ["Blended cost per request", cost(costPerRequest), "Provider cost divided by supplied requests; not a model price"],
-            ["Input tokens", count(totals.processedInput), `Cache read: ${count(totals.cachedInput)} · Cache write: ${count(totals.cacheWriteInput)}`],
-            ["Output tokens", count(totals.outputTokens), "Unknown fields are not zero"],
+            ["Input tokens", reported("processedInput"), coverageNote("processedInput", `Cache read: ${reported("cachedInput")} · Cache write: ${reported("cacheWriteInput")}`)],
+            ["Output tokens", reported("outputTokens"), coverageNote("outputTokens", "Unknown fields are not zero")],
             ["Cache-read share", cacheShare === null ? "Not supplied" : pct(cacheShare, 1), "Use only the cache fields reported by the source"],
             ["Outcome economics", "Optional", "Add results only when you need to test value or a route change"],
             ["Human effort", "Optional", "Add only when people actively review or correct the output"],
           ]
         : [
             [costBasisLabel(review.basis), cost(totals.providerCost), "The declared cost for this workload and period"],
-            ["Requests", count(totals.requests), "Includes additional attempts when reported"],
+            ["Requests", reported("requests"), coverageNote("requests", "Includes additional attempts when reported")],
             ["Ready results", count(review.ready), `${review.completed} outcome rows under the declared ready rule`],
             ["Provider cost per ready result", cost(review.providerUnit), "Excludes shared infrastructure and human effort"],
             ["Full operating cost per ready result", review.fullUnit === null ? "Optional" : cost(review.fullUnit), "Available only when relevant human and shared costs are supplied"],
             ["Retries", count(review.retries), "Optional; missing retry records do not block the unit cost"],
             ["Human minutes", count(review.minutes), "Optional; include only active review and correction time"],
-            ["Cache-read share", cacheShare === null ? "Not supplied" : pct(cacheShare, 1), "Use only the cache fields reported by the source"],
+            ["Cache-read share", cacheShare === null ? "Not supplied" : pct(cacheShare, 1), cacheShare === null && ["partial", "missing"].includes(totals.coverage.cachedInput.status) ? reportedCoverageNote(totals, "cachedInput", "Use only the cache fields reported by the source") : "Use only the cache fields reported by the source"],
           ];
     document.getElementById("bill-review-kicker").textContent = stage.kicker;
     document.getElementById("bill-review-title").textContent = stage.title;
-    document.getElementById("bill-source-title").textContent = "Your completed universal template";
+    const sourceTitles = {
+      invoice_form: "Your invoice details",
+      claude_spend_report: "Your Claude Team or Enterprise spend report",
+      claude_admin_api: "Your saved Claude Admin API reports",
+    };
+    document.getElementById("bill-source-title").textContent = sourceTitles[state.data.config.reviewSource] || "Your completed universal template";
     document.getElementById("bill-source-copy").textContent = "Start with the records you already have. Each additional layer deepens the review without replacing the bill.";
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · supplied date buckets, not proof of service-period coverage`;
     document.getElementById("bill-mode-tag").textContent = stage.tag;
@@ -6447,7 +7030,7 @@ body.story-mode .cockpit-grid {
     document.getElementById("model-mix-title").textContent = "Declared bill drivers and available usage";
     document.getElementById("bill-mix-note").textContent = `Amounts use ${costBasisLabel(review.basis).toLowerCase()}. This is the supplied attribution, not an inferred allocation or savings estimate. Cache values are token counts.`;
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Provider / model / route</th><th>Requests</th><th>Input / output</th><th>Cache read / write</th><th>Cost basis</th><th>Declared cost</th></tr>";
-    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${count(row.requests)}</td><td>${count(row.processedInput)} / ${count(row.outputTokens)}</td><td>${count(row.cachedInput)} / ${count(row.cacheWriteInput)}</td><td>${escapeHtml(costBasisLabel(review.basis))}</td><td>${cost(row.providerCost)}</td></tr>`).join("");
+    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${escapeHtml(reportedCoverageValue(row, "requests"))}</td><td>${escapeHtml(reportedCoverageValue(row, "processedInput"))} / ${escapeHtml(reportedCoverageValue(row, "outputTokens"))}</td><td>${escapeHtml(reportedCoverageValue(row, "cachedInput"))} / ${escapeHtml(reportedCoverageValue(row, "cacheWriteInput"))}</td><td>${escapeHtml(costBasisLabel(review.basis))}</td><td>${cost(row.providerCost)}</td></tr>`).join("");
     document.getElementById("bill-opportunity-ledger").innerHTML = guidance.map(([kind, label, title, value, note]) => `<article class="opportunity-row state-${kind}"><span class="opportunity-state">${escapeHtml(label)}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(note)}</p></div><em>${escapeHtml(value)}</em></article>`).join("");
     document.getElementById("bill-next-step").textContent = stage.key === "bill"
       ? "Keep this baseline. Add the next piece of data only when it answers a real decision."
@@ -6474,6 +7057,28 @@ body.story-mode .cockpit-grid {
     document.getElementById("memo-footer-status").textContent = "Calculated locally from supplied records · no AI API";
   }
 
+  function openAIFieldCoverage(usage, field) {
+    return usage.field_coverage?.[field] || {
+      supplied_rows: usage.totals[field] === null ? 0 : usage.populated_rows,
+      total_rows: usage.populated_rows,
+      status: usage.totals[field] === null ? "missing" : "complete",
+    };
+  }
+
+  function openAIReportedValue(usage, field) {
+    const coverage = openAIFieldCoverage(usage, field);
+    if (coverage.status === "missing") return "Not supplied";
+    const value = compact(usage.reported_subtotals?.[field] ?? usage.totals[field]);
+    return coverage.status === "partial" ? `${value} reported` : value;
+  }
+
+  function openAICoverageNote(usage, field, completeNote) {
+    const coverage = openAIFieldCoverage(usage, field);
+    if (coverage.status === "partial") return `${coverage.supplied_rows} of ${coverage.total_rows} rows supplied this field; the full total is unavailable.`;
+    if (coverage.status === "missing") return "No rows supplied this field; missing values were not treated as zero.";
+    return completeNote;
+  }
+
   function renderOpenAIBill() {
     document.getElementById("bill-review-kicker").textContent = "WALK · EXPLAIN THE USAGE";
     document.getElementById("bill-review-title").textContent = "Where is the AI cost going?";
@@ -6483,13 +7088,17 @@ body.story-mode .cockpit-grid {
     document.getElementById("bill-mix-note").textContent = "These are observed usage measures. They are not billed dollars by model.";
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Model</th><th>Requests</th><th>Input</th><th>Output</th><th>Cache share</th><th>Billed cost</th></tr>";
     const { bill, usage, period, reconciliation, limitations } = state.data;
-    const totalInput = usage.totals.input_tokens;
-    const cacheShare = totalInput ? usage.totals.cached_input_tokens / totalInput : 0;
-    const costPerRequest = period.aligned && usage.totals.requests ? Number(bill.total) / usage.totals.requests : null;
-    const averageInput = usage.totals.requests ? totalInput / usage.totals.requests : null;
-    const averageOutput = usage.totals.requests ? usage.totals.output_tokens / usage.totals.requests : null;
+    const completeValue = (field) => openAIFieldCoverage(usage, field).status === "complete" ? usage.totals[field] : null;
+    const requests = completeValue("requests");
+    const totalInput = completeValue("input_tokens");
+    const cachedInput = completeValue("cached_input_tokens");
+    const outputTokens = completeValue("output_tokens");
+    const cacheShare = totalInput && cachedInput !== null ? cachedInput / totalInput : null;
+    const costPerRequest = period.aligned && requests ? Number(bill.total) / requests : null;
+    const averageInput = requests && totalInput !== null ? totalInput / requests : null;
+    const averageOutput = requests && outputTokens !== null ? outputTokens / requests : null;
     const topModel = usage.by_model[0];
-    const topRequestShare = topModel && usage.totals.requests ? topModel.requests / usage.totals.requests : null;
+    const topRequestShare = topModel && requests ? topModel.requests / requests : null;
     const costPerRequestLabel = costPerRequest === null ? "Unavailable" : money(costPerRequest, costPerRequest < 1 ? 4 : 2);
     const topRequestShareLabel = topRequestShare === null ? "Unavailable" : pct(topRequestShare, 1);
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
@@ -6497,17 +7106,21 @@ body.story-mode .cockpit-grid {
     document.getElementById("bill-finding-title").textContent =
       period.aligned
         ? costPerRequest === null
-          ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. No nonzero request volume was supplied for a blended unit cost.`
-          : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(usage.totals.requests)} requests, or ${costPerRequestLabel} per observed request.`
+          ? openAIFieldCoverage(usage, "requests").status === "partial"
+            ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. ${openAIReportedValue(usage, "requests")} are visible, but the complete request total is unavailable.`
+            : openAIFieldCoverage(usage, "requests").status === "missing"
+              ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. Request volume was not supplied.`
+              : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. No requests were recorded, so blended cost per request is unavailable.`
+          : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(requests)} requests, or ${costPerRequestLabel} per observed request.`
         : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} in the cost export. Usage covers different daily buckets; these totals are not a matched financial review.`;
     document.getElementById("bill-finding-limit").textContent = period.aligned ? `This is a useful cost and usage baseline. ${limitations[0]} Human effort is not required for this review.`
       : "PERIOD MISMATCH: usage and cost exports cover different daily buckets. Export the same date range again before using this review for a financial decision.";
     const metrics = [
       ["Provider reported cost", money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2), `${bill.populated_rows} populated cost row${bill.populated_rows === 1 ? "" : "s"}`],
-      ["Requests", compact(usage.totals.requests), `${usage.by_model.length} model${usage.by_model.length === 1 ? "" : "s"} observed`],
-      ["Blended cost per request", costPerRequestLabel, "Full exported cost divided by observed requests; not a model price"],
-      ["Input tokens", compact(totalInput), `${pct(cacheShare, 1)} read from cache`],
-      ["Output tokens", compact(usage.totals.output_tokens), `${usage.days_with_usage} day${usage.days_with_usage === 1 ? "" : "s"} with usage`],
+      ["Requests", openAIReportedValue(usage, "requests"), openAICoverageNote(usage, "requests", `${usage.by_model.length} model${usage.by_model.length === 1 ? "" : "s"} observed`)],
+      ["Blended cost per request", costPerRequestLabel, costPerRequest === null ? "Available only when every usage row supplies requests and the total is greater than zero" : "Full exported cost divided by observed requests; not a model price"],
+      ["Input tokens", openAIReportedValue(usage, "input_tokens"), openAICoverageNote(usage, "input_tokens", cacheShare === null ? "Cache share is unavailable" : `${pct(cacheShare, 1)} read from cache`)],
+      ["Output tokens", openAIReportedValue(usage, "output_tokens"), openAICoverageNote(usage, "output_tokens", `${usage.days_with_usage} day${usage.days_with_usage === 1 ? "" : "s"} with usage`)],
       ["Average input per request", averageInput === null ? "Unavailable" : compact(averageInput), "A prompt-size baseline for this exported period"],
       ["Average output per request", averageOutput === null ? "Unavailable" : compact(averageOutput), "An output-length baseline for this exported period"],
       ["Human effort", "Optional", "Add only when people actively review or correct the output"],
@@ -6516,20 +7129,27 @@ body.story-mode .cockpit-grid {
       <div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>
     `).join("");
     document.getElementById("bill-model-rows").innerHTML = usage.by_model.map((row) => {
-      const share = row.input_tokens ? row.cached_input_tokens / row.input_tokens : 0;
+      const rowUsage = { totals: row, reported_subtotals: row.reported_subtotals, populated_rows: row.field_coverage?.input_tokens?.total_rows || 1, field_coverage: row.field_coverage };
+      const rowInput = openAIFieldCoverage(rowUsage, "input_tokens").status === "complete" ? row.input_tokens : null;
+      const rowCached = openAIFieldCoverage(rowUsage, "cached_input_tokens").status === "complete" ? row.cached_input_tokens : null;
+      const share = rowInput && rowCached !== null ? rowCached / rowInput : null;
       return `<tr>
         <td>${escapeHtml(row.model)}</td>
-        <td>${compact(row.requests)}</td>
-        <td>${compact(row.input_tokens)}</td>
-        <td>${compact(row.output_tokens)}</td>
-        <td>${pct(share, 1)}</td>
+        <td>${escapeHtml(openAIReportedValue(rowUsage, "requests"))}</td>
+        <td>${escapeHtml(openAIReportedValue(rowUsage, "input_tokens"))}</td>
+        <td>${escapeHtml(openAIReportedValue(rowUsage, "output_tokens"))}</td>
+        <td>${share === null ? "Unavailable" : pct(share, 1)}</td>
         <td class="unavailable">Unavailable</td>
       </tr>`;
     }).join("");
+    const requestCoverage = openAIFieldCoverage(usage, "requests");
+    const requestStart = requestCoverage.status === "complete" && requests
+      ? ["save", "START HERE", `Most requests went to ${topModel.model}`, topRequestShareLabel, `${topModel.model} handled ${compact(topModel.requests)} of ${compact(requests)} requests. Start with the busiest visible route before smaller ones.`]
+      : ["test", "CHECK FIRST", "Complete the request count", openAIReportedValue(usage, "requests"), openAICoverageNote(usage, "requests", "No requests were recorded for this period; request-based metrics remain unavailable.")];
     const ledger = period.aligned ? [
-      ["save", "START HERE", `Most requests went to ${topModel.model}`, topRequestShareLabel, `${topModel.model} handled ${compact(topModel.requests)} of ${compact(usage.totals.requests)} requests. Start with the busiest visible route before smaller ones.`],
+      requestStart,
       ["test", "UNIT COST", costPerRequest === null ? "Request unit cost is unavailable" : "Use the blended request cost as a baseline", costPerRequestLabel, costPerRequest === null ? "The export has no nonzero request volume. Keep the unit cost unavailable rather than dividing by zero." : "This is the full exported cost divided by observed requests. Track it over time, but do not treat it as a billed model rate."],
-      ["test", "CHECK NEXT", cacheShare ? "Cached input is already visible" : "Check whether repeated context can be cached", pct(cacheShare, 1), cacheShare ? `${pct(cacheShare, 1)} of input tokens were read from cache. Confirm the provider's billed treatment before calling it a saving.` : "If this workload repeatedly sends the same context, test provider-supported caching on one bounded job and compare the actual bill."],
+      ["test", "CHECK NEXT", cacheShare ? "Cached input is already visible" : "Check whether repeated context can be cached", cacheShare === null ? "Unavailable" : pct(cacheShare, 1), cacheShare ? `${pct(cacheShare, 1)} of input tokens were read from cache. Confirm the provider's billed treatment before calling it a saving.` : cacheShare === null ? "Cache share needs complete input and cache-read coverage. Known partial values remain visible above." : "If this workload repeatedly sends the same long context, test provider-supported caching on one bounded job and compare the actual bill."],
       ["test", "TEST FIRST", "Try a cheaper route on one repeatable job", "Bounded test", "Keep the job and quality rule fixed. Outcomes can be a small sample first; human effort is optional unless people actually review the work."],
       ["leave", "LEAVE ALONE", "Do not spread the total bill across models", "Unsupported", "Token share shows usage. The saved cost export does not support billed dollars by model."],
     ] : [
@@ -6545,7 +7165,7 @@ body.story-mode .cockpit-grid {
     `).join("");
     document.getElementById("bill-next-step").textContent = period.aligned
       ? topRequestShare === null
-        ? `Start with ${topModel.model}, the busiest visible route in this export.`
+        ? requestCoverage.status === "complete" ? `Start with ${topModel.model}, the busiest visible route in this export.` : "Complete the request coverage before using request volume to prioritize a route."
         : `Start with ${topModel.model}, the route handling ${topRequestShareLabel} of requests.`
       : "Export matching usage and cost periods before investigating optimization.";
     document.getElementById("bill-boundary-copy").textContent = period.aligned
@@ -6573,12 +7193,16 @@ body.story-mode .cockpit-grid {
     if (isBill) {
       const { bill, usage, period, reconciliation, limitations } = state.data;
       const total = Number(bill.total);
-      const requests = usage.totals.requests;
+      const completeValue = (field) => openAIFieldCoverage(usage, field).status === "complete" ? usage.totals[field] : null;
+      const requests = completeValue("requests");
       const costPerRequest = period.aligned && requests ? total / requests : null;
       const costPerRequestLabel = costPerRequest === null ? "Unavailable" : money(costPerRequest, costPerRequest < 1 ? 4 : 2);
-      const averageInput = requests ? usage.totals.input_tokens / requests : null;
-      const averageOutput = requests ? usage.totals.output_tokens / requests : null;
-      const cacheShare = usage.totals.input_tokens ? usage.totals.cached_input_tokens / usage.totals.input_tokens : 0;
+      const inputTokens = completeValue("input_tokens");
+      const outputTokens = completeValue("output_tokens");
+      const cachedInput = completeValue("cached_input_tokens");
+      const averageInput = requests && inputTokens !== null ? inputTokens / requests : null;
+      const averageOutput = requests && outputTokens !== null ? outputTokens / requests : null;
+      const cacheShare = inputTokens && cachedInput !== null ? cachedInput / inputTokens : null;
       const topModel = usage.by_model[0];
       const topRequestShare = topModel && requests ? topModel.requests / requests : null;
       document.getElementById("memo-title").textContent = "OpenAI bill review";
@@ -6595,13 +7219,13 @@ body.story-mode .cockpit-grid {
       document.getElementById("memo-table-head").innerHTML = "<tr><th>Measure</th><th>Observed</th><th>What it proves</th></tr>";
       const billRows = [
         ["Provider reported cost", money(total, total < 1 ? 4 : 2), "The organization total for the exported period"],
-        ["Requests", compact(requests), "Observed request volume"],
-        ["Blended cost per request", costPerRequestLabel, "Full exported cost divided by observed requests; not a billed model rate"],
-        ["Input tokens", compact(usage.totals.input_tokens), "Observed input usage, including cached input"],
-        ["Output tokens", compact(usage.totals.output_tokens), "Observed output usage"],
+        ["Requests", openAIReportedValue(usage, "requests"), openAICoverageNote(usage, "requests", "Observed request volume")],
+        ["Blended cost per request", costPerRequestLabel, costPerRequest === null ? "Unavailable until request coverage is complete and greater than zero" : "Full exported cost divided by observed requests; not a billed model rate"],
+        ["Input tokens", openAIReportedValue(usage, "input_tokens"), openAICoverageNote(usage, "input_tokens", "Observed input usage, including cached input")],
+        ["Output tokens", openAIReportedValue(usage, "output_tokens"), openAICoverageNote(usage, "output_tokens", "Observed output usage")],
         ["Average input per request", averageInput === null ? "Unavailable" : compact(averageInput), "Prompt-size baseline for the exported period"],
         ["Average output per request", averageOutput === null ? "Unavailable" : compact(averageOutput), "Output-length baseline for the exported period"],
-        ["Cache-read share", pct(cacheShare, 1), "Share of input tokens read from cache"],
+        ["Cache-read share", cacheShare === null ? "Unavailable" : pct(cacheShare, 1), cacheShare === null ? "Requires complete input and cache-read coverage" : "Share of input tokens read from cache"],
       ];
       document.getElementById("memo-table-body").innerHTML = billRows.map(([label, value, meaning]) =>
         `<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td><td>${escapeHtml(meaning)}</td></tr>`,
@@ -6622,7 +7246,7 @@ body.story-mode .cockpit-grid {
       document.getElementById("memo-next-step").textContent = period.aligned
         ? topModel
           ? topRequestShare === null
-            ? `Start with ${topModel.model}, the busiest visible route, and test one bounded change.`
+            ? openAIFieldCoverage(usage, "requests").status === "complete" ? `Start with ${topModel.model}, the busiest visible route, and test one bounded change.` : "Complete request coverage before using request volume to prioritize a route."
             : `Start with ${topModel.model}, which handled ${pct(topRequestShare, 1)} of requests, and test one bounded change.`
           : "Choose one repeatable workload and establish its request and token baseline."
         : "Export matching usage and cost periods before investigating optimization.";
@@ -6768,7 +7392,7 @@ body.story-mode .cockpit-grid {
   const reviewDialog = document.getElementById("review-dialog");
   const builderForm = document.getElementById("review-builder");
   const filenameDefaults = new Map(
-    ["spend-file-name", "work-file-name", "openai-usage-file-name", "openai-cost-file-name"]
+    ["spend-file-name", "work-file-name", "openai-usage-file-name", "openai-cost-file-name", "claude-spend-file-name", "claude-usage-file-name", "claude-cost-file-name"]
       .map((id) => [id, document.getElementById(id).textContent]),
   );
 
@@ -6778,6 +7402,8 @@ body.story-mode .cockpit-grid {
         input.disabled = state.builderMode !== mode;
       });
     }
+    document.getElementById("openai-import-fields").querySelectorAll("input").forEach((input) => { input.disabled = state.builderMode !== "openai" || state.importProvider !== "openai"; });
+    document.getElementById("claude-import-fields").querySelectorAll("input").forEach((input) => { input.disabled = state.builderMode !== "openai" || state.importProvider !== "claude"; });
     for (const [id, mode] of [["sample-outcome-fields", "sample"], ["detailed-outcome-fields", "detailed"]]) {
       document.getElementById(id).querySelectorAll("input, select, textarea").forEach((input) => {
         input.disabled = state.builderMode !== "workload" || state.outcomeMode !== mode;
@@ -6796,7 +7422,25 @@ body.story-mode .cockpit-grid {
     error.classList.remove("visible");
     state.builderMode = null;
     state.outcomeMode = "sample";
-    document.querySelectorAll(".outcome-mode").forEach((item) => {
+    state.importProvider = "openai";
+    state.pendingClaudeImport = null;
+    state.uploadRoute = null;
+    state.pendingMappedImport = null;
+    state.invoicePdfCandidate = null;
+    document.getElementById("smart-upload-file-status").textContent = "Files are inspected only in this browser.";
+    document.getElementById("smart-upload-status").textContent = "";
+    document.getElementById("smart-upload-status").hidden = true;
+    document.getElementById("structured-mapper").hidden = true;
+    document.getElementById("mapping-preview").textContent = "";
+    document.getElementById("invoice-pdf-status").textContent = "";
+    document.getElementById("invoice-pdf-status").hidden = true;
+    document.getElementById("invoice-amount-choice-label").hidden = true;
+    document.getElementById("invoice-amount-choice").innerHTML = '<option value="">Review the invoice totals</option>';
+    document.querySelectorAll(".import-provider").forEach((item) => { const active = item.dataset.importProvider === "openai"; item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active)); });
+    document.getElementById("openai-import-fields").hidden = false;
+    document.getElementById("claude-import-fields").hidden = true;
+    document.getElementById("claude-confirmation").hidden = true;
+    document.querySelectorAll("[data-outcome-mode]").forEach((item) => {
       const active = item.dataset.outcomeMode === "sample";
       item.classList.toggle("active", active);
       item.setAttribute("aria-pressed", String(active));
@@ -6816,6 +7460,35 @@ body.story-mode .cockpit-grid {
     syncBuilderControls();
   }
 
+  function activateBuilderMode(mode, button = null) {
+    state.builderMode = mode;
+    if (mode === "example") {
+      if (!state.demoData) { showToast("The worked example is still loading. Try again in a moment."); return; }
+      state.data = cloneData(state.demoData);
+      state.view = "review";
+      state.story = false;
+      document.body.classList.remove("story-mode");
+      document.getElementById("story-toggle").textContent = "Share view";
+      renderAll(); setView("review"); reviewDialog.close(); showToast("Worked example open. No files needed."); return;
+    }
+    document.querySelectorAll(".builder-mode").forEach((item) => {
+      const active = button ? item === button : item.dataset.builderMode === mode;
+      item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active));
+    });
+    const isOpenAI = mode === "openai";
+    const isSingle = mode === "single";
+    document.getElementById("single-builder-fields").hidden = !isSingle;
+    document.getElementById("workload-builder-fields").hidden = isOpenAI || isSingle;
+    document.getElementById("openai-builder-fields").hidden = !isOpenAI;
+    document.getElementById("builder-actions").hidden = false;
+    document.getElementById("builder-path-help").hidden = true;
+    document.getElementById("review-dialog-title").textContent = isSingle ? "Start with the records you already have." : isOpenAI ? "See what is driving the provider bill." : "Test whether the proposed change is actually cheaper.";
+    document.getElementById("builder-action-note").textContent = isSingle ? "Cost is enough to start. Usage and outcomes deepen the review when available; human effort and retries are optional." : isOpenAI ? "The result will show a useful cost and usage baseline without requiring outcome or human-review data." : state.outcomeMode === "sample" ? "The quick path produces a sampled estimate. It never becomes booked savings." : "Use the detailed log when you have one row per completed result.";
+    document.getElementById("build-review").textContent = isSingle ? "Understand this bill" : isOpenAI ? "Review the provider export" : "Build the finance review";
+    document.getElementById("builder-error").classList.remove("visible");
+    syncBuilderControls();
+  }
+
   document.getElementById("start-review").addEventListener("click", () => {
     document.getElementById("builder-error").classList.remove("visible");
     resetBuilderStart();
@@ -6827,54 +7500,28 @@ body.story-mode .cockpit-grid {
   });
 
   document.querySelectorAll(".builder-mode").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.builderMode = button.dataset.builderMode;
-      if (state.builderMode === "example") {
-        if (!state.demoData) {
-          showToast("The worked example is still loading. Try again in a moment.");
-          return;
-        }
-        state.data = cloneData(state.demoData);
-        state.view = "review";
-        state.story = false;
-        document.body.classList.remove("story-mode");
-        document.getElementById("story-toggle").textContent = "Share view";
-        renderAll();
-        setView("review");
-        reviewDialog.close();
-        showToast("Worked example open. No files needed.");
-        return;
-      }
-      document.querySelectorAll(".builder-mode").forEach((item) => {
-        const active = item === button;
-        item.classList.toggle("active", active);
-        item.setAttribute("aria-pressed", String(active));
-      });
-      const isOpenAI = state.builderMode === "openai";
-      const isSingle = state.builderMode === "single";
-      document.getElementById("single-builder-fields").hidden = !isSingle;
-      document.getElementById("workload-builder-fields").hidden = isOpenAI || isSingle;
-      document.getElementById("openai-builder-fields").hidden = !isOpenAI;
-      document.getElementById("builder-actions").hidden = false;
-      document.getElementById("builder-path-help").hidden = true;
-      document.getElementById("review-dialog-title").textContent = isSingle ? "Start with the records you already have." : isOpenAI
-        ? "See what is driving the OpenAI bill."
-        : "Test whether the proposed change is actually cheaper.";
-      document.getElementById("builder-action-note").textContent = isSingle ? "Cost is enough to start. Usage and outcomes deepen the review when available; human effort and retries are optional." : isOpenAI
-        ? "The result will show a useful cost and usage baseline without requiring outcome or human-review data."
-        : state.outcomeMode === "sample"
-          ? "The quick path produces a sampled estimate. It never becomes booked savings."
-          : "Use the detailed log when you have one row per completed result.";
-      document.getElementById("build-review").textContent = isSingle ? "Understand this bill" : isOpenAI ? "Review the OpenAI bill" : "Build the finance review";
-      document.getElementById("builder-error").classList.remove("visible");
-      syncBuilderControls();
-    });
+    button.addEventListener("click", () => activateBuilderMode(button.dataset.builderMode, button));
   });
 
-  document.querySelectorAll(".outcome-mode").forEach((button) => {
+  function setImportProvider(provider) {
+      state.importProvider = provider;
+      state.pendingClaudeImport = null;
+      document.querySelectorAll(".import-provider").forEach((item) => { const active = item.dataset.importProvider === provider; item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active)); });
+      document.getElementById("openai-import-fields").hidden = state.importProvider !== "openai";
+      document.getElementById("claude-import-fields").hidden = state.importProvider !== "claude";
+      document.getElementById("claude-confirmation").hidden = true;
+      document.getElementById("build-review").textContent = state.importProvider === "openai" ? "Review the OpenAI bill" : "Check the Claude export";
+      syncBuilderControls();
+  }
+
+  document.querySelectorAll(".import-provider").forEach((button) => {
+    button.addEventListener("click", () => setImportProvider(button.dataset.importProvider));
+  });
+
+  document.querySelectorAll("[data-outcome-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       state.outcomeMode = button.dataset.outcomeMode;
-      document.querySelectorAll(".outcome-mode").forEach((item) => {
+      document.querySelectorAll("[data-outcome-mode]").forEach((item) => {
         const active = item === button;
         item.classList.toggle("active", active);
         item.setAttribute("aria-pressed", String(active));
@@ -6890,14 +7537,138 @@ body.story-mode .cockpit-grid {
     });
   });
 
-  [["spend-file", "spend-file-name"], ["work-file", "work-file-name"], ["openai-usage-file", "openai-usage-file-name"], ["openai-cost-file", "openai-cost-file-name"]].forEach(
+  function clearPendingClaudeImport() {
+    state.pendingClaudeImport = null;
+    const confirmation = document.getElementById("claude-confirmation");
+    confirmation.textContent = "";
+    confirmation.hidden = true;
+    if (state.builderMode === "openai" && state.importProvider === "claude") document.getElementById("build-review").textContent = "Check the Claude export";
+  }
+
+  function discardImportedSourceState() {
+    state.uploadRoute = null;
+    state.pendingMappedImport = null;
+    state.pendingClaudeImport = null;
+    state.invoicePdfCandidate = null;
+  }
+
+  const mappingElementIds = {
+    date: "map-date", service_end: "map-service-end", provider: "map-provider", model: "map-model", workload: "map-workload",
+    cost: "map-cost", currency: "map-currency", requests: "map-requests", input: "map-input", output: "map-output",
+    cache_read: "map-cache-read", cache_write: "map-cache-write",
+  };
+
+  function selectedMapping() {
+    return {
+      ...Object.fromEntries(Object.entries(mappingElementIds).map(([field, id]) => [field, document.getElementById(id).value])),
+      currencyConstant: document.getElementById("map-currency-constant").value,
+      providerConstant: document.getElementById("map-provider-constant").value,
+    };
+  }
+
+  async function updateMappingPreview() {
+    if (state.uploadRoute?.kind !== "mapping") return;
+    state.pendingMappedImport = null;
+    const preview = document.getElementById("mapping-preview");
+    try {
+      const mapped = await buildMappedReview(state.uploadRoute.text, state.uploadRoute.filename, selectedMapping());
+      const value = mapped.confirmation;
+      preview.textContent = `${value.rows} source rows normalize to ${value.currency} ${value.normalizedTotal.toFixed(2)}. Source and normalized cost totals reconcile. Missing fields stay unavailable. Check the mapping, then continue to confirmation.`;
+    } catch (error) {
+      preview.textContent = `${error.message} Use manual invoice entry or the universal spend template if the file cannot support a reliable cost review.`;
+    }
+  }
+
+  Object.values(mappingElementIds).forEach((id) => document.getElementById(id).addEventListener("change", updateMappingPreview));
+  ["map-currency-constant", "map-provider-constant"].forEach((id) => document.getElementById(id).addEventListener("input", updateMappingPreview));
+
+  document.getElementById("invoice-amount-choice").addEventListener("change", (event) => {
+    const candidate = state.invoicePdfCandidate?.amountCandidates?.[Number(event.target.value)];
+    if (!candidate) return;
+    document.getElementById("invoice-amount").value = String(candidate.value);
+    if (candidate.currency) document.getElementById("invoice-currency").value = candidate.currency;
+  });
+
+  document.getElementById("smart-upload-files").addEventListener("change", async (event) => {
+    const status = document.getElementById("smart-upload-status");
+    const error = document.getElementById("builder-error");
+    status.hidden = false; status.textContent = "Inspecting locally…"; error.classList.remove("visible");
+    state.uploadRoute = null; state.pendingMappedImport = null; state.invoicePdfCandidate = null;
+    document.getElementById("structured-mapper").hidden = true;
+    document.getElementById("smart-upload-file-status").textContent = `${event.target.files.length} file${event.target.files.length === 1 ? "" : "s"} selected. Contents stay in this browser.`;
+    try {
+      const route = await inspectUploadedFiles(event.target.files);
+      state.uploadRoute = route;
+      if (route.kind === "pdf") {
+        const candidate = extractInvoiceCandidate(await extractPdfText(route.file));
+        activateBuilderMode("single");
+        const pdfStatus = document.getElementById("invoice-pdf-status");
+        pdfStatus.hidden = false;
+        if (!candidate.supported) { pdfStatus.textContent = candidate.reason; return; }
+        state.invoicePdfCandidate = candidate;
+        document.getElementById("invoice-provider").value = candidate.provider;
+        document.getElementById("invoice-workload").value = `${candidate.provider} invoice`;
+        document.getElementById("invoice-date").value = candidate.invoiceDate;
+        document.getElementById("invoice-period-start").value = candidate.serviceStart;
+        document.getElementById("invoice-period-end").value = candidate.serviceEnd;
+        document.getElementById("invoice-currency").value = candidate.currency;
+        const choice = document.getElementById("invoice-amount-choice");
+        choice.innerHTML = '<option value="">Choose a labeled amount</option>' + candidate.amountCandidates.map((item, index) => `<option value="${index}">${escapeHtml(item.label)}: ${escapeHtml(item.currency || "currency not confirmed")} ${escapeHtml(item.value)}</option>`).join("");
+        document.getElementById("invoice-amount-choice-label").hidden = candidate.amountCandidates.length <= 1;
+        if (candidate.suggestedAmount) {
+          document.getElementById("invoice-amount").value = String(candidate.suggestedAmount.value);
+          if (candidate.suggestedAmount.currency) document.getElementById("invoice-currency").value = candidate.suggestedAmount.currency;
+        }
+        const currencyPrompt = candidate.dollarSymbolNeedsConfirmation ? " This invoice uses $. Confirm whether it is USD, CAD, AUD, or another dollar currency." : "";
+        pdfStatus.textContent = candidate.amountCandidates.length > 1 ? `The invoice contains several labeled amounts. Choose the one to review, then confirm every field below.${currencyPrompt}` : `Invoice fields were read locally. Confirm every field below before building the review. No usage was inferred.${currencyPrompt}`;
+        return;
+      }
+      if (route.kind === "mapping") {
+        const options = '<option value="">Not supplied</option>' + route.mappableHeaders.map((header) => `<option value="${escapeHtml(header)}">${escapeHtml(header)}</option>`).join("");
+        Object.entries(mappingElementIds).forEach(([field, id]) => { const select = document.getElementById(id); select.innerHTML = options; select.value = route.mapping[field]; });
+        document.getElementById("structured-mapper").hidden = false;
+        status.textContent = "We don’t recognize this file automatically yet. Match the columns you know below. Your file stays in this browser.";
+        await updateMappingPreview(); return;
+      }
+      if (route.kind === "openai") {
+        setImportProvider("openai");
+        status.textContent = "Recognized the matching OpenAI Usage Dashboard activity and cost CSV exports. Review the provider steps, then build.";
+      } else if (route.kind === "claude_spend") {
+        setImportProvider("claude");
+        status.textContent = "Recognized a Claude Team/Enterprise spend report. Add its reporting-period dates below, then check the normalized review.";
+      } else if (route.kind === "claude_api") {
+        setImportProvider("claude");
+        const usage = JSON.parse(route.usageText);
+        const dates = usage.data.map((bucket) => bucket.starting_at.slice(0, 10)).sort();
+        document.getElementById("claude-period-start").value = dates[0] || "";
+        document.getElementById("claude-period-end").value = dates.at(-1) || "";
+        status.textContent = "Recognized complete Claude Admin Usage and Cost JSON reports. Check the detected reporting period, then confirm the normalized review.";
+      } else if (route.kind === "universal") {
+        activateBuilderMode("single");
+        document.getElementById("invoice-pdf-status").hidden = false;
+        document.getElementById("invoice-pdf-status").textContent = "Recognized the universal one-bill spend template. Optional outcome and human-effort evidence can be added below.";
+      }
+    } catch (caught) {
+      state.uploadRoute = null;
+      status.textContent = caught.message || "The file could not be inspected. Use manual invoice entry or the universal template.";
+      error.textContent = status.textContent; error.classList.add("visible");
+      if ([...event.target.files].some((file) => /\.pdf$/i.test(file.name))) {
+        activateBuilderMode("single");
+        const pdfStatus = document.getElementById("invoice-pdf-status"); pdfStatus.hidden = false; pdfStatus.textContent = status.textContent;
+      }
+    }
+  });
+
+  [["spend-file", "spend-file-name"], ["work-file", "work-file-name"], ["openai-usage-file", "openai-usage-file-name"], ["openai-cost-file", "openai-cost-file-name"], ["claude-spend-file", "claude-spend-file-name"], ["claude-usage-file", "claude-usage-file-name"], ["claude-cost-file", "claude-cost-file-name"]].forEach(
     ([inputId, labelId]) => {
       document.getElementById(inputId).addEventListener("change", (event) => {
+        if (inputId.startsWith("claude-")) clearPendingClaudeImport();
         const [file] = event.target.files;
         if (file) document.getElementById(labelId).textContent = file.name;
       });
     },
   );
+  ["claude-period-start", "claude-period-end"].forEach((id) => document.getElementById(id).addEventListener("change", clearPendingClaudeImport));
 
   document.getElementById("review-builder").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -6911,25 +7682,82 @@ body.story-mode .cockpit-grid {
       if (state.builderMode === "single") {
         const [spendFile] = document.getElementById("single-spend-file").files;
         const [workFile] = document.getElementById("single-work-file").files;
-        if (!spendFile) throw new Error("Add the completed universal spend template.");
-        state.data = await buildSingleBillReview(await readLocalFile(spendFile), workFile ? await readLocalFile(workFile) : "", {
+        const routedUniversal = !spendFile && state.uploadRoute?.kind === "universal";
+        let spendText = spendFile ? await readLocalFile(spendFile) : routedUniversal ? state.uploadRoute.text : "";
+        if (!spendFile && !routedUniversal) {
+          const provider = safeImportedLabel(document.getElementById("invoice-provider").value, "Provider");
+          const workload = safeImportedLabel(document.getElementById("invoice-workload").value, "Subscription or workload name");
+          const invoiceDate = validDate(document.getElementById("invoice-date").value, "Invoice date");
+          const amount = costNumber(document.getElementById("invoice-amount").value, "Billed amount");
+          const currency = document.getElementById("invoice-currency").value.trim().toUpperCase();
+          if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a three-letter code.");
+          spendText = rowsToCsv([{ period: "baseline", date: invoiceDate, workload, provider, model: "", route: "Subscription or invoice", requests: "", input_tokens: "", cached_input_tokens: "", cache_write_input_tokens: "", output_tokens: "", provider_cost: String(amount), cost_basis: "provider_reported", currency }]);
+        }
+        state.data = await buildSingleBillReview(spendText, workFile ? await readLocalFile(workFile) : "", {
           acceptanceRule: document.getElementById("single-ready-rule").value.trim(),
           verifier: document.getElementById("single-verifier").value.trim(),
           complete: document.getElementById("single-complete").checked,
           hourlyRate: document.getElementById("single-hourly-rate").value,
           sharedCost: document.getElementById("single-shared-cost").value,
+          serviceStart: spendFile ? "" : document.getElementById("invoice-period-start").value,
+          serviceEnd: spendFile ? "" : document.getElementById("invoice-period-end").value,
+          reviewSource: spendFile || routedUniversal ? "universal_template" : state.invoicePdfCandidate ? "invoice_pdf" : "invoice_form",
         });
+        discardImportedSourceState();
         renderAll();
         reviewDialog.close();
         showToast("Single bill reviewed locally. No savings claimed.");
         return;
       }
       if (state.builderMode === "openai") {
+        if (state.uploadRoute?.kind === "mapping") {
+          if (state.pendingMappedImport) {
+            state.data = state.pendingMappedImport.review;
+            validateResult(state.data);
+            discardImportedSourceState();
+            renderAll(); reviewDialog.close(); showToast("Mapped bill reviewed locally. Only the fields you confirmed were included. Unmapped source fields were discarded."); return;
+          }
+          state.pendingMappedImport = await buildMappedReview(state.uploadRoute.text, state.uploadRoute.filename, selectedMapping());
+          const summary = state.pendingMappedImport.confirmation;
+          const box = document.getElementById("mapping-preview");
+          box.textContent = `${summary.rows} rows. ${summary.currency} ${summary.normalizedTotal.toFixed(2)} normalized and reconciled to the mapped source cost. Period: ${summary.period.start} to ${summary.period.end}. Only the fields you confirmed were included. Unmapped source fields were discarded. Confirm to build the review.`;
+          submit.textContent = "Confirm and build mapped review"; return;
+        }
+        if (state.importProvider === "claude") {
+          if (state.pendingClaudeImport) {
+            state.data = state.pendingClaudeImport.review;
+            validateResult(state.data);
+            discardImportedSourceState();
+            renderAll(); reviewDialog.close(); showToast("Claude bill reviewed locally. Personal identifiers were discarded."); return;
+          }
+          const [spendFile] = document.getElementById("claude-spend-file").files;
+          const [usageFile] = document.getElementById("claude-usage-file").files;
+          const [costFile] = document.getElementById("claude-cost-file").files;
+          const start = document.getElementById("claude-period-start").value;
+          const end = document.getElementById("claude-period-end").value;
+          if (spendFile && (usageFile || costFile)) throw new Error("Choose the spend CSV or the Admin API JSON pair, not both.");
+          if (spendFile || state.uploadRoute?.kind === "claude_spend") state.pendingClaudeImport = await buildClaudeSpendReview(spendFile ? await readLocalFile(spendFile) : state.uploadRoute.text, start, end);
+          else {
+            if ((!usageFile || !costFile) && state.uploadRoute?.kind !== "claude_api") throw new Error("Add a Claude spend CSV or both complete Admin API JSON files.");
+            state.pendingClaudeImport = await buildClaudeApiReview(usageFile ? await readLocalFile(usageFile) : state.uploadRoute.usageText, costFile ? await readLocalFile(costFile) : state.uploadRoute.costText, start, end);
+          }
+          const summary = state.pendingClaudeImport.confirmation;
+          const box = document.getElementById("claude-confirmation");
+          const confirmationMeasure = (field, value) => {
+            const coverage = summary.coverage?.[field];
+            if (!coverage || coverage.status === "complete") return value === null ? "unavailable" : String(value);
+            if (coverage.status === "missing") return "unavailable";
+            return `${value} reported (${coverage.suppliedRows} of ${coverage.totalRows} rows)`;
+          };
+          box.textContent = `Provider: ${summary.provider}. Period: ${summary.period.start} to ${summary.period.end}. Products: ${summary.products.join(", ")}. Models: ${summary.models.join(", ")}. Provider-reported cost: $${summary.providerCost.toFixed(2)}. Requests: ${confirmationMeasure("requests", summary.requests)}. Input tokens: ${confirmationMeasure("processedInput", summary.inputTokens)}. Output tokens: ${confirmationMeasure("outputTokens", summary.outputTokens)}. Not included: ${summary.missing.join(", ")}. Source rows: ${summary.sourceRows}. Personal identifiers were discarded.`;
+          box.hidden = false; submit.textContent = "Confirm and build Claude review"; return;
+        }
         const [usageFile] = document.getElementById("openai-usage-file").files;
         const [costFile] = document.getElementById("openai-cost-file").files;
-        if (!usageFile || !costFile) throw new Error("Add both OpenAI CSV exports before building the bill review.");
-        state.data = await buildOpenAIBillReview(await readLocalFile(usageFile), await readLocalFile(costFile));
+        if ((!usageFile || !costFile) && state.uploadRoute?.kind !== "openai") throw new Error("Add both OpenAI CSV exports before building the bill review.");
+        state.data = await buildOpenAIBillReview(usageFile ? await readLocalFile(usageFile) : state.uploadRoute.usageText, costFile ? await readLocalFile(costFile) : state.uploadRoute.costText);
         validateResult(state.data);
+        discardImportedSourceState();
         renderAll();
         reviewDialog.close();
         showToast("OpenAI bill reviewed locally. Your files never left the browser.");
@@ -7021,7 +7849,7 @@ body.story-mode .cockpit-grid {
     } finally {
       submit.disabled = false;
       submit.textContent = state.builderMode === "single" ? "Understand this bill" : state.builderMode === "openai"
-        ? "Review the OpenAI bill"
+        ? state.pendingMappedImport ? "Confirm and build mapped review" : state.importProvider === "claude" && state.pendingClaudeImport ? "Confirm and build Claude review" : state.importProvider === "claude" ? "Check the Claude export" : "Review the OpenAI bill"
         : state.builderMode === "workload"
           ? "Build the finance review"
           : "Continue";

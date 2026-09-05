@@ -1,0 +1,12 @@
+{
+  "data": [{
+    "starting_at": "2026-08-01T00:00:00Z",
+    "ending_at": "2026-08-02T00:00:00Z",
+    "results": [
+      {"amount":"120","currency":"USD","description":"Synthetic Sonnet usage","model":"claude-sonnet-4-5","cost_type":"tokens","workspace_id":"workspace_synthetic"},
+      {"amount":"80","currency":"USD","description":"Synthetic Opus usage","model":"claude-opus-4-1","cost_type":"tokens","workspace_id":"workspace_synthetic"}
+    ]
+  }],
+  "has_more": false,
+  "next_page": null
+}

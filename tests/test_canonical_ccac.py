@@ -206,8 +206,8 @@ def test_real_local_1_0_reports_current_producer_and_adapter(tmp_path: Path):
         mode="real",
         contract_version="1.0.0",
     )
-    assert result["producer"]["version"] == "0.3.2"
-    assert {source["adapter_version"] for source in result["inputs"]} == {"0.3.2"}
+    assert result["producer"]["version"] == "0.3.3"
+    assert {source["adapter_version"] for source in result["inputs"]} == {"0.3.3"}
 
 
 def test_custom_illustrative_1_0_cannot_impersonate_legacy_demo(tmp_path: Path):
@@ -221,8 +221,8 @@ def test_custom_illustrative_1_0_cannot_impersonate_legacy_demo(tmp_path: Path):
         contract_version="1.0.0",
         compatibility_demo=True,
     )
-    assert result["producer"]["version"] == "0.3.2"
-    assert {source["adapter_version"] for source in result["inputs"]} == {"0.3.2"}
+    assert result["producer"]["version"] == "0.3.3"
+    assert {source["adapter_version"] for source in result["inputs"]} == {"0.3.3"}
 
 
 def test_1_1_emits_one_canonical_direct_ai_scope_with_exact_components():
@@ -230,7 +230,7 @@ def test_1_1_emits_one_canonical_direct_ai_scope_with_exact_components():
     scope = _scope(payload)
     boundary = scope["accounting_boundary"]
     assert payload["contract"] == "ccac/1.1.0"
-    assert payload["producer"] == {"name": "ai-cost-lens", "version": "0.3.2"}
+    assert payload["producer"] == {"name": "ai-cost-lens", "version": "0.3.3"}
     assert (scope["id"], scope["value"], scope["currency"]) == (
         "metric.tech-spend.scope.direct_ai",
         8.2825,

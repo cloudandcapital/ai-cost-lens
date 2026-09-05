@@ -1,0 +1,12 @@
+{
+  "data": [{
+    "starting_at": "2026-08-01T00:00:00Z",
+    "ending_at": "2026-08-02T00:00:00Z",
+    "results": [
+      {"account_id":"user_synthetic","api_key_id":"key_synthetic","workspace_id":"workspace_synthetic","model":"claude-sonnet-4-5","uncached_input_tokens":1000,"cache_read_input_tokens":200,"cache_creation":{"ephemeral_1h_input_tokens":100,"ephemeral_5m_input_tokens":0},"output_tokens":300,"server_tool_use":{"web_search_requests":0}},
+      {"account_id":null,"api_key_id":null,"workspace_id":null,"model":"claude-opus-4-1","uncached_input_tokens":400,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":0},"output_tokens":100,"server_tool_use":{"web_search_requests":0}}
+    ]
+  }],
+  "has_more": false,
+  "next_page": null
+}

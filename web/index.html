@@ -457,9 +457,9 @@
             <span>Get a cost baseline and practical next steps. Usage, outcomes, retries, and human effort are optional.</span>
           </button>
           <button class="builder-mode" data-builder-mode="openai" type="button" aria-pressed="false">
-            <small>OPENAI BILL AND USAGE</small>
-            <strong>Review OpenAI exports</strong>
-            <span>Use matching Activity and Cost CSVs for a bill and usage review.</span>
+            <small>OPENAI OR CLAUDE · START HERE</small>
+            <strong>Upload what you have</strong>
+            <span>Choose CSV, JSON, or a text-based invoice PDF. The browser checks it locally.</span>
           </button>
           <button class="builder-mode" data-builder-mode="workload" type="button" aria-pressed="false">
             <small>ANY PROVIDER OR AI TOOL</small>
@@ -479,12 +479,26 @@
             <div class="step-number">01</div>
             <div>
               <h3>Start with one bill</h3>
+              <p>For a simple subscription or invoice, enter the bill below. No CSV is required.</p>
+              <div id="invoice-pdf-status" class="path-requirements" role="status" hidden></div>
+              <label id="invoice-amount-choice-label" hidden><span>Choose the invoice amount to review</span><select id="invoice-amount-choice"><option value="">Review the invoice totals</option></select><small>Choose only after checking the label and amount against the invoice.</small></label>
+              <div class="field-grid compact-fields invoice-entry">
+                <label><span>Provider</span><input id="invoice-provider" type="text" placeholder="Claude, ChatGPT, or another provider" /></label>
+                <label><span>Subscription or workload name</span><input id="invoice-workload" type="text" /></label>
+                <label><span>Invoice date</span><input id="invoice-date" type="date" /></label>
+                <label><span>Optional service-period start</span><input id="invoice-period-start" type="date" /></label>
+                <label><span>Optional service-period end</span><input id="invoice-period-end" type="date" /></label>
+                <label><span>Billed amount</span><input id="invoice-amount" type="number" min="0" step="any" /></label>
+                <label><span>Currency</span><input id="invoice-currency" type="text" maxlength="3" placeholder="USD" /></label>
+              </div>
+              <p>An invoice proves cost, not usage or outcomes. Missing requests, tokens, retries, and human effort stay unavailable. One bill cannot establish savings. Add detailed usage later only when it is useful.</p>
+              <p><strong>More detail?</strong> Upload the universal CSV instead.</p>
               <p>Download the template, delete every example row, and keep the column headers. Use <strong>baseline</strong> on every new row; no proposed period is needed.</p>
               <div class="template-links"><a href="templates/ai-cost-lens-spend-template.csv" download>Download spend template</a></div>
               <p>For an invoice or subscription, enter one row with <code>period=baseline</code>, the invoice date in <code>date</code> (YYYY-MM-DD), the subscription or workload name in <code>workload</code>, the billed amount in <code>provider_cost</code>, <code>cost_basis=provider_reported</code>, and a three-letter <code>currency</code>. Enter <code>provider</code> if known. Leave model, route, requests and tokens blank unless the source supports them. An invoice date is not evidence of the service-period duration.</p>
               <p>With usage, transfer matched date/workload/model/route buckets into separate rows: <code>provider</code>, <code>model</code>, <code>route</code>, <code>requests</code>, <code>input_tokens</code>, <code>cached_input_tokens</code>, <code>cache_write_input_tokens</code>, and <code>output_tokens</code>. Input tokens include uncached, cache-read and cache-write tokens. Requests include retries. Blank means unknown; zero means a confirmed zero.</p>
               <p>Each cost amount must appear once. If cost cannot be joined to model-level usage, aggregate usage to the bill boundary in one row and leave model/route blank; do not spread dollars by token share. Use <code>calculated</code> for quantity × rate or <code>allocated</code> for a documented share of a bill, never label those billed evidence. Keep one currency, workload and cost basis per review.</p>
-              <p>Only this completed CSV template is supported here. Manually transfer the supported fields from your source; PDFs, screenshots and arbitrary raw provider exports are not automatically read.</p>
+              <p>This detailed upload expects the completed universal CSV. Use Upload what you have for supported provider exports, structured-file mapping, or a text-based OpenAI or Anthropic invoice PDF. Scans and screenshots are not read.</p>
               <div class="file-pair single-file-row"><label class="field-wide"><span>Universal spend CSV</span><input id="single-spend-file" type="file" accept=".csv,text/csv" /></label></div>
             </div>
           </section>
@@ -579,7 +593,7 @@
                   <li>Both routes describe the same workload and use the same currency.</li>
                   <li>Each source amount appears once. Do not copy one invoice total onto every usage row.</li>
                   <li>Blank means the source did not supply the measure. Zero means the source reported zero or the measure does not apply.</li>
-                  <li>The upload cannot read raw Anthropic JSON, AWS CUR files, Google billing exports, PDFs, or screenshots directly.</li>
+                  <li>The comparison upload reads this universal template. Use Upload what you have for supported Claude JSON, invoice PDFs, or guided structured-file mapping.</li>
                 </ul>
               </div>
             </div>
@@ -749,12 +763,50 @@
         </div>
 
         <div id="openai-builder-fields" hidden>
+          <section class="builder-step upload-entry" aria-labelledby="smart-upload-title">
+            <div class="step-number">01</div>
+            <div>
+              <h3 id="smart-upload-title">Upload what you have</h3>
+              <p>A bill tells us what you paid. A usage report can also help explain where the cost went.</p>
+              <p>Choose one invoice PDF or structured file. For OpenAI dashboard exports or Claude Admin reports, choose the matching pair together.</p>
+              <div class="file-pair single-file-row">
+                <label class="field-wide"><span>CSV, JSON, or text-based PDF</span><input id="smart-upload-files" type="file" multiple accept=".csv,text/csv,.json,application/json,.pdf,application/pdf" /><small id="smart-upload-file-status">Files are inspected only in this browser.</small></label>
+              </div>
+              <div id="smart-upload-status" class="path-requirements" role="status" hidden></div>
+              <div id="structured-mapper" class="sample-outcome-fields" hidden>
+                <div class="sample-intro"><strong>Match the fields you recognize</strong><span>Suggestions use header names only. Check every selection before continuing.</span></div>
+                <div class="field-grid compact-fields" id="mapping-fields">
+                  <label><span>Date or service-period start</span><select id="map-date"></select></label>
+                  <label><span>Optional service-period end</span><select id="map-service-end"></select></label>
+                  <label><span>Provider column</span><select id="map-provider"></select></label>
+                  <label><span>Provider for every row (optional)</span><input id="map-provider-constant" type="text" maxlength="100" placeholder="Anthropic" /><small>Use when the file has no provider column.</small></label>
+                  <label><span>Model or product</span><select id="map-model"></select></label>
+                  <label><span>Workload or route</span><select id="map-workload"></select></label>
+                  <label><span>Provider-reported cost</span><select id="map-cost"></select></label>
+                  <label><span>Currency column</span><select id="map-currency"></select></label>
+                  <label><span>Reported currency for every row</span><input id="map-currency-constant" type="text" maxlength="3" inputmode="text" placeholder="USD" /><small>Required when the file has no currency column. No conversion is applied.</small></label>
+                  <label><span>Requests</span><select id="map-requests"></select></label>
+                  <label><span>Input tokens</span><select id="map-input"></select></label>
+                  <label><span>Output tokens</span><select id="map-output"></select></label>
+                  <label><span>Cache-read tokens</span><select id="map-cache-read"></select></label>
+                  <label><span>Cache-write tokens</span><select id="map-cache-write"></select></label>
+                </div>
+                <div id="mapping-preview" class="path-requirements" role="status"></div>
+              </div>
+            </div>
+          </section>
+          <p class="builder-choice-label">Or use the exact provider steps</p>
+          <div class="outcome-mode-choice" role="group" aria-label="Choose provider export">
+            <button class="outcome-mode import-provider active" data-import-provider="openai" type="button" aria-pressed="true"><strong>OpenAI</strong><span>Activity and Cost CSVs</span></button>
+            <button class="outcome-mode import-provider" data-import-provider="claude" type="button" aria-pressed="false"><strong>Claude</strong><span>Team/Enterprise spend CSV or Admin API JSON</span></button>
+          </div>
+          <div id="openai-import-fields">
           <div class="path-requirements">
             <strong>What you need</strong>
             <span>One Activity data CSV for Completions and one Cost data CSV, exported for the same date range in the OpenAI Usage dashboard.</span>
           </div>
-          <section class="builder-step" aria-labelledby="openai-files-title">
-            <div class="step-number">01</div>
+            <section class="builder-step" aria-labelledby="openai-files-title">
+            <div class="step-number">02</div>
             <div>
               <h3 id="openai-files-title">Add the two OpenAI exports</h3>
               <p>
@@ -777,7 +829,7 @@
           </section>
 
           <section class="builder-step openai-boundary-step" aria-labelledby="openai-boundary-title">
-            <div class="step-number">02</div>
+            <div class="step-number">03</div>
             <div>
               <h3 id="openai-boundary-title">Keep the bill and outcome claims separate</h3>
               <p>
@@ -786,6 +838,23 @@
               </p>
             </div>
           </section>
+          </div>
+          <div id="claude-import-fields" hidden>
+            <div class="path-requirements"><strong>What you need</strong><span>A Claude Team/Enterprise spend-report CSV, or complete Messages Usage and Cost Admin API JSON exports. AI Cost Lens never asks for an API key.</span></div>
+            <section class="builder-step"><div class="step-number">02</div><div>
+              <h3>Add a documented Claude export</h3>
+              <p>Team and Enterprise spend reports include user email and account UUID. Those identifiers are discarded before the review is built and never appear in the review, JSON download, Share view, memo, browser storage, console, or errors.</p>
+              <div class="file-pair">
+                <label><span>Team/Enterprise spend CSV</span><input id="claude-spend-file" type="file" accept=".csv,text/csv" /><small id="claude-spend-file-name">Export from Settings → Analytics → How much is Claude costing?</small></label>
+                <label><span>Messages Usage API JSON</span><input id="claude-usage-file" type="file" accept=".json,application/json" /><small id="claude-usage-file-name">Optional when using the spend CSV; otherwise pair with Cost JSON.</small></label>
+                <label><span>Cost API JSON</span><input id="claude-cost-file" type="file" accept=".json,application/json" /><small id="claude-cost-file-name">Required with Messages Usage JSON.</small></label>
+              </div>
+              <div class="field-grid compact-fields"><label><span>Reporting-period start</span><input id="claude-period-start" type="date" /></label><label><span>Reporting-period end</span><input id="claude-period-end" type="date" /></label></div>
+              <p>Claude Console Usage and Cost CSV headers are not published by Anthropic, so those native CSVs are not claimed as supported without an authentic current sample. Export complete Admin API JSON pages yourself; do not paste an Admin API key here.</p>
+              <p>Provider reports count calls, but they do not identify which calls were retries for the same finished result. Add application, gateway, or work-log data only when available.</p>
+            </div></section>
+            <section class="builder-step"><div class="step-number">03</div><div><h3>Confirm the normalized review</h3><div id="claude-confirmation" class="path-requirements" hidden></div><p>Review the provider, period, products, models, totals, missing fields, row count, and identifier-removal confirmation before building the review.</p></div></section>
+          </div>
         </div>
 
         <div class="builder-error" id="builder-error" role="alert"></div>
