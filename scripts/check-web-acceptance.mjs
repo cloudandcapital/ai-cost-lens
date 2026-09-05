@@ -3,8 +3,16 @@ import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
 import { performance } from 'node:perf_hooks';
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { makeTextPdf } from './pdf-fixture.mjs';
+
+let pdfjs = null;
+if (process.env.AI_COST_LENS_SKIP_PDFJS_TEST_IMPORT !== '1') {
+  try {
+    pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error;
+  }
+}
 
 const root = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, root), 'utf8');
@@ -189,8 +197,10 @@ assert.equal(arbitraryNumbers.date, '', 'unknown date-like headers are never gue
 
 // Real, tiny text PDFs exercise the bundled parser boundary and sanitized invoice extraction.
 const pdfFile = (name, bytes) => ({ name, type: 'application/pdf', size: bytes.length, arrayBuffer: async () => bytes });
+const textPdfModule = (lines) => ({ getDocument: () => ({ promise: Promise.resolve({ numPages: 1, getPage: async () => ({ getTextContent: async () => ({ items: lines.map((str, index) => ({ str, transform: [1, 0, 0, 1, 54, 740 - index * 22] })) }) }), destroy: async () => {} }) }) });
 const openAIPdf = makeTextPdf(['OpenAI, L.L.C.', 'Invoice date: August 31, 2026', 'Service period: August 1, 2026 - August 31, 2026', 'Amount due: USD 42.50']);
-const openAIText = await api.extractPdfText(pdfFile('openai.pdf', openAIPdf), pdfjs);
+const openAILines = ['OpenAI, L.L.C.', 'Invoice date: August 31, 2026', 'Service period: August 1, 2026 - August 31, 2026', 'Amount due: USD 42.50'];
+const openAIText = await api.extractPdfText(pdfFile('openai.pdf', openAIPdf), pdfjs || textPdfModule(openAILines));
 const openAICandidate = api.extractInvoiceCandidate(openAIText);
 assert.equal(openAICandidate.provider, 'OpenAI');
 assert.equal(openAICandidate.invoiceDate, '2026-08-31');
@@ -199,13 +209,15 @@ assert.equal(openAICandidate.serviceEnd, '2026-08-31');
 assert.equal(openAICandidate.suggestedAmount.value, 42.5);
 assert.equal(openAICandidate.currency, 'USD');
 const anthropicPdf = makeTextPdf(['Anthropic PBC', 'Invoice date: 2026-08-31', 'Invoice total: USD 25.00']);
-assert.equal(api.extractInvoiceCandidate(await api.extractPdfText(pdfFile('anthropic.pdf', anthropicPdf), pdfjs)).provider, 'Anthropic');
+const anthropicLines = ['Anthropic PBC', 'Invoice date: 2026-08-31', 'Invoice total: USD 25.00'];
+assert.equal(api.extractInvoiceCandidate(await api.extractPdfText(pdfFile('anthropic.pdf', anthropicPdf), pdfjs || textPdfModule(anthropicLines))).provider, 'Anthropic');
 const ambiguous = api.extractInvoiceCandidate(['Claude subscription from Anthropic', 'Invoice date: 2026-08-31', 'Subtotal USD 100.00', 'Tax USD 8.00', 'Credit USD 10.00', 'Amount due USD 98.00'].join('\n'));
 assert.equal(ambiguous.amountCandidates.length, 4);
 assert.equal(ambiguous.suggestedAmount, null);
 assert.equal(api.extractInvoiceCandidate('Other Cloud Inc\nInvoice date: 2026-08-31\nTotal USD 10.00').supported, false);
-await assert.rejects(api.extractPdfText(pdfFile('blank.pdf', makeTextPdf([])), pdfjs), /No extractable/);
-await assert.rejects(api.extractPdfText(pdfFile('broken.pdf', Buffer.from('%PDF broken')), pdfjs), /malformed or scanned/);
+await assert.rejects(api.extractPdfText(pdfFile('blank.pdf', makeTextPdf([])), pdfjs || textPdfModule([])), /No extractable/);
+const malformedPdfModule = { getDocument: () => ({ promise: Promise.reject(new Error('Invalid PDF structure')) }) };
+await assert.rejects(api.extractPdfText(pdfFile('broken.pdf', Buffer.from('%PDF broken')), pdfjs || malformedPdfModule), /malformed or scanned/);
 await assert.rejects(api.extractPdfText(pdfFile('locked.pdf', Buffer.from('x')), { getDocument: () => ({ promise: Promise.reject(Object.assign(new Error('Password required'), { name: 'PasswordException' })) }) }), /encrypted/);
 // A universal one-bill review must not need a proposed period or any outcomes.
 const spendHeaders = spend.trim().split('\n')[0];
