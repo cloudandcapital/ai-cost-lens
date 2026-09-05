@@ -37,7 +37,8 @@ It does not connect to provider APIs, fetch live prices, certify invoices, enfor
   `model_route/0.1` profile
 - Deterministic decision validation that recomputes route arithmetic, checks
   evidence references, and blocks unsupported all-in savings or route changes
-- Strict local importers for supported OpenAI CSV exports and documented Claude spend CSV or Admin API JSON exports
+- One local “Upload what you have” entry point for supported OpenAI and Claude CSV, JSON, and text-based invoice PDF files
+- Strict direct importers remain preferred; unknown flat CSV or JSON can use a deterministic, user-confirmed field mapper
 - Visible pagination, period, attribution, and model-cost join limitations
 
 The public demo needs no credentials and uses entirely illustrative data.
@@ -122,9 +123,17 @@ To open the browser interface from a clone:
 python -m http.server 8000 --directory web
 ```
 
-Then open `http://localhost:8000`. Choose **See the worked example**, **Understand one bill**, **Review OpenAI or Claude exports**, or **Compare cost per ready result**. The one-bill path accepts a simple invoice form or the more detailed universal spend CSV. Use **Open saved review** to inspect another `ai-cost-lens-review-result/1.0` file. The file is parsed in the browser and is not uploaded. **Print finance memo** creates a compact handoff from the same decision record; the browser's print dialog can save it as a PDF.
+Then open `http://localhost:8000`. Choose **See the worked example**, **Understand one bill**, **Upload what you have**, or **Compare cost per ready result**. The one-bill path accepts a simple invoice form or the more detailed universal spend CSV. Use **Open saved review** to inspect another `ai-cost-lens-review-result/1.0` file. The file is parsed in the browser and is not uploaded. **Print finance memo** creates a compact handoff from the same decision record; the browser's print dialog can save it as a PDF.
 
-The OpenAI path accepts matching Activity data for Completions and Cost data CSV exports. The Claude path accepts the documented Team or Enterprise spend-report CSV, or a pair of complete Messages Usage and Cost Admin API JSON responses saved by the user. Both create a bill and usage review without inventing business outcomes. Use the universal spend and work templates for a route comparison or cost per ready result.
+The unified upload inspects files locally and routes exact supported formats first:
+
+- Matching OpenAI API Usage Dashboard Activity data for Completions and Cost data CSV exports.
+- A Claude Team or Enterprise spend-report CSV.
+- A pair of complete Claude Messages Usage and Cost Admin API JSON responses saved by the user.
+- Text-based OpenAI, ChatGPT, Anthropic, or Claude invoice PDFs whose provider and labeled fields can be confirmed.
+- One unknown flat CSV or JSON file through a deterministic header mapper when date, provider-reported cost, and currency can be mapped reliably.
+
+PDF invoices create an invoice-only review and never imply API usage. Scans, screenshots, encrypted PDFs, arbitrary provider exports, and nested JSON are not automatically supported. Use manual invoice entry or copy the supported fields into the universal template when local normalization is not possible. Direct provider imports create a bill and usage review without inventing business outcomes. Use the universal spend and work templates for a route comparison or cost per ready result.
 
 Claude Team and Enterprise spend import uses `total_net_spend_usd` as the provider-reported cost, aggregates the supplied product and model rows, and discards `user_email` and `account_uuid` before building the review record. Blank request or token values remain unavailable. The Admin API usage schema does not publish a request count, so that measure remains unavailable. The user must confirm the reporting period, and usage and cost daily buckets must match. Partial API pages are rejected.
 
@@ -132,7 +141,7 @@ Anthropic documents CSV export from the Claude Console Usage and Cost pages but 
 
 ### How to use another provider report
 
-The universal upload reads the AI Cost Lens template. It does not read an arbitrary Anthropic report, AWS CUR file, Google billing export, invoice PDF, or screenshot. The supported Claude direct-import formats are the separately identified Team or Enterprise spend-report CSV and complete Admin API JSON pair.
+The universal upload reads the AI Cost Lens template. The unified provider upload can guide a flat CSV or JSON through an explicit local mapping step, but it does not claim support for arbitrary Anthropic reports, AWS CUR files, Google billing exports, nested JSON, or screenshots. Text-based invoice PDF support is limited to identifiable OpenAI and Anthropic invoices. The supported Claude direct-import formats remain the separately identified Team or Enterprise spend-report CSV and complete Admin API JSON pair.
 
 1. Download the spend template from **Start a review**.
 2. Open it in Excel or Sheets. Replace the examples with rows from the current route (`baseline`) and the route being tested (`proposed`).

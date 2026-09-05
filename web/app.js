@@ -10,6 +10,9 @@
     outcomeMode: "sample",
     importProvider: "openai",
     pendingClaudeImport: null,
+    uploadRoute: null,
+    pendingMappedImport: null,
+    invoicePdfCandidate: null,
     breakEvenReady: false,
   };
 
@@ -1168,17 +1171,23 @@
       .sort((a, b) => b.requests - a.requests || String(a[field]).localeCompare(String(b[field])));
   }
 
+  const openAIUsageColumns = [
+    "start_time", "end_time", "project_id", "num_model_requests", "model", "service_tier",
+    "input_tokens", "output_tokens", "input_cached_tokens", "input_cache_write_tokens", "input_uncached_tokens",
+  ];
+  const openAICostColumns = ["start_time", "end_time", "amount_value", "amount_currency", "line_item", "project_id"];
+
   async function buildOpenAIBillReview(usageText, costText) {
     const rawUsage = parseCsv(usageText, "OpenAI usage export");
     const rawCosts = parseCsv(costText, "OpenAI cost export");
     requireColumns(
       rawUsage,
-      ["start_time", "end_time", "project_id", "num_model_requests", "model", "service_tier", "input_tokens", "output_tokens", "input_cached_tokens", "input_cache_write_tokens", "input_uncached_tokens"],
+      openAIUsageColumns,
       "OpenAI usage export",
     );
     requireColumns(
       rawCosts,
-      ["start_time", "end_time", "amount_value", "amount_currency", "line_item", "project_id"],
+      openAICostColumns,
       "OpenAI cost export",
     );
     const usageDates = [...new Set(rawUsage.map((row, index) => openAIBucketDay(row, `Usage row ${index + 2}`)))].sort();
@@ -1428,6 +1437,254 @@
     const review = await buildSingleBillReview(rowsToCsv(rows), "", { acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", serviceStart: period.start, serviceEnd: period.end, reviewSource: "claude_admin_api" });
     const summary = summarizeSingleBill(review);
     return { review, confirmation: { provider: "Anthropic", period, products: ["Claude API"], models: [...new Set(rows.map((row) => row.model))], providerCost: summary.totals.providerCost, requests: null, inputTokens: summary.totals.processedInput, outputTokens: summary.totals.outputTokens, missing: ["Request count", "Retries", "Human effort", "Outcomes"], sourceRows: usage.data.length + costs.data.length, identifiersDiscarded: true } };
+  }
+
+  const mappingFields = ["date", "service_end", "provider", "model", "workload", "cost", "currency", "requests", "input", "output", "cache_read", "cache_write"];
+  const mappingAliases = {
+    date: ["date", "invoice_date", "billing_date", "period_start", "service_period_start", "usage_date"],
+    service_end: ["service_end", "period_end", "service_period_end", "billing_period_end"],
+    provider: ["provider", "vendor"],
+    model: ["model", "model_name"],
+    workload: ["workload", "route", "product", "service", "project"],
+    cost: ["provider_cost", "cost", "amount", "net_cost", "total_cost", "spend", "billed_amount"],
+    currency: ["currency", "currency_code", "amount_currency"],
+    requests: ["requests", "request_count", "total_requests", "num_model_requests"],
+    input: ["input_tokens", "prompt_tokens", "total_prompt_tokens"],
+    output: ["output_tokens", "completion_tokens", "total_completion_tokens"],
+    cache_read: ["cached_input_tokens", "cache_read_tokens", "input_cached_tokens"],
+    cache_write: ["cache_write_input_tokens", "cache_write_tokens", "input_cache_write_tokens"],
+  };
+
+  const normalizeHeader = (value) => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+  function parseFlatStructured(text, filename = "structured file") {
+    if (new TextEncoder().encode(text).length > 5 * 1024 * 1024) throw new Error("The structured file exceeds the 5 MiB local limit.");
+    let rows;
+    if (/\.json$/i.test(filename) || /^\s*[\[{]/.test(text)) {
+      let parsed;
+      try { parsed = JSON.parse(text); } catch { throw new Error("The structured file is not valid JSON."); }
+      rows = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.data) ? parsed.data : parsed && typeof parsed === "object" ? [parsed] : null;
+      if (!rows?.length) throw new Error("The structured JSON needs at least one flat object.");
+      if (rows.length > 20000) throw new Error("The structured file exceeds 20,000 data rows.");
+      rows.forEach((row, index) => {
+        if (!row || typeof row !== "object" || Array.isArray(row) || Object.values(row).some((value) => value !== null && typeof value === "object")) {
+          throw new Error(`Structured JSON row ${index + 1} must be one flat object.`);
+        }
+      });
+      const headers = Object.keys(rows[0]);
+      if (!headers.length || rows.some((row) => Object.keys(row).length !== headers.length || headers.some((header) => !Object.hasOwn(row, header)))) {
+        throw new Error("Every structured JSON row must use the same flat fields.");
+      }
+      const seen = new Set();
+      rows.forEach((row, index) => {
+        const signature = JSON.stringify(headers.map((header) => row[header]));
+        if (seen.has(signature)) throw new Error(`Structured file row ${index + 1} duplicates an earlier row.`);
+        seen.add(signature);
+      });
+    } else {
+      rows = parseCsv(text, "Structured cost file");
+    }
+    const headers = Object.keys(rows[0]);
+    const normalized = headers.map(normalizeHeader);
+    if (new Set(normalized).size !== normalized.length) throw new Error("The structured file has duplicate normalized column names.");
+    return { rows, headers, normalized };
+  }
+
+  function suggestStructuredMapping(parsed) {
+    return Object.fromEntries(mappingFields.map((field) => {
+      const matches = parsed.headers.filter((header) => mappingAliases[field].includes(normalizeHeader(header)));
+      return [field, matches.length === 1 ? matches[0] : ""];
+    }));
+  }
+
+  async function buildMappedReview(text, filename, mapping) {
+    const parsed = parseFlatStructured(text, filename);
+    for (const required of ["date", "cost", "currency"]) {
+      if (!mapping[required] || !parsed.headers.includes(mapping[required])) throw new Error(`Map ${required === "cost" ? "provider-reported cost" : required} before building the review.`);
+    }
+    const read = (row, field) => mapping[field] ? String(row[mapping[field]] ?? "").trim() : "";
+    const normalized = parsed.rows.map((row, index) => {
+      const label = `Mapped row ${index + 2}`;
+      const date = validDate(read(row, "date"), `${label} date`);
+      const serviceEnd = read(row, "service_end");
+      if (serviceEnd) validDate(serviceEnd, `${label} service end`);
+      const cost = costNumber(read(row, "cost"), `${label} provider-reported cost`);
+      const currency = read(row, "currency").toUpperCase();
+      if (!/^[A-Z]{3}$/.test(currency)) throw new Error(`${label} currency must be a three-letter code.`);
+      const optionalInteger = (field, name) => {
+        const value = read(row, field);
+        return value === "" ? "" : String(finiteNumber(value, `${label} ${name}`, { integer: true }));
+      };
+      return {
+        period: "baseline", date,
+        workload: read(row, "workload") ? safeImportedLabel(read(row, "workload"), `${label} workload`) : "Imported provider bill",
+        provider: read(row, "provider") ? safeImportedLabel(read(row, "provider"), `${label} provider`) : "Provider not supplied",
+        model: read(row, "model") ? safeImportedLabel(read(row, "model"), `${label} model`) : "",
+        route: read(row, "workload") ? safeImportedLabel(read(row, "workload"), `${label} route`) : "Mapped structured file",
+        requests: optionalInteger("requests", "requests"),
+        input_tokens: optionalInteger("input", "input tokens"),
+        cached_input_tokens: optionalInteger("cache_read", "cache read tokens"),
+        cache_write_input_tokens: optionalInteger("cache_write", "cache write tokens"),
+        output_tokens: optionalInteger("output", "output tokens"),
+        provider_cost: String(cost), cost_basis: "provider_reported", currency,
+        _serviceEnd: serviceEnd,
+      };
+    });
+    const currencies = new Set(normalized.map((row) => row.currency));
+    if (currencies.size !== 1) throw new Error("One bill review cannot mix currencies. Split the file before review; no currency conversion is applied.");
+    const serviceEnds = normalized.map((row) => row._serviceEnd).filter(Boolean);
+    if (serviceEnds.length && serviceEnds.length !== normalized.length) throw new Error("Service-period end is missing from some mapped rows. Complete it for every row or leave it unmapped.");
+    const sourceTotal = normalized.reduce((total, row) => total + Number(row.provider_cost), 0);
+    const csv = rowsToCsv(normalized);
+    const review = await buildSingleBillReview(csv, "", {
+      acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "",
+      serviceStart: serviceEnds.length ? [...normalized.map((row) => row.date)].sort()[0] : "", serviceEnd: serviceEnds.length ? [...serviceEnds].sort().at(-1) : "", reviewSource: "structured_mapping",
+    });
+    const summary = summarizeSingleBill(review);
+    if (Math.abs(summary.totals.providerCost - sourceTotal) > Math.max(0.00001, Math.abs(sourceTotal) * 0.000001)) {
+      throw new Error("The normalized cost total does not reconcile to the mapped source rows.");
+    }
+    return { review, confirmation: {
+      rows: normalized.length, currency: [...currencies][0], sourceTotal: round(sourceTotal), normalizedTotal: round(summary.totals.providerCost),
+      period: summary.period, missing: mappingFields.filter((field) => !mapping[field]), identifiersDiscarded: true,
+    } };
+  }
+
+  async function extractPdfText(file, suppliedPdfModule = null) {
+    if (file.size > 5 * 1024 * 1024) throw new Error("The PDF exceeds the 5 MiB local limit. Enter the invoice fields manually.");
+    let pdf = null;
+    try {
+      const pdfjs = suppliedPdfModule || await import("./vendor/pdf.min.mjs");
+      if (!suppliedPdfModule) pdfjs.GlobalWorkerOptions.workerSrc = new URL("vendor/pdf.worker.min.mjs", document.baseURI).href;
+      const options = { data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false, verbosity: 0 };
+      if (!suppliedPdfModule) {
+        options.wasmUrl = new URL("vendor/wasm/", document.baseURI).href;
+        options.standardFontDataUrl = new URL("vendor/standard_fonts/", document.baseURI).href;
+      }
+      const loadingTask = pdfjs.getDocument(options);
+      pdf = await loadingTask.promise;
+      if (pdf.numPages > 20) throw new Error("This invoice has more than 20 pages. Enter the invoice fields manually.");
+      const lines = [];
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const content = await (await pdf.getPage(pageNumber)).getTextContent();
+        const items = content.items.filter((item) => typeof item.str === "string" && item.str.trim()).map((item) => ({ text: item.str.trim(), x: Number(item.transform?.[4] || 0), y: Number(item.transform?.[5] || 0) }));
+        const bands = [];
+        items.sort((a, b) => b.y - a.y || a.x - b.x).forEach((item) => {
+          let band = bands.find((candidate) => Math.abs(candidate.y - item.y) < 2);
+          if (!band) { band = { y: item.y, items: [] }; bands.push(band); }
+          band.items.push(item);
+        });
+        lines.push(...bands.sort((a, b) => b.y - a.y).map((band) => band.items.sort((a, b) => a.x - b.x).map((item) => item.text).join(" ")));
+      }
+      const text = lines.join("\n").trim();
+      if (text.length < 12) throw new Error("No extractable invoice text was found. The PDF may be scanned; enter the invoice fields manually.");
+      return text;
+    } catch (error) {
+      const message = String(error?.message || "");
+      if (/password|encrypted/i.test(`${error?.name || ""} ${message}`)) throw new Error("This PDF is encrypted. Unlock it first or enter the invoice fields manually.");
+      if (/No extractable|more than 20 pages|5 MiB/.test(message)) throw error;
+      throw new Error("This PDF could not be read as a text invoice. It may be malformed or scanned; enter the invoice fields manually.");
+    } finally {
+      if (pdf?.destroy) await pdf.destroy();
+    }
+  }
+
+  function invoiceDate(value) {
+    const raw = String(value).trim().replace(/,$/, "");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return validDate(raw, "Invoice date");
+    const match = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    if (match) return validDate(`${match[3]}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`, "Invoice date");
+    const timestamp = Date.parse(raw);
+    if (!Number.isFinite(timestamp)) return null;
+    return new Date(timestamp).toISOString().slice(0, 10);
+  }
+
+  function extractInvoiceCandidate(text) {
+    const providerSignals = [
+      { provider: "OpenAI", matches: /\b(?:openai|chatgpt)\b/i.test(text) },
+      { provider: "Anthropic", matches: /\b(?:anthropic|claude)\b/i.test(text) },
+    ].filter((item) => item.matches);
+    if (providerSignals.length !== 1) return { supported: false, reason: "The invoice provider could not be confirmed as OpenAI or Anthropic. Enter the invoice fields manually." };
+    const lineList = String(text).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const dateFromLabel = (labels) => {
+      for (const line of lineList) {
+        const match = line.match(new RegExp(`(?:${labels})\\s*:?\\s*(.+)$`, "i"));
+        if (match) { try { const date = invoiceDate(match[1]); if (date) return date; } catch {} }
+      }
+      return "";
+    };
+    const periodLine = lineList.find((line) => /(?:service|billing)\s+period/i.test(line)) || "";
+    const periodDates = [...periodLine.matchAll(/(?:\d{4}-\d{2}-\d{2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{4}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4})/gi)].map((match) => invoiceDate(match[0])).filter(Boolean);
+    const amountPattern = /\b(subtotal|tax|credit|amount\s+due|amount\s+paid|prior\s+balance|invoice\s+total|total\s+due|total)\b\s*:?\s*(?:(USD|EUR|GBP|US\$)\s*)?([\$€£])?\s*(-?\d[\d,]*(?:\.\d{1,2})?)/i;
+    const amountCandidates = lineList.flatMap((line) => {
+      const match = line.match(amountPattern);
+      if (!match) return [];
+      const currencyToken = (match[2] || match[3] || "").toUpperCase();
+      const currency = currencyToken === "US$" || currencyToken === "USD" ? "USD" : currencyToken === "EUR" || currencyToken === "€" ? "EUR" : currencyToken === "GBP" || currencyToken === "£" ? "GBP" : "";
+      const value = Number(match[4].replaceAll(",", ""));
+      if (!Number.isFinite(value)) return [];
+      return [{ label: match[1].replace(/\s+/g, " ").toLowerCase(), value, currency }];
+    });
+    const currencies = new Set(amountCandidates.map((item) => item.currency).filter(Boolean));
+    return {
+      supported: true, provider: providerSignals[0].provider,
+      invoiceDate: dateFromLabel("invoice date|date issued|issued on"),
+      serviceStart: periodDates[0] || "", serviceEnd: periodDates[1] || "",
+      currency: currencies.size === 1 ? [...currencies][0] : "",
+      amountCandidates,
+      suggestedAmount: amountCandidates.length === 1 ? amountCandidates[0] : null,
+    };
+  }
+
+  async function inspectUploadedFiles(files) {
+    const selected = [...files];
+    if (!selected.length) throw new Error("Choose a CSV, JSON, or text-based PDF.");
+    if (selected.length > 2) throw new Error("Choose one file, or one matching provider export pair.");
+    const pdfs = selected.filter((file) => /\.pdf$/i.test(file.name) || file.type === "application/pdf");
+    if (pdfs.length) {
+      if (selected.length !== 1) throw new Error("Review one invoice PDF at a time.");
+      return { kind: "pdf", file: pdfs[0] };
+    }
+    const loaded = await Promise.all(selected.map(async (file) => ({ file, text: await readLocalFile(file) })));
+    const csvs = [];
+    const jsons = [];
+    for (const item of loaded) {
+      if (/\.json$/i.test(item.file.name) || /^\s*[\[{]/.test(item.text)) jsons.push(item);
+      else csvs.push({ ...item, parsed: parseFlatStructured(item.text, item.file.name) });
+    }
+    if (csvs.length === 2 && !jsons.length) {
+      const has = (parsed, required) => required.every((column) => parsed.headers.includes(column));
+      const usage = csvs.find((item) => has(item.parsed, openAIUsageColumns));
+      const cost = csvs.find((item) => has(item.parsed, openAICostColumns));
+      if (usage && cost && usage !== cost) return { kind: "openai", usageText: usage.text, costText: cost.text };
+      throw new Error("These two CSV files are not a recognized matching OpenAI export pair. Choose one unknown structured file at a time for guided mapping.");
+    }
+    if (jsons.length === 2 && !csvs.length) {
+      const parsed = jsons.map((item) => {
+        let value; try { value = JSON.parse(item.text); } catch { throw new Error("One selected JSON file is malformed."); }
+        const results = value?.data?.flatMap((bucket) => Array.isArray(bucket?.results) ? bucket.results : []) || [];
+        return { ...item, value, usage: results.some((row) => Object.hasOwn(row, "uncached_input_tokens")), cost: results.some((row) => Object.hasOwn(row, "amount")) };
+      });
+      const usage = parsed.find((item) => item.usage && !item.cost);
+      const cost = parsed.find((item) => item.cost && !item.usage);
+      if (usage && cost) return { kind: "claude_api", usageText: usage.text, costText: cost.text };
+      throw new Error("These JSON files are not a complete Claude Messages Usage and Cost report pair.");
+    }
+    if (loaded.length !== 1) throw new Error("Choose one structured file, or one recognized matching provider pair.");
+    if (csvs.length) {
+      const item = csvs[0];
+      const normalized = new Set(item.parsed.normalized);
+      if (claudeSpendColumns.every((column) => normalized.has(column))) return { kind: "claude_spend", text: item.text };
+      if (singleSpendColumns.every((column) => item.parsed.headers.includes(column))) {
+        if (item.parsed.rows.some((row) => String(row.period).toLowerCase() !== "baseline")) {
+          throw new Error("This universal file contains a route comparison. Use Compare two routes so the existing evidence gates remain in force.");
+        }
+        return { kind: "universal", text: item.text };
+      }
+      return { kind: "mapping", text: item.text, filename: item.file.name, parsed: item.parsed, mapping: suggestStructuredMapping(item.parsed) };
+    }
+    const parsed = parseFlatStructured(jsons[0].text, jsons[0].file.name);
+    return { kind: "mapping", text: jsons[0].text, filename: jsons[0].file.name, parsed, mapping: suggestStructuredMapping(parsed) };
   }
 
   function validateResult(data) {
@@ -2739,6 +2996,18 @@
     state.outcomeMode = "sample";
     state.importProvider = "openai";
     state.pendingClaudeImport = null;
+    state.uploadRoute = null;
+    state.pendingMappedImport = null;
+    state.invoicePdfCandidate = null;
+    document.getElementById("smart-upload-file-status").textContent = "Files are inspected only in this browser.";
+    document.getElementById("smart-upload-status").textContent = "";
+    document.getElementById("smart-upload-status").hidden = true;
+    document.getElementById("structured-mapper").hidden = true;
+    document.getElementById("mapping-preview").textContent = "";
+    document.getElementById("invoice-pdf-status").textContent = "";
+    document.getElementById("invoice-pdf-status").hidden = true;
+    document.getElementById("invoice-amount-choice-label").hidden = true;
+    document.getElementById("invoice-amount-choice").innerHTML = '<option value="">Review the invoice totals</option>';
     document.querySelectorAll(".import-provider").forEach((item) => { const active = item.dataset.importProvider === "openai"; item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active)); });
     document.getElementById("openai-import-fields").hidden = false;
     document.getElementById("claude-import-fields").hidden = true;
@@ -2763,6 +3032,35 @@
     syncBuilderControls();
   }
 
+  function activateBuilderMode(mode, button = null) {
+    state.builderMode = mode;
+    if (mode === "example") {
+      if (!state.demoData) { showToast("The worked example is still loading. Try again in a moment."); return; }
+      state.data = cloneData(state.demoData);
+      state.view = "review";
+      state.story = false;
+      document.body.classList.remove("story-mode");
+      document.getElementById("story-toggle").textContent = "Share view";
+      renderAll(); setView("review"); reviewDialog.close(); showToast("Worked example open. No files needed."); return;
+    }
+    document.querySelectorAll(".builder-mode").forEach((item) => {
+      const active = button ? item === button : item.dataset.builderMode === mode;
+      item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active));
+    });
+    const isOpenAI = mode === "openai";
+    const isSingle = mode === "single";
+    document.getElementById("single-builder-fields").hidden = !isSingle;
+    document.getElementById("workload-builder-fields").hidden = isOpenAI || isSingle;
+    document.getElementById("openai-builder-fields").hidden = !isOpenAI;
+    document.getElementById("builder-actions").hidden = false;
+    document.getElementById("builder-path-help").hidden = true;
+    document.getElementById("review-dialog-title").textContent = isSingle ? "Start with the records you already have." : isOpenAI ? "See what is driving the provider bill." : "Test whether the proposed change is actually cheaper.";
+    document.getElementById("builder-action-note").textContent = isSingle ? "Cost is enough to start. Usage and outcomes deepen the review when available; human effort and retries are optional." : isOpenAI ? "The result will show a useful cost and usage baseline without requiring outcome or human-review data." : state.outcomeMode === "sample" ? "The quick path produces a sampled estimate. It never becomes booked savings." : "Use the detailed log when you have one row per completed result.";
+    document.getElementById("build-review").textContent = isSingle ? "Understand this bill" : isOpenAI ? "Review the provider export" : "Build the finance review";
+    document.getElementById("builder-error").classList.remove("visible");
+    syncBuilderControls();
+  }
+
   document.getElementById("start-review").addEventListener("click", () => {
     document.getElementById("builder-error").classList.remove("visible");
     resetBuilderStart();
@@ -2774,61 +3072,22 @@
   });
 
   document.querySelectorAll(".builder-mode").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.builderMode = button.dataset.builderMode;
-      if (state.builderMode === "example") {
-        if (!state.demoData) {
-          showToast("The worked example is still loading. Try again in a moment.");
-          return;
-        }
-        state.data = cloneData(state.demoData);
-        state.view = "review";
-        state.story = false;
-        document.body.classList.remove("story-mode");
-        document.getElementById("story-toggle").textContent = "Share view";
-        renderAll();
-        setView("review");
-        reviewDialog.close();
-        showToast("Worked example open. No files needed.");
-        return;
-      }
-      document.querySelectorAll(".builder-mode").forEach((item) => {
-        const active = item === button;
-        item.classList.toggle("active", active);
-        item.setAttribute("aria-pressed", String(active));
-      });
-      const isOpenAI = state.builderMode === "openai";
-      const isSingle = state.builderMode === "single";
-      document.getElementById("single-builder-fields").hidden = !isSingle;
-      document.getElementById("workload-builder-fields").hidden = isOpenAI || isSingle;
-      document.getElementById("openai-builder-fields").hidden = !isOpenAI;
-      document.getElementById("builder-actions").hidden = false;
-      document.getElementById("builder-path-help").hidden = true;
-      document.getElementById("review-dialog-title").textContent = isSingle ? "Start with the records you already have." : isOpenAI
-        ? "See what is driving the provider bill."
-        : "Test whether the proposed change is actually cheaper.";
-      document.getElementById("builder-action-note").textContent = isSingle ? "Cost is enough to start. Usage and outcomes deepen the review when available; human effort and retries are optional." : isOpenAI
-        ? "The result will show a useful cost and usage baseline without requiring outcome or human-review data."
-        : state.outcomeMode === "sample"
-          ? "The quick path produces a sampled estimate. It never becomes booked savings."
-          : "Use the detailed log when you have one row per completed result.";
-      document.getElementById("build-review").textContent = isSingle ? "Understand this bill" : isOpenAI ? "Review the provider export" : "Build the finance review";
-      document.getElementById("builder-error").classList.remove("visible");
-      syncBuilderControls();
-    });
+    button.addEventListener("click", () => activateBuilderMode(button.dataset.builderMode, button));
   });
 
-  document.querySelectorAll(".import-provider").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.importProvider = button.dataset.importProvider;
+  function setImportProvider(provider) {
+      state.importProvider = provider;
       state.pendingClaudeImport = null;
-      document.querySelectorAll(".import-provider").forEach((item) => { const active = item === button; item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active)); });
+      document.querySelectorAll(".import-provider").forEach((item) => { const active = item.dataset.importProvider === provider; item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active)); });
       document.getElementById("openai-import-fields").hidden = state.importProvider !== "openai";
       document.getElementById("claude-import-fields").hidden = state.importProvider !== "claude";
       document.getElementById("claude-confirmation").hidden = true;
       document.getElementById("build-review").textContent = state.importProvider === "openai" ? "Review the OpenAI bill" : "Check the Claude export";
       syncBuilderControls();
-    });
+  }
+
+  document.querySelectorAll(".import-provider").forEach((button) => {
+    button.addEventListener("click", () => setImportProvider(button.dataset.importProvider));
   });
 
   document.querySelectorAll(".outcome-mode").forEach((button) => {
@@ -2858,6 +3117,114 @@
     if (state.builderMode === "openai" && state.importProvider === "claude") document.getElementById("build-review").textContent = "Check the Claude export";
   }
 
+  function discardImportedSourceState() {
+    state.uploadRoute = null;
+    state.pendingMappedImport = null;
+    state.pendingClaudeImport = null;
+    state.invoicePdfCandidate = null;
+  }
+
+  const mappingElementIds = {
+    date: "map-date", service_end: "map-service-end", provider: "map-provider", model: "map-model", workload: "map-workload",
+    cost: "map-cost", currency: "map-currency", requests: "map-requests", input: "map-input", output: "map-output",
+    cache_read: "map-cache-read", cache_write: "map-cache-write",
+  };
+
+  function selectedMapping() {
+    return Object.fromEntries(Object.entries(mappingElementIds).map(([field, id]) => [field, document.getElementById(id).value]));
+  }
+
+  async function updateMappingPreview() {
+    if (state.uploadRoute?.kind !== "mapping") return;
+    state.pendingMappedImport = null;
+    const preview = document.getElementById("mapping-preview");
+    try {
+      const mapped = await buildMappedReview(state.uploadRoute.text, state.uploadRoute.filename, selectedMapping());
+      const value = mapped.confirmation;
+      preview.textContent = `${value.rows} source rows normalize to ${value.currency} ${value.normalizedTotal.toFixed(2)}. Source and normalized cost totals reconcile. Missing fields stay unavailable. Check the mapping, then continue to confirmation.`;
+    } catch (error) {
+      preview.textContent = `${error.message} Use manual invoice entry or the universal spend template if the file cannot support a reliable cost review.`;
+    }
+  }
+
+  Object.values(mappingElementIds).forEach((id) => document.getElementById(id).addEventListener("change", updateMappingPreview));
+
+  document.getElementById("invoice-amount-choice").addEventListener("change", (event) => {
+    const candidate = state.invoicePdfCandidate?.amountCandidates?.[Number(event.target.value)];
+    if (!candidate) return;
+    document.getElementById("invoice-amount").value = String(candidate.value);
+    if (candidate.currency) document.getElementById("invoice-currency").value = candidate.currency;
+  });
+
+  document.getElementById("smart-upload-files").addEventListener("change", async (event) => {
+    const status = document.getElementById("smart-upload-status");
+    const error = document.getElementById("builder-error");
+    status.hidden = false; status.textContent = "Inspecting locally…"; error.classList.remove("visible");
+    state.uploadRoute = null; state.pendingMappedImport = null; state.invoicePdfCandidate = null;
+    document.getElementById("structured-mapper").hidden = true;
+    document.getElementById("smart-upload-file-status").textContent = `${event.target.files.length} file${event.target.files.length === 1 ? "" : "s"} selected. Contents stay in this browser.`;
+    try {
+      const route = await inspectUploadedFiles(event.target.files);
+      state.uploadRoute = route;
+      if (route.kind === "pdf") {
+        const candidate = extractInvoiceCandidate(await extractPdfText(route.file));
+        activateBuilderMode("single");
+        const pdfStatus = document.getElementById("invoice-pdf-status");
+        pdfStatus.hidden = false;
+        if (!candidate.supported) { pdfStatus.textContent = candidate.reason; return; }
+        state.invoicePdfCandidate = candidate;
+        document.getElementById("invoice-provider").value = candidate.provider;
+        document.getElementById("invoice-workload").value = `${candidate.provider} invoice`;
+        document.getElementById("invoice-date").value = candidate.invoiceDate;
+        document.getElementById("invoice-period-start").value = candidate.serviceStart;
+        document.getElementById("invoice-period-end").value = candidate.serviceEnd;
+        document.getElementById("invoice-currency").value = candidate.currency;
+        const choice = document.getElementById("invoice-amount-choice");
+        choice.innerHTML = '<option value="">Choose a labeled amount</option>' + candidate.amountCandidates.map((item, index) => `<option value="${index}">${escapeHtml(item.label)}: ${escapeHtml(item.currency || "currency not confirmed")} ${escapeHtml(item.value)}</option>`).join("");
+        document.getElementById("invoice-amount-choice-label").hidden = candidate.amountCandidates.length <= 1;
+        if (candidate.suggestedAmount) {
+          document.getElementById("invoice-amount").value = String(candidate.suggestedAmount.value);
+          if (candidate.suggestedAmount.currency) document.getElementById("invoice-currency").value = candidate.suggestedAmount.currency;
+        }
+        pdfStatus.textContent = candidate.amountCandidates.length > 1 ? "The invoice contains several labeled amounts. Choose the one to review, then confirm every field below." : "Invoice fields were read locally. Confirm every field below before building the review. No usage was inferred.";
+        return;
+      }
+      if (route.kind === "mapping") {
+        const options = '<option value="">Not supplied</option>' + route.parsed.headers.map((header) => `<option value="${escapeHtml(header)}">${escapeHtml(header)}</option>`).join("");
+        Object.entries(mappingElementIds).forEach(([field, id]) => { const select = document.getElementById(id); select.innerHTML = options; select.value = route.mapping[field]; });
+        document.getElementById("structured-mapper").hidden = false;
+        status.textContent = "This schema is not a supported direct export. Match its fields locally; suggestions come only from exact header aliases.";
+        await updateMappingPreview(); return;
+      }
+      if (route.kind === "openai") {
+        state.importProvider = "openai";
+        status.textContent = "Recognized the matching OpenAI Usage Dashboard activity and cost CSV exports. Review the provider steps, then build.";
+      } else if (route.kind === "claude_spend") {
+        setImportProvider("claude");
+        status.textContent = "Recognized a Claude Team/Enterprise spend report. Add its reporting-period dates below, then check the normalized review.";
+      } else if (route.kind === "claude_api") {
+        setImportProvider("claude");
+        const usage = JSON.parse(route.usageText);
+        const dates = usage.data.map((bucket) => bucket.starting_at.slice(0, 10)).sort();
+        document.getElementById("claude-period-start").value = dates[0] || "";
+        document.getElementById("claude-period-end").value = dates.at(-1) || "";
+        status.textContent = "Recognized complete Claude Admin Usage and Cost JSON reports. Check the detected reporting period, then confirm the normalized review.";
+      } else if (route.kind === "universal") {
+        activateBuilderMode("single");
+        document.getElementById("invoice-pdf-status").hidden = false;
+        document.getElementById("invoice-pdf-status").textContent = "Recognized the universal one-bill spend template. Optional outcome and human-effort evidence can be added below.";
+      }
+    } catch (caught) {
+      state.uploadRoute = null;
+      status.textContent = caught.message || "The file could not be inspected. Use manual invoice entry or the universal template.";
+      error.textContent = status.textContent; error.classList.add("visible");
+      if ([...event.target.files].some((file) => /\.pdf$/i.test(file.name))) {
+        activateBuilderMode("single");
+        const pdfStatus = document.getElementById("invoice-pdf-status"); pdfStatus.hidden = false; pdfStatus.textContent = status.textContent;
+      }
+    }
+  });
+
   [["spend-file", "spend-file-name"], ["work-file", "work-file-name"], ["openai-usage-file", "openai-usage-file-name"], ["openai-cost-file", "openai-cost-file-name"], ["claude-spend-file", "claude-spend-file-name"], ["claude-usage-file", "claude-usage-file-name"], ["claude-cost-file", "claude-cost-file-name"]].forEach(
     ([inputId, labelId]) => {
       document.getElementById(inputId).addEventListener("change", (event) => {
@@ -2881,8 +3248,9 @@
       if (state.builderMode === "single") {
         const [spendFile] = document.getElementById("single-spend-file").files;
         const [workFile] = document.getElementById("single-work-file").files;
-        let spendText = spendFile ? await readLocalFile(spendFile) : "";
-        if (!spendFile) {
+        const routedUniversal = !spendFile && state.uploadRoute?.kind === "universal";
+        let spendText = spendFile ? await readLocalFile(spendFile) : routedUniversal ? state.uploadRoute.text : "";
+        if (!spendFile && !routedUniversal) {
           const provider = safeImportedLabel(document.getElementById("invoice-provider").value, "Provider");
           const workload = safeImportedLabel(document.getElementById("invoice-workload").value, "Subscription or workload name");
           const invoiceDate = validDate(document.getElementById("invoice-date").value, "Invoice date");
@@ -2899,18 +3267,33 @@
           sharedCost: document.getElementById("single-shared-cost").value,
           serviceStart: spendFile ? "" : document.getElementById("invoice-period-start").value,
           serviceEnd: spendFile ? "" : document.getElementById("invoice-period-end").value,
-          reviewSource: spendFile ? "universal_template" : "invoice_form",
+          reviewSource: spendFile || routedUniversal ? "universal_template" : state.invoicePdfCandidate ? "invoice_pdf" : "invoice_form",
         });
+        discardImportedSourceState();
         renderAll();
         reviewDialog.close();
         showToast("Single bill reviewed locally. No savings claimed.");
         return;
       }
       if (state.builderMode === "openai") {
+        if (state.uploadRoute?.kind === "mapping") {
+          if (state.pendingMappedImport) {
+            state.data = state.pendingMappedImport.review;
+            validateResult(state.data);
+            discardImportedSourceState();
+            renderAll(); reviewDialog.close(); showToast("Mapped bill reviewed locally. Unmapped fields and personal identifiers were discarded."); return;
+          }
+          state.pendingMappedImport = await buildMappedReview(state.uploadRoute.text, state.uploadRoute.filename, selectedMapping());
+          const summary = state.pendingMappedImport.confirmation;
+          const box = document.getElementById("mapping-preview");
+          box.textContent = `${summary.rows} rows. ${summary.currency} ${summary.normalizedTotal.toFixed(2)} normalized and reconciled to the mapped source cost. Period: ${summary.period.start} to ${summary.period.end}. Unmapped fields are unavailable and were discarded. Confirm to build the review.`;
+          submit.textContent = "Confirm and build mapped review"; return;
+        }
         if (state.importProvider === "claude") {
           if (state.pendingClaudeImport) {
             state.data = state.pendingClaudeImport.review;
             validateResult(state.data);
+            discardImportedSourceState();
             renderAll(); reviewDialog.close(); showToast("Claude bill reviewed locally. Personal identifiers were discarded."); return;
           }
           const [spendFile] = document.getElementById("claude-spend-file").files;
@@ -2919,10 +3302,10 @@
           const start = document.getElementById("claude-period-start").value;
           const end = document.getElementById("claude-period-end").value;
           if (spendFile && (usageFile || costFile)) throw new Error("Choose the spend CSV or the Admin API JSON pair, not both.");
-          if (spendFile) state.pendingClaudeImport = await buildClaudeSpendReview(await readLocalFile(spendFile), start, end);
+          if (spendFile || state.uploadRoute?.kind === "claude_spend") state.pendingClaudeImport = await buildClaudeSpendReview(spendFile ? await readLocalFile(spendFile) : state.uploadRoute.text, start, end);
           else {
-            if (!usageFile || !costFile) throw new Error("Add a Claude spend CSV or both complete Admin API JSON files.");
-            state.pendingClaudeImport = await buildClaudeApiReview(await readLocalFile(usageFile), await readLocalFile(costFile), start, end);
+            if ((!usageFile || !costFile) && state.uploadRoute?.kind !== "claude_api") throw new Error("Add a Claude spend CSV or both complete Admin API JSON files.");
+            state.pendingClaudeImport = await buildClaudeApiReview(usageFile ? await readLocalFile(usageFile) : state.uploadRoute.usageText, costFile ? await readLocalFile(costFile) : state.uploadRoute.costText, start, end);
           }
           const summary = state.pendingClaudeImport.confirmation;
           const box = document.getElementById("claude-confirmation");
@@ -2931,9 +3314,10 @@
         }
         const [usageFile] = document.getElementById("openai-usage-file").files;
         const [costFile] = document.getElementById("openai-cost-file").files;
-        if (!usageFile || !costFile) throw new Error("Add both OpenAI CSV exports before building the bill review.");
-        state.data = await buildOpenAIBillReview(await readLocalFile(usageFile), await readLocalFile(costFile));
+        if ((!usageFile || !costFile) && state.uploadRoute?.kind !== "openai") throw new Error("Add both OpenAI CSV exports before building the bill review.");
+        state.data = await buildOpenAIBillReview(usageFile ? await readLocalFile(usageFile) : state.uploadRoute.usageText, costFile ? await readLocalFile(costFile) : state.uploadRoute.costText);
         validateResult(state.data);
+        discardImportedSourceState();
         renderAll();
         reviewDialog.close();
         showToast("OpenAI bill reviewed locally. Your files never left the browser.");
@@ -3025,7 +3409,7 @@
     } finally {
       submit.disabled = false;
       submit.textContent = state.builderMode === "single" ? "Understand this bill" : state.builderMode === "openai"
-        ? state.importProvider === "claude" && state.pendingClaudeImport ? "Confirm and build Claude review" : state.importProvider === "claude" ? "Check the Claude export" : "Review the OpenAI bill"
+        ? state.pendingMappedImport ? "Confirm and build mapped review" : state.importProvider === "claude" && state.pendingClaudeImport ? "Confirm and build Claude review" : state.importProvider === "claude" ? "Check the Claude export" : "Review the OpenAI bill"
         : state.builderMode === "workload"
           ? "Build the finance review"
           : "Continue";

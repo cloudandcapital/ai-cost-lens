@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
 import { performance } from 'node:perf_hooks';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { makeTextPdf } from './pdf-fixture.mjs';
 
 const root = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, root), 'utf8');
@@ -19,7 +21,7 @@ const element = (id) => {
 navButtons.push(element('review-tab'), element('anatomy-tab'), element('evidence-tab'));
 const document = { getElementById: element, querySelector: element, querySelectorAll() { return []; }, body: element('body') };
 const context = { TextEncoder, crypto: webcrypto, document, window: { scrollTo() {} } };
-runInNewContext(source.slice(0, boundary) + 'globalThis.api = {parseCsv, validDate, validateResult, buildLocalReview, buildSampledReview, buildOpenAIBillReview, buildSingleBillReview, buildClaudeSpendReview, buildClaudeApiReview, summarizeSingleBill, failedSavingsGateText, lumenResponse, renderAll, state};})();', context);
+runInNewContext(source.slice(0, boundary) + 'globalThis.api = {parseCsv, validDate, validateResult, buildLocalReview, buildSampledReview, buildOpenAIBillReview, buildSingleBillReview, buildClaudeSpendReview, buildClaudeApiReview, parseFlatStructured, suggestStructuredMapping, buildMappedReview, extractPdfText, extractInvoiceCandidate, inspectUploadedFiles, summarizeSingleBill, failedSavingsGateText, lumenResponse, renderAll, state};})();', context);
 const api = context.api;
 for (const date of ['2026-02-31', '2026-02-29', '2026-04-31', '2026-13-01', 'not-a-date']) assert.throws(() => api.validDate(date, 'Date'));
 for (const date of ['2024-02-29', '2026-02-28', '2026-12-31']) assert.equal(api.validDate(date, 'Date'), date);
@@ -141,6 +143,70 @@ await assert.rejects(api.buildClaudeSpendReview(read('tests/fixtures/synthetic-c
 await assert.rejects(api.buildClaudeSpendReview(read('tests/fixtures/synthetic-claude-team-spend.csv').replace(',10,1000,200,', ',-1,1000,200,'), '2026-08-01', '2026-08-31'), /non-negative whole number/);
 await assert.rejects(api.buildClaudeSpendReview(read('tests/fixtures/synthetic-claude-team-spend.csv').replace(',Chat,', ',=IMPORTXML,', 1), '2026-08-01', '2026-08-31'), /unsupported formula/);
 await assert.rejects(api.buildClaudeSpendReview(`${claudeHeader}\n${claudeRows[0]}\n${claudeRows[0]}\n`, '2026-08-01', '2026-08-31'), /duplicates/);
+
+// The unified entry point prefers strict provider schemas before guided mapping.
+const localFile = (name, contents, type = '') => ({ name, type, size: Buffer.byteLength(contents), text: async () => contents, arrayBuffer: async () => Buffer.from(contents) });
+assert.equal((await api.inspectUploadedFiles([
+  localFile('usage.csv', read('tests/fixtures/openai-dashboard-usage.csv')),
+  localFile('cost.csv', read('tests/fixtures/openai-dashboard-cost.csv')),
+])).kind, 'openai');
+assert.equal((await api.inspectUploadedFiles([localFile('claude.csv', read('tests/fixtures/synthetic-claude-team-spend.csv'))])).kind, 'claude_spend');
+assert.equal((await api.inspectUploadedFiles([
+  localFile('usage.json', read('tests/fixtures/synthetic-claude-usage-api.json'), 'application/json'),
+  localFile('cost.json', read('tests/fixtures/synthetic-claude-cost-api.json'), 'application/json'),
+])).kind, 'claude_api');
+
+const mappedCsv = [
+  'billing_date,service_period_end,vendor,model_name,route,spend,currency_code,request_count,prompt_tokens,completion_tokens,cache_read_tokens,customer_email,account_id',
+  '2026-08-01,2026-08-31,Anthropic,claude-sonnet,Support,12.50,USD,0,1000,200,100,private@example.invalid,acct-private',
+  '2026-08-02,2026-08-31,Anthropic,claude-sonnet,Support,7.50,USD,,500,100,,other@example.invalid,acct-other',
+].join('\n');
+const mappedParsed = api.parseFlatStructured(mappedCsv, 'unknown.csv');
+const suggested = api.suggestStructuredMapping(mappedParsed);
+assert.deepEqual({ ...suggested }, {
+  date: 'billing_date', service_end: 'service_period_end', provider: 'vendor', model: 'model_name', workload: 'route',
+  cost: 'spend', currency: 'currency_code', requests: 'request_count', input: 'prompt_tokens', output: 'completion_tokens',
+  cache_read: 'cache_read_tokens', cache_write: '',
+});
+const mapped = await api.buildMappedReview(mappedCsv, 'unknown.csv', suggested);
+const mappedSummary = api.summarizeSingleBill(mapped.review);
+assert.equal(mapped.confirmation.sourceTotal, 20);
+assert.equal(mapped.confirmation.normalizedTotal, 20);
+assert.equal(mappedSummary.totals.providerCost, 20);
+assert.equal(mappedSummary.totals.requests, null, 'incomplete request coverage remains unavailable');
+assert.equal(mappedSummary.totals.processedInput, 1500);
+assert.equal(mapped.review.config.reviewSource, 'structured_mapping');
+assert.doesNotMatch(JSON.stringify(mapped.review), /private@example|acct-private|acct-other/);
+assert.equal((await api.inspectUploadedFiles([localFile('unknown.csv', mappedCsv)])).kind, 'mapping');
+await assert.rejects(api.buildMappedReview(mappedCsv, 'unknown.csv', { ...suggested, cost: '' }), /Map provider-reported cost/);
+await assert.rejects(api.buildMappedReview(mappedCsv.replace('12.50', '-12.50'), 'unknown.csv', suggested), /credits or refunds/);
+await assert.rejects(api.buildMappedReview(`${mappedCsv}\n${mappedCsv.split('\n')[1]}`, 'unknown.csv', suggested), /duplicates/);
+await assert.rejects(api.buildMappedReview(mappedCsv.replace('7.50,USD', '7.50,EUR'), 'unknown.csv', suggested), /cannot mix currencies/);
+assert.throws(() => api.parseFlatStructured('{bad', 'unknown.json'), /not valid JSON/);
+const arbitraryNumbers = api.suggestStructuredMapping(api.parseFlatStructured('day,seat_count,estimated_budget\n2026-08-01,12,40', 'unknown.csv'));
+assert.equal(arbitraryNumbers.cost, '', 'unrelated numeric fields are never guessed');
+assert.equal(arbitraryNumbers.date, '', 'unknown date-like headers are never guessed');
+
+// Real, tiny text PDFs exercise the bundled parser boundary and sanitized invoice extraction.
+const pdfFile = (name, bytes) => ({ name, type: 'application/pdf', size: bytes.length, arrayBuffer: async () => bytes });
+const openAIPdf = makeTextPdf(['OpenAI, L.L.C.', 'Invoice date: August 31, 2026', 'Service period: August 1, 2026 - August 31, 2026', 'Amount due: USD 42.50']);
+const openAIText = await api.extractPdfText(pdfFile('openai.pdf', openAIPdf), pdfjs);
+const openAICandidate = api.extractInvoiceCandidate(openAIText);
+assert.equal(openAICandidate.provider, 'OpenAI');
+assert.equal(openAICandidate.invoiceDate, '2026-08-31');
+assert.equal(openAICandidate.serviceStart, '2026-08-01');
+assert.equal(openAICandidate.serviceEnd, '2026-08-31');
+assert.equal(openAICandidate.suggestedAmount.value, 42.5);
+assert.equal(openAICandidate.currency, 'USD');
+const anthropicPdf = makeTextPdf(['Anthropic PBC', 'Invoice date: 2026-08-31', 'Invoice total: USD 25.00']);
+assert.equal(api.extractInvoiceCandidate(await api.extractPdfText(pdfFile('anthropic.pdf', anthropicPdf), pdfjs)).provider, 'Anthropic');
+const ambiguous = api.extractInvoiceCandidate(['Claude subscription from Anthropic', 'Invoice date: 2026-08-31', 'Subtotal USD 100.00', 'Tax USD 8.00', 'Credit USD 10.00', 'Amount due USD 98.00'].join('\n'));
+assert.equal(ambiguous.amountCandidates.length, 4);
+assert.equal(ambiguous.suggestedAmount, null);
+assert.equal(api.extractInvoiceCandidate('Other Cloud Inc\nInvoice date: 2026-08-31\nTotal USD 10.00').supported, false);
+await assert.rejects(api.extractPdfText(pdfFile('blank.pdf', makeTextPdf([])), pdfjs), /No extractable/);
+await assert.rejects(api.extractPdfText(pdfFile('broken.pdf', Buffer.from('%PDF broken')), pdfjs), /malformed or scanned/);
+await assert.rejects(api.extractPdfText(pdfFile('locked.pdf', Buffer.from('x')), { getDocument: () => ({ promise: Promise.reject(Object.assign(new Error('Password required'), { name: 'PasswordException' })) }) }), /encrypted/);
 // A universal one-bill review must not need a proposed period or any outcomes.
 const spendHeaders = spend.trim().split('\n')[0];
 const singleRows = (rows) => spendHeaders + '\n' + rows.map((row) => row.join(',')).join('\n') + '\n';

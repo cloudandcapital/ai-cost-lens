@@ -11,3 +11,4 @@ private-openai-capture/
 sanitized-openai-evidence/
 artifacts/
 node_modules/
+web/vendor/

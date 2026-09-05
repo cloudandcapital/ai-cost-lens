@@ -75,6 +75,7 @@ const mode = value => document.querySelectorAll('.builder-mode').find(n => n.dat
 const provider = value => document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === value).emit('click');
 const outcome = value => document.querySelectorAll('.outcome-mode').find(n => n.dataset.outcomeMode === value).emit('click');
 const file = async (id, text, name = id + '.csv') => { el(id).files = [{name,size:Buffer.byteLength(text),text:async()=>text}]; await el(id).emit('change'); };
+const files = async (id, values) => { el(id).files = values.map(({name,text,type=''}) => ({name,type,size:Buffer.byteLength(text),text:async()=>text})); await el(id).emit('change'); };
 const submit = () => el('review-builder').emit('submit');
 const spend = read('web/templates/ai-cost-lens-spend-template.csv');
 const work = read('web/templates/ai-cost-lens-work-log-template.csv');
@@ -115,6 +116,9 @@ const fileLabels = ['spend-file-name','work-file-name','openai-usage-file-name',
 const labelDefaults = Object.fromEntries(fileLabels.map(id => [id,el(id).textContent]));
 async function assertFresh(nextMode) {
   const previous = api.state.data;
+  api.state.uploadRoute = {kind:'stale'};
+  api.state.pendingMappedImport = {review:'stale'};
+  api.state.invoicePdfCandidate = {provider:'stale'};
   for (const input of el('review-builder').querySelectorAll('input')) {
     if (input.attrs.type === 'file') input.files = [{name:'stale.csv'}];
     else if (input.attrs.type === 'checkbox') input.checked = !input.defaultChecked;
@@ -125,6 +129,7 @@ async function assertFresh(nextMode) {
   await click('start-review');
   assert.equal(api.state.data,previous);
   assert.equal(api.state.builderMode,null); assert.equal(api.state.outcomeMode,'sample');
+  assert.equal(api.state.uploadRoute,null); assert.equal(api.state.pendingMappedImport,null); assert.equal(api.state.invoicePdfCandidate,null);
   for (const input of el('review-builder').querySelectorAll('input')) {
     if (input.attrs.type === 'file') assert.equal(input.files.length,0,input.id);
     else { assert.equal(input.value,input.defaultValue,input.id); assert.equal(input.checked,input.defaultChecked,input.id); }
@@ -132,6 +137,9 @@ async function assertFresh(nextMode) {
   for (const id of fileLabels) assert.equal(el(id).textContent,labelDefaults[id],id);
   assert.equal(el('builder-error').textContent,'');
   assert.equal(el('builder-error').classList.contains('visible'),false);
+  assert.equal(el('structured-mapper').hidden,true);
+  assert.equal(el('invoice-pdf-status').hidden,true);
+  assert.equal(el('invoice-amount-choice-label').hidden,true);
   await mode(nextMode);
   for (const name of ['single','workload','openai']) {
     for (const input of el(name + '-builder-fields').querySelectorAll('input')) {
@@ -156,6 +164,27 @@ assert.match(el('bill-finding-limit').textContent,/Export the same date range/);
 assert.match(el('bill-finding-title').textContent,/not a matched financial review/);
 assert.equal(el('memo-decision-code').textContent,'PERIOD MISMATCH');
 assert.match(el('bill-boundary-copy').textContent,/before using this review for a financial decision/);
+await assertFresh('openai');
+await files('smart-upload-files', [
+  {name:'activity.csv',text:read('tests/fixtures/openai-dashboard-usage.csv')},
+  {name:'cost.csv',text:read('tests/fixtures/openai-dashboard-cost.csv')},
+]);
+assert.equal(api.state.uploadRoute.kind,'openai');
+await submit();
+assert.equal(api.state.data.schema_version,'ai-cost-lens-openai-bill-review/0.1');
+await assertFresh('openai');
+const mappedText = 'billing_date,vendor,route,spend,currency_code,request_count,private_email\n2026-08-01,Anthropic,Support,12.5,USD,0,private@example.invalid\n2026-08-02,Anthropic,Support,7.5,USD,,other@example.invalid\n';
+await files('smart-upload-files', [{name:'unknown.csv',text:mappedText}]);
+assert.equal(api.state.uploadRoute.kind,'mapping');
+assert.equal(el('structured-mapper').hidden,false);
+assert.match(el('mapping-preview').textContent,/USD 20.00/);
+const beforeMappedConfirmation = api.state.data;
+await submit();
+assert.equal(api.state.data,beforeMappedConfirmation);
+assert.ok(api.state.pendingMappedImport);
+await submit();
+assert.equal(api.state.data.config.reviewSource,'structured_mapping');
+assert.doesNotMatch(JSON.stringify(api.state.data),/private@example|other@example/);
 await assertFresh('openai');
 await provider('claude');
 await file('claude-spend-file',read('tests/fixtures/synthetic-claude-team-spend.csv'));

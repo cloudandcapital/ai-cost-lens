@@ -10,7 +10,11 @@ All notable changes to AI Cost Lens are documented here.
 - A confirmation step that shows the normalized provider, period, product, model, cost, usage, missing fields, and row count before a Claude review is built.
 - Claude Team and Enterprise email and account identifiers are discarded before the review record is created.
 - Missing Claude request and token fields remain unavailable, and Admin API usage does not manufacture a request count.
-- The existing OpenAI importer and all savings gates remain unchanged.
+- A single local upload entry routes supported OpenAI and Claude CSV or JSON files before offering guided normalization.
+- Text-based OpenAI and Anthropic invoice PDFs can prefill the existing invoice form for review and confirmation; scans, encryption, malformed files, and ambiguous totals fall back safely.
+- Unknown flat CSV or JSON files can be mapped through deterministic header aliases with required confirmation and cost reconciliation.
+- Raw PDF text, unmapped fields, and personal identifiers do not enter the saved review.
+- The existing calculation engine and all savings gates remain unchanged.
 
 ## [0.3.2]: 2026-09-04
 
