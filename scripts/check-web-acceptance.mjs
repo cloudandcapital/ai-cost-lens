@@ -186,10 +186,37 @@ assert.equal(mappedSummary.totals.processedInput, 1500);
 assert.equal(mapped.review.config.reviewSource, 'structured_mapping');
 assert.doesNotMatch(JSON.stringify(mapped.review), /private@example|acct-private|acct-other/);
 assert.equal((await api.inspectUploadedFiles([localFile('unknown.csv', mappedCsv)])).kind, 'mapping');
+const mappedRoute = await api.inspectUploadedFiles([localFile('unknown.csv', mappedCsv)]);
+for (const identifying of ['customer_email', 'account_id']) assert.ok(!mappedRoute.mappableHeaders.includes(identifying));
+for (const harmless of ['vendor', 'model_name', 'route']) assert.ok(mappedRoute.mappableHeaders.includes(harmless));
 await assert.rejects(api.buildMappedReview(mappedCsv, 'unknown.csv', { ...suggested, cost: '' }), /Map provider-reported cost/);
 await assert.rejects(api.buildMappedReview(mappedCsv.replace('12.50', '-12.50'), 'unknown.csv', suggested), /credits or refunds/);
 await assert.rejects(api.buildMappedReview(`${mappedCsv}\n${mappedCsv.split('\n')[1]}`, 'unknown.csv', suggested), /duplicates/);
 await assert.rejects(api.buildMappedReview(mappedCsv.replace('7.50,USD', '7.50,EUR'), 'unknown.csv', suggested), /cannot mix currencies/);
+await assert.rejects(api.buildMappedReview(mappedCsv, 'unknown.csv', { ...suggested, provider: 'customer_email' }), /Identifying source fields/);
+await assert.rejects(api.buildMappedReview(mappedCsv.replace('Anthropic', 'private@example.invalid'), 'unknown.csv', suggested), /personal identifier/);
+await assert.rejects(api.buildMappedReview(mappedCsv.replace('claude-sonnet', '8ca9f0be-36a7-4dd9-95d5-848d2b669afb'), 'unknown.csv', suggested), /personal identifier/);
+const identityHeaders = 'date,cost,currency,user_email,full_name,account_uuid,user_id,address,workload\n2026-08-01,10,USD,private@example.invalid,Private Person,8ca9f0be-36a7-4dd9-95d5-848d2b669afb,user-123,1 Private Way,Customer Support';
+const identityRoute = await api.inspectUploadedFiles([localFile('identity.csv', identityHeaders)]);
+assert.deepEqual([...identityRoute.mappableHeaders], ['date', 'cost', 'currency', 'workload']);
+const constantCsv = 'billing_date,spend,route\n2026-08-01,12.50,Customer Support\n2026-08-02,7.50,Customer Support';
+const constantSuggested = api.suggestStructuredMapping(api.parseFlatStructured(constantCsv, 'constant.csv'));
+await assert.rejects(api.buildMappedReview(constantCsv, 'constant.csv', constantSuggested), /enter the three-letter reported currency/);
+await assert.rejects(api.buildMappedReview(constantCsv, 'constant.csv', { ...constantSuggested, currencyConstant: 'US' }), /three-letter code/);
+const constantMapped = await api.buildMappedReview(constantCsv, 'constant.csv', { ...constantSuggested, currencyConstant: 'EUR', providerConstant: 'Anthropic' });
+assert.equal(constantMapped.review.currency, 'EUR');
+assert.ok(constantMapped.review.source.spend.every((row) => row.provider === 'Anthropic'));
+assert.ok(constantMapped.review.source.spend.every((row) => row.workload === 'Customer Support'));
+const missingProviderMapped = await api.buildMappedReview(constantCsv, 'constant.csv', { ...constantSuggested, currencyConstant: 'EUR' });
+assert.ok(missingProviderMapped.review.source.spend.every((row) => row.provider === 'Provider not supplied'));
+await assert.rejects(api.buildMappedReview(mappedCsv, 'unknown.csv', { ...suggested, currencyConstant: 'USD' }), /either a mapped currency column/);
+await assert.rejects(api.buildMappedReview(mappedCsv, 'unknown.csv', { ...suggested, providerConstant: 'Anthropic' }), /either a mapped provider column/);
+const mixedConstantCsv = 'billing_date,spend,currency_code\n2026-08-01,12.50,USD\n2026-08-02,7.50,EUR';
+const mixedConstantSuggested = api.suggestStructuredMapping(api.parseFlatStructured(mixedConstantCsv, 'mixed.csv'));
+await assert.rejects(api.buildMappedReview(mixedConstantCsv, 'mixed.csv', mixedConstantSuggested), /cannot mix currencies/);
+for (const value of ['private@example.invalid', '8ca9f0be-36a7-4dd9-95d5-848d2b669afb']) {
+  await assert.rejects(api.buildMappedReview(constantCsv, 'constant.csv', { ...constantSuggested, currencyConstant: 'USD', providerConstant: value }), /personal identifier/);
+}
 assert.throws(() => api.parseFlatStructured('{bad', 'unknown.json'), /not valid JSON/);
 const arbitraryNumbers = api.suggestStructuredMapping(api.parseFlatStructured('day,seat_count,estimated_budget\n2026-08-01,12,40', 'unknown.csv'));
 assert.equal(arbitraryNumbers.cost, '', 'unrelated numeric fields are never guessed');
@@ -208,6 +235,18 @@ assert.equal(openAICandidate.serviceStart, '2026-08-01');
 assert.equal(openAICandidate.serviceEnd, '2026-08-31');
 assert.equal(openAICandidate.suggestedAmount.value, 42.5);
 assert.equal(openAICandidate.currency, 'USD');
+for (const [label, value, expected] of [
+  ['Date of issue', 'February 29, 2024', '2024-02-29'],
+  ['Billing date', '2/29/2024', '2024-02-29'],
+  ['Date issued', '2026-08-31', '2026-08-31'],
+  ['Issued on', '31 August 2026', '2026-08-31'],
+]) {
+  assert.equal(api.extractInvoiceCandidate(`OpenAI\n${label}: ${value}\nTotal USD 10.00`).invoiceDate, expected);
+}
+for (const value of ['February 29, 2026', '2/29/2026', '2026-02-29']) {
+  assert.throws(() => api.extractInvoiceCandidate(`OpenAI\nInvoice date: ${value}\nTotal USD 10.00`), /calendar/);
+}
+assert.equal(api.extractInvoiceCandidate('OpenAI\nPayment due date: August 31, 2026\nTotal USD 10.00').invoiceDate, '');
 const anthropicPdf = makeTextPdf(['Anthropic PBC', 'Invoice date: 2026-08-31', 'Invoice total: USD 25.00']);
 const anthropicLines = ['Anthropic PBC', 'Invoice date: 2026-08-31', 'Invoice total: USD 25.00'];
 assert.equal(api.extractInvoiceCandidate(await api.extractPdfText(pdfFile('anthropic.pdf', anthropicPdf), pdfjs || textPdfModule(anthropicLines))).provider, 'Anthropic');

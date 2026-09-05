@@ -165,13 +165,30 @@ assert.match(el('bill-finding-title').textContent,/not a matched financial revie
 assert.equal(el('memo-decision-code').textContent,'PERIOD MISMATCH');
 assert.match(el('bill-boundary-copy').textContent,/before using this review for a financial decision/);
 await assertFresh('openai');
+await provider('claude');
 await files('smart-upload-files', [
   {name:'activity.csv',text:read('tests/fixtures/openai-dashboard-usage.csv')},
   {name:'cost.csv',text:read('tests/fixtures/openai-dashboard-cost.csv')},
 ]);
 assert.equal(api.state.uploadRoute.kind,'openai');
+assert.equal(api.state.importProvider,'openai');
+assert.equal(document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === 'openai').classList.contains('active'),true);
+assert.equal(el('openai-import-fields').hidden,false);
+assert.equal(el('claude-import-fields').hidden,true);
+assert.equal(el('build-review').textContent,'Review the OpenAI bill');
+assert.equal(el('smart-upload-files').files.length,2);
 await submit();
 assert.equal(api.state.data.schema_version,'ai-cost-lens-openai-bill-review/0.1');
+await assertFresh('openai');
+await provider('openai');
+await files('smart-upload-files', [{name:'claude.csv',text:read('tests/fixtures/synthetic-claude-team-spend.csv')}]);
+assert.equal(api.state.uploadRoute.kind,'claude_spend');
+assert.equal(api.state.importProvider,'claude');
+assert.equal(document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === 'claude').classList.contains('active'),true);
+assert.equal(el('openai-import-fields').hidden,true);
+assert.equal(el('claude-import-fields').hidden,false);
+assert.equal(el('build-review').textContent,'Check the Claude export');
+assert.equal(el('smart-upload-files').files.length,1);
 await assertFresh('openai');
 const mappedText = 'billing_date,vendor,route,spend,currency_code,request_count,private_email\n2026-08-01,Anthropic,Support,12.5,USD,0,private@example.invalid\n2026-08-02,Anthropic,Support,7.5,USD,,other@example.invalid\n';
 await files('smart-upload-files', [{name:'unknown.csv',text:mappedText}]);

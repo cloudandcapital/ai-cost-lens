@@ -778,11 +778,13 @@
                 <div class="field-grid compact-fields" id="mapping-fields">
                   <label><span>Date or service-period start</span><select id="map-date"></select></label>
                   <label><span>Optional service-period end</span><select id="map-service-end"></select></label>
-                  <label><span>Provider</span><select id="map-provider"></select></label>
+                  <label><span>Provider column</span><select id="map-provider"></select></label>
+                  <label><span>Provider for every row (optional)</span><input id="map-provider-constant" type="text" maxlength="100" placeholder="Anthropic" /><small>Use when the file has no provider column.</small></label>
                   <label><span>Model or product</span><select id="map-model"></select></label>
                   <label><span>Workload or route</span><select id="map-workload"></select></label>
                   <label><span>Provider-reported cost</span><select id="map-cost"></select></label>
-                  <label><span>Currency</span><select id="map-currency"></select></label>
+                  <label><span>Currency column</span><select id="map-currency"></select></label>
+                  <label><span>Reported currency for every row</span><input id="map-currency-constant" type="text" maxlength="3" inputmode="text" placeholder="USD" /><small>Required when the file has no currency column. No conversion is applied.</small></label>
                   <label><span>Requests</span><select id="map-requests"></select></label>
                   <label><span>Input tokens</span><select id="map-input"></select></label>
                   <label><span>Output tokens</span><select id="map-output"></select></label>

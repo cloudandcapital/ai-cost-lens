@@ -1457,6 +1457,21 @@
 
   const normalizeHeader = (value) => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 
+  function identifyingHeader(value) {
+    const header = normalizeHeader(value);
+    return header === "name" || /(?:^|_)(?:email|e_mail|full_name|first_name|last_name|address|street_address|postal_address|account_uuid|user_uuid|account_id|user_id|customer_id|member_id|employee_id|contact_id)(?:_|$)/.test(header);
+  }
+
+  const mappableHeaders = (parsed) => parsed.headers.filter((header) => !identifyingHeader(header));
+
+  function safeMappedLabel(value, label) {
+    const text = safeImportedLabel(value, label);
+    if (/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(text) || /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i.test(text)) {
+      throw new Error(`${label} looks like a personal identifier. Choose a non-identifying provider, model, workload, or route label.`);
+    }
+    return text;
+  }
+
   function parseFlatStructured(text, filename = "structured file") {
     if (new TextEncoder().encode(text).length > 5 * 1024 * 1024) throw new Error("The structured file exceeds the 5 MiB local limit.");
     let rows;
@@ -1491,17 +1506,30 @@
   }
 
   function suggestStructuredMapping(parsed) {
+    const allowed = mappableHeaders(parsed);
     return Object.fromEntries(mappingFields.map((field) => {
-      const matches = parsed.headers.filter((header) => mappingAliases[field].includes(normalizeHeader(header)));
+      const matches = allowed.filter((header) => mappingAliases[field].includes(normalizeHeader(header)));
       return [field, matches.length === 1 ? matches[0] : ""];
     }));
   }
 
   async function buildMappedReview(text, filename, mapping) {
     const parsed = parseFlatStructured(text, filename);
-    for (const required of ["date", "cost", "currency"]) {
+    for (const field of mappingFields) {
+      if (mapping[field] && (!parsed.headers.includes(mapping[field]) || identifyingHeader(mapping[field]))) {
+        throw new Error("Identifying source fields cannot be included in a mapped review.");
+      }
+    }
+    for (const required of ["date", "cost"]) {
       if (!mapping[required] || !parsed.headers.includes(mapping[required])) throw new Error(`Map ${required === "cost" ? "provider-reported cost" : required} before building the review.`);
     }
+    const currencyConstant = String(mapping.currencyConstant || "").trim().toUpperCase();
+    const providerConstant = String(mapping.providerConstant || "").trim();
+    if (mapping.currency && currencyConstant) throw new Error("Choose either a mapped currency column or one reported currency, not both.");
+    if (!mapping.currency && !currencyConstant) throw new Error("Map currency or enter the three-letter reported currency before building the review.");
+    if (currencyConstant && !/^[A-Z]{3}$/.test(currencyConstant)) throw new Error("Reported currency must be a three-letter code.");
+    if (mapping.provider && providerConstant) throw new Error("Choose either a mapped provider column or one provider name, not both.");
+    const checkedProviderConstant = providerConstant ? safeMappedLabel(providerConstant, "Provider") : "";
     const read = (row, field) => mapping[field] ? String(row[mapping[field]] ?? "").trim() : "";
     const normalized = parsed.rows.map((row, index) => {
       const label = `Mapped row ${index + 2}`;
@@ -1509,7 +1537,7 @@
       const serviceEnd = read(row, "service_end");
       if (serviceEnd) validDate(serviceEnd, `${label} service end`);
       const cost = costNumber(read(row, "cost"), `${label} provider-reported cost`);
-      const currency = read(row, "currency").toUpperCase();
+      const currency = mapping.currency ? read(row, "currency").toUpperCase() : currencyConstant;
       if (!/^[A-Z]{3}$/.test(currency)) throw new Error(`${label} currency must be a three-letter code.`);
       const optionalInteger = (field, name) => {
         const value = read(row, field);
@@ -1517,10 +1545,10 @@
       };
       return {
         period: "baseline", date,
-        workload: read(row, "workload") ? safeImportedLabel(read(row, "workload"), `${label} workload`) : "Imported provider bill",
-        provider: read(row, "provider") ? safeImportedLabel(read(row, "provider"), `${label} provider`) : "Provider not supplied",
-        model: read(row, "model") ? safeImportedLabel(read(row, "model"), `${label} model`) : "",
-        route: read(row, "workload") ? safeImportedLabel(read(row, "workload"), `${label} route`) : "Mapped structured file",
+        workload: read(row, "workload") ? safeMappedLabel(read(row, "workload"), `${label} workload`) : "Imported provider bill",
+        provider: read(row, "provider") ? safeMappedLabel(read(row, "provider"), `${label} provider`) : checkedProviderConstant || "Provider not supplied",
+        model: read(row, "model") ? safeMappedLabel(read(row, "model"), `${label} model`) : "",
+        route: read(row, "workload") ? safeMappedLabel(read(row, "workload"), `${label} route`) : "Mapped structured file",
         requests: optionalInteger("requests", "requests"),
         input_tokens: optionalInteger("input", "input tokens"),
         cached_input_tokens: optionalInteger("cache_read", "cache read tokens"),
@@ -1546,7 +1574,7 @@
     }
     return { review, confirmation: {
       rows: normalized.length, currency: [...currencies][0], sourceTotal: round(sourceTotal), normalizedTotal: round(summary.totals.providerCost),
-      period: summary.period, missing: mappingFields.filter((field) => !mapping[field]), identifiersDiscarded: true,
+      period: summary.period, missing: mappingFields.filter((field) => !mapping[field] && !mapping[`${field}Constant`]), confirmedFieldsOnly: true,
     } };
   }
 
@@ -1592,11 +1620,19 @@
   function invoiceDate(value) {
     const raw = String(value).trim().replace(/,$/, "");
     if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return validDate(raw, "Invoice date");
-    const match = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-    if (match) return validDate(`${match[3]}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`, "Invoice date");
-    const timestamp = Date.parse(raw);
-    if (!Number.isFinite(timestamp)) return null;
-    return new Date(timestamp).toISOString().slice(0, 10);
+    const numeric = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    if (numeric) return validDate(`${numeric[3]}-${numeric[1].padStart(2, "0")}-${numeric[2].padStart(2, "0")}`, "Invoice date");
+    const months = { jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12 };
+    const monthFirst = raw.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+    const dayFirst = raw.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+    const match = monthFirst || dayFirst;
+    if (!match) return null;
+    const monthName = (monthFirst ? match[1] : match[2]).toLowerCase();
+    const month = months[monthName];
+    if (!month) return null;
+    const day = monthFirst ? match[2] : match[1];
+    const year = match[3];
+    return validDate(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, "Invoice date");
   }
 
   function extractInvoiceCandidate(text) {
@@ -1608,8 +1644,8 @@
     const lineList = String(text).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     const dateFromLabel = (labels) => {
       for (const line of lineList) {
-        const match = line.match(new RegExp(`(?:${labels})\\s*:?\\s*(.+)$`, "i"));
-        if (match) { try { const date = invoiceDate(match[1]); if (date) return date; } catch {} }
+        const match = line.match(new RegExp(`^(?:${labels})\\s*:?\\s*(.+)$`, "i"));
+        if (match) { const date = invoiceDate(match[1]); if (date) return date; }
       }
       return "";
     };
@@ -1628,7 +1664,7 @@
     const currencies = new Set(amountCandidates.map((item) => item.currency).filter(Boolean));
     return {
       supported: true, provider: providerSignals[0].provider,
-      invoiceDate: dateFromLabel("invoice date|date issued|issued on"),
+      invoiceDate: dateFromLabel("invoice date|date issued|date of issue|issued on|billing date"),
       serviceStart: periodDates[0] || "", serviceEnd: periodDates[1] || "",
       currency: currencies.size === 1 ? [...currencies][0] : "",
       amountCandidates,
@@ -1681,10 +1717,10 @@
         }
         return { kind: "universal", text: item.text };
       }
-      return { kind: "mapping", text: item.text, filename: item.file.name, parsed: item.parsed, mapping: suggestStructuredMapping(item.parsed) };
+      return { kind: "mapping", text: item.text, filename: item.file.name, parsed: item.parsed, mappableHeaders: mappableHeaders(item.parsed), mapping: suggestStructuredMapping(item.parsed) };
     }
     const parsed = parseFlatStructured(jsons[0].text, jsons[0].file.name);
-    return { kind: "mapping", text: jsons[0].text, filename: jsons[0].file.name, parsed, mapping: suggestStructuredMapping(parsed) };
+    return { kind: "mapping", text: jsons[0].text, filename: jsons[0].file.name, parsed, mappableHeaders: mappableHeaders(parsed), mapping: suggestStructuredMapping(parsed) };
   }
 
   function validateResult(data) {
@@ -3131,7 +3167,11 @@
   };
 
   function selectedMapping() {
-    return Object.fromEntries(Object.entries(mappingElementIds).map(([field, id]) => [field, document.getElementById(id).value]));
+    return {
+      ...Object.fromEntries(Object.entries(mappingElementIds).map(([field, id]) => [field, document.getElementById(id).value])),
+      currencyConstant: document.getElementById("map-currency-constant").value,
+      providerConstant: document.getElementById("map-provider-constant").value,
+    };
   }
 
   async function updateMappingPreview() {
@@ -3148,6 +3188,7 @@
   }
 
   Object.values(mappingElementIds).forEach((id) => document.getElementById(id).addEventListener("change", updateMappingPreview));
+  ["map-currency-constant", "map-provider-constant"].forEach((id) => document.getElementById(id).addEventListener("input", updateMappingPreview));
 
   document.getElementById("invoice-amount-choice").addEventListener("change", (event) => {
     const candidate = state.invoicePdfCandidate?.amountCandidates?.[Number(event.target.value)];
@@ -3190,14 +3231,14 @@
         return;
       }
       if (route.kind === "mapping") {
-        const options = '<option value="">Not supplied</option>' + route.parsed.headers.map((header) => `<option value="${escapeHtml(header)}">${escapeHtml(header)}</option>`).join("");
+        const options = '<option value="">Not supplied</option>' + route.mappableHeaders.map((header) => `<option value="${escapeHtml(header)}">${escapeHtml(header)}</option>`).join("");
         Object.entries(mappingElementIds).forEach(([field, id]) => { const select = document.getElementById(id); select.innerHTML = options; select.value = route.mapping[field]; });
         document.getElementById("structured-mapper").hidden = false;
         status.textContent = "This schema is not a supported direct export. Match its fields locally; suggestions come only from exact header aliases.";
         await updateMappingPreview(); return;
       }
       if (route.kind === "openai") {
-        state.importProvider = "openai";
+        setImportProvider("openai");
         status.textContent = "Recognized the matching OpenAI Usage Dashboard activity and cost CSV exports. Review the provider steps, then build.";
       } else if (route.kind === "claude_spend") {
         setImportProvider("claude");
@@ -3281,12 +3322,12 @@
             state.data = state.pendingMappedImport.review;
             validateResult(state.data);
             discardImportedSourceState();
-            renderAll(); reviewDialog.close(); showToast("Mapped bill reviewed locally. Unmapped fields and personal identifiers were discarded."); return;
+            renderAll(); reviewDialog.close(); showToast("Mapped bill reviewed locally. Only the fields you confirmed were included. Unmapped source fields were discarded."); return;
           }
           state.pendingMappedImport = await buildMappedReview(state.uploadRoute.text, state.uploadRoute.filename, selectedMapping());
           const summary = state.pendingMappedImport.confirmation;
           const box = document.getElementById("mapping-preview");
-          box.textContent = `${summary.rows} rows. ${summary.currency} ${summary.normalizedTotal.toFixed(2)} normalized and reconciled to the mapped source cost. Period: ${summary.period.start} to ${summary.period.end}. Unmapped fields are unavailable and were discarded. Confirm to build the review.`;
+          box.textContent = `${summary.rows} rows. ${summary.currency} ${summary.normalizedTotal.toFixed(2)} normalized and reconciled to the mapped source cost. Period: ${summary.period.start} to ${summary.period.end}. Only the fields you confirmed were included. Unmapped source fields were discarded. Confirm to build the review.`;
           submit.textContent = "Confirm and build mapped review"; return;
         }
         if (state.importProvider === "claude") {
