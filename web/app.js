@@ -200,28 +200,26 @@
 
   function summarizeSpendRows(spend, period, { allowZeroRequests = false } = {}) {
     const tokenFields = {
-      input_tokens: { total: 0, complete: true, label: "input_tokens" },
-      cached_input_tokens: { total: 0, complete: true, label: "cached_input_tokens" },
-      cache_write_input_tokens: { total: 0, complete: true, label: "cache_write_input_tokens" },
-      output_tokens: { total: 0, complete: true, label: "output_tokens" },
+      input_tokens: { total: 0, supplied: 0, label: "input_tokens", result: "processedInput" },
+      cached_input_tokens: { total: 0, supplied: 0, label: "cached_input_tokens", result: "cachedInput" },
+      cache_write_input_tokens: { total: 0, supplied: 0, label: "cache_write_input_tokens", result: "cacheWriteInput" },
+      output_tokens: { total: 0, supplied: 0, label: "output_tokens", result: "outputTokens" },
     };
     let requests = 0;
-    let requestsComplete = true;
+    let requestsSupplied = 0;
     let providerCost = 0;
 
     spend.forEach((row, index) => {
       const rowNumber = index + 2;
       const rowRequests = optionalNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
-      if (rowRequests === null) requestsComplete = false;
-      else requests += rowRequests;
+      if (rowRequests !== null) { requests += rowRequests; requestsSupplied++; }
       providerCost += costNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
 
       const supplied = {};
       Object.entries(tokenFields).forEach(([field, aggregate]) => {
         const value = optionalNumber(row[field], `Spend ${period} row ${rowNumber} ${aggregate.label}`, { integer: true });
         supplied[field] = value;
-        if (value === null) aggregate.complete = false;
-        else aggregate.total += value;
+        if (value !== null) { aggregate.total += value; aggregate.supplied++; }
       });
 
       if (supplied.input_tokens === null && (supplied.cached_input_tokens !== null || supplied.cache_write_input_tokens !== null)) {
@@ -237,17 +235,31 @@
       }
     });
 
-    if (!allowZeroRequests && requestsComplete && requests === 0) {
+    if (!allowZeroRequests && requestsSupplied === spend.length && requests === 0) {
       throw new Error(`Spend ${period} requests must be greater than zero when supplied.`);
     }
-    const totalOrMissing = (field) => tokenFields[field].complete ? tokenFields[field].total : null;
+    const coverageEntry = (suppliedRows, reportedSubtotal) => ({
+      suppliedRows,
+      totalRows: spend.length,
+      status: suppliedRows === spend.length ? "complete" : suppliedRows ? "partial" : "missing",
+      reportedSubtotal: suppliedRows ? reportedSubtotal : null,
+    });
+    const coverage = { requests: coverageEntry(requestsSupplied, requests) };
+    const reported = { requests: requestsSupplied ? requests : null };
+    Object.values(tokenFields).forEach((aggregate) => {
+      coverage[aggregate.result] = coverageEntry(aggregate.supplied, aggregate.total);
+      reported[aggregate.result] = aggregate.supplied ? aggregate.total : null;
+    });
+    const totalOrMissing = (field) => tokenFields[field].supplied === spend.length ? tokenFields[field].total : null;
     return {
-      requests: requestsComplete ? requests : null,
+      requests: requestsSupplied === spend.length ? requests : null,
       providerCost,
       processedInput: totalOrMissing("input_tokens"),
       cachedInput: totalOrMissing("cached_input_tokens"),
       cacheWriteInput: totalOrMissing("cache_write_input_tokens"),
       outputTokens: totalOrMissing("output_tokens"),
+      reported,
+      coverage,
     };
   }
 
@@ -380,6 +392,20 @@
     };
   }
 
+  function reportedCoverageValue(totals, field) {
+    const coverage = totals.coverage[field];
+    if (coverage.status === "missing") return "Not supplied";
+    const value = compact(totals.reported[field]);
+    return coverage.status === "partial" ? `${value} reported` : value;
+  }
+
+  function reportedCoverageNote(totals, field, completeNote) {
+    const coverage = totals.coverage[field];
+    if (coverage.status === "partial") return `${coverage.suppliedRows} of ${coverage.totalRows} rows supplied this field; the full total is unavailable.`;
+    if (coverage.status === "missing") return "No rows supplied this field; missing values were not treated as zero.";
+    return completeNote;
+  }
+
   function singleBillGuidance(review) {
     const { totals } = review;
     const cost = (value) => money(value, value < 1 ? 4 : 2);
@@ -408,14 +434,19 @@
     if (review.providerUnit === null) {
       const topLabel = topCost?.label || review.workload;
       const topValue = topCostShare === null ? cost(totals.providerCost) : pct(topCostShare, 1);
-      const cacheTitle = cacheShare === null
-        ? "Caching is a question, not a saving"
+      const cacheCoverage = totals.coverage.cachedInput;
+      const cacheTitle = cacheCoverage.status === "partial"
+        ? "Cache-read coverage is incomplete"
+        : cacheShare === null
+          ? "Caching is a question, not a saving"
         : cacheShare
           ? "Cached input is already visible"
           : "No cached input is visible";
-      const cacheValue = cacheShare === null ? "Not supplied" : pct(cacheShare, 1);
-      const cacheNote = cacheShare === null
-        ? "If this workload repeatedly sends the same context, check whether the provider or gateway can report and discount cached input. Do not assume it is available."
+      const cacheValue = cacheCoverage.status === "partial" ? `${compact(totals.reported.cachedInput)} reported` : cacheShare === null ? "Not supplied" : pct(cacheShare, 1);
+      const cacheNote = cacheCoverage.status === "partial"
+        ? `${cacheCoverage.suppliedRows} of ${cacheCoverage.totalRows} rows supplied cache-read tokens. The known subtotal is preserved, but cache share is unavailable.`
+        : cacheShare === null
+          ? "If this workload repeatedly sends the same context, check whether the provider or gateway can report and discount cached input. Do not assume it is available."
         : cacheShare
           ? `${pct(cacheShare, 1)} of processed input was reported as cache reads. Confirm that the billing treatment is actually discounted before calling it a saving.`
           : "If prompts repeatedly send the same long context, test provider-supported caching on one bounded workload and compare the billed result.";
@@ -1155,9 +1186,21 @@
       "cache_write_input_tokens",
       "output_tokens",
     ];
-    return Object.fromEntries(
-      fields.map((field) => [field, rows.reduce((total, row) => total + row[field], 0)]),
-    );
+    const totals = {};
+    const reportedSubtotals = {};
+    const coverage = {};
+    fields.forEach((field) => {
+      const supplied = rows.filter((row) => row[field] !== null);
+      const subtotal = supplied.length ? supplied.reduce((total, row) => total + row[field], 0) : null;
+      totals[field] = supplied.length === rows.length ? subtotal : null;
+      reportedSubtotals[field] = subtotal;
+      coverage[field] = {
+        supplied_rows: supplied.length,
+        total_rows: rows.length,
+        status: supplied.length === rows.length ? "complete" : supplied.length ? "partial" : "missing",
+      };
+    });
+    return { totals, reportedSubtotals, coverage };
   }
 
   function groupOpenAIUsage(rows, field) {
@@ -1167,8 +1210,11 @@
       groups.get(row[field]).push(row);
     });
     return [...groups.entries()]
-      .map(([name, values]) => ({ [field]: name, ...openAIUsageTotals(values) }))
-      .sort((a, b) => b.requests - a.requests || String(a[field]).localeCompare(String(b[field])));
+      .map(([name, values]) => {
+        const aggregate = openAIUsageTotals(values);
+        return { [field]: name, ...aggregate.totals, reported_subtotals: aggregate.reportedSubtotals, field_coverage: aggregate.coverage };
+      })
+      .sort((a, b) => (b.reported_subtotals.requests || 0) - (a.reported_subtotals.requests || 0) || String(a[field]).localeCompare(String(b[field])));
   }
 
   const openAIUsageColumns = [
@@ -1195,13 +1241,15 @@
     const usageRows = rawUsage.flatMap((row, index) => {
       if (![row.num_model_requests, row.model, row.input_tokens, row.output_tokens].some((value) => value)) return [];
       const label = `Usage row ${index + 2}`;
-      const input = finiteNumber(row.input_tokens || 0, `${label} input_tokens`, { integer: true });
-      const cached = finiteNumber(row.input_cached_tokens || 0, `${label} input_cached_tokens`, { integer: true });
-      const cacheWrite = finiteNumber(row.input_cache_write_tokens || 0, `${label} input_cache_write_tokens`, { integer: true });
-      const uncached = row.input_uncached_tokens === ""
+      const optionalUsageNumber = (value, field) => value === "" ? null : finiteNumber(value, `${label} ${field}`, { integer: true });
+      const input = optionalUsageNumber(row.input_tokens, "input_tokens");
+      const cached = optionalUsageNumber(row.input_cached_tokens, "input_cached_tokens");
+      const cacheWrite = optionalUsageNumber(row.input_cache_write_tokens, "input_cache_write_tokens");
+      const suppliedUncached = optionalUsageNumber(row.input_uncached_tokens, "input_uncached_tokens");
+      const uncached = suppliedUncached === null && input !== null && cached !== null && cacheWrite !== null
         ? input - cached - cacheWrite
-        : finiteNumber(row.input_uncached_tokens, `${label} input_uncached_tokens`, { integer: true });
-      if (uncached < 0 || uncached + cached + cacheWrite !== input) {
+        : suppliedUncached;
+      if (input !== null && cached !== null && cacheWrite !== null && uncached !== null && (uncached < 0 || uncached + cached + cacheWrite !== input)) {
         throw new Error(`${label} input token categories do not reconcile to input_tokens.`);
       }
       return [{
@@ -1210,12 +1258,12 @@
         project: row.project_id || "unattributed",
         api_key: row.api_key_id || "unattributed",
         service_tier: row.service_tier || "unattributed",
-        requests: finiteNumber(row.num_model_requests || 0, `${label} num_model_requests`, { integer: true }),
+        requests: optionalUsageNumber(row.num_model_requests, "num_model_requests"),
         input_tokens: input,
         uncached_input_tokens: uncached,
         cached_input_tokens: cached,
         cache_write_input_tokens: cacheWrite,
-        output_tokens: finiteNumber(row.output_tokens || 0, `${label} output_tokens`, { integer: true }),
+        output_tokens: optionalUsageNumber(row.output_tokens, "output_tokens"),
       }];
     });
     if (!usageRows.length) throw new Error("The OpenAI usage export has no populated usage rows.");
@@ -1245,6 +1293,7 @@
     ];
     if (!projectJoin) limitations.splice(1, 0, "The saved cost export does not fully attribute cost to projects, so project-level billed cost is unavailable.");
     if (!aligned) limitations.unshift("The usage and cost exports do not cover the same daily buckets.");
+    const usageAggregate = openAIUsageTotals(usageRows);
     return {
       schema_version: "ai-cost-lens-openai-bill-review/0.1",
       provider: "openai",
@@ -1266,7 +1315,9 @@
       },
       usage: {
         basis: "provider_reported",
-        totals: openAIUsageTotals(usageRows),
+        totals: usageAggregate.totals,
+        reported_subtotals: usageAggregate.reportedSubtotals,
+        field_coverage: usageAggregate.coverage,
         populated_rows: usageRows.length,
         days_with_usage: new Set(usageRows.map((row) => row.date)).size,
         by_model: groupOpenAIUsage(usageRows, "model"),
@@ -1359,8 +1410,8 @@
     const summary = summarizeSingleBill(review);
     return { review, confirmation: {
       provider: "Anthropic", period, products: [...new Set(rows.map((row) => row.route))], models: [...new Set(rows.map((row) => row.model))],
-      providerCost: summary.totals.providerCost, requests: summary.totals.requests, inputTokens: summary.totals.processedInput,
-      outputTokens: summary.totals.outputTokens, missing: ["Cache values", "Retries", "Human effort", "Outcomes"],
+      providerCost: summary.totals.providerCost, requests: summary.totals.reported.requests, inputTokens: summary.totals.reported.processedInput,
+      outputTokens: summary.totals.reported.outputTokens, coverage: summary.totals.coverage, missing: ["Cache values", "Retries", "Human effort", "Outcomes"],
       sourceRows: raw.length, identifiersDiscarded: true,
     } };
   }
@@ -1651,15 +1702,15 @@
     };
     const periodLine = lineList.find((line) => /(?:service|billing)\s+period/i.test(line)) || "";
     const periodDates = [...periodLine.matchAll(/(?:\d{4}-\d{2}-\d{2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{4}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4})/gi)].map((match) => invoiceDate(match[0])).filter(Boolean);
-    const amountPattern = /\b(subtotal|tax|credit|amount\s+due|amount\s+paid|prior\s+balance|invoice\s+total|total\s+due|total)\b\s*:?\s*(?:(USD|EUR|GBP|US\$)\s*)?([\$€£])?\s*(-?\d[\d,]*(?:\.\d{1,2})?)/i;
+    const amountPattern = /\b(subtotal|tax|credit|amount\s+due|amount\s+paid|prior\s+balance|invoice\s+total|total\s+due|total)\b\s*:?\s*(?:(USD|EUR|GBP|CAD|AUD|US\$)\s*)?([\$€£])?\s*(-?\d[\d,]*(?:\.\d{1,2})?)/i;
     const amountCandidates = lineList.flatMap((line) => {
       const match = line.match(amountPattern);
       if (!match) return [];
       const currencyToken = (match[2] || match[3] || "").toUpperCase();
-      const currency = currencyToken === "US$" || currencyToken === "USD" ? "USD" : currencyToken === "EUR" || currencyToken === "€" ? "EUR" : currencyToken === "GBP" || currencyToken === "£" ? "GBP" : "";
+      const currency = currencyToken === "US$" || currencyToken === "USD" ? "USD" : currencyToken === "EUR" || currencyToken === "€" ? "EUR" : currencyToken === "GBP" || currencyToken === "£" ? "GBP" : ["CAD", "AUD"].includes(currencyToken) ? currencyToken : "";
       const value = Number(match[4].replaceAll(",", ""));
       if (!Number.isFinite(value)) return [];
-      return [{ label: match[1].replace(/\s+/g, " ").toLowerCase(), value, currency }];
+      return [{ label: match[1].replace(/\s+/g, " ").toLowerCase(), value, currency, dollarSymbolNeedsConfirmation: match[3] === "$" && !match[2] }];
     });
     const currencies = new Set(amountCandidates.map((item) => item.currency).filter(Boolean));
     return {
@@ -1667,6 +1718,7 @@
       invoiceDate: dateFromLabel("invoice date|date issued|date of issue|issued on|billing date"),
       serviceStart: periodDates[0] || "", serviceEnd: periodDates[1] || "",
       currency: currencies.size === 1 ? [...currencies][0] : "",
+      dollarSymbolNeedsConfirmation: amountCandidates.some((item) => item.dollarSymbolNeedsConfirmation),
       amountCandidates,
       suggestedAmount: amountCandidates.length === 1 ? amountCandidates[0] : null,
     };
@@ -1767,7 +1819,8 @@
       return data;
     }
     if (data?.schema_version === "ai-cost-lens-openai-bill-review/0.1") {
-      const usage = fields("requests input_tokens uncached_input_tokens cached_input_tokens cache_write_input_tokens output_tokens");
+      const usageFieldNames = "requests input_tokens uncached_input_tokens cached_input_tokens cache_write_input_tokens output_tokens".split(" ");
+      const usage = fields(usageFieldNames.join(" "), "number?");
       shape(data, {
         provider: "string", finding: "string", next_step: "string", limitations: ["string"],
         bill: { basis: "string", currency: "string", total: "number", ...fields("populated_rows days_with_cost") },
@@ -1778,6 +1831,21 @@
         source: { usage_export: "string", cost_export: "string", usage_sha256: "string?", cost_sha256: "string?" },
       });
       currency(data.bill.currency);
+      const validateUsageCoverage = (totals, reportedSubtotals, coverage, path) => {
+        if (coverage === undefined) return;
+        usageFieldNames.forEach((field) => {
+          shape(coverage[field], { supplied_rows: "number", total_rows: "number", status: "string" }, `${path}.${field}`);
+          const item = coverage[field];
+          if (!Number.isInteger(item.supplied_rows) || !Number.isInteger(item.total_rows) || item.total_rows < 1 || item.supplied_rows < 0 || item.supplied_rows > item.total_rows) fail(`${path}.${field}`);
+          const expected = item.supplied_rows === item.total_rows ? "complete" : item.supplied_rows ? "partial" : "missing";
+          const reported = reportedSubtotals?.[field];
+          if (item.status !== expected || (item.status === "complete") !== (totals[field] !== null) || (item.status === "missing") !== (reported === null)) fail(`${path}.${field}`);
+          if (reported !== null && (typeof reported !== "number" || !Number.isFinite(reported))) fail(`${path}.${field}`);
+        });
+      };
+      validateUsageCoverage(data.usage.totals, data.usage.reported_subtotals, data.usage.field_coverage, "usage.field_coverage");
+      data.usage.by_model.forEach((row, index) => validateUsageCoverage(row, row.reported_subtotals, row.field_coverage, `usage.by_model[${index}].field_coverage`));
+      data.usage.by_project.forEach((row, index) => validateUsageCoverage(row, row.reported_subtotals, row.field_coverage, `usage.by_project[${index}].field_coverage`));
       if (!data.limitations.length || data.bill.total < 0 || data.provider !== "openai" || data.reconciliation.savings_claim_allowed || data.reconciliation.model_cost_allocation_supported || data.reconciliation.outcome_cost_supported) fail("bill evidence boundary");
       return;
     }
@@ -2618,6 +2686,8 @@
     const stage = singleBillStage(review);
     const guidance = singleBillGuidance(review);
     const count = (value) => value === null ? "Not supplied" : compact(value);
+    const reported = (field) => reportedCoverageValue(totals, field);
+    const coverageNote = (field, completeNote) => reportedCoverageNote(totals, field, completeNote);
     const cost = (value) => value === null ? "Unavailable" : money(value, value < 1 ? 4 : 2);
     const costPerRequest = totals.requests ? totals.providerCost / totals.requests : null;
     const cacheShare = totals.processedInput && totals.cachedInput !== null ? totals.cachedInput / totals.processedInput : null;
@@ -2638,23 +2708,23 @@
       : stage.key === "usage"
         ? [
             [costBasisLabel(review.basis), cost(totals.providerCost), "The declared cost for this workload and period"],
-            ["Requests", count(totals.requests), "Includes additional attempts when reported"],
+            ["Requests", reported("requests"), coverageNote("requests", "Includes additional attempts when reported")],
             ["Blended cost per request", cost(costPerRequest), "Provider cost divided by supplied requests; not a model price"],
-            ["Input tokens", count(totals.processedInput), `Cache read: ${count(totals.cachedInput)} · Cache write: ${count(totals.cacheWriteInput)}`],
-            ["Output tokens", count(totals.outputTokens), "Unknown fields are not zero"],
+            ["Input tokens", reported("processedInput"), coverageNote("processedInput", `Cache read: ${reported("cachedInput")} · Cache write: ${reported("cacheWriteInput")}`)],
+            ["Output tokens", reported("outputTokens"), coverageNote("outputTokens", "Unknown fields are not zero")],
             ["Cache-read share", cacheShare === null ? "Not supplied" : pct(cacheShare, 1), "Use only the cache fields reported by the source"],
             ["Outcome economics", "Optional", "Add results only when you need to test value or a route change"],
             ["Human effort", "Optional", "Add only when people actively review or correct the output"],
           ]
         : [
             [costBasisLabel(review.basis), cost(totals.providerCost), "The declared cost for this workload and period"],
-            ["Requests", count(totals.requests), "Includes additional attempts when reported"],
+            ["Requests", reported("requests"), coverageNote("requests", "Includes additional attempts when reported")],
             ["Ready results", count(review.ready), `${review.completed} outcome rows under the declared ready rule`],
             ["Provider cost per ready result", cost(review.providerUnit), "Excludes shared infrastructure and human effort"],
             ["Full operating cost per ready result", review.fullUnit === null ? "Optional" : cost(review.fullUnit), "Available only when relevant human and shared costs are supplied"],
             ["Retries", count(review.retries), "Optional; missing retry records do not block the unit cost"],
             ["Human minutes", count(review.minutes), "Optional; include only active review and correction time"],
-            ["Cache-read share", cacheShare === null ? "Not supplied" : pct(cacheShare, 1), "Use only the cache fields reported by the source"],
+            ["Cache-read share", cacheShare === null ? "Not supplied" : pct(cacheShare, 1), cacheShare === null && ["partial", "missing"].includes(totals.coverage.cachedInput.status) ? reportedCoverageNote(totals, "cachedInput", "Use only the cache fields reported by the source") : "Use only the cache fields reported by the source"],
           ];
     document.getElementById("bill-review-kicker").textContent = stage.kicker;
     document.getElementById("bill-review-title").textContent = stage.title;
@@ -2679,7 +2749,7 @@
     document.getElementById("model-mix-title").textContent = "Declared bill drivers and available usage";
     document.getElementById("bill-mix-note").textContent = `Amounts use ${costBasisLabel(review.basis).toLowerCase()}. This is the supplied attribution, not an inferred allocation or savings estimate. Cache values are token counts.`;
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Provider / model / route</th><th>Requests</th><th>Input / output</th><th>Cache read / write</th><th>Cost basis</th><th>Declared cost</th></tr>";
-    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${count(row.requests)}</td><td>${count(row.processedInput)} / ${count(row.outputTokens)}</td><td>${count(row.cachedInput)} / ${count(row.cacheWriteInput)}</td><td>${escapeHtml(costBasisLabel(review.basis))}</td><td>${cost(row.providerCost)}</td></tr>`).join("");
+    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${escapeHtml(reportedCoverageValue(row, "requests"))}</td><td>${escapeHtml(reportedCoverageValue(row, "processedInput"))} / ${escapeHtml(reportedCoverageValue(row, "outputTokens"))}</td><td>${escapeHtml(reportedCoverageValue(row, "cachedInput"))} / ${escapeHtml(reportedCoverageValue(row, "cacheWriteInput"))}</td><td>${escapeHtml(costBasisLabel(review.basis))}</td><td>${cost(row.providerCost)}</td></tr>`).join("");
     document.getElementById("bill-opportunity-ledger").innerHTML = guidance.map(([kind, label, title, value, note]) => `<article class="opportunity-row state-${kind}"><span class="opportunity-state">${escapeHtml(label)}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(note)}</p></div><em>${escapeHtml(value)}</em></article>`).join("");
     document.getElementById("bill-next-step").textContent = stage.key === "bill"
       ? "Keep this baseline. Add the next piece of data only when it answers a real decision."
@@ -2706,6 +2776,28 @@
     document.getElementById("memo-footer-status").textContent = "Calculated locally from supplied records · no AI API";
   }
 
+  function openAIFieldCoverage(usage, field) {
+    return usage.field_coverage?.[field] || {
+      supplied_rows: usage.totals[field] === null ? 0 : usage.populated_rows,
+      total_rows: usage.populated_rows,
+      status: usage.totals[field] === null ? "missing" : "complete",
+    };
+  }
+
+  function openAIReportedValue(usage, field) {
+    const coverage = openAIFieldCoverage(usage, field);
+    if (coverage.status === "missing") return "Not supplied";
+    const value = compact(usage.reported_subtotals?.[field] ?? usage.totals[field]);
+    return coverage.status === "partial" ? `${value} reported` : value;
+  }
+
+  function openAICoverageNote(usage, field, completeNote) {
+    const coverage = openAIFieldCoverage(usage, field);
+    if (coverage.status === "partial") return `${coverage.supplied_rows} of ${coverage.total_rows} rows supplied this field; the full total is unavailable.`;
+    if (coverage.status === "missing") return "No rows supplied this field; missing values were not treated as zero.";
+    return completeNote;
+  }
+
   function renderOpenAIBill() {
     document.getElementById("bill-review-kicker").textContent = "WALK · EXPLAIN THE USAGE";
     document.getElementById("bill-review-title").textContent = "Where is the AI cost going?";
@@ -2715,13 +2807,17 @@
     document.getElementById("bill-mix-note").textContent = "These are observed usage measures. They are not billed dollars by model.";
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Model</th><th>Requests</th><th>Input</th><th>Output</th><th>Cache share</th><th>Billed cost</th></tr>";
     const { bill, usage, period, reconciliation, limitations } = state.data;
-    const totalInput = usage.totals.input_tokens;
-    const cacheShare = totalInput ? usage.totals.cached_input_tokens / totalInput : 0;
-    const costPerRequest = period.aligned && usage.totals.requests ? Number(bill.total) / usage.totals.requests : null;
-    const averageInput = usage.totals.requests ? totalInput / usage.totals.requests : null;
-    const averageOutput = usage.totals.requests ? usage.totals.output_tokens / usage.totals.requests : null;
+    const completeValue = (field) => openAIFieldCoverage(usage, field).status === "complete" ? usage.totals[field] : null;
+    const requests = completeValue("requests");
+    const totalInput = completeValue("input_tokens");
+    const cachedInput = completeValue("cached_input_tokens");
+    const outputTokens = completeValue("output_tokens");
+    const cacheShare = totalInput && cachedInput !== null ? cachedInput / totalInput : null;
+    const costPerRequest = period.aligned && requests ? Number(bill.total) / requests : null;
+    const averageInput = requests && totalInput !== null ? totalInput / requests : null;
+    const averageOutput = requests && outputTokens !== null ? outputTokens / requests : null;
     const topModel = usage.by_model[0];
-    const topRequestShare = topModel && usage.totals.requests ? topModel.requests / usage.totals.requests : null;
+    const topRequestShare = topModel && requests ? topModel.requests / requests : null;
     const costPerRequestLabel = costPerRequest === null ? "Unavailable" : money(costPerRequest, costPerRequest < 1 ? 4 : 2);
     const topRequestShareLabel = topRequestShare === null ? "Unavailable" : pct(topRequestShare, 1);
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
@@ -2729,17 +2825,21 @@
     document.getElementById("bill-finding-title").textContent =
       period.aligned
         ? costPerRequest === null
-          ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. No nonzero request volume was supplied for a blended unit cost.`
-          : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(usage.totals.requests)} requests, or ${costPerRequestLabel} per observed request.`
+          ? openAIFieldCoverage(usage, "requests").status === "partial"
+            ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. ${openAIReportedValue(usage, "requests")} are visible, but the complete request total is unavailable.`
+            : openAIFieldCoverage(usage, "requests").status === "missing"
+              ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. Request volume was not supplied.`
+              : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. No requests were recorded, so blended cost per request is unavailable.`
+          : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(requests)} requests, or ${costPerRequestLabel} per observed request.`
         : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} in the cost export. Usage covers different daily buckets; these totals are not a matched financial review.`;
     document.getElementById("bill-finding-limit").textContent = period.aligned ? `This is a useful cost and usage baseline. ${limitations[0]} Human effort is not required for this review.`
       : "PERIOD MISMATCH: usage and cost exports cover different daily buckets. Export the same date range again before using this review for a financial decision.";
     const metrics = [
       ["Provider reported cost", money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2), `${bill.populated_rows} populated cost row${bill.populated_rows === 1 ? "" : "s"}`],
-      ["Requests", compact(usage.totals.requests), `${usage.by_model.length} model${usage.by_model.length === 1 ? "" : "s"} observed`],
-      ["Blended cost per request", costPerRequestLabel, "Full exported cost divided by observed requests; not a model price"],
-      ["Input tokens", compact(totalInput), `${pct(cacheShare, 1)} read from cache`],
-      ["Output tokens", compact(usage.totals.output_tokens), `${usage.days_with_usage} day${usage.days_with_usage === 1 ? "" : "s"} with usage`],
+      ["Requests", openAIReportedValue(usage, "requests"), openAICoverageNote(usage, "requests", `${usage.by_model.length} model${usage.by_model.length === 1 ? "" : "s"} observed`)],
+      ["Blended cost per request", costPerRequestLabel, costPerRequest === null ? "Available only when every usage row supplies requests and the total is greater than zero" : "Full exported cost divided by observed requests; not a model price"],
+      ["Input tokens", openAIReportedValue(usage, "input_tokens"), openAICoverageNote(usage, "input_tokens", cacheShare === null ? "Cache share is unavailable" : `${pct(cacheShare, 1)} read from cache`)],
+      ["Output tokens", openAIReportedValue(usage, "output_tokens"), openAICoverageNote(usage, "output_tokens", `${usage.days_with_usage} day${usage.days_with_usage === 1 ? "" : "s"} with usage`)],
       ["Average input per request", averageInput === null ? "Unavailable" : compact(averageInput), "A prompt-size baseline for this exported period"],
       ["Average output per request", averageOutput === null ? "Unavailable" : compact(averageOutput), "An output-length baseline for this exported period"],
       ["Human effort", "Optional", "Add only when people actively review or correct the output"],
@@ -2748,20 +2848,27 @@
       <div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>
     `).join("");
     document.getElementById("bill-model-rows").innerHTML = usage.by_model.map((row) => {
-      const share = row.input_tokens ? row.cached_input_tokens / row.input_tokens : 0;
+      const rowUsage = { totals: row, reported_subtotals: row.reported_subtotals, populated_rows: row.field_coverage?.input_tokens?.total_rows || 1, field_coverage: row.field_coverage };
+      const rowInput = openAIFieldCoverage(rowUsage, "input_tokens").status === "complete" ? row.input_tokens : null;
+      const rowCached = openAIFieldCoverage(rowUsage, "cached_input_tokens").status === "complete" ? row.cached_input_tokens : null;
+      const share = rowInput && rowCached !== null ? rowCached / rowInput : null;
       return `<tr>
         <td>${escapeHtml(row.model)}</td>
-        <td>${compact(row.requests)}</td>
-        <td>${compact(row.input_tokens)}</td>
-        <td>${compact(row.output_tokens)}</td>
-        <td>${pct(share, 1)}</td>
+        <td>${escapeHtml(openAIReportedValue(rowUsage, "requests"))}</td>
+        <td>${escapeHtml(openAIReportedValue(rowUsage, "input_tokens"))}</td>
+        <td>${escapeHtml(openAIReportedValue(rowUsage, "output_tokens"))}</td>
+        <td>${share === null ? "Unavailable" : pct(share, 1)}</td>
         <td class="unavailable">Unavailable</td>
       </tr>`;
     }).join("");
+    const requestCoverage = openAIFieldCoverage(usage, "requests");
+    const requestStart = requestCoverage.status === "complete" && requests
+      ? ["save", "START HERE", `Most requests went to ${topModel.model}`, topRequestShareLabel, `${topModel.model} handled ${compact(topModel.requests)} of ${compact(requests)} requests. Start with the busiest visible route before smaller ones.`]
+      : ["test", "CHECK FIRST", "Complete the request count", openAIReportedValue(usage, "requests"), openAICoverageNote(usage, "requests", "No requests were recorded for this period; request-based metrics remain unavailable.")];
     const ledger = period.aligned ? [
-      ["save", "START HERE", `Most requests went to ${topModel.model}`, topRequestShareLabel, `${topModel.model} handled ${compact(topModel.requests)} of ${compact(usage.totals.requests)} requests. Start with the busiest visible route before smaller ones.`],
+      requestStart,
       ["test", "UNIT COST", costPerRequest === null ? "Request unit cost is unavailable" : "Use the blended request cost as a baseline", costPerRequestLabel, costPerRequest === null ? "The export has no nonzero request volume. Keep the unit cost unavailable rather than dividing by zero." : "This is the full exported cost divided by observed requests. Track it over time, but do not treat it as a billed model rate."],
-      ["test", "CHECK NEXT", cacheShare ? "Cached input is already visible" : "Check whether repeated context can be cached", pct(cacheShare, 1), cacheShare ? `${pct(cacheShare, 1)} of input tokens were read from cache. Confirm the provider's billed treatment before calling it a saving.` : "If this workload repeatedly sends the same context, test provider-supported caching on one bounded job and compare the actual bill."],
+      ["test", "CHECK NEXT", cacheShare ? "Cached input is already visible" : "Check whether repeated context can be cached", cacheShare === null ? "Unavailable" : pct(cacheShare, 1), cacheShare ? `${pct(cacheShare, 1)} of input tokens were read from cache. Confirm the provider's billed treatment before calling it a saving.` : cacheShare === null ? "Cache share needs complete input and cache-read coverage. Known partial values remain visible above." : "If this workload repeatedly sends the same long context, test provider-supported caching on one bounded job and compare the actual bill."],
       ["test", "TEST FIRST", "Try a cheaper route on one repeatable job", "Bounded test", "Keep the job and quality rule fixed. Outcomes can be a small sample first; human effort is optional unless people actually review the work."],
       ["leave", "LEAVE ALONE", "Do not spread the total bill across models", "Unsupported", "Token share shows usage. The saved cost export does not support billed dollars by model."],
     ] : [
@@ -2777,7 +2884,7 @@
     `).join("");
     document.getElementById("bill-next-step").textContent = period.aligned
       ? topRequestShare === null
-        ? `Start with ${topModel.model}, the busiest visible route in this export.`
+        ? requestCoverage.status === "complete" ? `Start with ${topModel.model}, the busiest visible route in this export.` : "Complete the request coverage before using request volume to prioritize a route."
         : `Start with ${topModel.model}, the route handling ${topRequestShareLabel} of requests.`
       : "Export matching usage and cost periods before investigating optimization.";
     document.getElementById("bill-boundary-copy").textContent = period.aligned
@@ -2805,12 +2912,16 @@
     if (isBill) {
       const { bill, usage, period, reconciliation, limitations } = state.data;
       const total = Number(bill.total);
-      const requests = usage.totals.requests;
+      const completeValue = (field) => openAIFieldCoverage(usage, field).status === "complete" ? usage.totals[field] : null;
+      const requests = completeValue("requests");
       const costPerRequest = period.aligned && requests ? total / requests : null;
       const costPerRequestLabel = costPerRequest === null ? "Unavailable" : money(costPerRequest, costPerRequest < 1 ? 4 : 2);
-      const averageInput = requests ? usage.totals.input_tokens / requests : null;
-      const averageOutput = requests ? usage.totals.output_tokens / requests : null;
-      const cacheShare = usage.totals.input_tokens ? usage.totals.cached_input_tokens / usage.totals.input_tokens : 0;
+      const inputTokens = completeValue("input_tokens");
+      const outputTokens = completeValue("output_tokens");
+      const cachedInput = completeValue("cached_input_tokens");
+      const averageInput = requests && inputTokens !== null ? inputTokens / requests : null;
+      const averageOutput = requests && outputTokens !== null ? outputTokens / requests : null;
+      const cacheShare = inputTokens && cachedInput !== null ? cachedInput / inputTokens : null;
       const topModel = usage.by_model[0];
       const topRequestShare = topModel && requests ? topModel.requests / requests : null;
       document.getElementById("memo-title").textContent = "OpenAI bill review";
@@ -2827,13 +2938,13 @@
       document.getElementById("memo-table-head").innerHTML = "<tr><th>Measure</th><th>Observed</th><th>What it proves</th></tr>";
       const billRows = [
         ["Provider reported cost", money(total, total < 1 ? 4 : 2), "The organization total for the exported period"],
-        ["Requests", compact(requests), "Observed request volume"],
-        ["Blended cost per request", costPerRequestLabel, "Full exported cost divided by observed requests; not a billed model rate"],
-        ["Input tokens", compact(usage.totals.input_tokens), "Observed input usage, including cached input"],
-        ["Output tokens", compact(usage.totals.output_tokens), "Observed output usage"],
+        ["Requests", openAIReportedValue(usage, "requests"), openAICoverageNote(usage, "requests", "Observed request volume")],
+        ["Blended cost per request", costPerRequestLabel, costPerRequest === null ? "Unavailable until request coverage is complete and greater than zero" : "Full exported cost divided by observed requests; not a billed model rate"],
+        ["Input tokens", openAIReportedValue(usage, "input_tokens"), openAICoverageNote(usage, "input_tokens", "Observed input usage, including cached input")],
+        ["Output tokens", openAIReportedValue(usage, "output_tokens"), openAICoverageNote(usage, "output_tokens", "Observed output usage")],
         ["Average input per request", averageInput === null ? "Unavailable" : compact(averageInput), "Prompt-size baseline for the exported period"],
         ["Average output per request", averageOutput === null ? "Unavailable" : compact(averageOutput), "Output-length baseline for the exported period"],
-        ["Cache-read share", pct(cacheShare, 1), "Share of input tokens read from cache"],
+        ["Cache-read share", cacheShare === null ? "Unavailable" : pct(cacheShare, 1), cacheShare === null ? "Requires complete input and cache-read coverage" : "Share of input tokens read from cache"],
       ];
       document.getElementById("memo-table-body").innerHTML = billRows.map(([label, value, meaning]) =>
         `<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td><td>${escapeHtml(meaning)}</td></tr>`,
@@ -2854,7 +2965,7 @@
       document.getElementById("memo-next-step").textContent = period.aligned
         ? topModel
           ? topRequestShare === null
-            ? `Start with ${topModel.model}, the busiest visible route, and test one bounded change.`
+            ? openAIFieldCoverage(usage, "requests").status === "complete" ? `Start with ${topModel.model}, the busiest visible route, and test one bounded change.` : "Complete request coverage before using request volume to prioritize a route."
             : `Start with ${topModel.model}, which handled ${pct(topRequestShare, 1)} of requests, and test one bounded change.`
           : "Choose one repeatable workload and establish its request and token baseline."
         : "Export matching usage and cost periods before investigating optimization.";
@@ -3048,7 +3159,7 @@
     document.getElementById("openai-import-fields").hidden = false;
     document.getElementById("claude-import-fields").hidden = true;
     document.getElementById("claude-confirmation").hidden = true;
-    document.querySelectorAll(".outcome-mode").forEach((item) => {
+    document.querySelectorAll("[data-outcome-mode]").forEach((item) => {
       const active = item.dataset.outcomeMode === "sample";
       item.classList.toggle("active", active);
       item.setAttribute("aria-pressed", String(active));
@@ -3126,10 +3237,10 @@
     button.addEventListener("click", () => setImportProvider(button.dataset.importProvider));
   });
 
-  document.querySelectorAll(".outcome-mode").forEach((button) => {
+  document.querySelectorAll("[data-outcome-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       state.outcomeMode = button.dataset.outcomeMode;
-      document.querySelectorAll(".outcome-mode").forEach((item) => {
+      document.querySelectorAll("[data-outcome-mode]").forEach((item) => {
         const active = item === button;
         item.classList.toggle("active", active);
         item.setAttribute("aria-pressed", String(active));
@@ -3227,14 +3338,15 @@
           document.getElementById("invoice-amount").value = String(candidate.suggestedAmount.value);
           if (candidate.suggestedAmount.currency) document.getElementById("invoice-currency").value = candidate.suggestedAmount.currency;
         }
-        pdfStatus.textContent = candidate.amountCandidates.length > 1 ? "The invoice contains several labeled amounts. Choose the one to review, then confirm every field below." : "Invoice fields were read locally. Confirm every field below before building the review. No usage was inferred.";
+        const currencyPrompt = candidate.dollarSymbolNeedsConfirmation ? " This invoice uses $. Confirm whether it is USD, CAD, AUD, or another dollar currency." : "";
+        pdfStatus.textContent = candidate.amountCandidates.length > 1 ? `The invoice contains several labeled amounts. Choose the one to review, then confirm every field below.${currencyPrompt}` : `Invoice fields were read locally. Confirm every field below before building the review. No usage was inferred.${currencyPrompt}`;
         return;
       }
       if (route.kind === "mapping") {
         const options = '<option value="">Not supplied</option>' + route.mappableHeaders.map((header) => `<option value="${escapeHtml(header)}">${escapeHtml(header)}</option>`).join("");
         Object.entries(mappingElementIds).forEach(([field, id]) => { const select = document.getElementById(id); select.innerHTML = options; select.value = route.mapping[field]; });
         document.getElementById("structured-mapper").hidden = false;
-        status.textContent = "This schema is not a supported direct export. Match its fields locally; suggestions come only from exact header aliases.";
+        status.textContent = "We don’t recognize this file automatically yet. Match the columns you know below. Your file stays in this browser.";
         await updateMappingPreview(); return;
       }
       if (route.kind === "openai") {
@@ -3350,7 +3462,13 @@
           }
           const summary = state.pendingClaudeImport.confirmation;
           const box = document.getElementById("claude-confirmation");
-          box.textContent = `Provider: ${summary.provider}. Period: ${summary.period.start} to ${summary.period.end}. Products: ${summary.products.join(", ")}. Models: ${summary.models.join(", ")}. Provider-reported cost: $${summary.providerCost.toFixed(2)}. Requests: ${summary.requests === null ? "unavailable" : summary.requests}. Input tokens: ${summary.inputTokens === null ? "unavailable" : summary.inputTokens}. Output tokens: ${summary.outputTokens === null ? "unavailable" : summary.outputTokens}. Not included: ${summary.missing.join(", ")}. Source rows: ${summary.sourceRows}. Personal identifiers were discarded.`;
+          const confirmationMeasure = (field, value) => {
+            const coverage = summary.coverage?.[field];
+            if (!coverage || coverage.status === "complete") return value === null ? "unavailable" : String(value);
+            if (coverage.status === "missing") return "unavailable";
+            return `${value} reported (${coverage.suppliedRows} of ${coverage.totalRows} rows)`;
+          };
+          box.textContent = `Provider: ${summary.provider}. Period: ${summary.period.start} to ${summary.period.end}. Products: ${summary.products.join(", ")}. Models: ${summary.models.join(", ")}. Provider-reported cost: $${summary.providerCost.toFixed(2)}. Requests: ${confirmationMeasure("requests", summary.requests)}. Input tokens: ${confirmationMeasure("processedInput", summary.inputTokens)}. Output tokens: ${confirmationMeasure("outputTokens", summary.outputTokens)}. Not included: ${summary.missing.join(", ")}. Source rows: ${summary.sourceRows}. Personal identifiers were discarded.`;
           box.hidden = false; submit.textContent = "Confirm and build Claude review"; return;
         }
         const [usageFile] = document.getElementById("openai-usage-file").files;

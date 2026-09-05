@@ -16,6 +16,13 @@ if (process.env.AI_COST_LENS_SKIP_PDFJS_TEST_IMPORT !== '1') {
 
 const root = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, root), 'utf8');
+const rewriteCsv = (text, mutate) => {
+  const headers = text.trim().split('\n')[0].split(',');
+  const rows = api.parseCsv(text, 'Synthetic rewrite');
+  const changed = mutate(rows) || rows;
+  const quote = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+  return [headers.join(','), ...changed.map((row) => headers.map((header) => quote(row[header])).join(','))].join('\n');
+};
 const source = read('web/app.js');
 const boundary = source.indexOf('  document.querySelectorAll(".nav-item").forEach', source.indexOf('  function showToast'));
 assert.ok(boundary > 0);
@@ -96,6 +103,54 @@ const requestMismatch = await api.buildLocalReview(spend.replace(',3,240000', ',
 assert.equal(requestMismatch.comparison.evidence_complete, false);
 assert.equal(requestMismatch.comparison.savings_claim_allowed, false);
 const bill = await api.buildOpenAIBillReview(read('tests/fixtures/openai-dashboard-usage.csv'), read('tests/fixtures/openai-dashboard-cost.csv'));
+const legacyBill = structuredClone(bill);
+delete legacyBill.usage.field_coverage;
+delete legacyBill.usage.reported_subtotals;
+for (const row of [...legacyBill.usage.by_model, ...legacyBill.usage.by_project]) {
+  delete row.field_coverage;
+  delete row.reported_subtotals;
+}
+api.validateResult(legacyBill);
+api.state.data = legacyBill;
+api.renderAll();
+assert.match(element('bill-metric-ledger').innerHTML, /Blended cost per request/);
+const openAIUsage = read('tests/fixtures/openai-dashboard-usage.csv');
+const openAICost = read('tests/fixtures/openai-dashboard-cost.csv');
+const openAIRequests = async (values, keepRows = 3) => api.buildOpenAIBillReview(rewriteCsv(openAIUsage, (rows) => {
+  rows.slice(1).forEach((row, index) => { row.num_model_requests = values[index] ?? ''; });
+  return rows.slice(0, keepRows);
+}), openAICost);
+const oneBlankRequest = await openAIRequests([''], 2);
+assert.equal(oneBlankRequest.usage.totals.requests, null);
+assert.equal(oneBlankRequest.usage.field_coverage.requests.status, 'missing');
+const oneZeroRequest = await openAIRequests(['0'], 2);
+assert.equal(oneZeroRequest.usage.totals.requests, 0);
+assert.equal(oneZeroRequest.usage.field_coverage.requests.status, 'complete');
+const onePositiveRequest = await openAIRequests(['7'], 2);
+assert.equal(onePositiveRequest.usage.totals.requests, 7);
+assert.equal(onePositiveRequest.usage.field_coverage.requests.status, 'complete');
+assert.equal(bill.usage.totals.requests, 30);
+assert.equal(bill.usage.field_coverage.requests.status, 'complete');
+const partialOpenAIRequests = await openAIRequests(['', '20']);
+assert.equal(partialOpenAIRequests.usage.totals.requests, null);
+assert.equal(partialOpenAIRequests.usage.reported_subtotals.requests, 20);
+assert.deepEqual({ ...partialOpenAIRequests.usage.field_coverage.requests }, { supplied_rows: 1, total_rows: 2, status: 'partial' });
+api.validateResult(JSON.parse(JSON.stringify(partialOpenAIRequests)));
+api.state.data = partialOpenAIRequests;
+api.renderAll();
+assert.match(element('bill-metric-ledger').innerHTML, /20 reported/);
+assert.match(element('bill-metric-ledger').innerHTML, /1 of 2 rows supplied this field/);
+assert.match(element('bill-metric-ledger').innerHTML, /Blended cost per request[\s\S]*Unavailable/);
+assert.match(element('bill-finding-title').textContent, /complete request total is unavailable/);
+assert.match(element('memo-table-body').innerHTML, /20 reported/);
+assert.match(element('memo-table-body').innerHTML, /1 of 2 rows supplied this field/);
+api.state.data = oneBlankRequest;
+api.renderAll();
+assert.match(element('bill-metric-ledger').innerHTML, /Requests<\/span><strong>Not supplied/);
+api.state.data = oneZeroRequest;
+api.renderAll();
+assert.match(element('bill-metric-ledger').innerHTML, /Requests<\/span><strong>0/);
+assert.match(element('bill-finding-title').textContent, /No requests were recorded/);
 const claudeSpend = await api.buildClaudeSpendReview(read('tests/fixtures/synthetic-claude-team-spend.csv'), '2026-08-01', '2026-08-31');
 let claude = api.summarizeSingleBill(claudeSpend.review);
 assert.equal(claude.totals.providerCost, 4);
@@ -137,6 +192,42 @@ const claudeZeroRequests = await api.buildClaudeSpendReview(`${claudeHeader}\n${
 assert.equal(api.summarizeSingleBill(claudeZeroRequests.review).totals.requests, 0);
 const claudeMixedRequests = await api.buildClaudeSpendReview(`${claudeHeader}\n${claudeRows[0]}\n${claudeRows[2].replace(',2,800,300,', ',,800,300,')}\n`, '2026-08-01', '2026-08-31');
 assert.equal(api.summarizeSingleBill(claudeMixedRequests.review).totals.requests, null);
+let partialClaude = api.summarizeSingleBill(claudeMixedRequests.review);
+assert.equal(partialClaude.totals.reported.requests, 10);
+assert.equal(partialClaude.totals.coverage.requests.status, 'partial');
+const claudePartialTokens = await api.buildClaudeSpendReview(rewriteCsv(read('tests/fixtures/synthetic-claude-team-spend.csv'), (rows) => {
+  rows[1].total_prompt_tokens = '';
+  rows[2].total_completion_tokens = '';
+}), '2026-08-01', '2026-08-31');
+partialClaude = api.summarizeSingleBill(claudePartialTokens.review);
+assert.equal(partialClaude.totals.processedInput, null);
+assert.equal(partialClaude.totals.reported.processedInput, 1800);
+assert.deepEqual({ ...partialClaude.totals.coverage.processedInput }, { suppliedRows: 2, totalRows: 3, status: 'partial', reportedSubtotal: 1800 });
+assert.equal(partialClaude.totals.outputTokens, null);
+assert.equal(partialClaude.totals.reported.outputTokens, 300);
+assert.equal(partialClaude.totals.coverage.outputTokens.status, 'partial');
+api.validateResult(JSON.parse(JSON.stringify(claudePartialTokens.review)));
+api.state.data = claudePartialTokens.review;
+api.renderAll();
+for (const id of ['bill-metric-ledger', 'memo-table-body']) {
+  assert.match(element(id).innerHTML, /1\.8K reported|1,800 reported/);
+  assert.match(element(id).innerHTML, /300 reported/);
+}
+assert.match(element('bill-model-rows').innerHTML, /1K reported/);
+assert.match(element('bill-model-rows').innerHTML, /800/);
+assert.match(element('bill-model-rows').innerHTML, /Not supplied/);
+assert.match(element('bill-metric-ledger').innerHTML, /2 of 3 rows supplied this field/);
+assert.match(element('bill-metric-ledger').innerHTML, /Cache-read share[\s\S]*Not supplied/);
+const claudeBlankTokens = await api.buildClaudeSpendReview(rewriteCsv(read('tests/fixtures/synthetic-claude-team-spend.csv'), (rows) => {
+  rows.forEach((row) => { row.total_prompt_tokens = ''; row.total_completion_tokens = ''; });
+}), '2026-08-01', '2026-08-31');
+assert.equal(api.summarizeSingleBill(claudeBlankTokens.review).totals.reported.processedInput, null);
+assert.equal(api.summarizeSingleBill(claudeBlankTokens.review).totals.coverage.processedInput.status, 'missing');
+const claudeZeroTokens = await api.buildClaudeSpendReview(rewriteCsv(read('tests/fixtures/synthetic-claude-team-spend.csv'), (rows) => {
+  rows.forEach((row) => { row.total_prompt_tokens = '0'; row.total_completion_tokens = '0'; });
+}), '2026-08-01', '2026-08-31');
+assert.equal(api.summarizeSingleBill(claudeZeroTokens.review).totals.processedInput, 0);
+assert.equal(api.summarizeSingleBill(claudeZeroTokens.review).totals.outputTokens, 0);
 const reorderedHeaders = claudeHeader.split(',').reverse();
 const reorderedRows = claudeRows.map((line) => {
   const parsed = api.parseCsv(`${claudeHeader}\n${line}\n`, 'Synthetic Claude row')[0];
@@ -235,6 +326,15 @@ assert.equal(openAICandidate.serviceStart, '2026-08-01');
 assert.equal(openAICandidate.serviceEnd, '2026-08-31');
 assert.equal(openAICandidate.suggestedAmount.value, 42.5);
 assert.equal(openAICandidate.currency, 'USD');
+for (const [amount, expectedCurrency, needsConfirmation] of [
+  ['$42.50', '', true], ['USD 42.50', 'USD', false], ['US$ 42.50', 'USD', false],
+  ['CAD 42.50', 'CAD', false], ['AUD 42.50', 'AUD', false], ['EUR 42.50', 'EUR', false],
+  ['€42.50', 'EUR', false], ['GBP 42.50', 'GBP', false], ['£42.50', 'GBP', false],
+]) {
+  const candidate = api.extractInvoiceCandidate(`OpenAI\nInvoice date: 2026-08-31\nAmount due: ${amount}`);
+  assert.equal(candidate.currency, expectedCurrency, amount);
+  assert.equal(candidate.dollarSymbolNeedsConfirmation, needsConfirmation, amount);
+}
 for (const [label, value, expected] of [
   ['Date of issue', 'February 29, 2024', '2024-02-29'],
   ['Billing date', '2/29/2024', '2024-02-29'],
@@ -310,6 +410,22 @@ const partialRow = [...invoiceRow]; partialRow[1] = '2026-08-02'; partialRow[6] 
 const partialUsage = api.summarizeSingleBill(await api.buildSingleBillReview(singleRows([invoiceRow, partialRow])));
 assert.equal(partialUsage.totals.requests, null);
 assert.equal(partialUsage.level, 'Cost and usage');
+const cacheRowA = [...invoiceRow];
+cacheRowA[6] = '2'; cacheRowA[7] = '100'; cacheRowA[8] = '20'; cacheRowA[9] = '0'; cacheRowA[10] = '50';
+const cacheRowB = [...invoiceRow];
+cacheRowB[1] = '2026-08-02'; cacheRowB[6] = '3'; cacheRowB[7] = '50'; cacheRowB[8] = ''; cacheRowB[9] = ''; cacheRowB[10] = '25';
+const partialCacheReview = await api.buildSingleBillReview(singleRows([cacheRowA, cacheRowB]));
+const partialCache = api.summarizeSingleBill(partialCacheReview);
+assert.equal(partialCache.totals.processedInput, 150);
+assert.equal(partialCache.totals.cachedInput, null);
+assert.equal(partialCache.totals.reported.cachedInput, 20);
+assert.equal(partialCache.totals.reported.cacheWriteInput, 0);
+assert.equal(partialCache.totals.coverage.cachedInput.status, 'partial');
+api.state.data = partialCacheReview;
+api.renderAll();
+assert.match(element('bill-metric-ledger').innerHTML, /Cache-read share[\s\S]*Not supplied/);
+assert.match(element('bill-opportunity-ledger').innerHTML, /20 reported/);
+assert.match(element('bill-opportunity-ledger').innerHTML, /cache share is unavailable/i);
 const missingRequests = await api.buildSingleBillReview(singleSpend.replace(',3,240000', ',,240000'));
 const zeroRequests = await api.buildSingleBillReview(singleSpend.replace(',3,240000', ',0,240000'));
 for (const [review, expected] of [
@@ -454,6 +570,9 @@ assert.match(html, /rel="canonical" href="https:\/\/lens.cloudandcapital.com\/"/
 assert.match(html, /class="wordmark" href="https:\/\/cloudandcapital.com"/);
 assert.match(html, /property="og:image" content="https:\/\/lens.cloudandcapital.com\/social-preview.png"/);
 assert.match(html, /does not contact an AI API/);
+assert.match(source, /This invoice uses \$\. Confirm whether it is USD, CAD, AUD, or another dollar currency\./);
+assert.match(source, /We don’t recognize this file automatically yet\. Match the columns you know below\. Your file stays in this browser\./);
+assert.doesNotMatch(source, /This schema is not a supported direct export|exact header aliases/);
 assert.doesNotMatch(source, /XMLHttpRequest|sendBeacon|WebSocket/);
 assert.deepEqual([...source.matchAll(/fetch\(([^)]*)\)/g)].map((m) => m[1]), ['"data/illustrative-review-result.json"']);
 const png = readFileSync(new URL('web/social-preview.png', root));
