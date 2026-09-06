@@ -37,7 +37,7 @@
   const pctOrMissing = (value, digits = 0) =>
     value === null || value === undefined ? "Not available" : pct(value, digits);
   const cents = (value) => `${(value * 100).toFixed(1)}¢`;
-  const unitMoney = (value) => (value < 1 ? cents(value) : money(value, 2));
+  const unitMoney = (value) => (value < 1 && (!state.data?.currency || state.data.currency === "USD") ? cents(value) : money(value, 2));
   const signedMoney = (value) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${money(Math.abs(value), 2)}`;
 
   const escapeHtml = (value) =>
@@ -1775,6 +1775,304 @@
     return { kind: "mapping", text: jsons[0].text, filename: jsons[0].file.name, parsed, mappableHeaders: mappableHeaders(parsed), mapping: suggestStructuredMapping(parsed) };
   }
 
+  function buildSimpleScenario(period, spendRows, sample, config, hashes) {
+    const spend = spendRows.filter((row) => row.period.toLowerCase() === period);
+    if (!spend.length) throw new Error(`The spend file has no ${period} rows.`);
+
+    const dates = spend.map((row, index) => validDate(row.date, `Spend ${period} row ${index + 2} date`));
+    const minDate = [...dates].sort()[0];
+    const maxDate = [...dates].sort().at(-1);
+    const workload = spend[0].workload.trim();
+    if (!workload) throw new Error(`Spend ${period} workload is required.`);
+    if (spend.some((row) => row.workload.trim() !== workload)) {
+      throw new Error(`Spend ${period} rows contain more than one workload.`);
+    }
+
+    const currencies = new Set(spend.map((row) => row.currency.trim().toUpperCase()));
+    if (currencies.size !== 1 || !/^[A-Z]{3}$/.test([...currencies][0])) {
+      throw new Error(`Spend ${period} rows must use one three-letter currency.`);
+    }
+    const basis = spendCostBasis(spend, period);
+
+    let requests = 0;
+    let processedInput = 0;
+    let cachedInput = 0;
+    let cacheWriteInput = 0;
+    let outputTokens = 0;
+    let providerCost = 0;
+    spend.forEach((row, index) => {
+      const rowNumber = index + 2;
+      const rowInput = finiteNumber(row.input_tokens, `Spend ${period} row ${rowNumber} input_tokens`, { integer: true });
+      const rowCached = finiteNumber(row.cached_input_tokens, `Spend ${period} row ${rowNumber} cached_input_tokens`, { integer: true });
+      const rowCacheWrite = finiteNumber(row.cache_write_input_tokens, `Spend ${period} row ${rowNumber} cache_write_input_tokens`, { integer: true });
+      if (rowCached + rowCacheWrite > rowInput) {
+        throw new Error(`Spend ${period} row ${rowNumber} has more cached and cache-write tokens than input tokens.`);
+      }
+      requests += finiteNumber(row.requests, `Spend ${period} row ${rowNumber} requests`, { integer: true });
+      processedInput += rowInput;
+      cachedInput += rowCached;
+      cacheWriteInput += rowCacheWrite;
+      outputTokens += finiteNumber(row.output_tokens, `Spend ${period} row ${rowNumber} output_tokens`, { integer: true });
+      providerCost += finiteNumber(row.provider_cost, `Spend ${period} row ${rowNumber} provider_cost`);
+    });
+    if (requests === 0) throw new Error(`Spend ${period} requests must be greater than zero.`);
+
+    const population = finiteNumber(sample.population, `${period} results in period`, { integer: true });
+    const ready = finiteNumber(sample.ready, `${period} ready sample`, { integer: true });
+    const correction = finiteNumber(sample.correction, `${period} correction sample`, { integer: true });
+    const escalation = finiteNumber(sample.escalation, `${period} escalation sample`, { integer: true });
+    const humanTimeSupplied = sample.humanMinutes !== null && sample.humanMinutes !== undefined;
+    const sampleMinutes = humanTimeSupplied ? finiteNumber(sample.humanMinutes, `${period} sample human minutes`) : 0;
+    const sampleSize = ready + correction + escalation;
+    if (!sampleSize) throw new Error(`The ${period} sample is empty.`);
+    if (!ready) throw new Error(`The ${period === "baseline" ? "current" : "other"} option has zero usable outputs. Cost per usable result is undefined, so no cost comparison can be made. Keep this as a failed quality test and collect a sample with usable outputs before comparing unit costs.`);
+    if (sampleSize > population) {
+      throw new Error(`The ${period} sample cannot be larger than the declared results in the period.`);
+    }
+
+    const readyRate = ready / sampleSize;
+    const estimatedReady = population * readyRate;
+    const estimatedCorrection = population * (correction / sampleSize);
+    const estimatedEscalation = population * (escalation / sampleSize);
+    const projectedHumanMinutes = (sampleMinutes / sampleSize) * population;
+    const humanCost = (projectedHumanMinutes / 60) * config.hourlyRate;
+    const sharedCost = period === "baseline" ? config.baselineShared : config.proposedShared;
+    const changeCost = period === "proposed" ? config.changeCost : 0;
+    const recurring = providerCost + humanCost + sharedCost;
+    const allIn = recurring + changeCost;
+    const route = [...new Set(spend.map((row) => row.route.trim()).filter(Boolean))].join(", ") || `${period} route`;
+    const models = [...new Set(spend.map((row) => row.model.trim()).filter(Boolean))];
+    const providers = [...new Set(spend.map((row) => row.provider.trim()).filter(Boolean))];
+    const [intervalLow, intervalHigh] = wilsonInterval(ready, sampleSize);
+
+    return {
+      dates,
+      currency: [...currencies][0],
+      workload,
+      scenario: {
+        id: period,
+        label: period === "baseline" ? "Current route" : "Proposed route",
+        model: {
+          provider: providers.join(", ") || "Provider not named",
+          name: models.join(", ") || "Model not named",
+          route,
+        },
+        costs: {
+          model_cost: round(providerCost),
+          shared_infrastructure_cost: round(sharedCost),
+          human_review_cost: round(humanCost),
+          one_time_change_cost: round(changeCost),
+          recurring_operating_cost: round(recurring),
+          all_in_pilot_cost: round(allIn),
+        },
+        usage: {
+          requests,
+          retries: null,
+          unique_input_tokens: null,
+          processed_input_tokens: processedInput,
+          cached_input_tokens: cachedInput,
+          cache_write_input_tokens: cacheWriteInput,
+          output_tokens: outputTokens,
+        },
+        outcomes: {
+          basis: "sampled",
+          completed_results: population,
+          usable_results: round(estimatedReady),
+          status_counts: {
+            ready_to_use: round(estimatedReady),
+            needs_correction: round(estimatedCorrection),
+            needs_escalation: round(estimatedEscalation),
+          },
+          sample_counts: {
+            ready_to_use: ready,
+            needs_correction: correction,
+            needs_escalation: escalation,
+          },
+          sample_size: sampleSize,
+          sample_method: config.sampleRandom ? "declared random or systematic" : "user selected",
+          ready_rate_interval_95: [intervalLow, intervalHigh],
+          human_review_minutes: round(projectedHumanMinutes),
+          sample_human_minutes: round(sampleMinutes),
+          review_minutes: round(projectedHumanMinutes),
+          correction_minutes: 0,
+          verifier: config.verifier,
+          acceptance_rule: config.acceptanceRule,
+        },
+        policy: {
+          approved: policyApproval(config, period),
+          retention_mode: policyApproval(config, period) ? "Declared approved by reviewer" : "Approval not established",
+        },
+        evidence: {
+          cost_basis: basis,
+          outcome_basis: "sampled",
+          source: `${costBasisLabel(basis)} from the universal spend template + sampled outcome counts`,
+          observed_at: maxDate,
+          coverage: humanTimeSupplied
+            ? `${sampleSize} of ${population.toLocaleString()} results reviewed; outcome yield and human time extrapolated`
+            : `${sampleSize} of ${population.toLocaleString()} results reviewed; outcome yield extrapolated; human time not supplied`,
+          coverage_status: "sampled",
+          reconciliation_issues: humanTimeSupplied ? [] : ["Human review and correction time was not supplied."],
+          cost_boundary: humanTimeSupplied
+            ? "provider cost + declared shared infrastructure + sampled human review and correction"
+            : "provider cost + declared shared infrastructure; human review and correction not included",
+          human_time_supplied: humanTimeSupplied,
+          provider_usage_sha256: hashes.spend,
+          provider_cost_sha256: hashes.spend,
+          outcome_log_sha256: hashes.sample,
+        },
+        measures: {
+          cost_per_usable_result: round(recurring / estimatedReady),
+          all_in_cost_per_usable_result: round(allIn / estimatedReady),
+          usable_result_rate: round(readyRate),
+          retry_rate: null,
+          cache_reuse_rate: processedInput ? round(cachedInput / processedInput) : 0,
+          cache_write_rate: processedInput ? round(cacheWriteInput / processedInput) : 0,
+          context_reprocessing_ratio: null,
+          human_review_minutes_per_usable_result: round(projectedHumanMinutes / estimatedReady),
+        },
+      },
+    };
+  }
+
+  async function buildSimpleReview(spendText, samples, config) {
+    const spendRows = parseCsv(spendText, "Spend file");
+    requireColumns(
+      spendRows,
+      ["period", "date", "workload", "provider", "model", "route", "requests", "input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "provider_cost", "cost_basis", "currency"],
+      "Spend file",
+    );
+    const allowedPeriods = new Set(["baseline", "proposed"]);
+    if (spendRows.some((row) => !allowedPeriods.has(row.period.toLowerCase()))) {
+      throw new Error("Spend period must be baseline or proposed.");
+    }
+    const sampleText = JSON.stringify({ samples, sampleRandom: config.sampleRandom });
+    const hashes = { spend: await sha256(spendText), sample: await sha256(sampleText) };
+    const baselineBuild = buildSimpleScenario("baseline", spendRows, samples.baseline, config, hashes);
+    const proposedBuild = buildSimpleScenario("proposed", spendRows, samples.proposed, config, hashes);
+    if (baselineBuild.currency !== proposedBuild.currency) {
+      throw new Error("Baseline and proposed spend use different currencies.");
+    }
+    if (baselineBuild.workload !== proposedBuild.workload) {
+      throw new Error("Baseline and proposed files must describe the same workload.");
+    }
+
+    const baseline = baselineBuild.scenario;
+    const proposed = proposedBuild.scenario;
+    const planning = buildPlanningRecord(baseline, proposed, config.planning);
+    const baselineUnit = baseline.measures.cost_per_usable_result;
+    const proposedUnit = proposed.measures.cost_per_usable_result;
+    const recurringDifference = proposed.costs.recurring_operating_cost - baseline.costs.recurring_operating_cost;
+    const unitDifference = proposedUnit - baselineUnit;
+    const unitChangePct = baselineUnit ? (unitDifference / baselineUnit) * 100 : null;
+    const qualityHolds = proposed.measures.usable_result_rate >= config.qualityFloor;
+    const normalizedProposed = proposedUnit * baseline.outcomes.usable_results;
+    const normalizedDifference = normalizedProposed - baseline.costs.recurring_operating_cost;
+    const savingsPerResult = baselineUnit - proposedUnit;
+    const payback = savingsPerResult > 0 && proposed.costs.one_time_change_cost > 0
+      ? Math.ceil(proposed.costs.one_time_change_cost / savingsPerResult)
+      : null;
+    const lower = unitDifference < 0;
+    const sameCostBasis = baseline.evidence.cost_basis === proposed.evidence.cost_basis;
+    const providerCostReported = [baseline, proposed].every(
+      (scenario) => scenario.evidence.cost_basis === "observed",
+    );
+    const humanCostIncluded = [baseline, proposed].every(
+      (scenario) => scenario.evidence.human_time_supplied !== false,
+    );
+    const allDates = [...baselineBuild.dates, ...proposedBuild.dates].sort();
+
+    return {
+      schema_version: "ai-cost-lens-review-result/1.0",
+      mode: "sampled",
+      currency: baselineBuild.currency,
+      period: { start: allDates[0], end: allDates.at(-1), timezone: "UTC" },
+      workload: {
+        name: baselineBuild.workload,
+        description: "Finance review of one repeatable AI workload using provider spend and sampled outcomes.",
+        outcome_unit: "ready result",
+        accepted_quality_threshold: config.qualityFloor,
+      },
+      baseline,
+      proposed,
+      comparison: {
+        status: lower ? "sampled_improvement" : "sampled_no_improvement",
+        finding: "",
+        limitation: `${providerCostReported ? "Provider spend is reported" : `${costBasisLabel(proposed.evidence.cost_basis)} is used`}. Outcome yield${humanCostIncluded ? " and human time are" : " is"} extrapolated from samples of ${baseline.outcomes.sample_size} and ${proposed.outcomes.sample_size}${humanCostIncluded ? "" : "; human work is not included"}. This is not booked savings.`,
+        recommendation: !humanCostIncluded
+          ? "Use this as a quality and bill comparison. Add rough human review time before deciding whether either route is truly cheaper."
+          : lower
+            ? "The proposed route looks lower per ready result in this sample. Repeat or expand the sample before treating the difference as savings."
+            : "The proposed route does not improve cost per ready result in this sample. Do not change routes on the provider rate alone.",
+        savings_claim_allowed: false,
+        same_cost_basis: sameCostBasis,
+        provider_cost_reported: providerCostReported,
+        quality_holds: qualityHolds,
+        both_policy_approved: baseline.policy.approved && proposed.policy.approved,
+        evidence_complete: false,
+        outcome_evidence_basis: "sampled",
+        human_cost_included: humanCostIncluded,
+        recurring_cost_difference: round(recurringDifference),
+        cost_per_usable_result_difference: round(unitDifference),
+        cost_per_usable_result_change_pct: unitChangePct === null ? null : round(unitChangePct, 1),
+        usable_result_rate_change_points: round((proposed.measures.usable_result_rate - baseline.measures.usable_result_rate) * 100, 1),
+        normalized_proposed_cost_at_baseline_volume: round(normalizedProposed),
+        normalized_cost_difference: round(normalizedDifference),
+        payback_usable_results: payback,
+      },
+      ...(planning ? { planning } : {}),
+    };
+  }
+
+  function validateComparison(data) {
+    if (!data || data.schema_version !== "ai-cost-lens-review-result/1.0") {
+      throw new Error("That file is not an AI Cost Lens review result.");
+    }
+    if (!data.baseline || !data.proposed || !data.comparison || !data.workload) {
+      throw new Error("The review result is missing required sections.");
+    }
+    const fail = () => { throw new Error("This review has missing or inconsistent numbers. Rebuild it from the original inputs."); };
+    const nonnegative = value => typeof value === "number" && Number.isFinite(value) && value >= 0;
+    const close = (a, b) => Math.abs(a - b) <= Math.max(0.00001, Math.abs(b) * 0.000001);
+    if (!/^[A-Z]{3}$/.test(data.currency) || !["real", "sampled", "illustrative"].includes(data.mode) || !data.period) fail();
+    if (!nonnegative(data.workload.accepted_quality_threshold) || data.workload.accepted_quality_threshold > 1) fail();
+    for (const scenario of [data.baseline, data.proposed]) {
+      for (const key of ["model", "costs", "usage", "outcomes", "policy", "evidence", "measures"]) if (!scenario[key] || typeof scenario[key] !== "object") fail();
+      const c = scenario.costs, o = scenario.outcomes, m = scenario.measures;
+      for (const key of ["model_cost", "shared_infrastructure_cost", "human_review_cost", "one_time_change_cost", "recurring_operating_cost", "all_in_pilot_cost"]) if (!nonnegative(c[key])) fail();
+      if (!nonnegative(o.completed_results) || !nonnegative(o.usable_results) || !o.usable_results || o.usable_results > o.completed_results) fail();
+      if (!close(c.recurring_operating_cost, c.model_cost + c.shared_infrastructure_cost + c.human_review_cost) || !close(c.all_in_pilot_cost, c.recurring_operating_cost + c.one_time_change_cost)) fail();
+      for (const [key, expected] of [["cost_per_usable_result", c.recurring_operating_cost / o.usable_results], ["all_in_cost_per_usable_result", c.all_in_pilot_cost / o.usable_results], ["usable_result_rate", o.usable_results / o.completed_results]]) if (!nonnegative(m[key]) || !close(m[key], expected)) fail();
+      if (typeof scenario.policy.approved !== "boolean" || !Array.isArray(scenario.evidence.reconciliation_issues)) fail();
+      if (o.sample_counts) {
+        if (!Number.isSafeInteger(o.sample_size) || !o.sample_size || o.sample_size > o.completed_results) fail();
+        const counts = ["ready_to_use", "needs_correction", "needs_escalation"].map(key => o.sample_counts[key]);
+        if (counts.some(n => !Number.isSafeInteger(n) || n < 0) || counts.reduce((a,b) => a+b,0) !== o.sample_size || !close(m.usable_result_rate, counts[0] / o.sample_size)) fail();
+      }
+    }
+    if (data.experience === "simple") {
+      for (const scenario of [data.baseline, data.proposed]) {
+        if (typeof scenario.model.name === "string" && scenario.model.name.trim()) scenario.label = scenario.model.name.trim();
+      }
+    }
+    const { baseline: a, proposed: b, comparison: c } = data;
+    c.quality_holds = b.measures.usable_result_rate >= data.workload.accepted_quality_threshold;
+    c.both_policy_approved = a.policy.approved && b.policy.approved;
+    c.same_cost_basis = a.evidence.cost_basis === b.evidence.cost_basis;
+    c.provider_cost_reported = [a,b].every(s => s.evidence.cost_basis === "observed");
+    c.evidence_complete = data.mode === "real" && [a,b].every(s => s.outcomes.basis !== "sampled" && s.evidence.coverage_status === "complete" && !s.evidence.reconciliation_issues.length);
+    c.human_cost_included = [a,b].every(s => s.evidence.human_time_supplied !== false);
+    c.cost_per_usable_result_difference = round(b.measures.cost_per_usable_result - a.measures.cost_per_usable_result);
+    c.cost_per_usable_result_change_pct = a.measures.cost_per_usable_result > 0 ? round(c.cost_per_usable_result_difference / a.measures.cost_per_usable_result * 100, 1) : null;
+    c.savings_claim_allowed = c.cost_per_usable_result_difference < 0 && c.quality_holds && c.both_policy_approved && c.same_cost_basis && c.provider_cost_reported && c.evidence_complete && c.human_cost_included;
+    c.recurring_cost_difference = round(b.costs.recurring_operating_cost - a.costs.recurring_operating_cost);
+    c.usable_result_rate_change_points = round((b.measures.usable_result_rate - a.measures.usable_result_rate) * 100, 1);
+    c.normalized_proposed_cost_at_baseline_volume = round(b.measures.cost_per_usable_result * a.outcomes.usable_results);
+    c.normalized_cost_difference = round(c.normalized_proposed_cost_at_baseline_volume - a.costs.recurring_operating_cost);
+    c.payback_usable_results = c.cost_per_usable_result_difference < 0 && b.costs.one_time_change_cost > 0 ? Math.ceil(b.costs.one_time_change_cost / -c.cost_per_usable_result_difference) : null;
+    c.recommendation = decisionFor(data).reason;
+    c.decision_code = decisionFor(data).code;
+  }
+
   function validateResult(data) {
     const fail = (path) => { throw new Error(`Review validation failed at ${path}. Rebuild the review from the original files.`); };
     const shape = (value, spec, path = "review") => {
@@ -1802,6 +2100,7 @@
       if (value && typeof value === "object") Object.values(value).forEach((v) => walk(v, depth + 1));
     };
     walk(data);
+    if (data?.experience === "simple") { validateComparison(data); return data; }
     shape(data, { schema_version: "string", mode: "string", period: { start: "string", end: "string", timezone: "string" } });
     validDate(data.period.start, "Review period start");
     validDate(data.period.end, "Review period end");
@@ -1859,7 +2158,8 @@
       comparison: {
         ...fields("status finding limitation recommendation", "string"),
         ...fields("savings_claim_allowed same_cost_basis provider_cost_reported quality_holds both_policy_approved evidence_complete", "boolean"),
-        ...fields("recurring_cost_difference cost_per_usable_result_difference cost_per_usable_result_change_pct usable_result_rate_change_points normalized_proposed_cost_at_baseline_volume normalized_cost_difference"),
+        ...fields("recurring_cost_difference cost_per_usable_result_difference usable_result_rate_change_points normalized_proposed_cost_at_baseline_volume normalized_cost_difference"),
+        cost_per_usable_result_change_pct: "number?",
         payback_usable_results: "number?",
       },
     });
@@ -1877,7 +2177,7 @@
         evidence: { ...fields("cost_basis outcome_basis source observed_at coverage coverage_status cost_boundary", "string"), reconciliation_issues: ["string"], ...fields("provider_usage_sha256 provider_cost_sha256 outcome_log_sha256", "string?") },
         measures: { ...fields("cost_per_usable_result all_in_cost_per_usable_result usable_result_rate human_review_minutes_per_usable_result"), ...fields("retry_rate cache_reuse_rate cache_write_rate context_reprocessing_ratio", "number?") },
       }, key);
-      if (Object.values(scenario.costs).some((n) => n < 0) || scenario.costs.recurring_operating_cost <= 0 || scenario.outcomes.usable_results < 0.000001 || scenario.outcomes.completed_results < scenario.outcomes.usable_results || scenario.measures.cost_per_usable_result < 0.000001) fail(`${key} costs or outcomes`);
+      if (Object.values(scenario.costs).some((n) => n < 0) || scenario.costs.recurring_operating_cost < 0 || scenario.outcomes.usable_results < 0.000001 || scenario.outcomes.completed_results < scenario.outcomes.usable_results || scenario.measures.cost_per_usable_result < 0) fail(`${key} costs or outcomes`);
       if (Object.values(scenario.usage).some((n) => n !== null && n < 0) || Object.values(scenario.outcomes.status_counts).some((n) => n < 0)) fail(`${key} counts`);
       close(scenario.costs.recurring_operating_cost, scenario.costs.model_cost + scenario.costs.shared_infrastructure_cost + scenario.costs.human_review_cost, `${key} recurring cost`);
       close(scenario.costs.all_in_pilot_cost, scenario.costs.recurring_operating_cost + scenario.costs.one_time_change_cost, `${key} pilot cost`);
@@ -1915,6 +2215,7 @@
       shape(data.planning, { label: "string", plan, actual: plan, variance: { ...fields("provider_cost shared_infrastructure_cost human_review_cost recurring_operating_cost ready_results ready_result_rate_points cost_per_ready_result"), primary_cost_drivers: [{ label: "string", amount: "number", direction: "string" }] }, payback: { ...fields("expected_ready_results_per_month decision_horizon_months monthly_operating_savings one_time_change_cost horizon_net_savings"), payback_months: "number?", within_decision_horizon: "boolean", status: "string" } }, "planning");
       if (["within_horizon", "outside_horizon"].includes(data.planning.payback.status) && data.planning.payback.payback_months === null) fail("planning payback");
     }
+    validateComparison(data);
   }
 
   function scenarioLabel(scenario) {
@@ -1967,7 +2268,112 @@
       </div>`;
   }
 
+  function renderSimpleTruthSection() {
+    const { baseline, proposed, comparison } = state.data;
+    const simple = state.data.experience === "simple";
+    const baselineUnit = baseline.measures.cost_per_usable_result;
+    const proposedUnit = proposed.measures.cost_per_usable_result;
+    const lower = proposedUnit < baselineUnit;
+    const change = baselineUnit ? ((proposedUnit - baselineUnit) / baselineUnit) * 100 : 0;
+    const sampled = baseline.outcomes.basis === "sampled" || proposed.outcomes.basis === "sampled";
+    const humanIncluded = comparison.human_cost_included !== false;
+    const providerTerm = providerCostTerm(baseline, proposed);
+    const costBasisEvidence = comparison.same_cost_basis
+      ? costBasisLabel(proposed.evidence.cost_basis).toUpperCase()
+      : "MIXED COST BASIS";
+    const evidenceLabel = simple
+      ? `SAMPLED n=${baseline.outcomes.sample_size} / ${proposed.outcomes.sample_size} · USER-ENTERED COST AND TIME`
+      : sampled
+      ? `SAMPLED n=${baseline.outcomes.sample_size} / ${proposed.outcomes.sample_size} · ${baseline.outcomes.sample_method === "declared random or systematic" && proposed.outcomes.sample_method === "declared random or systematic" ? "RANDOM / SYSTEMATIC" : "USER-SELECTED"} · ${costBasisEvidence}`
+      : state.data.mode === "illustrative"
+        ? "ILLUSTRATIVE"
+        : `OBSERVED OUTCOMES · ${costBasisEvidence}`;
+    const metricRows = [
+      {
+        label: simple ? "Monthly tool cost" : sentenceCase(providerTerm),
+        current: money(baseline.costs.model_cost),
+        proposed: money(proposed.costs.model_cost),
+        change: baseline.costs.model_cost
+          ? `${proposed.costs.model_cost <= baseline.costs.model_cost ? "↓" : "↑"} ${Math.abs(((proposed.costs.model_cost - baseline.costs.model_cost) / baseline.costs.model_cost) * 100).toFixed(1)}%`
+          : "Not comparable",
+        meaning: simple ? "The subscription or plan cost you entered" : providerCostsReported(baseline, proposed, comparison)
+          ? "Provider-reported model and API charges"
+          : "Model and API cost using the declared basis",
+      },
+      {
+        label: simple ? "Monthly cost including your time" : humanIncluded ? "Total recurring cost" : "Measured recurring cost",
+        current: money(baseline.costs.recurring_operating_cost),
+        proposed: money(proposed.costs.recurring_operating_cost),
+        change: baseline.costs.recurring_operating_cost
+          ? `${proposed.costs.recurring_operating_cost <= baseline.costs.recurring_operating_cost ? "↓" : "↑"} ${Math.abs(((proposed.costs.recurring_operating_cost - baseline.costs.recurring_operating_cost) / baseline.costs.recurring_operating_cost) * 100).toFixed(1)}%`
+          : "Not comparable",
+        meaning: simple ? "Tool cost + your review and fixing time" : humanIncluded ? "Provider + shared + human work" : "Provider + shared; human work not supplied",
+      },
+      {
+        label: simple ? "Usable results" : "Ready results",
+        current: compact(baseline.outcomes.usable_results),
+        proposed: compact(proposed.outcomes.usable_results),
+        change: `${proposed.outcomes.usable_results >= baseline.outcomes.usable_results ? "+" : "−"}${compact(Math.abs(proposed.outcomes.usable_results - baseline.outcomes.usable_results))}`,
+        meaning: simple ? "Work usable without a significant fix" : "Outputs that cleared the same rule",
+      },
+      {
+        label: simple ? "Cost per usable result" : humanIncluded ? "Cost per ready result" : "Measured cost per ready result",
+        current: unitMoney(baselineUnit),
+        proposed: unitMoney(proposedUnit),
+        change: `${lower ? "↓" : "↑"} ${Math.abs(change).toFixed(1)}%`,
+        meaning: simple ? "The fairest way to compare the two" : humanIncluded ? "The decision metric" : "Directional until human work is added",
+        emphasis: true,
+      },
+    ];
+    document.getElementById("truth-summary").textContent = simple
+      ? "A cheaper subscription can cost more when it creates extra reviewing and fixing work."
+      : humanIncluded
+      ? `Four numbers tell the story. ${sentenceCase(providerTerm)} can fall while the cost of usable work rises.`
+      : `This first pass connects the bill to usable work. Human review time was not supplied, so the unit cost remains directional.`;
+    document.getElementById("unit-economics-card").innerHTML = `
+      <div class="decision-table-heading">
+        <div><span>${simple ? "COST COMPARISON" : "DECISION LEDGER"}</span><strong>${simple ? lower ? "The other option costs less per usable result in this sample." : "The cheaper subscription did not produce cheaper usable work." : lower ? humanIncluded ? "The proposed route is cheaper per ready result." : "The proposed route is lower on the costs supplied." : humanIncluded ? "The cheaper bill did not produce cheaper work." : "The proposed route is not cheaper on the costs supplied."}</strong></div>
+        <span class="evidence-pill ${state.data.mode === "illustrative" ? "is-illustrative" : sampled ? "is-sampled" : "is-observed"}">${escapeHtml(evidenceLabel)}</span>
+      </div>
+      <div class="decision-table-wrap">
+        <table class="decision-table">
+          <thead><tr><th>Metric</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Change</th><th>What it includes</th></tr></thead>
+          <tbody>
+            ${metricRows.map((row) => `
+              <tr class="${row.emphasis ? "decision-row" : ""}">
+                <th scope="row">${escapeHtml(row.label)}</th>
+                <td data-label="${escapeHtml(baseline.label)}">${escapeHtml(row.current)}</td>
+                <td data-label="${escapeHtml(proposed.label)}">${escapeHtml(row.proposed)}</td>
+                <td data-label="Change">${escapeHtml(row.change)}</td>
+                <td data-label="What it includes">${escapeHtml(row.meaning)}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+      <p class="table-boundary">${escapeHtml(
+        comparison.savings_claim_allowed
+          ? "The bill, ready result log, quality floor, policy, and cost basis reconcile."
+          : sampled
+            ? humanIncluded
+              ? simple
+                ? "This estimate uses the monthly costs, usable outputs, and time you entered. Treat it as a first comparison and repeat the sample before making a bigger decision."
+                : "The spend is observed. Outcome yield and human work are extrapolated from the reviewed samples, so the difference remains a test result, not booked savings."
+              : "The spend is observed and outcome yield is estimated from the reviewed samples. Human work was not supplied, so the unit cost is incomplete and cannot become a savings claim."
+            : "This is a financial comparison, not booked savings. The evidence check below shows what is still missing.",
+      )}</p>`;
+    document.getElementById("outcome-yield-card").innerHTML = `
+      <div class="yield-header">
+        <div><span>OUTCOME YIELD</span><strong>For every 100 attempts</strong></div>
+        <span>QUALITY FLOOR ${pct(state.data.workload.accepted_quality_threshold)}</span>
+      </div>
+      ${renderYieldRoute(baseline)}
+      ${renderYieldRoute(proposed)}`;
+    configureBreakEvenExplorer();
+    renderLumenPanel();
+  }
+
   function renderTruthSection() {
+    if (state.data.experience === "simple") return renderSimpleTruthSection();
     const { baseline, proposed, comparison } = state.data;
     const baselineUnit = baseline.measures.cost_per_usable_result;
     const proposedUnit = proposed.measures.cost_per_usable_result;
@@ -2112,11 +2518,13 @@
     const hasReadyResults = readyResults > 0;
     document.getElementById("break-even-verdict").textContent = !hasReadyResults
       ? "NO READY RESULTS"
-      : delta <= 0
-        ? "PROPOSED ROUTE WINS"
-        : "CURRENT ROUTE STILL WINS";
-    document.getElementById("break-even-verdict").classList.toggle("wins", hasReadyResults && delta <= 0);
-    document.getElementById("break-even-copy").textContent = !hasReadyResults
+      : Math.abs(modeledUnit - currentUnit) < 0.000001
+        ? "NO COST ADVANTAGE"
+        : modeledUnit < currentUnit ? "LOWER MODELED COST" : "CURRENT ROUTE STILL WINS";
+    document.getElementById("break-even-verdict").classList.toggle("wins", hasReadyResults && modeledUnit < currentUnit);
+    document.getElementById("break-even-copy").textContent = currentUnit === 0
+      ? "The current option has zero cost on the supplied inputs. A percentage saving is undefined; the other option can only match zero or cost more. Quality and approval requirements still apply."
+      : !hasReadyResults
       ? `At 0% ready, the proposed route produces no usable result, so a unit cost cannot be calculated. At these costs it needs ${breakEvenYield.toFixed(1)}% of attempts to be ready to match ${unitMoney(currentUnit)}.`
       : breakEvenYield <= 100
         ? `At these costs, the proposed route needs ${breakEvenYield.toFixed(1)}% of attempts to be ready to match ${unitMoney(currentUnit)}. The slider currently models ${readyResults.toFixed(0)} ready results and a ${Math.abs(delta).toFixed(1)}% ${delta <= 0 ? "advantage" : "premium"}.`
@@ -2137,7 +2545,36 @@
     return { baseline, proposed, comparison, mode, providerChange, recurringChange, requiredReady, requiredRate };
   }
 
+  function renderSimpleLumenPanel() {
+    const facts = lumenFacts();
+    const simple = state.data.experience === "simple";
+    const unitChange = facts.comparison.cost_per_usable_result_change_pct;
+    const providerTerm = providerCostTerm(facts.baseline, facts.proposed);
+    const humanIncluded = facts.comparison.human_cost_included !== false;
+    document.getElementById("lumen-panel-title").textContent = unitChange > 0
+      ? "Don't switch yet."
+      : facts.comparison.savings_claim_allowed
+        ? "The proposed route earned approval."
+        : "The proposed route earned another test.";
+    document.getElementById("lumen-panel-copy").textContent = simple
+      ? unitChange > 0
+        ? `The other option costs less each month, but it created more reviewing and fixing work. Cost per usable result is ${Math.abs(unitChange).toFixed(1)}% higher.`
+        : `Cost per usable result is ${Math.abs(unitChange).toFixed(1)}% lower in your sample. Test it again before making a bigger decision.`
+      : !humanIncluded
+      ? `The bill and sampled ready result rate are connected. Human work is still missing, so this is a directional comparison, not a full cost or savings claim.`
+      : unitChange > 0
+        ? `${sentenceCase(providerTerm)} is lower, but fewer results are ready and human work is higher. Full cost per ready result is ${Math.abs(unitChange).toFixed(1)}% worse.`
+        : `The cost per ready result is ${Math.abs(unitChange).toFixed(1)}% lower. The evidence check decides whether that is a real saving or still only an estimate.`;
+    document.getElementById("lumen-signals").innerHTML = `
+      <div><span>${simple ? "Monthly tool cost" : escapeHtml(sentenceCase(providerTerm))}</span><strong>${facts.providerChange <= 0 ? "↓" : "↑"} ${Math.abs(facts.providerChange).toFixed(1)}%</strong></div>
+      <div><span>${simple ? "Usable result rate" : "Ready result rate"}</span><strong>${pct(facts.baseline.measures.usable_result_rate)} → ${pct(facts.proposed.measures.usable_result_rate)}</strong></div>
+      <div><span>${simple ? "Cost per usable result" : "Full unit cost"}</span><strong>${unitMoney(facts.baseline.measures.cost_per_usable_result)} → ${unitMoney(facts.proposed.measures.cost_per_usable_result)}</strong></div>`;
+    document.getElementById("lumen-conversation").innerHTML = "";
+    configureLumenPrompts(false);
+  }
+
   function renderLumenPanel() {
+    if (state.data.experience === "simple") return renderSimpleLumenPanel();
     const facts = lumenFacts();
     const unitChange = facts.comparison.cost_per_usable_result_change_pct;
     const providerTerm = providerCostTerm(facts.baseline, facts.proposed);
@@ -2156,7 +2593,43 @@
     document.getElementById("lumen-conversation").innerHTML = "";
   }
 
+  function configureLumenPrompts(forBill) {
+    const billLabels = {
+      why: "Where did the money go?",
+      changed: "What stands out?",
+      improve: "Where would you look first?",
+      evidence: "What is missing?",
+      cfo: "Explain this for finance.",
+      plan: "How well is this attributed?",
+      payback: "Can this prove savings?",
+      challenge: "Challenge the recommendation.",
+    };
+    const workloadLabels = {
+      why: "How do these costs compare?",
+      changed: "What changed?",
+      improve: "What has to improve?",
+      evidence: "What evidence is missing?",
+      cfo: "Explain it for a CFO.",
+      plan: "What happened versus plan?",
+      payback: "Does the change pay back?",
+      challenge: "Challenge the conclusion.",
+    };
+    const labels = forBill ? billLabels : workloadLabels;
+    document.querySelectorAll("[data-lumen-question]").forEach((button) => {
+      button.textContent = labels[button.dataset.lumenQuestion];
+    });
+  }
+
   function lumenResponse(kind) {
+    if (state.data?.experience === "simple") {
+      const { baseline, proposed, comparison } = state.data;
+      const decision = decisionFor(state.data);
+      if (["evidence", "challenge"].includes(kind)) return `${decision.reason} ${comparison.limitation}`;
+      if (kind === "plan" || kind === "payback") return "No budget plan or switching cost was supplied. A monthly scenario alone does not establish payback or realized savings.";
+      return `${decision.reason} Current cost per qualifying result: ${unitMoney(baseline.measures.cost_per_usable_result)}. Other option: ${unitMoney(proposed.measures.cost_per_usable_result)}. Tool charges and estimated time value are included; qualifying means usable without a significant fix.`;
+    }
+
+
     const facts = lumenFacts();
     const { baseline, proposed, comparison, mode } = facts;
     const issueCount = (baseline.evidence.reconciliation_issues || []).length +
@@ -2181,8 +2654,8 @@
           : "exactly on"
       : null;
     const responses = {
-      why: `The provider bill fell from ${money(baseline.costs.model_cost)} to ${money(proposed.costs.model_cost)}, but that is only one part of the full cost. Ready results fell from ${compact(baseline.outcomes.usable_results)} to ${compact(proposed.outcomes.usable_results)}, while human review and correction rose from ${money(baseline.costs.human_review_cost)} to ${money(proposed.costs.human_review_cost)}. That pushed the proposed route to ${unitMoney(proposed.measures.cost_per_usable_result)} per ready result, ${Math.abs(comparison.cost_per_usable_result_change_pct).toFixed(1)}% above the current route.`,
-      changed: `${sentenceCase(providerTerm)} ${facts.providerChange <= 0 ? "fell" : "rose"} ${Math.abs(facts.providerChange).toFixed(1)}%. Total recurring cost ${facts.recurringChange <= 0 ? "fell" : "rose"} ${Math.abs(facts.recurringChange).toFixed(1)}%. But the ready result rate moved from ${pct(baseline.measures.usable_result_rate)} to ${pct(proposed.measures.usable_result_rate)}, which is why the lower bill did not produce a lower cost per usable result.`,
+      why: `${decisionFor(state.data).reason} Current unit cost: ${unitMoney(baseline.measures.cost_per_usable_result)}. Proposed unit cost: ${unitMoney(proposed.measures.cost_per_usable_result)}.`,
+      changed: `${decisionFor(state.data).reason} Provider cost: ${money(baseline.costs.model_cost)} → ${money(proposed.costs.model_cost)}. Human work: ${money(baseline.costs.human_review_cost)} → ${money(proposed.costs.human_review_cost)}.`,
       improve: facts.requiredRate === null
         ? "The review does not contain enough volume data to calculate a break-even yield."
         : `At the current proposed cost, at least ${compact(facts.requiredReady)} of ${compact(proposed.outcomes.completed_results)} attempts must be ready to match the current ${unitMoney(baseline.measures.cost_per_usable_result)} unit cost. That is a ${facts.requiredRate.toFixed(1)}% ready result rate, compared with ${pct(proposed.measures.usable_result_rate)} now. The break-even explorer lets you test a different yield, provider bill, or human work cost.`,
@@ -2193,9 +2666,7 @@
           : issueCount
             ? `${failedGateSentence} still ${failedGateVerb} a savings claim. Open The evidence for the ${issueCount} reconciliation issue${issueCount === 1 ? "" : "s"}.`
             : `The files match, but ${failedGateText} still ${failedGateVerb} a savings claim.`,
-      cfo: comparison.cost_per_usable_result_change_pct > 0
-        ? `The proposed route reduces ${providerTerm}, but not the cost of usable work. After shared infrastructure and human correction, each ready result costs ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. Keep the current route and test whether the proposed route can reach at least ${facts.requiredRate?.toFixed(1) ?? "the required"}% ready results before changing the default.`
-        : `The proposed route produces a ready result for ${unitMoney(proposed.measures.cost_per_usable_result)} versus ${unitMoney(baseline.measures.cost_per_usable_result)} today. ${comparison.savings_claim_allowed ? "The evidence supports the difference for this workload and period." : `${failedGateSentence} still ${failedGateVerb} a savings claim.`}`,
+      cfo: decisionFor(state.data).reason,
       plan: planning
         ? `The current route finished ${money(Math.abs(planning.variance.recurring_operating_cost))} ${planCostPosition} its recurring cost plan. ${planning.variance.primary_cost_drivers.map((driver) => `${sentenceCase(driver.label)} was ${money(Math.abs(driver.amount))} ${driver.amount > 0 ? "over plan" : driver.amount < 0 ? "under plan" : "on plan"}`).join(". ")}. Ready result yield was ${Math.abs(planning.variance.ready_result_rate_points).toFixed(1)} points ${planYieldPosition} plan.`
         : "No approved plan was supplied with this review. Add the planned provider, infrastructure, human work, volume, and ready result assumptions to create a Plan vs Actual check.",
@@ -2279,7 +2750,254 @@
       <div><dt>${payback.decision_horizon_months}-month net</dt><dd class="${horizonValue >= 0 ? "positive" : "negative"}">${signedMoney(horizonValue)}</dd></div>`;
   }
 
+  function renderSimpleReview() {
+    const { baseline, proposed, comparison, workload, period, mode } = state.data;
+    const simple = state.data.experience === "simple";
+    document.getElementById("review-kicker").textContent = simple ? "AI TOOL COST COMPARISON" : "FINANCE FIRST AI SPEND REVIEW";
+    document.getElementById("review-title").textContent = simple ? "What did one usable result really cost?" : "What did one ready result really cost?";
+    document.getElementById("truth-kicker").textContent = simple ? "THE NUMBER THAT MATTERS" : "THE NUMBER FINANCE NEEDS";
+    document.getElementById("truth-title").textContent = simple ? "The cost of one usable result" : "The cost of one ready result";
+    const humanIncluded = comparison.human_cost_included !== false;
+    document.getElementById("period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
+    document.getElementById("mode-tag").textContent =
+      mode === "illustrative"
+        ? "ILLUSTRATIVE DATA · NOT CUSTOMER DATA"
+        : mode === "sampled"
+          ? "SAMPLED OUTCOMES · FINANCIAL ESTIMATE"
+          : "OBSERVED OUTCOME REVIEW";
+    document.getElementById("workload-name").textContent = workload.name;
+    document.getElementById("workload-description").textContent = workload.description;
+    const baselineUnit = baseline.measures.cost_per_usable_result;
+    const proposedUnit = proposed.measures.cost_per_usable_result;
+    const modelCostChange = baseline.costs.model_cost
+      ? ((proposed.costs.model_cost - baseline.costs.model_cost) / baseline.costs.model_cost) * 100
+      : null;
+    const readyResultCostChange = baselineUnit
+      ? ((proposedUnit - baselineUnit) / baselineUnit) * 100
+      : null;
+    const providerTerm = providerCostTerm(baseline, proposed);
+    if (!humanIncluded) {
+      document.getElementById("finding-title").textContent =
+        `The sampled ready result rate is visible. Human review time is not, so the displayed unit cost includes only the costs supplied.`;
+    } else if (comparison.savings_claim_allowed) {
+      document.getElementById("finding-title").textContent =
+        modelCostChange !== null && modelCostChange < 0 && readyResultCostChange !== null
+          ? `The provider bill fell ${Math.abs(modelCostChange).toFixed(1)}%. The cost of a ready result fell ${Math.abs(readyResultCostChange).toFixed(1)}%.`
+          : `${proposed.label} cost ${unitMoney(proposedUnit)} for each result that was ready to use. ${baseline.label} cost ${unitMoney(baselineUnit)}. The difference is supported for this workload and period.`;
+    } else if (mode === "sampled" && proposedUnit < baselineUnit) {
+      document.getElementById("finding-title").textContent =
+        `${proposed.label} comes out at ${unitMoney(proposedUnit)} per ready result in the sampled review. ` +
+        `${baseline.label} comes out at ${unitMoney(baselineUnit)}. The difference is worth testing, not booking.`;
+    } else if (proposedUnit < baselineUnit) {
+      document.getElementById("finding-title").textContent =
+        `${proposed.label} comes out at ${unitMoney(proposedUnit)} for each result that was ready ` +
+        `to use. ${baseline.label} cost ${unitMoney(baselineUnit)}. It looks better, but ${costBasisLabel(proposed.evidence.cost_basis).toLowerCase()} is not booked provider spend.`;
+    } else {
+      document.getElementById("finding-title").textContent =
+        modelCostChange !== null && modelCostChange < 0 && readyResultCostChange !== null && readyResultCostChange > 0
+          ? `${sentenceCase(providerTerm)} fell ${Math.abs(modelCostChange).toFixed(1)}%. The cost of a ready result rose ${readyResultCostChange.toFixed(1)}%.`
+          : `${proposed.label} cost ${unitMoney(proposedUnit)} for each result that was ready to use, compared with ${unitMoney(baselineUnit)} for ${baseline.label.toLowerCase()}.`;
+    }
+    document.getElementById("finding-limit").textContent = comparison.limitation;
+    document.getElementById("decision-title").textContent = comparison.recommendation;
+    document.getElementById("decision-code").textContent =
+      comparison.savings_claim_allowed && proposedUnit < baselineUnit
+        ? "SAVE NOW"
+        : proposedUnit < baselineUnit
+          ? "TEST FIRST"
+          : "KEEP CURRENT ROUTE";
+    renderTruthSection();
+    renderPlanning();
+
+    const bars = [
+      {
+        className: "baseline",
+        label: baseline.label,
+        note: humanIncluded ? "Recurring cost per ready result" : "Cost per ready result; human work not supplied",
+        value: baseline.measures.cost_per_usable_result,
+      },
+      {
+        className: "proposed",
+        label: proposed.label,
+        note: humanIncluded ? "Recurring cost per ready result" : "Cost per ready result; human work not supplied",
+        value: proposed.measures.cost_per_usable_result,
+      },
+    ];
+    if (proposed.costs.one_time_change_cost > 0) {
+      bars.push({
+        className: "pilot",
+        label: `${proposed.label}, first period`,
+        note: "Includes one time change cost",
+        value: proposed.measures.all_in_cost_per_usable_result,
+      });
+    }
+    const values = bars.map((bar) => bar.value);
+    const maxValue = Math.max(...values) * 1.06 || 1;
+
+    const chart = document.getElementById("unit-cost-chart");
+    chart.setAttribute(
+      "aria-label",
+      proposed.costs.one_time_change_cost > 0
+        ? `Current recurring cost is ${unitMoney(values[0])} per ready result. Proposed recurring cost is ${unitMoney(values[1])}. Proposed first period cost including change work is ${unitMoney(values[2])}.`
+        : `Current recurring cost is ${unitMoney(values[0])} per ready result. Proposed recurring cost is ${unitMoney(values[1])}. No one time change cost is included in this review.`,
+    );
+    chart.innerHTML = bars
+      .map(
+        (bar) => `
+          <div class="bar-row ${bar.className}">
+            <div class="bar-label">
+              <strong>${escapeHtml(bar.label)}</strong>
+              <small>${escapeHtml(bar.note)}</small>
+            </div>
+            <div class="bar-track" aria-hidden="true">
+              <div class="bar-fill" style="width:${((bar.value / maxValue) * 100).toFixed(1)}%"></div>
+            </div>
+            <div class="bar-value">${unitMoney(bar.value)}<small>per ready result</small></div>
+          </div>`,
+      )
+      .join("");
+
+    const metrics = [
+      {
+        label: humanIncluded ? "Recurring cost" : "Measured recurring cost",
+        value: `${money(baseline.costs.recurring_operating_cost)} → ${money(proposed.costs.recurring_operating_cost)}`,
+        note: `${money(Math.abs(comparison.recurring_cost_difference))} ${comparison.recurring_cost_difference <= 0 ? "lower" : "higher"} in the compared period`,
+      },
+      {
+        label: "Ready result rate",
+        value: `${pct(baseline.measures.usable_result_rate)} → ${pct(proposed.measures.usable_result_rate)}`,
+        note: `${Math.abs(comparison.usable_result_rate_change_points).toFixed(1)} points ${comparison.usable_result_rate_change_points >= 0 ? "higher" : "lower"}`,
+      },
+      {
+        label: "Retries",
+        value: baseline.measures.retry_rate === null || proposed.measures.retry_rate === null
+          ? "Not supplied"
+          : `${pct(baseline.measures.retry_rate)} → ${pct(proposed.measures.retry_rate)}`,
+        note: baseline.measures.retry_rate === null || proposed.measures.retry_rate === null
+          ? "The quick sample does not infer retry counts"
+          : `${compact(Math.abs(baseline.usage.retries - proposed.usage.retries))} ${baseline.usage.retries >= proposed.usage.retries ? "fewer" : "more"} retry events`,
+      },
+      {
+        label: "One time change cost",
+        value: proposed.costs.one_time_change_cost
+          ? money(proposed.costs.one_time_change_cost)
+          : "None included",
+        note: proposed.costs.one_time_change_cost
+          ? `${money(proposed.costs.all_in_pilot_cost)} in the first period, all in`
+          : "Add migration, testing, and rollout work before approval",
+      },
+    ];
+    document.getElementById("metric-ledger").innerHTML = metrics
+      .map(
+        (item) => `
+          <div class="metric-cell">
+            <span>${escapeHtml(item.label)}</span>
+            <strong>${escapeHtml(item.value)}</strong>
+            <small>${escapeHtml(item.note)}</small>
+          </div>`,
+      )
+      .join("");
+
+    const evidenceIssues = [
+      ...baseline.evidence.reconciliation_issues,
+      ...proposed.evidence.reconciliation_issues,
+    ];
+    const lowerUnitCost = proposed.measures.cost_per_usable_result < baseline.measures.cost_per_usable_result;
+    const gateFailures = [
+      !comparison.quality_holds && "the quality floor",
+      !comparison.both_policy_approved && "policy approval",
+      !comparison.evidence_complete && "complete outcome evidence",
+      !comparison.same_cost_basis && "the same kind of cost data on both routes",
+      !providerCostsReported(baseline, proposed, comparison) && "a provider bill for both routes",
+    ].filter(Boolean);
+    const gateFailureText = gateFailures.length > 1
+      ? `${gateFailures.slice(0, -1).join(", ")} and ${gateFailures.at(-1)}`
+      : gateFailures[0] || "a decision gate";
+    const illustrative = mode === "illustrative";
+    const opportunityRows = [
+      {
+        state: "save",
+        label: "SAVE NOW",
+        title: comparison.savings_claim_allowed ? "Proven savings" : "No proven savings yet",
+        value: comparison.savings_claim_allowed ? money(Math.abs(comparison.normalized_cost_difference)) : "—",
+        note: comparison.savings_claim_allowed
+          ? "At the current volume, the lower full cost is supported by the bill and the work records."
+          : "Nothing shows up here until the provider bill, usable work, quality, and policy checks all agree.",
+      },
+      {
+        state: "test",
+        label: "TEST FIRST",
+        title: lowerUnitCost && !comparison.savings_claim_allowed ? "Proposed model route" : "No open route test",
+        value: lowerUnitCost && !comparison.savings_claim_allowed
+          ? `${money(Math.abs(comparison.normalized_cost_difference))} difference`
+          : "—",
+        note: lowerUnitCost && !comparison.savings_claim_allowed
+          ? `The unit cost is ${Math.abs(comparison.cost_per_usable_result_change_pct).toFixed(1)}% lower at equivalent accepted volume, but ${gateFailureText} still blocks a savings claim.`
+          : "This comparison does not point to another route worth testing.",
+      },
+      {
+        state: "fix",
+        label: "FIX THE EVIDENCE",
+        title: evidenceIssues.length
+          ? "Fix the missing or mismatched data"
+          : illustrative
+            ? "Replace the example with real evidence"
+            : mode === "sampled" ? "Sample assumptions need confirmation" : "No file or math mismatch found",
+        value: evidenceIssues.length
+          ? `${evidenceIssues.length} issue${evidenceIssues.length === 1 ? "" : "s"}`
+          : illustrative
+            ? "Example"
+            : mode === "sampled" ? "Estimate" : "Files match",
+        note: evidenceIssues[0] || (illustrative
+          ? "The synthetic inputs match each other. They do not prove what would happen with a real workload or vendor."
+          : mode === "sampled" ? "Sample arithmetic is consistent. This does not verify an invoice or a complete work log." : "The bill and work log match for this review. Quality, policy, and approval checks still apply."),
+      },
+      {
+        state: "leave",
+        label: !lowerUnitCost ? "KEEP CURRENT ROUTE" : "HOLD SEPARATE",
+        title: !lowerUnitCost ? sentenceCase(decisionFor(state.data).code.toLowerCase()) : proposed.costs.one_time_change_cost ? "One time change cost" : "No separate cost to protect",
+        value: !lowerUnitCost
+          ? (comparison.cost_per_usable_result_change_pct === null ? "Zero-cost baseline" : comparison.cost_per_usable_result_difference === 0 ? "No change" : `${Math.abs(comparison.cost_per_usable_result_change_pct).toFixed(1)}% higher`)
+          : proposed.costs.one_time_change_cost ? money(proposed.costs.one_time_change_cost) : "—",
+        note: !lowerUnitCost
+          ? decisionFor(state.data).reason
+          : proposed.costs.one_time_change_cost
+            ? comparison.payback_usable_results
+              ? `Keep it separate from recurring cost. It earns back after about ${compact(comparison.payback_usable_results)} accepted results if the monthly savings hold.`
+              : "Keep this separate from recurring cost. The supplied comparison does not establish a payback."
+            : "No one time or policy cost was entered for this row.",
+      },
+    ];
+    document.getElementById("opportunity-ledger").innerHTML = opportunityRows
+      .map(
+        (row) => `
+          <article class="opportunity-row state-${row.state}">
+            <span class="opportunity-state">${escapeHtml(row.label)}</span>
+            <div>
+              <strong>${escapeHtml(row.title)}</strong>
+              <p>${escapeHtml(row.note)}</p>
+            </div>
+            <em>${escapeHtml(row.value)}</em>
+          </article>`,
+      )
+      .join("");
+
+    document.getElementById("claim-status").textContent = comparison.savings_claim_allowed
+      ? "Savings claim supported"
+      : "Modeled difference, not booked savings";
+    document.getElementById("payback-status").textContent = comparison.payback_usable_results
+      ? `Modeled payback: ${compact(comparison.payback_usable_results)} usable results`
+      : !lowerUnitCost
+        ? "No payback: recurring unit cost is higher"
+        : "Payback not established from the supplied evidence";
+  }
+
   function renderReview() {
+    if (state.data.experience === "simple") return renderSimpleReview();
+    document.getElementById("review-kicker").textContent = "FINANCE FIRST AI SPEND REVIEW";
+    document.getElementById("review-title").textContent = "What did one ready result really cost?";
+    document.getElementById("truth-kicker").textContent = "THE NUMBER FINANCE NEEDS";
+    document.getElementById("truth-title").textContent = "The cost of one ready result";
     const { baseline, proposed, comparison, workload, period, mode } = state.data;
     document.getElementById("period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
     document.getElementById("mode-tag").textContent =
@@ -2333,13 +3051,13 @@
       {
         className: "baseline",
         label: baseline.label,
-        note: "Recurring operating cost",
+        note: "Recurring cost per ready result",
         value: baseline.measures.cost_per_usable_result,
       },
       {
         className: "proposed",
         label: proposed.label,
-        note: "Recurring operating cost",
+        note: "Recurring cost per ready result",
         value: proposed.measures.cost_per_usable_result,
       },
     ];
@@ -2505,6 +3223,7 @@
 
   function anatomyCard(scenario) {
     const recurring = scenario.costs.recurring_operating_cost;
+    const humanKnown = scenario.evidence.human_time_supplied !== false;
     const parts = [
       ["Model usage", scenario.costs.model_cost, "model"],
       ["Shared infrastructure", scenario.costs.shared_infrastructure_cost, "shared"],
@@ -2523,7 +3242,7 @@
           ${parts
             .map(
               ([, value, key]) =>
-                `<div class="stack-${key}" style="width:${((value / recurring) * 100).toFixed(2)}%"></div>`,
+                `<div class="stack-${key}" style="width:${(recurring ? (value / recurring) * 100 : 0).toFixed(2)}%"></div>`,
             )
             .join("")}
         </div>
@@ -2534,7 +3253,7 @@
                 <div class="cost-line">
                   <i class="stack-${key}"></i>
                   <span>${escapeHtml(label)}</span>
-                  <strong>${money(value)} · ${((value / recurring) * 100).toFixed(0)}%</strong>
+                  <strong>${key === "human" && !humanKnown ? "Not supplied" : `${money(value)} · ${recurring ? ((value / recurring) * 100).toFixed(0) + "%" : "No cost"}`}</strong>
                 </div>`,
             )
             .join("")}
@@ -2646,7 +3365,7 @@
               : status === "illustrative"
                 ? "<p>The synthetic spend, cost, and outcome rows reconcile internally. This is not evidence from a real workload.</p>"
                 : status === "sampled"
-                ? "<p>The spend file reconciles. Outcome yield and human time remain sampled estimates.</p>"
+                ? "<p>The entered numbers reconcile. Outcome yield and human time remain sampled estimates.</p>"
                 : "<p>Usage, provider cost, and the outcome log reconcile for the declared scope.</p>"
           }
         </div>
@@ -3075,7 +3794,63 @@
     renderReview();
     renderAnatomy();
     renderEvidence();
+    renderDecisionConsistency();
     setView(state.view);
+  }
+
+  function decisionFor(data) {
+    const { baseline, proposed, comparison } = data;
+    const a = baseline.measures.cost_per_usable_result;
+    const b = proposed.measures.cost_per_usable_result;
+    const delta = b - a;
+    let code, reason;
+    if (!comparison.both_policy_approved) {
+      code = "CHECK APPROVAL";
+      reason = "Policy approval for both options has not been established. Resolve approval before testing or switching.";
+    } else if (!comparison.quality_holds) {
+      code = "QUALITY BELOW MINIMUM";
+      reason = "The other option does not meet your minimum usable-result rate. A lower cost does not override that requirement.";
+    } else if (comparison.human_cost_included === false) {
+      code = "ADD MISSING TIME";
+      reason = "Review and fixing time is missing. Add it before deciding which option costs less overall.";
+    } else if (Math.abs(delta) < 0.000001) {
+      code = "NO COST ADVANTAGE";
+      reason = "The options have the same cost per qualifying result at the precision shown. This comparison establishes no cost advantage.";
+    } else if (delta > 0) {
+      code = "KEEP CURRENT ROUTE";
+      reason = "The other option costs more per qualifying result on the inputs supplied. This comparison does not support switching to save money.";
+    } else {
+      code = comparison.savings_claim_allowed ? "SAVE NOW" : "TEST FIRST";
+      reason = comparison.savings_claim_allowed ? "The supplied evidence supports a lower cost per qualifying result for this workload and period." : "The other option costs less per qualifying result in this estimate. Repeat the comparison before treating the difference as savings.";
+    }
+    if (data.experience !== "simple" && !comparison.savings_claim_allowed) {
+      const gates = failedSavingsGateText(comparison, baseline, proposed);
+      reason += ` ${sentenceCase(gates)} still ${/,| and /.test(gates) ? "block" : "blocks"} a savings claim.`;
+    }
+    return { code, reason, delta, percent: a > 0 ? delta / a * 100 : null };
+  }
+
+  function renderDecisionConsistency() {
+    if ([singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version)) return;
+    const decision = decisionFor(state.data);
+    for (const id of ["decision-code", "memo-decision-code"]) document.getElementById(id).textContent = decision.code;
+    for (const id of ["decision-title", "memo-decision-title", "memo-next-step", "lumen-panel-copy"]) document.getElementById(id).textContent = decision.reason;
+    document.getElementById("lumen-panel-title").textContent = sentenceCase(decision.code.toLowerCase());
+    const decisionHeading = document.querySelector(".decision-table-heading strong");
+    if (decisionHeading) decisionHeading.textContent = sentenceCase(decision.code.toLowerCase());
+    const changeCell = document.querySelector(".decision-row td:nth-child(4)");
+    if (changeCell) changeCell.textContent = decision.percent === null ? "Not comparable from zero" : Math.abs(decision.delta) < 0.000001 ? "No change" : `${decision.percent > 0 ? "↑" : "↓"} ${Math.abs(decision.percent).toFixed(1)}%`;
+    if (state.data.mode !== "illustrative") {
+      document.getElementById("finding-title").textContent = decision.reason;
+      document.getElementById("finding-limit").textContent = state.data.comparison.limitation;
+    }
+    if (state.data.experience === "simple") {
+      document.getElementById("period-label").textContent = "Monthly scenario · billing dates not supplied";
+      document.getElementById("memo-meta").textContent = "Monthly scenario · billing dates not supplied";
+      document.getElementById("finding-title").textContent = decision.reason;
+      document.getElementById("finding-limit").textContent = state.data.comparison.limitation;
+      document.getElementById("lumen-signals").innerHTML = `<div><span>Current cost per qualifying result</span><strong>${escapeHtml(unitMoney(state.data.baseline.measures.cost_per_usable_result))}</strong></div><div><span>Other option</span><strong>${escapeHtml(unitMoney(state.data.proposed.measures.cost_per_usable_result))}</strong></div>`;
+    }
   }
 
   function setView(view) {
@@ -3116,7 +3891,7 @@
   );
 
   function syncBuilderControls() {
-    for (const mode of ["single", "workload", "openai"]) {
+    for (const mode of ["single", "workload", "openai", "simple"]) {
       document.getElementById(`${mode}-builder-fields`).querySelectorAll("input, select, textarea").forEach((input) => {
         input.disabled = state.builderMode !== mode;
       });
@@ -3173,6 +3948,7 @@
     document.getElementById("workload-builder-fields").hidden = true;
     document.getElementById("openai-builder-fields").hidden = true;
     document.getElementById("single-builder-fields").hidden = true;
+    document.getElementById("simple-builder-fields").hidden = true;
     document.getElementById("builder-actions").hidden = true;
     document.getElementById("builder-path-help").hidden = false;
     document.getElementById("review-dialog-title").textContent = "What would you like to check?";
@@ -3196,8 +3972,10 @@
     });
     const isOpenAI = mode === "openai";
     const isSingle = mode === "single";
+    const isSimple = mode === "simple";
+    document.getElementById("simple-builder-fields").hidden = !isSimple;
     document.getElementById("single-builder-fields").hidden = !isSingle;
-    document.getElementById("workload-builder-fields").hidden = isOpenAI || isSingle;
+    document.getElementById("workload-builder-fields").hidden = isOpenAI || isSingle || isSimple;
     document.getElementById("openai-builder-fields").hidden = !isOpenAI;
     document.getElementById("builder-actions").hidden = false;
     document.getElementById("builder-path-help").hidden = true;
@@ -3205,6 +3983,11 @@
     document.getElementById("builder-action-note").textContent = isSingle ? "Cost is enough to start. Usage and outcomes deepen the review when available; human effort and retries are optional." : isOpenAI ? "The result will show a useful cost and usage baseline without requiring outcome or human-review data." : state.outcomeMode === "sample" ? "The quick path produces a sampled estimate. It never becomes booked savings." : "Use the detailed log when you have one row per completed result.";
     document.getElementById("build-review").textContent = isSingle ? "Understand this bill" : isOpenAI ? "Review the provider export" : "Build the finance review";
     document.getElementById("builder-error").classList.remove("visible");
+    if (isSimple) {
+      document.getElementById("review-dialog-title").textContent = "Compare two AI tools or plans";
+      document.getElementById("builder-action-note").textContent = "A monthly estimate including the value of your time. No files needed.";
+      document.getElementById("build-review").textContent = "Compare my options";
+    }
     syncBuilderControls();
   }
 
@@ -3221,6 +4004,8 @@
   document.querySelectorAll(".builder-mode").forEach((button) => {
     button.addEventListener("click", () => activateBuilderMode(button.dataset.builderMode, button));
   });
+
+  document.getElementById("simple-change-path").addEventListener("click", resetBuilderStart);
 
   function setImportProvider(provider) {
       state.importProvider = provider;
@@ -3398,6 +4183,74 @@
     submit.textContent = "Checking the evidence…";
     const previousData = state.data;
     try {
+      if (state.builderMode === "simple") {
+        const value = (id, label, options) => finiteNumber(document.getElementById(id).value, label, options);
+        const currentName = document.getElementById("simple-current-name").value.trim();
+        const otherName = document.getElementById("simple-other-name").value.trim();
+        if (!currentName || !otherName) throw new Error("Give both tools or plans a name.");
+        const monthlyTasks = value("simple-monthly-tasks", "Monthly tasks", { integer: true });
+        const currentChecked = value("simple-current-checked", "Current outputs checked", { integer: true });
+        const otherChecked = value("simple-other-checked", "Other outputs checked", { integer: true });
+        const currentUsable = value("simple-current-usable", "Current usable outputs", { integer: true });
+        const otherUsable = value("simple-other-usable", "Other usable outputs", { integer: true });
+        if (!monthlyTasks || !currentChecked || !otherChecked) throw new Error("Enter at least one monthly task and one checked output for each option.");
+        if (currentUsable > currentChecked || otherUsable > otherChecked) throw new Error("Usable outputs cannot be greater than the number you checked.");
+        if (currentChecked > monthlyTasks || otherChecked > monthlyTasks) throw new Error("The number checked cannot be greater than your monthly tasks.");
+        const csvCell = (input) => `"${String(input).replaceAll('"', '""')}"`;
+        const header = "period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,cost_basis,currency";
+        const today = new Date().toISOString().slice(0, 10);
+        const row = (period, name, cost, route) => [period, today, "My monthly AI-assisted work", name, name, route, monthlyTasks, 0, 0, 0, 0, cost, "calculated", "USD"].map(csvCell).join(",");
+        const spendText = [
+          header,
+          row("baseline", currentName, value("simple-current-cost", "Current monthly cost"), "What you use now"),
+          row("proposed", otherName, value("simple-other-cost", "Other monthly cost"), "The other option"),
+        ].join("\n");
+        const approved = document.getElementById("simple-approved").checked;
+        const config = {
+          acceptanceRule: "Usable without a significant fix",
+          verifier: "User review",
+          qualityFloor: value("simple-quality-floor", "Minimum usable rate") / 100,
+          hourlyRate: value("simple-hourly-rate", "Hourly value"),
+          baselinePolicyApproved: approved,
+          proposedPolicyApproved: approved,
+          baselineShared: 0,
+          proposedShared: 0,
+          changeCost: 0,
+          sampleRandom: false,
+          outcomeLogComplete: false,
+          planning: null,
+        };
+        if (config.qualityFloor <= 0 || config.qualityFloor > 1) throw new Error("Minimum usable rate must be between 1% and 100%.");
+        state.data = await buildSimpleReview(spendText, {
+          baseline: { population: monthlyTasks, ready: currentUsable, correction: currentChecked - currentUsable, escalation: 0, humanMinutes: value("simple-current-minutes", "Current review and fixing minutes") },
+          proposed: { population: monthlyTasks, ready: otherUsable, correction: otherChecked - otherUsable, escalation: 0, humanMinutes: value("simple-other-minutes", "Other review and fixing minutes") },
+        }, config);
+        state.data.experience = "simple";
+        state.data.workload.name = "My monthly AI-assisted work";
+        state.data.workload.description = "A plain-language comparison of two AI options using monthly cost, usable work, and the user's review and fixing time.";
+        state.data.workload.outcome_unit = "usable result";
+        state.data.baseline.label = currentName;
+        state.data.proposed.label = otherName;
+        state.data.period = { start: null, end: null, timezone: "Not supplied" };
+        for (const scenario of [state.data.baseline, state.data.proposed]) {
+          scenario.evidence.source = "User-entered monthly cost and sample; no provider export supplied";
+          scenario.evidence.observed_at = "Not supplied";
+          scenario.evidence.cost_boundary = "Entered tool cost plus estimated value of review and fixing time; time value is not necessarily a cash expense";
+          scenario.evidence.provider_usage_sha256 = null;
+          scenario.evidence.provider_cost_sha256 = null;
+          for (const key of Object.keys(scenario.usage)) scenario.usage[key] = null;
+          scenario.measures.cache_reuse_rate = null;
+          scenario.measures.cache_write_rate = null;
+        }
+        state.data.comparison.limitation = "User-entered monthly scenario, not a verified invoice. The denominator counts results usable without a significant fix, not all final completed tasks. Time value is an estimate, not necessarily cash paid.";
+        state.data.comparison.recommendation = decisionFor(state.data).reason;
+        validateResult(state.data);
+        renderAll();
+        setView("review");
+        reviewDialog.close();
+        showToast("Comparison built. Your answers stayed in this browser.");
+        return;
+      }
       if (state.builderMode === "single") {
         const [spendFile] = document.getElementById("single-spend-file").files;
         const [workFile] = document.getElementById("single-work-file").files;
@@ -3567,7 +4420,7 @@
       errorBox.classList.add("visible");
     } finally {
       submit.disabled = false;
-      submit.textContent = state.builderMode === "single" ? "Understand this bill" : state.builderMode === "openai"
+      submit.textContent = state.builderMode === "simple" ? "Compare my options" : state.builderMode === "single" ? "Understand this bill" : state.builderMode === "openai"
         ? state.pendingMappedImport ? "Confirm and build mapped review" : state.importProvider === "claude" && state.pendingClaudeImport ? "Confirm and build Claude review" : state.importProvider === "claude" ? "Check the Claude export" : "Review the OpenAI bill"
         : state.builderMode === "workload"
           ? "Build the finance review"
@@ -3583,13 +4436,16 @@
     anchor.href = url;
     const label = state.data.workload?.name || (state.data.provider === "openai" ? "openai-bill-review" : "review");
     anchor.download = `ai-cost-lens-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "review"}.json`;
+    document.body.appendChild(anchor);
     anchor.click();
-    URL.revokeObjectURL(url);
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 
   document.getElementById("print-memo").addEventListener("click", () => {
     if (!state.data) return;
     renderFinanceMemo();
+    renderDecisionConsistency();
     document.body.classList.add("printing-memo");
     try {
       window.print();

@@ -48,7 +48,7 @@ const requiredLeaves = (obj, prefix = []) => Object.entries(obj).flatMap(([key, 
   if (['planning'].includes(key) && !prefix.length) return [];
   return value && typeof value === 'object' && !Array.isArray(value) ? requiredLeaves(value, [...prefix, key]) : [[...prefix, key]];
 });
-for (const path of requiredLeaves(demo)) {
+for (const path of requiredLeaves(JSON.parse(read('web/data/illustrative-review-result.json')))) {
   const copy = structuredClone(demo);
   let parent = copy;
   for (const key of path.slice(0, -1)) parent = parent[key];

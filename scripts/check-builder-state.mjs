@@ -37,7 +37,7 @@ class Element {
     const selectors = selector.split(',').map(s => s.trim());
     return this.children.flatMap(child => [...(selectors.some(s => child.matches(s)) ? [child] : []), ...child.querySelectorAll(selector)]);
   }
-  querySelector(selector) { return this.querySelectorAll(selector)[0]; }
+  querySelector(selector) { const parts = selector.split(' '); if (parts.length > 1) return this.querySelector(parts[0])?.querySelector(parts.slice(1).join(' ')); return this.querySelectorAll(selector)[0]; }
   reset() { for (const field of this.querySelectorAll('input, select, textarea')) { field.value = field.defaultValue; field.checked = field.defaultChecked; } }
   showModal() { this.open = true; }
   close() { this.open = false; }
@@ -263,3 +263,39 @@ window.print = () => { throw new Error('Printing unavailable'); };
 await click('print-memo');
 assert.equal(document.body.classList.contains('printing-memo'),false,'Failed print does not strand print-only UI');
 console.log('PASS: five builder transition/correction sequences and non-blocking print lifecycle');
+
+// Integrated no-file comparison: real HTML defaults and registered submit handler.
+await click('start-review'); await mode('simple');
+assert.equal(el('simple-current-cost').disabled,false);
+assert.equal(el('spend-file').disabled,true);
+el('simple-current-name').value = 'Diana current';
+el('simple-other-name').value = '<Diana other>';
+await submit();
+assert.equal(api.state.data.experience,'simple');
+assert.equal(api.state.data.baseline.costs.recurring_operating_cost,70);
+assert.equal(api.state.data.proposed.costs.recurring_operating_cost,220);
+assert.equal(el('decision-code').textContent,'KEEP CURRENT ROUTE');
+assert.match(el('memo-table-head').innerHTML,/Diana current/);
+assert.match(el('memo-table-head').innerHTML,/&lt;Diana other&gt;/);
+assert.equal(api.state.data.period.start,null);
+assert.equal(api.state.data.baseline.usage.requests,null);
+const simpleRecord = JSON.stringify(api.state.data);
+await file('review-file',simpleRecord,'comparison.json');
+assert.equal(api.state.data.experience,'simple');
+await click('start-review'); await mode('simple');
+el('simple-current-cost').value = '0'; el('simple-other-cost').value = '0';
+el('simple-hourly-rate').value = '0';
+await submit();
+assert.equal(el('decision-code').textContent,'NO COST ADVANTAGE');
+await click('start-review'); await mode('simple');
+el('simple-other-usable').value = '0';
+const prior = api.state.data;
+await submit();
+assert.equal(api.state.data,prior);
+assert.match(el('builder-error').textContent,/zero usable outputs/);
+await click('start-review'); await mode('example');
+assert.equal(el('review-title').textContent,'What did one ready result really cost?');
+await click('start-review'); await mode('openai');
+assert.equal(el('simple-current-cost').disabled,true);
+assert.equal(el('openai-usage-file').disabled,false);
+console.log('PASS: simple comparison, free plans, JSON round trip, invalid-input rollback and existing-path transitions');
