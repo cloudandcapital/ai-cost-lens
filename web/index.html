@@ -125,7 +125,7 @@
 
           <div class="title-grid">
             <div>
-              <p class="kicker">FINANCE FIRST AI SPEND REVIEW</p>
+              <p class="kicker" id="review-kicker">FINANCE FIRST AI SPEND REVIEW</p>
               <h1 id="review-title">What did one ready result really cost?</h1>
             </div>
             <div class="workload-intro">
@@ -137,7 +137,7 @@
           <section class="truth-section share-card" aria-labelledby="truth-title">
             <div class="truth-heading">
               <div>
-                <p class="kicker">THE NUMBER FINANCE NEEDS</p>
+                <p class="kicker" id="truth-kicker">THE NUMBER FINANCE NEEDS</p>
                 <h2 id="truth-title">The cost of one ready result</h2>
               </div>
               <p id="truth-summary"></p>
@@ -445,6 +445,12 @@
 
         <p class="builder-choice-label">What would help you today?</p>
         <div class="builder-mode-choice" role="group" aria-label="Choose how to start">
+          <button class="builder-mode builder-mode-simple" data-builder-mode="simple" type="button" aria-pressed="false">
+            <small>SIMPLE · NO FILES NEEDED</small>
+            <strong>Compare two AI tools or plans</strong>
+            <span>For subscriptions, solo work, and small teams. Enter two monthly costs and check a small sample of work.</span>
+            <em>START HERE FOR A QUICK COMPARISON</em>
+          </button>
           <button class="builder-mode builder-mode-featured" data-builder-mode="example" type="button" aria-pressed="false">
             <small>NO FILES NEEDED</small>
             <strong>See the worked example</strong>
@@ -520,6 +526,76 @@
               <label><input id="single-complete" type="checkbox" /> The cost, usage and full outcome log cover the same workload and service period, with no omitted results.</label>
               <p>Without outcomes, the result is still a useful cost and usage review. With reconciled complete outcomes, it adds provider cost per ready result. Full operating unit cost appears only when relevant human and shared costs are supplied. Zero ready results means unit cost is unavailable. For a route comparison, use the separate comparison path and its evidence gates.</p>
               <p>Downloaded single-bill JSON includes the supplied CSV rows, including result IDs. Keep it private. It is recalculated and validated when reopened; files are not uploaded.</p>
+            </div>
+          </section>
+        </div>
+
+        <div id="simple-builder-fields" hidden>
+          <div class="path-requirements simple-requirements">
+            <strong>No spreadsheet needed</strong>
+            <span>Use estimates if that is all you have. The result will stay clearly labeled as a sample, not guaranteed savings.</span>
+            <button class="simple-change-path" id="simple-change-path" type="button">Choose a different path</button>
+          </div>
+          <section class="builder-step" aria-labelledby="simple-cost-title">
+            <div class="step-number">01</div>
+            <div>
+              <h3 id="simple-cost-title">What are you comparing?</h3>
+              <p>A subscription, model, app, or plan all work here. Enter USD costs for one monthly scenario. Billing dates are not collected or verified.</p>
+              <div class="sample-route-grid">
+                <fieldset class="sample-route-card">
+                  <legend>What you use now</legend>
+                  <div class="simple-field-grid">
+                    <label><span>Tool or plan name</span><input id="simple-current-name" type="text" value="Current AI tool" /></label>
+                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-current-cost" type="number" min="0" step="0.01" value="40" /></div></label>
+                  </div>
+                </fieldset>
+                <fieldset class="sample-route-card">
+                  <legend>The other option</legend>
+                  <div class="simple-field-grid">
+                    <label><span>Tool or plan name</span><input id="simple-other-name" type="text" value="Lower-cost AI tool" /></label>
+                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-other-cost" type="number" min="0" step="0.01" value="20" /></div></label>
+                  </div>
+                </fieldset>
+              </div>
+            </div>
+          </section>
+          <section class="builder-step" aria-labelledby="simple-work-title">
+            <div class="step-number">02</div>
+            <div>
+              <h3 id="simple-work-title">Check a small sample of your work</h3>
+              <p>Use the same kind of task for both tools. Count outputs usable without a significant fix. Successfully repaired outputs are excluded from this first-pass measure; it is not cost per final completed task. A small sample is directional, not proof.</p>
+              <label class="simple-volume-field"><span>About how many of these tasks do you complete per month?</span><input id="simple-monthly-tasks" type="number" min="1" step="1" value="40" /></label>
+              <div class="sample-route-grid">
+                <fieldset class="sample-route-card">
+                  <legend>What you use now</legend>
+                  <div class="sample-field-grid">
+                    <label><span>Outputs checked</span><input id="simple-current-checked" type="number" min="1" step="1" value="20" /></label>
+                    <label><span>Usable without a big fix</span><input id="simple-current-usable" type="number" min="0" step="1" value="19" /></label>
+                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-current-minutes" type="number" min="0" step="0.1" value="30" /></label>
+                  </div>
+                </fieldset>
+                <fieldset class="sample-route-card">
+                  <legend>The other option</legend>
+                  <div class="sample-field-grid">
+                    <label><span>Outputs checked</span><input id="simple-other-checked" type="number" min="1" step="1" value="20" /></label>
+                    <label><span>Usable without a big fix</span><input id="simple-other-usable" type="number" min="0" step="1" value="16" /></label>
+                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-other-minutes" type="number" min="0" step="0.1" value="200" /></label>
+                  </div>
+                </fieldset>
+              </div>
+            </div>
+          </section>
+          <section class="builder-step" aria-labelledby="simple-time-title">
+            <div class="step-number">03</div>
+            <div>
+              <h3 id="simple-time-title">Put a value on your time</h3>
+              <p>This estimates the value of review and fixing time. It is not necessarily cash paid or money you could recover. Enter zero if you only want to compare tool charges.</p>
+              <div class="field-grid compact-fields">
+                <label><span>What is an hour of your time worth?</span><div class="input-prefix"><em>$</em><input id="simple-hourly-rate" type="number" min="0" step="0.01" value="30" /></div></label>
+                <label><span>Minimum usable rate you would accept</span><div class="input-suffix"><input id="simple-quality-floor" type="number" min="1" max="100" step="0.1" value="80" /><em>%</em></div></label>
+                <label class="check-field field-wide"><input id="simple-approved" type="checkbox" checked /><span>Both tools are okay to use for this work</span></label>
+              </div>
+              <p class="sample-caveat">The prefilled numbers are a small-business example. Replace them with your own before comparing.</p>
             </div>
           </section>
         </div>

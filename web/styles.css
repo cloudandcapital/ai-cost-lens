@@ -3389,3 +3389,71 @@ body.story-mode .cockpit-grid {
     display: none;
   }
 }
+
+.builder-mode.builder-mode-simple {
+  grid-column: 1 / -1;
+  min-height: 126px;
+  border-right: 0;
+  border-bottom: 1px solid var(--ink);
+  background: var(--sage-soft);
+}
+
+.builder-mode-simple strong {
+  font-size: 26px;
+}
+
+.simple-requirements {
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.simple-change-path {
+  padding: 0 0 3px;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.simple-field-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.simple-field-grid label,
+.simple-volume-field {
+  display: grid;
+  gap: 7px;
+}
+
+.simple-field-grid label > span,
+.simple-volume-field > span {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.simple-field-grid input,
+.simple-volume-field input {
+  width: 100%;
+  min-height: 41px;
+  padding: 9px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--paper-light);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.simple-volume-field {
+  max-width: 430px;
+  margin-top: 18px;
+}
+
+@media(max-width:620px){.simple-change-path{width:max-content;margin-top:8px}}
+body{min-width:0}
+.decision-table th,.bar-label,.evidence-card h2,.anatomy-card h2,.finance-memo th{overflow-wrap:anywhere}
