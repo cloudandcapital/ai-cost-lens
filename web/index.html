@@ -31,12 +31,13 @@
         </a>
         <div class="header-actions">
           <button class="text-button price-prompt-launch" id="price-prompt" type="button">Price a prompt</button>
+          <button class="text-button" id="review-usage" type="button">Review AI usage</button>
           <button class="text-button" id="story-toggle" type="button">Share view</button>
           <button class="text-button" id="download-review" type="button" title="Save the complete machine-readable review">Download decision record (JSON)</button>
           <button class="text-button" id="print-memo" type="button" title="Open the print dialog, where you can save the memo as a PDF">Print finance memo</button>
           <button class="file-button primary-action" id="start-review" type="button">Start a review</button>
-          <label class="text-button" for="review-file">Open saved review</label>
-          <input id="review-file" type="file" accept="application/json,.json" />
+          <button class="text-button" id="open-review" type="button">Open saved review</button>
+          <input id="review-file" type="file" accept="application/json,.json" tabindex="-1" aria-label="Saved review file" />
         </div>
       </header>
 
@@ -372,7 +373,7 @@
             </div>
             <details class="request-data-details request-cost-boundary-inputs">
               <summary>Optional: add the rest of the operating cost</summary>
-              <p>Use totals for the same period and currency as the request log. Enter only costs not already included in provider request cost or another category. Blank means unknown. Enter zero only when you confirmed there was no cost. AI Cost Lens shows a fully loaded total only when every category is supplied.</p>
+              <p>Use totals for the same period and currency as the request log. Enter only costs not already included in provider request cost or another category. Blank means unknown. Enter zero only when you confirmed there was no cost. AI Cost Lens shows a fully loaded total only when every request is priced and every category is supplied.</p>
               <div class="request-reconciliation-inputs">
                 <label><span>Compute</span><input id="request-compute-cost" type="number" min="0" step="any" placeholder="Unknown" /></label>
                 <label><span>Retrieval and data</span><input id="request-retrieval-data-cost" type="number" min="0" step="any" placeholder="Unknown" /></label>

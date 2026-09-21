@@ -349,6 +349,7 @@
   }
 
   function rateForEvent(event, catalog, kind) {
+    if (!catalog || event.currency !== catalog.currency || event.batch === null) return null;
     const model = findModel(catalog, event.provider, event.model);
     if (!model) return null;
     const base = event.batch ? model.batch : model.standard;
@@ -360,6 +361,7 @@
   }
 
   function priceShapeWithModel(event, model) {
+    if (event.batch === null || event.cached_input_tokens === null || event.cache_write_tokens > 0) return null;
     if (!model || event.input_tokens === null || event.output_tokens === null) return null;
     const total = event.input_tokens + event.output_tokens;
     if (model.context_window_tokens && total > model.context_window_tokens) return null;
@@ -473,7 +475,7 @@
       if (!prefixGroups.has(key)) prefixGroups.set(key, []);
       prefixGroups.get(key).push(event);
     });
-    const cacheCandidates = [...prefixGroups.values()].filter((members) => members.length >= 3).flatMap((members) => members.filter((event) => !event.cached_input_tokens));
+    const cacheCandidates = [...prefixGroups.values()].filter((members) => members.length >= 3).flatMap((members) => members.filter((event) => event.cached_input_tokens === 0));
     if (cacheCandidates.length) {
       const amounts = eventAmountMap(cacheCandidates, (event) => {
         const input = rateForEvent(event, catalog, "input");
@@ -585,6 +587,7 @@
       }).filter(Boolean)).values()];
       if (models.length < 2) continue;
       members.forEach((event) => {
+        if (!catalog || event.currency !== catalog.currency) return;
         const currentModel = findModel(catalog, event.provider, event.model);
         const current = priceShapeWithModel(event, currentModel);
         if (current === null || current <= 0) return;
@@ -696,6 +699,11 @@
         headline_eligible: false,
       }));
     }
+    findings.forEach((item) => {
+      const affectedIds = new Set(item.affected_event_ids);
+      const affected = events.filter((event) => affectedIds.has(event.record_id));
+      if (affected.length && affected.every((event) => event.selected_cost === null)) item.current_cost = null;
+    });
     return findings.sort((left, right) => {
       const tier = (item) => item.headline_eligible ? 0 : item.estimated_avoidable_cost !== null ? 1 : 2;
       const tierDifference = tier(left) - tier(right);
@@ -755,7 +763,12 @@
     const statusRows = events.filter((event) => recognizedStatuses.has(event.request_status));
     const failedRows = statusRows.filter((event) => ["failed", "cancelled"].includes(event.request_status));
     const retryRows = events.filter((event) => event.request_status === "retried" || event.retry_parent_event_id);
-    const retryCoverageRows = sourceHasField(sourceRows, "retry_parent_event_id") ? events.length : statusRows.length;
+    // A success/failure status says nothing about whether a call was a retry.
+    // An explicitly present parent column (blank means no link) covers only its own row.
+    const retryCoverageRows = events.filter((event, index) =>
+      event.request_status === "retried" || event.retry_parent_event_id
+      || sourceHasField([sourceRows[index] || {}], "retry_parent_event_id"),
+    ).length;
     const cacheRows = events.filter((event) => event.input_tokens !== null && event.cached_input_tokens !== null);
     const cacheInputTokens = cacheRows.reduce((sum, event) => sum + event.input_tokens, 0);
     const cachedInputTokens = cacheRows.reduce((sum, event) => sum + event.cached_input_tokens, 0);
@@ -921,7 +934,7 @@
     };
   }
 
-  function operatingCostStack(rawOptions, selectedObservedCost, currency, currencyComparable) {
+  function operatingCostStack(rawOptions, selectedObservedCost, currency, currencyComparable, allRequestsPriced = true) {
     const categories = OPERATING_COST_CATEGORIES.map(([key, label]) => {
       const amount = number(rawOptions[key], label);
       return { key, label, amount: amount === null ? null : round(amount), supplied: amount !== null };
@@ -936,12 +949,12 @@
     const knownOperatingCost = comparableProviderCost === null
       ? null
       : round(comparableProviderCost + (knownAdjacentCost || 0));
-    const complete = categories.every((item) => item.supplied);
+    const complete = allRequestsPriced && categories.every((item) => item.supplied);
     const status = comparableProviderCost === null
       ? "NOT_COMPARABLE"
       : complete
         ? "FULLY_LOADED"
-        : supplied.length
+        : supplied.length || !allRequestsPriced
           ? "PARTIAL"
           : "PROVIDER_ONLY";
     return {
@@ -953,7 +966,7 @@
       known_operating_cost: knownOperatingCost,
       fully_loaded_cost: complete ? knownOperatingCost : null,
       missing_categories: categories.filter((item) => !item.supplied).map((item) => item.key),
-      method: "Known operating cost equals selected provider request cost plus only the period-level cost categories explicitly supplied. Additional categories must exclude charges already included in provider request cost or another category. Fully loaded cost appears only when compute, retrieval/data, network, tooling, pipeline, and human review are each supplied; enter zero only when confirmed none. These totals are not spread across requests or allocation dimensions.",
+      method: "Known operating cost equals selected provider request cost plus only the period-level cost categories explicitly supplied. Additional categories must exclude charges already included in provider request cost or another category. Fully loaded cost appears only when every request is priced and compute, retrieval/data, network, tooling, pipeline, and human review are each supplied; enter zero only when confirmed none. These totals are not spread across requests or allocation dimensions.",
       savings_claim_allowed: false,
     };
   }
@@ -1099,7 +1112,7 @@
       complete_period_confirmed: completePeriodConfirmed,
     };
     const projected30DayCost = runRateAvailable ? round(selectedObservedCost / calendarDays * 30) : null;
-    const costStack = operatingCostStack(rawOptions, selectedObservedCost, currency, currencyComparable);
+    const costStack = operatingCostStack(rawOptions, selectedObservedCost, currency, currencyComparable, pricedRows === events.length);
     return {
       currency,
       period,
@@ -1178,7 +1191,7 @@
     let billDuplicateExcludedDifference = null;
     if (billTotal !== null) {
       if (!billScopeConfirmed) billStatus = "SCOPE_NOT_CONFIRMED";
-      else if (!priced.length) billStatus = "REQUEST_COST_MISSING";
+      else if (priced.length !== events.length) billStatus = "REQUEST_COST_MISSING";
       else if (mixedCurrency) billStatus = "MIXED_CURRENCY";
       else if (pricedCurrencyMissing) billStatus = "REQUEST_CURRENCY_MISSING";
       else if (!billCurrency) billStatus = "BILL_CURRENCY_MISSING";

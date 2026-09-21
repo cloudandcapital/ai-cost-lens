@@ -3589,7 +3589,9 @@
       ? "Every declared category was supplied, including confirmed zeros."
       : costStack.status === "NOT_COMPARABLE"
         ? "Request cost is missing or not in one comparable currency, so no fully loaded claim is shown."
-        : `${wholeNumber(costStack.missing_categories.length)} categories remain unknown, so no fully loaded claim is shown.`;
+        : review.reconciliation.unpriced_rows
+          ? `${wholeNumber(review.reconciliation.unpriced_rows)} request rows remain unpriced, so no fully loaded claim is shown.`
+          : `${wholeNumber(costStack.missing_categories.length)} categories remain unknown, so no fully loaded claim is shown.`;
     document.getElementById("request-cost-stack").innerHTML = `
       <div class="request-explorer-head"><div><p class="kicker">FULL COST BOUNDARY</p><h4>What sits beyond the model or provider charge?</h4></div><p>${escapeHtml(costStack.status.replaceAll("_", " "))}</p></div>
       <div class="request-spend-context">
@@ -3695,7 +3697,7 @@
       },
       REQUEST_COST_MISSING: {
         title: "Request cost unavailable",
-        copy: "No imported row has a provider-reported or safely calculated cost, so the bill cannot be reconciled to request evidence.",
+        copy: "Some imported rows have no provider-reported or safely calculated cost. Price every row before reconciling the bill to request evidence.",
       },
       MIXED_CURRENCY: {
         title: "Mixed currencies",
@@ -3755,6 +3757,16 @@
   }
 
   function initializeRequestLogAnalysis() {
+  // A result belongs to the options used to calculate it, not subsequent edits.
+  document.querySelectorAll(".request-review-panel input:not([type=file]), .request-review-panel select").forEach((input) => {
+    if (input.id.startsWith("request-filter-")) return;
+    input.addEventListener("input", () => {
+      if (!state.usageReview) return;
+      state.usageReview = null;
+      document.getElementById("request-analysis-results").hidden = true;
+      showToast("Review inputs changed. Choose Analyze locally to update the results.");
+    });
+  });
   document.getElementById("request-log-file").addEventListener("change", (event) => {
     const [file] = event.target.files;
     document.getElementById("request-log-file-status").textContent = file
@@ -3991,8 +4003,8 @@
       <strong id="blind-output-label-${presentation.slot}">Output ${presentation.slot}</strong>
       <pre aria-labelledby="blind-output-label-${presentation.slot}">${escapeHtml(presentation.output_text)}</pre>
       <div class="blind-score-fields">
-        <label><span>Human outcome</span><select id="blind-outcome-${presentation.slot}"><option value="">Choose one</option><option value="ready_to_use">Ready to use</option><option value="needs_correction">Needs correction</option><option value="needs_escalation">Needs escalation</option></select></label>
-        <label><span>Review minutes · optional</span><input id="blind-minutes-${presentation.slot}" type="number" min="0" step="0.1" placeholder="Unknown" /></label>
+        <label><span>Human outcome · Output ${presentation.slot}</span><select id="blind-outcome-${presentation.slot}"><option value="">Choose one</option><option value="ready_to_use">Ready to use</option><option value="needs_correction">Needs correction</option><option value="needs_escalation">Needs escalation</option></select></label>
+        <label><span>Review minutes · Output ${presentation.slot} · optional</span><input id="blind-minutes-${presentation.slot}" type="number" min="0" step="0.1" placeholder="Unknown" /></label>
       </div>
     </article>`).join("");
     document.getElementById("save-blind-case").textContent = state.verificationCaseIndex === session.case_count - 1 ? "Finish blind review" : "Save and continue";
@@ -4997,6 +5009,10 @@
     }
     syncBuilderControls();
   }
+
+  document.getElementById("open-review").addEventListener("click", () => document.getElementById("review-file").click());
+
+  document.getElementById("review-usage").addEventListener("click", () => activateBuilderMode("usage"));
 
   document.getElementById("start-review").addEventListener("click", () => {
     document.getElementById("builder-error").classList.remove("visible");

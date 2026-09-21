@@ -67,6 +67,7 @@ npm run build
 node scripts/check-builder-state.mjs
 node scripts/check-web-acceptance.mjs
 uv lock --check
+uv sync --frozen --extra dev
 uv run --frozen black --check ai_cost_lens tests
 uv run --frozen isort --check-only ai_cost_lens tests
 uv run --frozen flake8 ai_cost_lens tests --count --select=E9,F63,F7,F82,F401 --show-source --statistics

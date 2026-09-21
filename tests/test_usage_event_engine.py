@@ -230,8 +230,8 @@ def test_model_mismatch_is_only_a_candidate_and_never_headline_savings():
 const engine = require(process.argv[1]);
 const catalog = require(process.argv[2]);
 const rows = [
-  {event_id: "a", workload: "Classification", provider: "OpenAI", model: "gpt-6-astra", input_tokens: 1000, output_tokens: 50, cost_usd: 0.0125, currency: "USD", outcome_status: "ready_to_use"},
-  {event_id: "b", workload: "Classification", provider: "OpenAI", model: "gpt-5.6-luna", input_tokens: 1000, output_tokens: 50, cost_usd: 0.00026, currency: "USD", outcome_status: "ready_to_use"},
+  {event_id: "a", workload: "Classification", batch: false, cached_input_tokens: 0, provider: "OpenAI", model: "gpt-6-astra", input_tokens: 1000, output_tokens: 50, cost_usd: 0.0125, currency: "USD", outcome_status: "ready_to_use"},
+  {event_id: "b", workload: "Classification", batch: false, cached_input_tokens: 0, provider: "OpenAI", model: "gpt-5.6-luna", input_tokens: 1000, output_tokens: 50, cost_usd: 0.00026, currency: "USD", outcome_status: "ready_to_use"},
 ];
 console.log(JSON.stringify(engine.buildReview(rows, {catalog, generated_at: "2026-09-21T00:00:00Z"})));
 """,
@@ -902,3 +902,68 @@ console.log(JSON.stringify({full, minimal, mixed, unpriced}));
         review_validator.validate(review)
         for event in review["events"]:
             event_validator.validate(event)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_incomplete_request_cost_cannot_reconcile_or_be_fully_loaded():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const rows = [{cost:10,currency:"USD"},{currency:"USD"}];
+const options = {billed_total:10,billed_currency:"USD",bill_scope_confirmed:true,
+ compute_cost:0,retrieval_data_cost:0,network_cost:0,tooling_cost:0,pipeline_cost:0,human_review_cost:0};
+console.log(JSON.stringify({partial:engine.buildReview(rows,options),
+ complete:engine.buildReview([rows[0],{...rows[1],cost:0}],options)}));
+""",
+        ENGINE,
+    )
+    partial = result["partial"]
+    assert partial["spend"]["cost_stack"]["known_operating_cost"] == 10
+    assert partial["spend"]["cost_stack"]["fully_loaded_cost"] is None
+    assert partial["spend"]["cost_stack"]["status"] == "PARTIAL"
+    assert partial["evidence_layers"]["billing_evidence"]["status"] == "NOT_COMPARABLE"
+    assert partial["reconciliation"]["bill"]["raw_selected_cost_difference"] is None
+    assert result["complete"]["spend"]["cost_stack"]["fully_loaded_cost"] == 10
+    assert (
+        result["complete"]["evidence_layers"]["billing_evidence"]["status"]
+        == "RECONCILED"
+    )
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_retry_coverage_is_per_row_and_success_does_not_imply_no_retry():
+    result = run_node(
+        r"""
+const e = require(process.argv[1]);
+console.log(JSON.stringify({
+ absent:e.buildReview([{status:"success"},{status:"failed"}]).spend.operational_metrics,
+ partial:e.buildReview([{status:"success",retry_parent_event_id:""},{status:"success"},{status:"retried"}]).spend.operational_metrics
+}));
+""",
+        ENGINE,
+    )
+    assert result["absent"]["retry_linked_rate"] is None
+    assert result["absent"]["retry_coverage_rows"] == 0
+    assert result["partial"]["retry_coverage_rows"] == 2
+    assert result["partial"]["retry_linked_rate"] == 0.5
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_findings_do_not_invent_cache_evidence_or_convert_catalog_currency():
+    result = run_node(
+        r"""
+const e = require(process.argv[1]); const catalog = require(process.argv[2]);
+const rows = Array.from({length:3},(_,i)=>({event_id:String(i),model:"gpt-5.6-sol",
+ input_tokens:1000,output_tokens:100,prefix_fingerprint:"same",batch:false,currency:"EUR",cost:1}));
+const missing=e.buildReview(rows,{catalog});
+const euro=e.buildReview(rows.map(r=>({...r,cached_input_tokens:0})),{catalog});
+const unpriced=e.buildReview([{status:"failed"}]);
+console.log(JSON.stringify({missing,euro,unpriced}));
+""",
+        ENGINE,
+        CATALOG,
+    )
+    assert not any(f["category"] == "Caching" for f in result["missing"]["findings"])
+    cache = next(f for f in result["euro"]["findings"] if f["category"] == "Caching")
+    assert cache["estimated_avoidable_cost"] is None
+    assert result["unpriced"]["findings"][0]["current_cost"] is None
