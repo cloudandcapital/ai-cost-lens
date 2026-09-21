@@ -32,7 +32,7 @@ def test_demo_review_is_decision_ready_and_honest():
     assert payload["comparison"]["provider_cost_reported"] is True
     assert payload["baseline"]["outcomes"]["basis"] == "illustrative"
     assert payload["baseline"]["evidence"]["outcome_basis"] == "illustrative"
-    assert "synthetic stress test" in payload["comparison"]["limitation"]
+    assert payload["comparison"]["limitation"].startswith("The conclusion applies only")
     assert "does not lower" in payload["comparison"]["finding"]
 
 

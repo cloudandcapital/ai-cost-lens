@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudandcapital.com/schemas/ai-cost-lens-verification-1.0.schema.json",
+  "title": "AI Cost Lens paired-output verification 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "application_version", "generated_at", "source", "method", "thresholds", "baseline", "candidate", "comparison", "cases", "evidence_gate", "privacy"],
+  "properties": {
+    "schema_version": { "const": "ai-cost-lens-verification/1.0" },
+    "application_version": { "type": "string" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256", "uploaded"],
+      "properties": {
+        "name": { "type": "string" },
+        "sha256": { "type": ["string", "null"] },
+        "uploaded": { "const": false }
+      }
+    },
+    "method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["same_case_pairs", "sample_method", "blinded", "randomized_order", "case_count"],
+      "properties": {
+        "same_case_pairs": { "const": true },
+        "sample_method": { "enum": ["user_selected", "random_or_systematic"] },
+        "blinded": { "type": "boolean" },
+        "randomized_order": { "type": "boolean" },
+        "case_count": { "type": "integer", "minimum": 1, "maximum": 1000 }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum_deterministic_pass_rate", "minimum_ready_rate", "maximum_ready_rate_regression"],
+      "properties": {
+        "minimum_deterministic_pass_rate": { "$ref": "#/$defs/probability" },
+        "minimum_ready_rate": { "$ref": "#/$defs/probability" },
+        "maximum_ready_rate_regression": { "$ref": "#/$defs/probability" }
+      }
+    },
+    "baseline": { "$ref": "#/$defs/routeSummary" },
+    "candidate": { "$ref": "#/$defs/routeSummary" },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "deterministic_gate_passed", "outcome_gate_passed", "quality_gate_passed", "deterministic_pass_rate_change_points", "ready_rate_change_points", "human_minutes_difference", "failed_candidate_case_ids"],
+      "properties": {
+        "status": { "enum": ["QUALITY_FAIL", "INCOMPLETE", "DIRECTIONAL_PASS", "VERIFIED_PASS"] },
+        "deterministic_gate_passed": { "type": "boolean" },
+        "outcome_gate_passed": { "type": ["boolean", "null"] },
+        "quality_gate_passed": { "type": "boolean" },
+        "deterministic_pass_rate_change_points": { "type": "number" },
+        "ready_rate_change_points": { "type": ["number", "null"] },
+        "human_minutes_difference": { "type": ["number", "null"] },
+        "failed_candidate_case_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_id", "rule", "baseline", "candidate"],
+        "properties": {
+          "case_id": { "type": "string" },
+          "rule": { "$ref": "#/$defs/rule" },
+          "baseline": { "$ref": "#/$defs/caseResult" },
+          "candidate": { "$ref": "#/$defs/caseResult" }
+        }
+      }
+    },
+    "evidence_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "savings_claim_allowed", "reason"],
+      "properties": {
+        "decision": { "enum": ["KEEP_BASELINE", "TEST_FIRST", "QUALITY_GATE_PASSED"] },
+        "savings_claim_allowed": { "const": false },
+        "reason": { "type": "string" }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parsed_locally", "output_text_stored", "source_file_uploaded"],
+      "properties": {
+        "parsed_locally": { "const": true },
+        "output_text_stored": { "const": false },
+        "source_file_uploaded": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+    "nullableProbability": {
+      "anyOf": [
+        { "$ref": "#/$defs/probability" },
+        { "type": "null" }
+      ]
+    },
+    "outcomeCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ready_to_use", "needs_correction", "needs_escalation"],
+      "properties": {
+        "ready_to_use": { "type": "integer", "minimum": 0 },
+        "needs_correction": { "type": "integer", "minimum": 0 },
+        "needs_escalation": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "routeSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cases", "deterministic_cases_passed", "deterministic_pass_rate", "check_instances", "check_instances_passed", "outcomes_complete", "outcome_counts", "ready_rate", "ready_rate_interval_95", "human_time_complete", "human_minutes"],
+      "properties": {
+        "cases": { "type": "integer", "minimum": 1 },
+        "deterministic_cases_passed": { "type": "integer", "minimum": 0 },
+        "deterministic_pass_rate": { "$ref": "#/$defs/probability" },
+        "check_instances": { "type": "integer", "minimum": 1 },
+        "check_instances_passed": { "type": "integer", "minimum": 0 },
+        "outcomes_complete": { "type": "boolean" },
+        "outcome_counts": { "$ref": "#/$defs/outcomeCounts" },
+        "ready_rate": { "$ref": "#/$defs/nullableProbability" },
+        "ready_rate_interval_95": {
+          "anyOf": [
+            { "type": "array", "prefixItems": [{ "$ref": "#/$defs/probability" }, { "$ref": "#/$defs/probability" }], "items": false, "minItems": 2, "maxItems": 2 },
+            { "type": "null" }
+          ]
+        },
+        "human_time_complete": { "type": "boolean" },
+        "human_minutes": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected_format", "required_terms", "forbidden_terms", "required_json_fields", "exact_label", "max_characters"],
+      "properties": {
+        "expected_format": { "enum": ["text", "json"] },
+        "required_terms": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "forbidden_terms": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "required_json_fields": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "exact_label": { "type": ["string", "null"] },
+        "max_characters": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "passed"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "passed": { "type": "boolean" }
+      }
+    },
+    "caseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "checks", "output_characters", "outcome_status", "human_minutes"],
+      "properties": {
+        "passed": { "type": "boolean" },
+        "checks": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/check" } },
+        "output_characters": { "type": "integer", "minimum": 0 },
+        "outcome_status": { "type": ["string", "null"], "enum": ["ready_to_use", "needs_correction", "needs_escalation", null] },
+        "human_minutes": { "type": ["number", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

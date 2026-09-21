@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudandcapital.com/schemas/ai-cost-lens-usage-review-1.0.schema.json",
+  "title": "AI Cost Lens usage review 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "application_version", "pricing_catalog_version", "source", "currency", "event_count", "events", "reconciliation", "spend", "findings", "headline", "evidence_gate", "privacy"],
+  "properties": {
+    "schema_version": { "const": "ai-cost-lens-usage-review/1.0" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "application_version": { "type": "string" },
+    "pricing_catalog_version": { "type": ["string", "null"] },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "adapter", "sha256", "uploaded"],
+      "properties": {
+        "name": { "type": "string" },
+        "adapter": { "type": "string" },
+        "sha256": { "type": ["string", "null"] },
+        "uploaded": { "const": false }
+      }
+    },
+    "currency": { "type": ["string", "null"], "anyOf": [{ "pattern": "^[A-Z]{3}$" }, { "const": "MIXED" }, { "type": "null" }] },
+    "event_count": { "type": "integer", "minimum": 1, "maximum": 20000 },
+    "events": { "type": "array", "minItems": 1, "maxItems": 20000, "items": { "$ref": "ai-cost-lens-usage-event-1.0.schema.json" } },
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider_reported_cost", "calculated_cost_used_when_reported_missing", "selected_observed_cost", "selected_cost_excluding_later_duplicate_rows", "priced_rows", "unpriced_rows", "duplicate_rows_flagged", "provider_reported_cost_precedence", "bill"],
+      "properties": {
+        "provider_reported_cost": { "type": ["number", "null"], "minimum": 0 },
+        "calculated_cost_used_when_reported_missing": { "type": ["number", "null"], "minimum": 0 },
+        "selected_observed_cost": { "type": ["number", "null"], "minimum": 0 },
+        "selected_cost_excluding_later_duplicate_rows": { "type": ["number", "null"], "minimum": 0 },
+        "priced_rows": { "type": "integer", "minimum": 0 },
+        "unpriced_rows": { "type": "integer", "minimum": 0 },
+        "duplicate_rows_flagged": { "type": "integer", "minimum": 0 },
+        "provider_reported_cost_precedence": { "const": true },
+        "bill": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "supplied_total", "supplied_currency", "same_scope_confirmed", "raw_selected_cost_difference", "duplicate_excluded_reference_difference", "method"],
+          "properties": {
+            "status": { "enum": ["NOT_SUPPLIED", "SCOPE_NOT_CONFIRMED", "REQUEST_COST_MISSING", "MIXED_CURRENCY", "REQUEST_CURRENCY_MISSING", "BILL_CURRENCY_MISSING", "CURRENCY_MISMATCH", "COMPARABLE"] },
+            "supplied_total": { "type": ["number", "null"], "minimum": 0 },
+            "supplied_currency": { "type": ["string", "null"], "pattern": "^[A-Z]{3}$" },
+            "same_scope_confirmed": { "type": "boolean" },
+            "raw_selected_cost_difference": { "type": ["number", "null"] },
+            "duplicate_excluded_reference_difference": { "type": ["number", "null"] },
+            "method": { "type": "string" }
+          }
+        }
+      }
+    },
+    "spend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "period", "selected_cost", "cost_per_priced_request", "average_cost_per_calendar_day", "projected_30_day_cost", "run_rate_status", "run_rate_method", "run_rate_limitations", "breakdowns"],
+      "properties": {
+        "currency": { "type": ["string", "null"], "anyOf": [{ "pattern": "^[A-Z]{3}$" }, { "const": "MIXED" }, { "type": "null" }] },
+        "period": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end", "calendar_days", "active_days", "timestamped_rows", "complete_period_confirmed"],
+          "properties": {
+            "start": { "type": ["string", "null"], "format": "date" },
+            "end": { "type": ["string", "null"], "format": "date" },
+            "calendar_days": { "type": ["integer", "null"], "minimum": 1 },
+            "active_days": { "type": "integer", "minimum": 0 },
+            "timestamped_rows": { "type": "integer", "minimum": 0 },
+            "complete_period_confirmed": { "type": "boolean" }
+          }
+        },
+        "selected_cost": { "type": ["number", "null"], "minimum": 0 },
+        "cost_per_priced_request": { "type": ["number", "null"], "minimum": 0 },
+        "average_cost_per_calendar_day": { "type": ["number", "null"], "minimum": 0 },
+        "projected_30_day_cost": { "type": ["number", "null"], "minimum": 0 },
+        "run_rate_status": { "enum": ["AVAILABLE", "NOT_SUPPORTED"] },
+        "run_rate_method": { "type": "string" },
+        "run_rate_limitations": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "breakdowns": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "model", "project", "team_owner", "workload", "customer_product"],
+          "properties": {
+            "provider": { "$ref": "#/$defs/spendBreakdown" },
+            "model": { "$ref": "#/$defs/spendBreakdown" },
+            "project": { "$ref": "#/$defs/spendBreakdown" },
+            "team_owner": { "$ref": "#/$defs/spendBreakdown" },
+            "workload": { "$ref": "#/$defs/spendBreakdown" },
+            "customer_product": { "$ref": "#/$defs/spendBreakdown" }
+          }
+        }
+      }
+    },
+    "findings": { "type": "array" },
+    "headline": { "type": "object" },
+    "evidence_gate": {
+      "type": "object",
+      "required": ["status", "savings_claim_allowed", "reason"],
+      "properties": { "savings_claim_allowed": { "const": false } }
+    },
+    "privacy": {
+      "type": "object",
+      "required": ["parsed_locally", "prompt_text_required", "prompt_text_stored", "source_file_uploaded"],
+      "properties": {
+        "parsed_locally": { "const": true },
+        "prompt_text_required": { "const": false },
+        "prompt_text_stored": { "const": false },
+        "source_file_uploaded": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "spendBreakdown": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "event_count", "priced_rows", "selected_cost", "share_of_selected_cost"],
+        "properties": {
+          "label": { "type": "string" },
+          "event_count": { "type": "integer", "minimum": 1 },
+          "priced_rows": { "type": "integer", "minimum": 0 },
+          "selected_cost": { "type": ["number", "null"], "minimum": 0 },
+          "share_of_selected_cost": {
+            "anyOf": [
+              { "type": "number", "minimum": 0, "maximum": 1 },
+              { "type": "null" }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

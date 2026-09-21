@@ -30,7 +30,7 @@
           <small>AI COST LENS</small>
         </a>
         <div class="header-actions">
-          <a class="text-button" href="model-route-decision.html">See model test</a>
+          <button class="text-button price-prompt-launch" id="price-prompt" type="button">Price a prompt</button>
           <button class="text-button" id="story-toggle" type="button">Share view</button>
           <button class="text-button" id="download-review" type="button" title="Save the complete machine-readable review">Download decision record (JSON)</button>
           <button class="text-button" id="print-memo" type="button" title="Open the print dialog, where you can save the memo as a PDF">Print finance memo</button>
@@ -42,13 +42,25 @@
 
       <nav class="question-nav" aria-label="Review sections">
         <button class="nav-item active" data-view="review" type="button">
-          The review
+          Overview
         </button>
         <button class="nav-item" data-view="anatomy" type="button">
-          The bill
+          Spend
+        </button>
+        <button class="nav-item" data-view="opportunities" type="button">
+          Opportunities
+        </button>
+        <button class="nav-item" data-view="simulate" type="button">
+          Simulate
+        </button>
+        <button class="nav-item" data-view="verify" type="button">
+          Verify
         </button>
         <button class="nav-item" data-view="evidence" type="button">
-          The evidence
+          Evidence
+        </button>
+        <button class="nav-item" data-view="actuals" type="button">
+          Actuals
         </button>
       </nav>
 
@@ -314,6 +326,233 @@
           </section>
         </section>
 
+        <section class="view" id="view-opportunities" aria-labelledby="opportunities-workbench-title">
+          <div class="eyebrow-row">
+            <p class="eyebrow">FINANCIALLY RANKED FINDINGS</p>
+            <span class="mode-tag">OVERLAP REMOVED FROM THE HEADLINE</span>
+          </div>
+          <div class="section-page-title">
+            <p class="kicker">OPPORTUNITIES</p>
+            <h1 id="opportunities-workbench-title">Where is the credible opportunity?</h1>
+            <p>Each finding shows its evidence basis, financial confidence, overlap, and next step. Candidate amounts are never added together and called savings.</p>
+          </div>
+          <div class="workbench-summary" id="opportunity-summary"></div>
+          <div class="opportunity-workbench-list" id="opportunity-workbench-list"></div>
+          <section class="request-review-panel" aria-labelledby="request-review-title">
+            <div class="section-heading">
+              <div>
+                <p class="kicker">REQUEST-LEVEL REVIEW</p>
+                <h2 id="request-review-title">Find the calls behind the pattern</h2>
+              </div>
+              <span class="mode-tag">LOCAL FILE · NO PROMPTS REQUIRED</span>
+            </div>
+            <p class="request-review-intro">Add a flat CSV or JSON request log to break down spend, calculate an evidence-gated run rate, and detect duplicate billing records, failed and repeated calls, retry loops, repeated uncached prefixes, oversized inputs, excessive outputs, reasoning intensity, and repeated tool use. Your source file is parsed in this browser and is not uploaded.</p>
+            <div class="request-import-row">
+              <label>
+                <span>Request log</span>
+                <input id="request-log-file" type="file" accept=".csv,text/csv,.json,application/json" />
+                <small id="request-log-file-status">Up to 20,000 flat rows or 5 MiB. Unknown fields, including prompt text, are not copied into the normalized record.</small>
+              </label>
+              <div class="request-import-actions">
+                <a class="text-button" href="templates/ai-cost-lens-request-log-template.csv" download>Download template</a>
+                <button class="build-button" id="analyze-request-log" type="button">Analyze locally</button>
+              </div>
+            </div>
+            <div class="request-reconciliation-inputs">
+              <label><span>Optional billed total</span><input id="request-billed-total" type="number" min="0" step="any" placeholder="Not supplied" /></label>
+              <label><span>Bill currency</span><input id="request-billed-currency" type="text" maxlength="3" placeholder="USD" /></label>
+              <label><span>Request currency fallback</span><input id="request-default-currency" type="text" maxlength="3" placeholder="Only if the file omits it" /></label>
+              <label><span>Optional monthly budget</span><input id="request-monthly-budget" type="number" min="0.01" step="any" placeholder="Not supplied" /></label>
+              <label><span>Budget warning threshold</span><div class="input-suffix"><input id="request-budget-warning" type="number" min="0.1" max="100" step="0.1" value="80" /><em>%</em></div></label>
+              <label class="check-field"><input id="request-bill-scope-confirmed" type="checkbox" /><span>The bill and request log cover the same provider, account, currency, and period</span></label>
+              <label class="check-field"><input id="request-period-complete" type="checkbox" /><span>The log covers one complete, continuous period from its first through last UTC date</span></label>
+            </div>
+            <div class="builder-error" id="request-log-error" role="alert"></div>
+            <div id="request-analysis-results" hidden>
+              <div class="request-analysis-head">
+                <div><p class="kicker">OBSERVED REQUEST REVIEW</p><h3 id="request-analysis-title">What the imported calls support</h3></div>
+                <div class="request-analysis-actions">
+                  <button class="text-button" id="download-normalized-usage" type="button">Download normalized usage</button>
+                  <button class="text-button" id="download-usage-review" type="button">Download analysis record</button>
+                </div>
+              </div>
+              <div class="workbench-summary" id="request-analysis-summary"></div>
+              <p class="request-analysis-boundary" id="request-analysis-boundary"></p>
+              <section class="request-spend-overview" aria-labelledby="request-spend-overview-title">
+                <div class="request-explorer-head">
+                  <div><p class="kicker">SPEND CONTEXT</p><h3 id="request-spend-overview-title">What shaped the imported cost?</h3></div>
+                  <p>Local snapshot · not live monitoring</p>
+                </div>
+                <div class="request-spend-context" id="request-spend-context"></div>
+                <div class="request-budget-status" id="request-budget-status"></div>
+                <section class="request-operational-section" aria-labelledby="request-operational-title">
+                  <div class="request-explorer-head">
+                    <div><p class="kicker">OPERATING SIGNALS</p><h4 id="request-operational-title">What could be driving the cost?</h4></div>
+                    <p>Coverage is shown with every metric</p>
+                  </div>
+                  <div class="request-operational-metrics" id="request-operational-metrics"></div>
+                </section>
+                <section class="request-variance-section" id="request-variance-section" aria-labelledby="request-variance-title">
+                  <div class="request-explorer-head">
+                    <div><p class="kicker">PERIOD VARIANCE</p><h4 id="request-variance-title">Why did the recent window change?</h4></div>
+                    <p>Equal consecutive UTC windows</p>
+                  </div>
+                  <div id="request-variance"></div>
+                </section>
+                <div class="request-spend-breakdowns" id="request-spend-breakdowns"></div>
+              </section>
+              <section class="request-event-explorer" aria-labelledby="request-event-explorer-title">
+                <div class="request-explorer-head">
+                  <div><p class="kicker">LOCAL SPEND EXPLORER</p><h3 id="request-event-explorer-title">Trace the finding back to its rows</h3></div>
+                  <p id="request-explorer-status"></p>
+                </div>
+                <div class="request-explorer-filters">
+                  <label><span>From</span><input id="request-filter-from" type="date" /></label>
+                  <label><span>Through</span><input id="request-filter-through" type="date" /></label>
+                  <label><span>Provider</span><select id="request-filter-provider"></select></label>
+                  <label><span>Model</span><select id="request-filter-model"></select></label>
+                  <label><span>Project</span><select id="request-filter-project"></select></label>
+                  <label><span>Workload</span><select id="request-filter-workload"></select></label>
+                  <label><span>Status</span><select id="request-filter-status"></select></label>
+                  <button class="text-button" id="reset-request-filters" type="button">Reset filters</button>
+                </div>
+                <div class="request-event-table-wrap">
+                  <table class="request-event-table">
+                    <thead><tr><th>Event</th><th>Time</th><th>Provider · model</th><th>Project · workload</th><th>Status</th><th>Input</th><th>Output</th><th>Cache</th><th>Selected cost</th></tr></thead>
+                    <tbody id="request-event-rows"></tbody>
+                  </table>
+                </div>
+                <p class="request-row-limit" id="request-row-limit"></p>
+              </section>
+              <div class="opportunity-workbench-list" id="request-finding-list"></div>
+              <details class="request-data-details">
+                <summary>Import coverage and limitations</summary>
+                <div id="request-import-coverage"></div>
+              </details>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-simulate" aria-labelledby="simulate-title">
+          <div class="eyebrow-row">
+            <p class="eyebrow">OBSERVED SHAPE · PROPOSED PRICE</p>
+            <span class="mode-tag">SIMULATION IS NOT VERIFICATION</span>
+          </div>
+          <div class="section-page-title">
+            <p class="kicker">SIMULATE</p>
+            <h1 id="simulate-title">What if the workload changed?</h1>
+            <p>Reprice the observed token shape under one proposed model or operating change. Quality, latency, tools, and model behavior remain unproven until you test them.</p>
+          </div>
+          <form class="workbench-form" id="scenario-form" novalidate>
+            <div class="workbench-form-grid">
+              <label><span>Observed route</span><select id="scenario-route"><option value="baseline">Current route</option><option value="proposed">Proposed route</option></select></label>
+              <label><span>Model to test</span><select id="scenario-model"></select></label>
+              <label><span>Cached input target</span><div class="input-suffix"><input id="scenario-cache" type="number" min="0" max="100" step="0.1" value="0" /><em>%</em></div></label>
+              <label><span>Output reduction</span><div class="input-suffix"><input id="scenario-output" type="number" min="0" max="100" step="0.1" value="0" /><em>%</em></div></label>
+              <label><span>Retry reduction</span><div class="input-suffix"><input id="scenario-retries" type="number" min="0" max="100" step="0.1" value="0" /><em>%</em></div></label>
+              <label class="check-field"><input id="scenario-batch" type="checkbox" /><span>Use published batch rates</span></label>
+            </div>
+            <div class="workbench-form-action">
+              <p>Token totals come from the selected route. The model price changes; output and retry behavior change only when you explicitly model them.</p>
+              <button class="build-button" type="submit">Run the simulation</button>
+            </div>
+            <div class="builder-error" id="scenario-error" role="alert"></div>
+          </form>
+          <section class="scenario-result" id="scenario-result" hidden>
+            <div class="scenario-result-head">
+              <div><p class="kicker">TEST FIRST</p><h2 id="scenario-result-title"></h2></div>
+              <span>ESTIMATED · NO SAVINGS CLAIM</span>
+            </div>
+            <div class="scenario-number-grid">
+              <article><span>Current provider cost</span><strong id="scenario-current-cost"></strong></article>
+              <article><span>Modeled provider cost</span><strong id="scenario-modeled-cost"></strong></article>
+              <article><span>Modeled provider difference</span><strong id="scenario-difference"></strong></article>
+            </div>
+            <div class="scenario-assumptions"><div><p class="kicker">WHAT STAYED FIXED</p><ul id="scenario-assumption-list"></ul></div><button class="build-button" id="send-scenario-to-verify" type="button">Send to verification</button></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-verify" aria-labelledby="verify-title">
+          <div class="eyebrow-row">
+            <p class="eyebrow">SAME WORK · SAME RULE · BLIND WHEN POSSIBLE</p>
+            <span class="mode-tag">QUALITY BEFORE ROUTE CHANGE</span>
+          </div>
+          <div class="section-page-title">
+            <p class="kicker">VERIFY</p>
+            <h1 id="verify-title">Did the cheaper route still do the job?</h1>
+            <p>Price can nominate a candidate. A comparable output sample determines whether it belongs in the decision.</p>
+          </div>
+          <div class="verification-status" id="verification-status"></div>
+          <section class="verification-method" aria-labelledby="verification-method-title">
+            <div class="section-heading"><div><p class="kicker">THE TEST</p><h2 id="verification-method-title">Use one decision rule for both routes</h2></div><p>Review model names only after scoring when practical.</p></div>
+            <ol class="verification-steps">
+              <li><span>01</span><div><strong>Choose the same tasks</strong><p>Use representative work from one bounded workload.</p></div></li>
+              <li><span>02</span><div><strong>Hide the route</strong><p>Blind model names and randomize order when practical.</p></div></li>
+              <li><span>03</span><div><strong>Apply the same rule</strong><p>Mark ready, needs correction, or needs escalation and record review time.</p></div></li>
+              <li><span>04</span><div><strong>Return to the decision</strong><p>Cost, quality, policy, and evidence must pass together.</p></div></li>
+            </ol>
+            <div class="verification-actions"><button class="build-button" id="open-verification-builder" type="button">Start a same-task sample</button></div>
+          </section>
+          <section class="paired-verification-panel" aria-labelledby="paired-verification-title">
+            <div class="section-heading">
+              <div>
+                <p class="kicker">PAIRED OUTPUT CHECK</p>
+                <h2 id="paired-verification-title">Test the same cases locally</h2>
+              </div>
+              <span class="mode-tag">OUTPUTS ARE NOT SAVED</span>
+            </div>
+            <p class="paired-verification-intro">Import one baseline row and one candidate row for every case. AI Cost Lens can check valid JSON, required or forbidden terms, required JSON fields, an exact label, and a maximum length. Human outcomes and review time remain separate evidence.</p>
+            <div class="verification-import-grid">
+              <label class="field-wide">
+                <span>Paired verification CSV</span>
+                <input id="verification-file" type="file" accept=".csv,text/csv" />
+                <small id="verification-file-status">The file is read only in this browser. Raw output text is discarded from the saved verification record.</small>
+              </label>
+              <div class="verification-template-action"><a class="text-button" href="templates/ai-cost-lens-verification-template.csv" download>Download blank template</a></div>
+            </div>
+            <div class="verification-control-grid">
+              <label><span>Minimum deterministic pass rate</span><div class="input-suffix"><input id="verification-check-floor" type="number" min="0" max="100" step="0.1" value="100" /><em>%</em></div></label>
+              <label><span>Minimum ready-result rate</span><div class="input-suffix"><input id="verification-ready-floor" type="number" min="0" max="100" step="0.1" value="90" /><em>%</em></div></label>
+              <label><span>Maximum ready-rate regression</span><div class="input-suffix"><input id="verification-regression" type="number" min="0" max="100" step="0.1" value="5" /><em>pts</em></div></label>
+            </div>
+            <div class="blind-review-start">
+              <div><strong>Score the outputs here</strong><p>AI Cost Lens will hide route names, randomize A/B order separately for every case, and clear the rendered outputs after the last score.</p></div>
+              <button class="build-button" id="start-blind-verification" type="button">Start blind review</button>
+            </div>
+            <section class="blind-review-workspace" id="verification-blind-review" aria-labelledby="verification-blind-title" hidden>
+              <div class="blind-review-head"><div><p class="kicker" id="verification-blind-progress" aria-live="polite"></p><h3 id="verification-blind-title">Score this pair without route names</h3></div><span class="mode-tag">BROWSER MEMORY ONLY</span></div>
+              <p id="verification-blind-rule"></p>
+              <div class="blind-review-cards" id="verification-blind-cards"></div>
+              <div class="blind-review-next"><p>Apply the same ready-result definition to A and B. The route is revealed only in the private calculation after scoring.</p><div class="paired-verification-actions"><button class="text-button" id="cancel-blind-review" type="button">Cancel and clear outputs</button><button class="build-button" id="save-blind-case" type="button">Save and continue</button></div></div>
+            </section>
+            <p class="verification-external-label"><strong>Already scored elsewhere?</strong> Keep the outcomes in the CSV, then describe how that review was run.</p>
+            <div class="verification-method-checks">
+              <label><input id="verification-random-sample" type="checkbox" /><span>The cases were selected randomly or systematically</span></label>
+              <label><input id="verification-blinded" type="checkbox" /><span>Route names were hidden while outcomes were scored</span></label>
+              <label><input id="verification-randomized-order" type="checkbox" /><span>Baseline and candidate presentation order was randomized</span></label>
+            </div>
+            <div class="verification-run-row">
+              <p>Every case must use the same deterministic rules on both routes. Arbitrary regular expressions and executable schemas are deliberately not run.</p>
+              <button class="build-button" id="run-paired-verification" type="button">Check supplied scores</button>
+            </div>
+            <div class="builder-error" id="verification-error" role="alert"></div>
+            <section class="paired-verification-result" id="paired-verification-result" aria-labelledby="paired-verification-result-title" hidden>
+              <div class="paired-verification-result-head">
+                <div><p class="kicker">QUALITY EVIDENCE · NOT A SAVINGS CLAIM</p><h3 id="paired-verification-result-title">What the paired cases support</h3></div>
+                <div class="paired-verification-actions"><button class="text-button" id="download-verification" type="button">Download verification record</button><button class="build-button" id="send-verification-to-review" type="button">Use outcomes in Review</button></div>
+              </div>
+              <div class="verification-result-summary" id="verification-result-summary"></div>
+              <p class="verification-result-conclusion" id="verification-result-conclusion"></p>
+              <div class="verification-case-table-wrap">
+                <table class="verification-case-table">
+                  <thead><tr><th>Case</th><th>Baseline checks</th><th>Candidate checks</th><th>Baseline outcome</th><th>Candidate outcome</th></tr></thead>
+                  <tbody id="verification-case-rows"></tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+        </section>
+
         <section class="view" id="view-evidence" aria-labelledby="evidence-title">
           <div class="eyebrow-row">
             <p class="eyebrow">DECISION RECORD</p>
@@ -338,11 +577,61 @@
             <p id="boundary-copy"></p>
           </section>
         </section>
+
+        <section class="view" id="view-actuals" aria-labelledby="actuals-title">
+          <div class="eyebrow-row">
+            <p class="eyebrow">POST-CHANGE RECONCILIATION</p>
+            <span class="mode-tag">MODELED → OBSERVED → REALIZED</span>
+          </div>
+          <div class="section-page-title">
+            <p class="kicker">ACTUALS</p>
+            <h1 id="actuals-title">Did the savings appear after the change?</h1>
+            <p>Normalize for ready-result volume, subtract implementation cost, and keep the result out of “realized” until every evidence gate passes. Amounts stay in the review currency; no conversion is applied.</p>
+          </div>
+          <form class="workbench-form actuals-form" id="actuals-form" novalidate>
+            <div class="actuals-period-grid">
+              <fieldset>
+                <legend>Baseline period</legend>
+                <label><span>Period label</span><input id="actuals-baseline-period" type="text" placeholder="July 2026" /></label>
+                <label><span>Recurring cost</span><input id="actuals-baseline-cost" type="number" min="0" step="0.01" /></label>
+                <label><span>Completed results</span><input id="actuals-baseline-volume" type="number" min="1" step="1" /></label>
+                <label><span>Usable-result rate</span><div class="input-suffix"><input id="actuals-baseline-rate" type="number" min="0.01" max="100" step="0.1" /><em>%</em></div></label>
+              </fieldset>
+              <fieldset>
+                <legend>Post-change period</legend>
+                <label><span>Period label</span><input id="actuals-post-period" type="text" placeholder="September 2026" /></label>
+                <label><span>Recurring cost</span><input id="actuals-post-cost" type="number" min="0" step="0.01" /></label>
+                <label><span>Completed results</span><input id="actuals-post-volume" type="number" min="1" step="1" /></label>
+                <label><span>Usable-result rate</span><div class="input-suffix"><input id="actuals-post-rate" type="number" min="0.01" max="100" step="0.1" /><em>%</em></div></label>
+              </fieldset>
+            </div>
+            <div class="workbench-form-grid actuals-controls">
+              <label><span>One-time implementation cost</span><input id="actuals-change-cost" type="number" min="0" step="0.01" value="0" /></label>
+              <label><span>Required quality floor</span><div class="input-suffix"><input id="actuals-quality-floor" type="number" min="0.01" max="100" step="0.1" value="90" /><em>%</em></div></label>
+              <label><span>Implemented on</span><input id="actuals-implemented-at" type="date" /></label>
+            </div>
+            <div class="actuals-gates">
+              <label><input id="actuals-quality-verified" type="checkbox" /><span>The same quality rule was verified after the change</span></label>
+              <label><input id="actuals-policy-approved" type="checkbox" /><span>The change has business and policy approval</span></label>
+              <label><input id="actuals-provider-reported" type="checkbox" /><span>Provider charges inside both totals reconcile to provider-reported bills</span></label>
+              <label><input id="actuals-periods-comparable" type="checkbox" /><span>The periods cover equivalent work and comparable duration</span></label>
+              <label><input id="actuals-outcomes-complete" type="checkbox" /><span>Outcome records cover the full declared scope</span></label>
+            </div>
+            <div class="workbench-form-action"><p>No checked box is inferred from the current review. Confirm each gate only when the record supports it.</p><button class="build-button" type="submit">Reconcile the actuals</button></div>
+            <div class="builder-error" id="actuals-error" role="alert"></div>
+          </form>
+          <section class="actuals-result" id="actuals-result" hidden>
+            <div class="actuals-result-head"><div><p class="kicker">SAVINGS LEDGER</p><h2 id="actuals-status"></h2></div><button class="text-button" id="download-actuals" type="button">Download ledger (JSON)</button></div>
+            <div class="savings-stages" id="savings-stages"></div>
+            <div class="savings-waterfall" id="savings-waterfall"></div>
+            <p class="actuals-conclusion" id="actuals-conclusion"></p>
+          </section>
+        </section>
       </main>
 
       <footer>
         <p>AI Cost Lens is free, open source, and local first.</p>
-        <p>Illustrative data is never presented as customer evidence.</p>
+        <p>Calculations run locally. Source files are not uploaded.</p>
       </footer>
     </div>
 
@@ -445,6 +734,18 @@
 
         <p class="builder-choice-label">What would help you today?</p>
         <div class="builder-mode-choice" role="group" aria-label="Choose how to start">
+          <button class="builder-mode builder-mode-featured" data-builder-mode="price" type="button" aria-pressed="false">
+            <small>NO FILES · LOCAL CALCULATOR</small>
+            <strong>Price a prompt</strong>
+            <span>Compare direct API costs, cache, batch, retries, and cost per expected usable result.</span>
+            <em>FASTEST WAY TO ESTIMATE A WORKLOAD</em>
+          </button>
+          <button class="builder-mode builder-mode-featured" data-builder-mode="usage" type="button" aria-pressed="false">
+            <small>CSV OR JSON · LOCAL ANALYSIS</small>
+            <strong>Review AI usage</strong>
+            <span>Find spend drivers, budget risk, operational patterns, variance, and credible optimization targets.</span>
+            <em>BEST FOR REQUEST OR TRACE EXPORTS</em>
+          </button>
           <button class="builder-mode builder-mode-simple" data-builder-mode="simple" type="button" aria-pressed="false">
             <small>SIMPLE · NO FILES NEEDED</small>
             <strong>Compare two AI tools or plans</strong>
@@ -941,6 +1242,124 @@
       </form>
     </dialog>
 
+    <dialog class="price-prompt-dialog" id="price-prompt-dialog" aria-labelledby="price-prompt-title">
+      <form class="price-prompt-workspace" id="price-prompt-form" novalidate>
+        <header class="price-prompt-head">
+          <div>
+            <p class="kicker">RATE SCENARIO · LOCAL ONLY</p>
+            <h2 id="price-prompt-title">Price a prompt before you test a route.</h2>
+            <p>Compare current direct API list prices or one rate you supply. The estimate can find a route worth testing; it cannot prove equivalent quality or savings.</p>
+          </div>
+          <button class="dialog-close" id="close-price-prompt" type="button" aria-label="Close prompt pricing">Close</button>
+        </header>
+
+        <div class="privacy-note price-privacy-note">
+          <strong>Your prompt stays in this browser.</strong>
+          <span>No API key is requested. Prompt text is not included in the estimate record.</span>
+        </div>
+
+        <div class="price-prompt-layout">
+          <section class="price-input-panel" aria-labelledby="price-input-title">
+            <div class="price-section-head">
+              <span>01</span>
+              <div><p class="kicker">THE WORKLOAD</p><h3 id="price-input-title">Describe one call</h3></div>
+            </div>
+            <label class="field-wide"><span>Prompt text</span><textarea id="prompt-text" rows="7" placeholder="Paste a representative prompt. It never leaves this page."></textarea></label>
+            <p class="price-field-note">OpenAI raw text is counted locally with its o200k_base encoding. Other providers use a clearly labeled 4-characters-per-token estimate. Enter a known count below to override both.</p>
+            <div class="price-field-grid">
+              <label><span>Known input tokens <small>optional override</small></span><input id="prompt-input-tokens" type="number" min="0" step="1" placeholder="Estimate from prompt" /></label>
+              <label><span>Expected output tokens</span><input id="prompt-output-tokens" type="number" min="0" step="1" value="500" /></label>
+              <label><span>Calls per month</span><input id="prompt-calls" type="number" min="0" step="1" value="1000" /></label>
+              <label><span>Retry calls</span><div class="input-suffix"><input id="prompt-retry-rate" type="number" min="0" max="100" step="0.1" value="0" /><em>%</em></div></label>
+              <label><span>Cached input share</span><div class="input-suffix"><input id="prompt-cache-share" type="number" min="0" max="100" step="0.1" value="0" /><em>%</em></div></label>
+              <label><span>Expected usable rate <small>optional</small></span><div class="input-suffix"><input id="prompt-usable-rate" type="number" min="0" max="100" step="0.1" placeholder="Not known" /><em>%</em></div></label>
+            </div>
+            <label class="check-field price-batch-field"><input id="prompt-batch" type="checkbox" /><span>Use asynchronous batch pricing where the provider publishes it</span></label>
+          </section>
+
+          <section class="price-model-panel" aria-labelledby="price-model-title">
+            <div class="price-section-head">
+              <span>02</span>
+              <div><p class="kicker">THE ROUTES</p><h3 id="price-model-title">Choose what to compare</h3></div>
+            </div>
+            <div class="price-model-fields">
+              <label><span>Current model</span><select id="prompt-current-model"></select></label>
+              <label><span>Alternative 1</span><select id="prompt-alt-1"></select></label>
+              <label><span>Alternative 2</span><select id="prompt-alt-2"></select></label>
+              <label><span>Alternative 3</span><select id="prompt-alt-3"></select></label>
+            </div>
+            <details class="custom-rate-card" id="prompt-custom-rate">
+              <summary>Use one custom or contract rate</summary>
+              <p>Choose <strong>Custom or contract rate</strong> in any route above, then enter its USD rates per 1M tokens. The values stay local. Do not paste agreement text or secrets; use a short source label.</p>
+              <div class="custom-rate-grid">
+                <label><span>Route name</span><input id="prompt-custom-label" type="text" maxlength="120" placeholder="My contracted route" /></label>
+                <label><span>Provider</span><input id="prompt-custom-provider" type="text" maxlength="80" placeholder="Provider or gateway" /></label>
+                <label><span>Rate effective date</span><input id="prompt-custom-effective" type="date" /></label>
+                <label><span>Source label</span><input id="prompt-custom-source" type="text" maxlength="200" placeholder="2026 contract rate card" /></label>
+                <label><span>Input rate</span><input id="prompt-custom-input" type="number" min="0" step="any" placeholder="USD / 1M" /></label>
+                <label><span>Cached-input rate</span><input id="prompt-custom-cached" type="number" min="0" step="any" placeholder="USD / 1M" /></label>
+                <label><span>Output rate</span><input id="prompt-custom-output" type="number" min="0" step="any" placeholder="USD / 1M" /></label>
+                <label><span>Context window <small>optional</small></span><input id="prompt-custom-context" type="number" min="1" step="1" placeholder="Tokens" /></label>
+                <label><span>Maximum output <small>optional</small></span><input id="prompt-custom-max-output" type="number" min="1" step="1" placeholder="Tokens" /></label>
+              </div>
+              <p class="custom-rate-subhead">Optional batch rates</p>
+              <div class="custom-rate-grid custom-rate-batch-grid">
+                <label><span>Batch input</span><input id="prompt-custom-batch-input" type="number" min="0" step="any" placeholder="Leave all three blank" /></label>
+                <label><span>Batch cached input</span><input id="prompt-custom-batch-cached" type="number" min="0" step="any" /></label>
+                <label><span>Batch output</span><input id="prompt-custom-batch-output" type="number" min="0" step="any" /></label>
+              </div>
+              <p class="price-field-note">Enter the same cached-input rate as input when your rate card has no cache discount. Enter zero only when the applicable source explicitly makes that token category free.</p>
+            </details>
+            <div class="catalog-stamp" id="prompt-catalog-stamp"></div>
+            <details class="model-catalog-browser">
+              <summary>Search the model catalog</summary>
+              <p>Compare verified text list prices and published token limits. Price is not a capability or quality score; your workload test remains the decision evidence.</p>
+              <div class="model-catalog-filters">
+                <label><span>Search models</span><input id="model-catalog-search" type="search" placeholder="Model or provider" /></label>
+                <label><span>Provider</span><select id="model-catalog-provider"><option value="">All providers</option></select></label>
+                <label><span>Workload signal</span><select id="model-catalog-task"><option value="">All workload signals</option><option value="general">General</option><option value="reasoning">Reasoning</option><option value="coding">Coding</option><option value="high_volume">High-volume</option><option value="long_context">Long context</option><option value="multimodal">Multimodal</option></select></label>
+              </div>
+              <div class="model-catalog-table-wrap">
+                <table class="model-catalog-table">
+                  <thead><tr><th>Model</th><th>Input</th><th>Cached</th><th>Output</th><th>Context</th><th>Workload signals</th><th></th></tr></thead>
+                  <tbody id="model-catalog-rows"></tbody>
+                </table>
+              </div>
+              <p class="model-catalog-count" id="model-catalog-count"></p>
+            </details>
+            <button class="build-button price-calculate" id="calculate-prompt-price" type="submit">Calculate the scenario</button>
+            <div class="builder-error" id="price-prompt-error" role="alert"></div>
+          </section>
+        </div>
+
+        <section class="price-results" id="price-results" aria-labelledby="price-results-title" hidden>
+          <div class="price-results-head">
+            <div>
+              <p class="kicker">ESTIMATED · NOT A SAVINGS CLAIM</p>
+              <h3 id="price-results-title">What the token arithmetic says</h3>
+            </div>
+            <strong id="price-token-summary"></strong>
+          </div>
+          <div class="price-table-wrap">
+            <table class="price-table">
+              <thead><tr><th>Route</th><th>Per call</th><th>Per 1,000 calls</th><th>Per month</th><th>Per year</th><th>Vs. current / month</th><th>Per usable result</th></tr></thead>
+              <tbody id="price-result-rows"></tbody>
+            </table>
+          </div>
+          <div class="price-result-footer">
+            <div>
+              <p id="price-result-read"></p>
+              <details><summary>Assumptions and exclusions</summary><ul id="price-assumptions"></ul></details>
+            </div>
+            <div class="price-result-actions">
+              <button class="text-button" id="download-price-estimate" type="button">Download estimate JSON</button>
+              <button class="build-button" id="send-price-to-review" type="button">Send estimate to Review</button>
+            </div>
+          </div>
+        </section>
+      </form>
+    </dialog>
+
     <dialog class="lumen-dialog" id="lumen-dialog" aria-labelledby="lumen-dialog-title">
       <div class="lumen-drawer">
         <header>
@@ -964,6 +1383,13 @@
         </div>
       </div>
     </dialog>
+    <script src="data/pricing-catalog-v0.4.js"></script>
+    <script src="pricing-engine.js"></script>
+    <script src="opportunity-engine.js"></script>
+    <script src="usage-event-engine.js"></script>
+    <script src="scenario-engine.js"></script>
+    <script src="verification-engine.js"></script>
+    <script src="actuals-engine.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

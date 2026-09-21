@@ -8,7 +8,7 @@ await mkdir(target, { recursive: true });
 
 const spendHeader = "period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,currency";
 const workHeader = "period,result_id,outcome_status,human_minutes";
-const workload = "Customer due diligence case summaries";
+const workload = "Contract risk summaries";
 
 function spendCsv(proposedCost) {
   return [

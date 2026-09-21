@@ -7,4 +7,4 @@ These cases are entirely synthetic. They are designed to test whether AI Cost Le
 - **Policy gate:** the economics look favorable, but the proposed route has not been approved for the workload. The tool must block a savings claim.
 - **Weak sample:** a small user-selected sample looks favorable. The tool may describe the sampled estimate but must not call it booked or proven savings.
 
-The workload is a fictional customer due diligence summary process. The figures are scenario inputs, not bank, investor, provider, or customer evidence.
+The workload is a contract risk summary process. The figures are scenario inputs, not bank, investor, provider, or customer evidence.

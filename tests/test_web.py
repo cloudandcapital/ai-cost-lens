@@ -25,7 +25,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert "EVIDENCE CHECK" in html
     assert 'id="boundary-title"' in html
     assert "ILLUSTRATIVE DATA" not in html  # The current file supplies the label.
-    assert "Illustrative data is never presented as customer evidence" in html
+    assert "Calculations run locally. Source files are not uploaded." in html
     assert "What would you like to check?" in html
     assert "See the worked example" in html
     assert "Upload what you have" in html
@@ -46,7 +46,9 @@ def test_web_assets_and_brand_contract_are_present():
         in html
     )
     assert "Set the decision rules" in html
-    assert html.count("data-builder-mode=") == 5
+    assert html.count("data-builder-mode=") == 7
+    assert "Price a prompt" in html
+    assert "Review AI usage" in html
     assert 'data-builder-mode="single"' in html
     assert "CRAWL" in html
     assert "WALK" in html
@@ -120,7 +122,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert "NO READY RESULTS" in app
     assert 'input.step = "any"' in app
     assert "safeMax / 200" not in app
-    assert "The example's numbers match. But this is not real-world proof." in app
+    assert "The numbers match. The conclusion remains bounded to these inputs." in app
     assert "if (proposed.costs.one_time_change_cost > 0)" in app
     assert ".status-illustrative" in css
     assert (
@@ -148,7 +150,16 @@ def test_single_file_preview_embeds_assets_and_data():
     preview = (WEB / "preview.html").read_text()
     assert '<link rel="stylesheet" href="styles.css"' not in preview
     assert '<script src="app.js"' not in preview
+    assert '<script src="pricing-engine.js"' not in preview
+    assert '<script src="data/pricing-catalog-v0.4.js"' not in preview
+    assert '<script src="opportunity-engine.js"' not in preview
+    assert '<script src="scenario-engine.js"' not in preview
+    assert '<script src="actuals-engine.js"' not in preview
     assert '"schema_version": "ai-cost-lens-review-result/1.0"' in preview
+    assert 'schema_version: "ai-cost-lens-pricing-catalog/0.4"' in preview
+    assert 'schema_version: "ai-cost-lens-opportunity-set/1.0"' in preview
+    assert 'schema_version: "ai-cost-lens-scenario/1.0"' in preview
+    assert 'schema_version: "ai-cost-lens-realized-savings/1.0"' in preview
     assert 'fetch("data/illustrative-review-result.json")' not in preview
     assert 'href="templates/ai-cost-lens-spend-template.csv"' not in preview
     assert 'href="templates/ai-cost-lens-work-log-template.csv"' not in preview
@@ -157,10 +168,23 @@ def test_single_file_preview_embeds_assets_and_data():
 
 def test_static_site_build_uses_the_self_contained_review_as_index():
     script = (ROOT / "scripts" / "build-static-site.mjs").read_text()
-    assert 'import("./build-model-route-decision-preview.mjs")' in script
+    assert 'import("./build-model-route-decision-preview.mjs")' not in script
     assert (
         'copyFile(resolve(web, "preview.html"), resolve(build, "index.html"))' in script
     )
+    assert '"model-route-decision.html"' in script
+    assert '"model-route-review.html"' in script
+    assert '"data/model-route-decision-v1.js"' in script
+    assert '"data/model-route-review-packet.js"' in script
+    assert '"README.md"' in script
+
+
+def test_public_workbench_does_not_link_internal_synthetic_pilots():
+    html = (WEB / "index.html").read_text()
+    preview = (WEB / "preview.html").read_text()
+    for page in ("model-route-decision.html", "model-route-review.html"):
+        assert page not in html
+        assert page not in preview
 
 
 def test_universal_templates_preserve_finance_join_fields():
@@ -263,14 +287,17 @@ console.log(JSON.stringify(Object.fromEntries([...elements.entries()].map(([id, 
     assert result.returncode == 0, result.stderr
     memo = __import__("json").loads(result.stdout)
     assert memo["memo-title"]["textContent"] == "AI spend decision memo"
-    assert "Customer due diligence case summaries" in memo["memo-meta"]["textContent"]
+    assert "Contract risk summaries" in memo["memo-meta"]["textContent"]
     assert memo["memo-decision-code"]["textContent"] == "KEEP CURRENT ROUTE"
     assert "$143.55" in memo["memo-table-body"]["innerHTML"]
     assert "$150.40" in memo["memo-table-body"]["innerHTML"]
     assert "+4.8%" in memo["memo-table-body"]["innerHTML"]
     assert "−$6,436.00" in memo["memo-plan-grid"]["innerHTML"]
     assert memo["memo-planning"]["hidden"] is False
-    assert "Illustrative data" in memo["memo-footer-status"]["textContent"]
+    assert (
+        "Conclusion bounded to the supplied inputs"
+        in memo["memo-footer-status"]["textContent"]
+    )
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -328,7 +355,23 @@ def test_question_navigation_matches_views():
     html = (WEB / "index.html").read_text()
     nav_views = set(re.findall(r'data-view="([^"]+)"', html))
     section_views = set(re.findall(r'id="view-([^"]+)"', html))
-    assert nav_views == section_views == {"review", "anatomy", "evidence"}
+    assert (
+        nav_views
+        == section_views
+        == {
+            "review",
+            "anatomy",
+            "opportunities",
+            "simulate",
+            "verify",
+            "evidence",
+            "actuals",
+        }
+    )
+    assert (
+        'const simpleViews = new Set(["review", "opportunities", "verify", "evidence"])'
+        in (WEB / "app.js").read_text()
+    )
 
 
 def test_release_review_regressions_have_plain_language_and_precise_formatting():

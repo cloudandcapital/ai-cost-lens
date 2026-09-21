@@ -531,7 +531,8 @@
   }
 
   function csvCell(value) {
-    const string = Array.isArray(value) ? value.join("|") : String(value ?? "");
+    const raw = Array.isArray(value) ? value.join("|") : String(value ?? "");
+    const string = /^[\s]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
     return `"${string.replaceAll('"', '""')}"`;
   }
 

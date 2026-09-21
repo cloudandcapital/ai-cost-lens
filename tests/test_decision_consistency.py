@@ -161,7 +161,7 @@ eval(source);
  const saved = JSON.parse(await blob.text());
  assert.equal(saved.comparison.decision_code,'QUALITY BELOW MINIMUM');
  assert.deepEqual(saved.baseline.costs,data.baseline.costs);
- assert.equal(elements.anchor.download,'ai-cost-lens-customer-due-diligence-case-summaries.json');
+ assert.equal(elements.anchor.download,'ai-cost-lens-contract-risk-summaries.json');
  handlers['print-memo:click']();assert.ok(printed);
  await handlers['review-file:change']({target:{files:[{text:async()=>'{invalid',name:'bad.json'}],value:'bad.json'}});
  assert.match(elements.toast.textContent,/valid JSON/);

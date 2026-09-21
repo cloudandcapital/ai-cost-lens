@@ -92,7 +92,7 @@
     const { decision, comparison, routes, workload } = state.data;
 
     byId("as-of-label").textContent = `AS OF ${recordedDate(state.data)}`;
-    byId("mode-label").textContent = `${workload.evidence_label} · NOT CUSTOMER DATA`;
+    byId("mode-label").textContent = workload.evidence_label;
     byId("decision-question").textContent = state.data.question;
     byId("page-title").textContent = state.data.title;
     byId("workload-copy").textContent = `${workload.name}. ${workload.description}`;

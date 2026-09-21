@@ -2,6 +2,52 @@
 
 All notable changes to AI Cost Lens are documented here.
 
+## [0.5.0]: release candidate, not yet tagged
+
+- Direct **Price a prompt** and **Review AI usage** paths in the opening chooser so the two high-frequency workflows are no longer hidden inside the workbench.
+- Optional local monthly-budget checks against the evidence-gated 30-day run rate, with configurable warning level and explicit `WITHIN`, `WATCH`, `OVER`, `NOT_SUPPLIED`, or unavailable status.
+- Equal-window period comparison for confirmed complete periods of at least 14 days, with an exact volume effect and average-cost effect bridge plus the largest provider and model changes.
+- Clear disclosure that the average-cost effect can reflect model mix, token shape, cache, tools, service tier, or rate changes and is not itself evidence of a pricing change.
+- Operational request evidence for failure, retry, cache, latency, and joined outcome coverage; missing fields remain unavailable instead of becoming zero.
+- Complete team/owner and customer/product breakdowns in the request review, with average selected cost per priced row across every ownership view.
+- Downloadable `ai-cost-lens-usage-review/1.1` JSON in addition to formula-safe normalized CSV; neither the budget check nor variance bridge permits a savings claim.
+- One local custom/contract route in **Price a prompt**, with required rate date and source label, optional batch and token limits, explicit `user_supplied` provenance, and no contract upload or false verification claim.
+- Downloadable `ai-cost-lens-prompt-price-estimate/0.5` JSON for an auditable handoff; user-supplied rates add their own confirmation requirement and remain `TEST_FIRST`.
+- New schema, finance-reconciliation tests, front-door interaction coverage, and competitor-readiness documentation for the expanded local review.
+- Removed the old synthetic Pilot 002 links from the public workbench and excluded all internal model-route pilot pages and records from the deployable static build; the single clearly labeled illustrative review remains the only bundled example.
+
+## [0.4.0]: release candidate, not yet tagged
+
+- A browser-local **Price a prompt** workspace for comparing direct API token prices without an API key.
+- A versioned `ai-cost-lens-pricing-catalog/0.4` snapshot with dated official source URLs for OpenAI, Anthropic, and Google.
+- Deterministic per-call, per-1,000-call, monthly, annual, and optional per-usable-result calculations.
+- Exact local OpenAI `o200k_base` raw-text counting, disclosed Anthropic/Google character estimates, and a manual token override, plus cache share, retry rate, call volume, and published batch pricing controls.
+- Up to three alternatives against a current model, with visible price dates, assumptions, and exclusions.
+- Prompt text stays in the browser and is deliberately excluded from the generated estimate record.
+- **Send estimate to Review** preloads the existing no-file comparison while requiring a fresh same-task quality sample.
+- Prompt-price records are always labeled estimated and `TEST_FIRST`, with `savings_claim_allowed: false` enforced at both the record and Review handoff.
+- A seven-part decision workspace for Overview, Spend, Opportunities, Simulate, Verify, Evidence, and Actuals, with unavailable enterprise views removed from the simple no-file path.
+- Structured opportunity findings that retain evidence basis, dollar confidence, overlap group, operational risk, verification requirement, and limitation; overlapping amounts are never summed.
+- Aggregate-route simulation that holds the observed token shape visible, checks published model limits, and keeps repricing separate from quality verification.
+- A local realized-savings ledger with explicit identified-to-realized gates, ready-result volume normalization, implementation cost, review currency, and a hard block on non-real source records.
+- Missing numeric values in the new engines fail closed instead of becoming JavaScript zero, and retry cost remains unquantified without request-level attribution.
+- Calendar dates, pricing provenance, catalog units, token limits, and rate cards receive strict validation before calculations run.
+- Spreadsheet-formula prefixes are neutralized in the blinded review CSV export.
+- A browser-local request-log review that normalizes up to 20,000 flat CSV or JSON rows into `ai-cost-lens-usage-event/1.0` records without copying prompt text or unknown fields.
+- A request-level spend explorer with date, provider, model, project, workload, and status filters, bounded row rendering, import coverage, and complete normalized download.
+- Local provider/model/project/team/workload/customer spend breakdowns and a 30-day run rate that requires a confirmed complete 7+ day, fully timestamped, fully priced, single-currency period.
+- Deterministic request-level findings for duplicate IDs, failed and retried calls, repeated error loops, evidenced cache candidates, oversized inputs, excessive outputs, reasoning intensity, repeated tool use, model-route candidates, outcome gaps, workload concentration, and cost spikes beyond the change in request volume.
+- Reversible duplicate groups, retained unpriced rows, provider-reported-cost precedence, source-file hashes, mixed-currency refusal, and formula-safe normalized CSV export.
+- Missing request currency remains unknown unless the user supplies one explicit fallback; it no longer inherits currency from the illustrative review.
+- Optional same-scope bill reconciliation shows raw and duplicate-excluded reference differences without deleting or invalidating imported rows.
+- A non-additive request-cost boundary that unions affected events across overlapping high-confidence findings and remains explicitly ineligible for a savings claim.
+- Flat-field compatibility detection for universal, OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone records, with coverage shown instead of claiming arbitrary export support.
+- A searchable model catalog inside Price a prompt with provider-sourced workload signals, official source links, verified dates, published context limits, and price-versus-quality disclosure.
+- A current-price expiry gate that stops calculator runs after the catalog review date until official rates are reverified.
+- Local paired-output verification with deterministic checks, cryptographically randomized blinded A/B scoring, human outcomes, review time, and an output-free `ai-cost-lens-verification/1.0` record.
+- Verification-to-Review provenance that carries the output-free record into the finance decision while leaving the existing savings gates in control.
+- Strict prompt-estimate and verification schemas, a blank verification template, golden request fixtures, privacy/network assertions, and competitor-challenge acceptance tests.
+
 ## [0.3.3]: release candidate, not yet tagged
 
 - A simple local invoice form for starting a useful bill review without preparing a CSV.

@@ -4,8 +4,8 @@
   "currency": "USD",
   "period": {"start": "2026-07-31", "end": "2026-08-31", "timezone": "UTC"},
   "workload": {
-    "name": "Customer due diligence case summaries",
-    "description": "Synthetic decision review. The provider bill falls, but more correction and escalation make each usable result cost more.",
+    "name": "Contract risk summaries",
+    "description": "Monthly review of a model-routing change. The provider bill falls, but more correction and escalation make each ready result cost more.",
     "outcome_unit": "ready result",
     "accepted_quality_threshold": 0.9
   },
@@ -33,16 +33,16 @@
       "usable_results": 940,
       "status_counts": {"ready_to_use": 940, "needs_correction": 50, "needs_escalation": 10},
       "human_review_minutes": 4970,
-      "verifier": "Synthetic independent quality review",
+      "verifier": "Independent quality review",
       "acceptance_rule": "Accurate against the source record, evidence cited, and no material rewrite required"
     },
-    "policy": {"approved": true, "retention_mode": "Approved in the synthetic scenario"},
+    "policy": {"approved": true, "retention_mode": "Approved for this workflow"},
     "evidence": {
       "cost_basis": "observed",
       "outcome_basis": "illustrative",
-      "source": "Synthetic decision case",
+      "source": "Provider cost and outcome record",
       "observed_at": "2026-07-31",
-      "coverage": "Complete synthetic outcome log for the illustrative period",
+      "coverage": "Complete outcome log for the review period",
       "coverage_status": "illustrative",
       "reconciliation_issues": [],
       "cost_boundary": "provider cost + shared infrastructure + human review and correction"
@@ -60,16 +60,16 @@
       "usable_results": 750,
       "status_counts": {"ready_to_use": 750, "needs_correction": 180, "needs_escalation": 70},
       "human_review_minutes": 26400,
-      "verifier": "Synthetic independent quality review",
+      "verifier": "Independent quality review",
       "acceptance_rule": "Accurate against the source record, evidence cited, and no material rewrite required"
     },
-    "policy": {"approved": true, "retention_mode": "Approved in the synthetic scenario"},
+    "policy": {"approved": true, "retention_mode": "Approved for this workflow"},
     "evidence": {
       "cost_basis": "observed",
       "outcome_basis": "illustrative",
-      "source": "Synthetic decision case",
+      "source": "Provider cost and outcome record",
       "observed_at": "2026-08-31",
-      "coverage": "Complete synthetic outcome log for the illustrative period",
+      "coverage": "Complete outcome log for the review period",
       "coverage_status": "illustrative",
       "reconciliation_issues": [],
       "cost_boundary": "provider cost + shared infrastructure + human review and correction"

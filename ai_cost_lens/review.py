@@ -605,9 +605,8 @@ def build_review(payload: Mapping[str, Any]) -> dict[str, Any]:
 
     if mode == "illustrative":
         limitation = (
-            "This is a synthetic stress test, not bank or customer data. It "
-            "demonstrates the decision logic; no savings or performance claim "
-            "extends beyond these inputs."
+            "The conclusion applies only to these inputs; it is not a savings or "
+            "performance claim for another workload."
         )
     elif not evidence_complete:
         limitation = (

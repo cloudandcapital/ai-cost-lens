@@ -6,7 +6,7 @@ customer-validated, invoice-certified, or production-proven
 
 ## Buyer being simulated
 
-A finance or FinOps analyst at a large financial institution is comparing a current AI route with a cheaper proposed route for customer due diligence case summaries. The analyst must be able to defend the recommendation to finance, engineering, operations quality, and policy stakeholders.
+A finance or FinOps analyst is comparing a current AI route with a cheaper proposed route for contract risk summaries. The analyst must be able to defend the recommendation to finance, engineering, operations quality, and policy stakeholders.
 
 All figures and records in this test are synthetic. They are not bank, investor, provider, or customer evidence.
 

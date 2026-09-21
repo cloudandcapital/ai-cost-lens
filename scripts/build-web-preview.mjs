@@ -1,9 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildOpenAITokenizer } from "./build-openai-tokenizer.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const web = resolve(root, "web");
+
+await buildOpenAITokenizer();
 
 let html = await readFile(resolve(web, "index.html"), "utf8");
 const css = await readFile(resolve(web, "styles.css"), "utf8");
@@ -17,7 +20,23 @@ const spendTemplate = await readFile(
 const workTemplate = await readFile(
   resolve(web, "templates", "ai-cost-lens-work-log-template.csv"),
 );
+const requestLogTemplate = await readFile(
+  resolve(web, "templates", "ai-cost-lens-request-log-template.csv"),
+);
+const verificationTemplate = await readFile(
+  resolve(web, "templates", "ai-cost-lens-verification-template.csv"),
+);
 let app = await readFile(resolve(web, "app.js"), "utf8");
+const pricingCatalog = await readFile(
+  resolve(web, "data", "pricing-catalog-v0.4.js"),
+  "utf8",
+);
+const pricingEngine = await readFile(resolve(web, "pricing-engine.js"), "utf8");
+const opportunityEngine = await readFile(resolve(web, "opportunity-engine.js"), "utf8");
+const usageEventEngine = await readFile(resolve(web, "usage-event-engine.js"), "utf8");
+const verificationEngine = await readFile(resolve(web, "verification-engine.js"), "utf8");
+const scenarioEngine = await readFile(resolve(web, "scenario-engine.js"), "utf8");
+const actualsEngine = await readFile(resolve(web, "actuals-engine.js"), "utf8");
 
 const loaderPattern =
   /  \/\* AI_COST_LENS_DEMO_LOADER_START \*\/[\s\S]*?  \/\* AI_COST_LENS_DEMO_LOADER_END \*\//;
@@ -39,6 +58,21 @@ html = html
     'href="templates/ai-cost-lens-work-log-template.csv"',
     `href="data:text/csv;base64,${workTemplate.toString("base64")}"`,
   )
+  .replaceAll(
+    'href="templates/ai-cost-lens-request-log-template.csv"',
+    `href="data:text/csv;base64,${requestLogTemplate.toString("base64")}"`,
+  )
+  .replaceAll(
+    'href="templates/ai-cost-lens-verification-template.csv"',
+    `href="data:text/csv;base64,${verificationTemplate.toString("base64")}"`,
+  )
+  .replace('<script src="data/pricing-catalog-v0.4.js"></script>', () => `<script>${pricingCatalog}</script>`)
+  .replace('<script src="pricing-engine.js"></script>', () => `<script>${pricingEngine}</script>`)
+  .replace('<script src="opportunity-engine.js"></script>', () => `<script>${opportunityEngine}</script>`)
+  .replace('<script src="usage-event-engine.js"></script>', () => `<script>${usageEventEngine}</script>`)
+  .replace('<script src="verification-engine.js"></script>', () => `<script>${verificationEngine}</script>`)
+  .replace('<script src="scenario-engine.js"></script>', () => `<script>${scenarioEngine}</script>`)
+  .replace('<script src="actuals-engine.js"></script>', () => `<script>${actualsEngine}</script>`)
   .replace('<script src="app.js"></script>', () => `<script>${app}</script>`);
 
 if (!html.includes(`<script>${app}</script>`)) {

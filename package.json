@@ -1,15 +1,17 @@
 {
   "name": "ai-cost-lens-site",
-  "version": "0.3.3",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "build": "node scripts/build-static-site.mjs",
-    "dev": "vite"
+    "build:tokenizer": "node scripts/build-openai-tokenizer.mjs",
+    "dev": "npm run build && vite"
   },
   "devDependencies": {
     "vite": "8.2.2"
   },
   "dependencies": {
+    "gpt-tokenizer": "4.0.0",
     "pdfjs-dist": "6.3.289"
   }
 }

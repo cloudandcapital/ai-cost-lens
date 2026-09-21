@@ -2,6 +2,17 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const openAITokenizer = require('gpt-tokenizer/encoding/o200k_base');
+const pricingCatalog = require('../web/data/pricing-catalog-v0.4.js');
+const pricingEngine = require('../web/pricing-engine.js');
+const opportunityEngine = require('../web/opportunity-engine.js');
+const usageEventEngine = require('../web/usage-event-engine.js');
+const scenarioEngine = require('../web/scenario-engine.js');
+const verificationEngine = require('../web/verification-engine.js');
+const actualsEngine = require('../web/actuals-engine.js');
 
 // Minimal DOM adapter: actual HTML defaults and actual app event handlers.
 // This checks state transitions, not browser layout or native file dialogs.
@@ -26,6 +37,7 @@ class Element {
   getAttribute(k) { return this.attrs[k] ?? null; }
   addEventListener(k,fn) { (this.listeners[k] ||= []).push(fn); }
   async emit(k) { for (const fn of this.listeners[k] || []) await fn({target:this,currentTarget:this,preventDefault(){}}); }
+  click() { return this.emit('click'); }
   matches(selector) {
     if (selector.startsWith('.')) return this.classList.contains(selector.slice(1));
     if (selector.startsWith('#')) return this.id === selector.slice(1);
@@ -41,6 +53,8 @@ class Element {
   reset() { for (const field of this.querySelectorAll('input, select, textarea')) { field.value = field.defaultValue; field.checked = field.defaultChecked; } }
   showModal() { this.open = true; }
   close() { this.open = false; }
+  focus() {}
+  scrollIntoView() {}
   replaceChildren() { this.children = []; this.innerHTML = ''; }
 }
 const document = new Element('document');
@@ -66,7 +80,20 @@ const media = new Element('media'); media.matches = false;
 window.matchMedia = () => media;
 const source = read('web/app.js').replace(/  \/\* AI_COST_LENS_DEMO_LOADER_START \*\/[\s\S]*?  \/\* AI_COST_LENS_DEMO_LOADER_END \*\//,
   'globalThis.api = {state, renderAll};');
-const context = {document,window,TextEncoder,crypto:webcrypto};
+const context = {
+  document,
+  window,
+  TextEncoder,
+  crypto:webcrypto,
+  AI_COST_LENS_PRICING_CATALOG:pricingCatalog,
+  AICostLensOpenAITokenizer:openAITokenizer,
+  AICostLensPricing:pricingEngine,
+  AICostLensOpportunities:opportunityEngine,
+  AICostLensUsageEvents:usageEventEngine,
+  AICostLensScenarios:scenarioEngine,
+  AICostLensVerification:verificationEngine,
+  AICostLensActuals:actualsEngine,
+};
 runInNewContext(source, context);
 const {api} = context;
 const el = id => document.getElementById(id);
@@ -262,7 +289,7 @@ assert.equal(document.body.classList.contains('printing-memo'),false,'Media exit
 window.print = () => { throw new Error('Printing unavailable'); };
 await click('print-memo');
 assert.equal(document.body.classList.contains('printing-memo'),false,'Failed print does not strand print-only UI');
-console.log('PASS: five builder transition/correction sequences and non-blocking print lifecycle');
+console.log('PASS: seven-path entry, builder transition/correction sequences and non-blocking print lifecycle');
 
 // Integrated no-file comparison: real HTML defaults and registered submit handler.
 await click('start-review'); await mode('simple');
@@ -299,3 +326,126 @@ await click('start-review'); await mode('openai');
 assert.equal(el('simple-current-cost').disabled,true);
 assert.equal(el('openai-usage-file').disabled,false);
 console.log('PASS: simple comparison, free plans, JSON round trip, invalid-input rollback and existing-path transitions');
+
+// Workbench integration: exercise the real event handlers, not only the pure engines.
+api.state.data = JSON.parse(read('web/data/illustrative-review-result.json'));
+api.renderAll();
+assert.match(el('opportunity-summary').innerHTML,/Largest supported amount/);
+assert.match(el('opportunity-workbench-list').innerHTML,/Retries deserve a closer look/);
+await click('start-review'); await mode('usage');
+assert.equal(el('view-opportunities').classList.contains('active'),true);
+await click('start-review'); await mode('price');
+assert.equal(el('price-prompt-dialog').open,true);
+await click('close-price-prompt');
+
+const requestCsv = [
+  'event_id,timestamp,provider,model,project,team,workload,customer,input_tokens,cached_input_tokens,provider_reported_cost,currency,status,latency_ms,outcome_status',
+  ...Array.from({length:14},(_,index) => `request-${index + 1},2026-09-${String(index + 1).padStart(2,'0')}T12:00:00Z,${index < 7 ? 'OpenAI' : 'Anthropic'},${index < 7 ? 'gpt-5.6-sol' : 'claude-sonnet-5'},Product,Platform,Summaries,Internal,100,20,${index < 7 ? 10 : 20},USD,success,${100 + index * 10},ready_to_use`),
+].join('\n');
+await file('request-log-file',requestCsv,'request-log.csv');
+el('request-period-complete').checked = true;
+el('request-monthly-budget').value = '500';
+await click('analyze-request-log');
+assert.equal(api.state.usageReview.schema_version,'ai-cost-lens-usage-review/1.1');
+assert.equal(api.state.usageReview.spend.projected_30_day_cost,450);
+assert.equal(api.state.usageReview.spend.run_rate_status,'AVAILABLE');
+assert.equal(api.state.usageReview.spend.budget.status,'WATCH');
+assert.equal(api.state.usageReview.spend.period_variance.total_cost_change,70);
+assert.equal(api.state.usageReview.spend.operational_metrics.cache_share,.2);
+assert.match(el('request-spend-context').innerHTML,/30-day run rate/);
+assert.match(el('request-spend-context').innerHTML,/\$450\.00/);
+assert.match(el('request-budget-status').innerHTML,/WATCH/);
+assert.match(el('request-operational-metrics').innerHTML,/20\.0%/);
+assert.match(el('request-variance').innerHTML,/Average-cost effect/);
+assert.match(el('request-spend-breakdowns').innerHTML,/By provider/);
+assert.match(el('request-spend-breakdowns').innerHTML,/By team or owner/);
+assert.equal(el('request-analysis-results').hidden,false);
+
+await click('price-prompt');
+el('prompt-text').value = 'Summarize the material contract risks for finance review.';
+el('prompt-current-model').value = 'openai/gpt-5.6-sol';
+el('prompt-alt-1').value = 'openai/gpt-5.6-luna';
+el('prompt-alt-2').value = '';
+el('prompt-alt-3').value = '';
+await el('price-prompt-form').emit('submit');
+assert.equal(el('price-results').hidden,false);
+assert.match(el('price-result-read').textContent,/worth testing, not a proven switch/);
+await click('send-price-to-review');
+assert.equal(el('review-dialog').open,true);
+assert.equal(el('simple-current-name').value,'GPT-5.6 Sol');
+assert.equal(el('simple-other-name').value,'GPT-5.6 Luna');
+el('simple-current-checked').value = '100';
+el('simple-current-usable').value = '95';
+el('simple-current-minutes').value = '0';
+el('simple-other-checked').value = '100';
+el('simple-other-usable').value = '92';
+el('simple-other-minutes').value = '0';
+await submit();
+assert.equal(api.state.data.pricing_estimate.evidence_gate.savings_claim_allowed,false);
+assert.equal(api.state.data.comparison.savings_claim_allowed,false);
+
+await click('price-prompt');
+el('prompt-input-tokens').value = '1000';
+el('prompt-current-model').value = 'openai/gpt-5.6-sol';
+el('prompt-alt-1').value = 'custom/user-supplied-rate';
+el('prompt-alt-2').value = '';
+el('prompt-alt-3').value = '';
+el('prompt-custom-label').value = 'Private contract route';
+el('prompt-custom-provider').value = 'Private gateway';
+el('prompt-custom-source').value = '2026 contract rate card';
+el('prompt-custom-input').value = '1';
+el('prompt-custom-cached').value = '.25';
+el('prompt-custom-output').value = '5';
+el('prompt-custom-effective').value = '2099-09-01';
+await el('price-prompt-form').emit('submit');
+assert.match(el('price-prompt-error').textContent,/cannot be later than the pricing date/);
+el('prompt-custom-effective').value = '2026-09-01';
+await el('price-prompt-form').emit('submit');
+assert.match(el('price-result-rows').innerHTML,/Private contract route/);
+assert.match(el('price-result-rows').innerHTML,/user-supplied/);
+assert.match(el('price-assumptions').innerHTML,/did not verify it/);
+await click('close-price-prompt');
+
+const verificationCsv = [
+  'case_id,route,output_text,exact_label,max_characters,outcome_status',
+  'spacing,baseline,"approved",approved,8,ready_to_use',
+  'spacing,candidate,"  approved  ",approved,8,ready_to_use',
+].join('\n');
+await file('verification-file',verificationCsv,'paired-output.csv');
+await click('run-paired-verification');
+assert.equal(api.state.verificationRecord.comparison.status,'QUALITY_FAIL');
+assert.equal(api.state.verificationRecord.cases[0].candidate.output_characters,12);
+assert.equal(JSON.stringify(api.state.verificationRecord).includes('  approved  '),false);
+
+api.state.data = JSON.parse(read('web/data/illustrative-review-result.json'));
+api.renderAll();
+el('scenario-route').value = 'baseline';
+el('scenario-model').value = 'openai/gpt-5.6-luna';
+await el('scenario-form').emit('submit');
+assert.ok(api.state.pendingScenario,el('scenario-error').textContent);
+assert.equal(api.state.pendingScenario.evidence_gate.savings_claim_allowed,false);
+assert.equal(el('scenario-result').hidden,false);
+await click('send-scenario-to-verify');
+assert.equal(api.state.view,'verify');
+assert.match(el('verification-status').innerHTML,/GPT-5.6 Luna/);
+
+for (const [id,value] of Object.entries({
+  'actuals-baseline-period':'2026-07',
+  'actuals-post-period':'2026-09',
+  'actuals-baseline-cost':'100000',
+  'actuals-post-cost':'70000',
+  'actuals-baseline-volume':'1000',
+  'actuals-post-volume':'900',
+  'actuals-baseline-rate':'90',
+  'actuals-post-rate':'92',
+  'actuals-change-cost':'5000',
+  'actuals-quality-floor':'90',
+  'actuals-implemented-at':'2026-09-01',
+})) el(id).value = value;
+for (const id of ['actuals-quality-verified','actuals-policy-approved','actuals-provider-reported','actuals-periods-comparable','actuals-outcomes-complete']) el(id).checked = true;
+await el('actuals-form').emit('submit');
+assert.equal(api.state.actualsLedger.gates.source_record_is_real,false);
+assert.equal(api.state.actualsLedger.gates.realized_savings_claim_allowed,false);
+assert.equal(el('actuals-result').hidden,false);
+assert.match(el('actuals-conclusion').textContent,/evidence gates remain open/);
+console.log('PASS: prompt pricing, opportunity, scenario-to-verification and actuals event flows');

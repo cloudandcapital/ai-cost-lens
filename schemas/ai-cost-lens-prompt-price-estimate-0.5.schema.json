@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudandcapital.com/schemas/ai-cost-lens-prompt-price-estimate-0.5.schema.json",
+  "title": "AI Cost Lens prompt price estimate 0.5",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "application_version", "created_at", "catalog", "estimate_basis", "comparison", "evidence_gate"],
+  "properties": {
+    "schema_version": { "const": "ai-cost-lens-prompt-price-estimate/0.5" },
+    "application_version": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "version", "effective_at", "review_by", "currency", "source_urls"],
+      "properties": {
+        "schema_version": { "const": "ai-cost-lens-pricing-catalog/0.4" },
+        "version": { "type": "string", "format": "date" },
+        "effective_at": { "type": "string", "format": "date" },
+        "review_by": { "type": "string", "format": "date" },
+        "currency": { "const": "USD" },
+        "source_urls": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "format": "uri", "pattern": "^https://" } }
+      }
+    },
+    "estimate_basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "input_tokens", "input_token_method", "input_token_scope", "model_token_estimates", "output_tokens", "calls_per_month", "retry_rate", "cached_input_share", "batch", "expected_usable_rate", "rate_source_scope", "user_supplied_rate_count", "prompt_text_stored"],
+      "properties": {
+        "status": { "const": "estimated" },
+        "input_tokens": { "$ref": "#/$defs/nonnegativeInteger" },
+        "input_token_method": { "type": "string" },
+        "input_token_scope": { "enum": ["shared", "model_specific"] },
+        "model_token_estimates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["model_id", "provider", "input_tokens", "input_token_method"],
+            "properties": {
+              "model_id": { "type": "string" },
+              "provider": { "type": "string" },
+              "input_tokens": { "$ref": "#/$defs/nonnegativeInteger" },
+              "input_token_method": { "enum": ["manual", "openai_o200k_base_exact_raw_text", "character_estimate_4_to_1", "shared_scenario"] }
+            }
+          }
+        },
+        "output_tokens": { "$ref": "#/$defs/nonnegativeInteger" },
+        "calls_per_month": { "$ref": "#/$defs/nonnegativeInteger" },
+        "retry_rate": { "$ref": "#/$defs/probability" },
+        "cached_input_share": { "$ref": "#/$defs/probability" },
+        "batch": { "type": "boolean" },
+        "expected_usable_rate": { "anyOf": [{ "$ref": "#/$defs/probability" }, { "type": "null" }] },
+        "rate_source_scope": { "enum": ["official_list_only", "mixed", "user_supplied_only"] },
+        "user_supplied_rate_count": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "prompt_text_stored": { "const": false }
+      }
+    },
+    "comparison": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/modelEstimate" }
+    },
+    "evidence_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "savings_claim_allowed", "missing", "reason"],
+      "properties": {
+        "decision": { "const": "TEST_FIRST" },
+        "savings_claim_allowed": { "const": false },
+        "missing": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "reason": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "nonnegativeInteger": { "type": "integer", "minimum": 0 },
+    "nonnegativeNumber": { "type": "number", "minimum": 0 },
+    "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+    "rates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "cached_input", "output"],
+      "properties": {
+        "input": { "$ref": "#/$defs/nonnegativeNumber" },
+        "cached_input": { "$ref": "#/$defs/nonnegativeNumber" },
+        "output": { "$ref": "#/$defs/nonnegativeNumber" }
+      }
+    },
+    "modelEstimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_id", "provider", "label", "rate_tier", "rates_per_1m_tokens", "pricing_adjustment", "context_compatible", "context_window_tokens", "max_output_tokens", "pricing_basis", "pricing_source_url", "pricing_source_note", "pricing_verified_at", "pricing_effective_at", "estimated_cost_per_call_usd", "estimated_cost_per_1000_calls_usd", "estimated_monthly_cost_usd", "estimated_annual_cost_usd", "estimated_cost_per_usable_result_usd", "billed_calls_per_month", "note", "input_tokens", "input_token_method", "role", "monthly_difference_from_current_usd", "annual_difference_from_current_usd"],
+      "properties": {
+        "model_id": { "type": "string" },
+        "provider": { "type": "string" },
+        "label": { "type": "string" },
+        "rate_tier": { "enum": ["standard", "batch"] },
+        "rates_per_1m_tokens": { "$ref": "#/$defs/rates" },
+        "pricing_adjustment": { "enum": ["standard_context", "long_context"] },
+        "context_compatible": { "const": true },
+        "context_window_tokens": { "type": ["integer", "null"], "minimum": 1 },
+        "max_output_tokens": { "type": ["integer", "null"], "minimum": 1 },
+        "pricing_basis": { "enum": ["official_list", "user_supplied"] },
+        "pricing_source_url": { "anyOf": [{ "type": "string", "format": "uri", "pattern": "^https://" }, { "type": "null" }] },
+        "pricing_source_note": { "type": ["string", "null"] },
+        "pricing_verified_at": { "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+        "pricing_effective_at": { "type": "string", "format": "date" },
+        "estimated_cost_per_call_usd": { "$ref": "#/$defs/nonnegativeNumber" },
+        "estimated_cost_per_1000_calls_usd": { "$ref": "#/$defs/nonnegativeNumber" },
+        "estimated_monthly_cost_usd": { "$ref": "#/$defs/nonnegativeNumber" },
+        "estimated_annual_cost_usd": { "$ref": "#/$defs/nonnegativeNumber" },
+        "estimated_cost_per_usable_result_usd": { "type": ["number", "null"], "minimum": 0 },
+        "billed_calls_per_month": { "$ref": "#/$defs/nonnegativeNumber" },
+        "note": { "type": ["string", "null"] },
+        "input_tokens": { "$ref": "#/$defs/nonnegativeInteger" },
+        "input_token_method": { "type": "string" },
+        "role": { "enum": ["current", "alternative"] },
+        "monthly_difference_from_current_usd": { "type": "number" },
+        "annual_difference_from_current_usd": { "type": "number" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "pricing_basis": { "const": "official_list" } }, "required": ["pricing_basis"] },
+          "then": {
+            "properties": {
+              "pricing_source_url": { "type": "string", "format": "uri", "pattern": "^https://" },
+              "pricing_source_note": { "type": "null" },
+              "pricing_verified_at": { "type": "string", "format": "date" }
+            }
+          },
+          "else": {
+            "properties": {
+              "pricing_source_url": { "type": "null" },
+              "pricing_source_note": { "type": "string", "minLength": 1 },
+              "pricing_verified_at": { "type": "null" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

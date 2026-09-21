@@ -31,7 +31,7 @@ It does not connect to provider APIs, fetch live prices, certify invoices, enfor
 - Optional Plan vs Actual for provider cost, shared cost, human work, output, yield, and unit cost
 - Time-based payback against an explicit monthly ready result volume and decision horizon
 - A savings gate that requires real evidence, equivalent work, and compatible cost bases
-- A local browser interface with four starting paths, Review, Bill, Evidence, and Share views
+- A local browser interface with seven guided starting paths and Overview, Spend, Opportunities, Simulate, Verify, Evidence, and Actuals views
 - A printable finance memo generated from the same decision record as the on-screen review
 - A portable `ai-cost-lens-decision-record/0.1` contract with a strict first
   `model_route/0.1` profile
@@ -40,6 +40,23 @@ It does not connect to provider APIs, fetch live prices, certify invoices, enfor
 - One local “Upload what you have” entry point for supported OpenAI and Claude CSV, JSON, and text-based invoice PDF files
 - Strict direct importers remain preferred; unknown flat CSV or JSON can use a deterministic, user-confirmed field mapper
 - Visible pagination, period, attribution, and model-cost join limitations
+- A browser-local **Price a prompt** calculator with a dated OpenAI, Anthropic, and Google list-price catalog
+- One local user-supplied contract/custom rate in the prompt comparison, with explicit provenance, no agreement upload, and no claim that AI Cost Lens verified it
+- Per-call, per-1,000-call, monthly, annual, and optional cost-per-usable-result estimates with retry, cache, and batch assumptions
+- A calculator-to-Review handoff that always remains `TEST_FIRST`; estimated pricing data cannot produce a savings claim
+- Financially ranked opportunity findings with explicit overlap and verification boundaries
+- Observed-shape scenario repricing that remains separate from quality verification
+- A local post-change ledger that cannot reach realized savings until source, quality, approval, implementation, period, bill, and outcome gates pass
+- A local request-log review with canonical events, reversible duplicate flags, retained unpriced rows, request-level waste candidates, and overlap-safe financial boundaries
+- Request-cost spike detection, local spend breakdowns, evidence-gated 30-day run rate, and optional bill reconciliation that never deletes suspected duplicate rows
+- Optional local monthly-budget thresholds against that evidence-gated run rate, with `WITHIN`, `WATCH`, `OVER`, or unavailable status and no claim of live enforcement
+- Equal-window period variance with an exact volume-versus-average-cost bridge, plus latency, cache, failure, retry, and outcome-evidence coverage
+- Direct opening paths for **Price a prompt** and **Review AI usage**, plus a safe JSON export of the complete local usage review
+- Safe JSON export of the prompt-price estimate, including official-versus-user-supplied rate basis and the unchanged `TEST_FIRST` evidence gate
+- A searchable model catalog with provider and workload-signal filters, official price sources, published token limits, and an explicit warning that list price is not workload quality
+- Exact local OpenAI `o200k_base` raw-text token counting, with disclosed estimates or manual overrides for other providers
+- A local paired-output verifier with deterministic rules, randomized blinded A/B scoring, human outcomes, review time, and output-free evidence records
+- Verification-to-Review provenance that carries the output-free paired record into the finance decision
 
 The public demo needs no credentials and uses entirely illustrative data.
 
@@ -47,10 +64,10 @@ The public demo needs no credentials and uses entirely illustrative data.
 
 Python 3.10 or newer is required.
 
-The latest tagged release is v0.3.2. This branch prepares the v0.3.3 Claude-import update.
+The latest tagged release is v0.3.3. This branch prepares the v0.5.0 product-readiness update.
 
 ```bash
-pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v0.3.2"
+pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v0.3.3"
 ai-cost-lens --help
 ```
 
@@ -115,15 +132,20 @@ ai-cost-lens review --demo --output workload-review.json
 
 The review compares a current support workflow with a routed alternative. It includes recurring model cost, shared infrastructure, human review, a one-time change cost, retries, cache reuse, an explicit usable-result definition, policy status, evidence basis, Plan vs Actual, and a time-based decision horizon.
 
-The demo is a synthetic false-economy stress test. Its provider bill falls, but the ready result yield and human work move enough to make each usable result more expensive. Every synthetic input is labeled illustrative and no result is presented as customer evidence.
+The bundled example is a false-economy stress test. Its provider bill falls, but ready-result yield and human work move enough to make each usable result more expensive. The interface labels the example once at the top and keeps it outside every savings claim.
 
-To open the browser interface from a clone:
+To open the browser interface from a clone with all local vendor assets prepared:
 
 ```bash
-python -m http.server 8000 --directory web
+npm ci
+npm run dev
 ```
 
-Then open `http://localhost:8000`. Choose **See the worked example**, **Understand one bill**, **Upload what you have**, or **Compare cost per ready result**. The one-bill path accepts a simple invoice form or the more detailed universal spend CSV. Use **Open saved review** to inspect another `ai-cost-lens-review-result/1.0` file. The file is parsed in the browser and is not uploaded. **Print finance memo** creates a compact handoff from the same decision record; the browser's print dialog can save it as a PDF.
+Then open the local URL printed by Vite. Use **Price a prompt** for a list-price scenario, or start a review with the worked example, one-bill, provider-upload, simple comparison, or detailed cost-per-ready-result path. The one-bill path accepts a simple invoice form or the more detailed universal spend CSV. Use **Open saved review** to inspect another `ai-cost-lens-review-result/1.0` file. The file is parsed in the browser and is not uploaded. **Print finance memo** creates a compact handoff from the same decision record; the browser's print dialog can save it as a PDF.
+
+**Price a prompt** uses catalog version `2026-09-21`, with source URLs and a review-by date embedded in every estimate. Current calculations stop after that review date until the official rates are rechecked. Prompt text stays in the page and is not copied into the estimate record. OpenAI raw text is counted locally with the bundled `o200k_base` encoder; chat framing, tools, images, audio, and provider-added wrapper tokens are excluded. Anthropic and Google use a disclosed four-characters-per-token approximation unless the user supplies a token count. The calculator models direct API text token charges only; it excludes negotiated discounts, taxes, regional uplifts, tools, cache writes and storage, data transfer, and other workload costs. Its handoff preloads the existing sampled Review and requires comparable output checks. It never converts a lower list-price estimate into a savings claim.
+
+The **Opportunities** view also accepts a flat request-log CSV or JSON file. It normalizes common universal, OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone field names into versioned canonical events, then points to the exact affected rows for duplicate identifiers, failed and retried calls, repeated retry chains, evidenced cache candidates, unusually large inputs or outputs, reasoning intensity, repeated tool use, model-route candidates, outcome gaps, spend concentration, and cost spikes unexplained by volume. This is local field compatibility, not a promise that every vendor export version is supported. Nested traces must be flattened. Unknown models and incomplete rows remain visible and unpriced; missing currency stays unknown and mixed currencies are never added. An optional billed total can be reconciled only after the user confirms matching scope; suspected duplicate rows remain present. Downloaded normalized usage neutralizes spreadsheet formulas. See the [request-level usage review](docs/request-level-usage-review.md).
 
 The unified upload inspects files locally and routes exact supported formats first:
 
@@ -164,7 +186,7 @@ A provider bill does not contain business outcomes. The ready result status, hum
 
 Flat ChatGPT, Claude, or similar subscription receipts do not contain the request and outcome detail needed for this review. A customer may allocate a subscription cost to a workload only when they also have their own usage and result records. Allocated cost remains visibly labeled and cannot become booked savings in the tool.
 
-See the [product brief](docs/product-brief.md), [research notes](docs/competitive-landscape.md), and [web interface notes](web/README.md) for the design and evidence model.
+See the [product brief](docs/product-brief.md), [research notes](docs/competitive-landscape.md), [dated competitor capability ledger](docs/competitor-parity-2026-09-21.md), and [web interface notes](web/README.md) for the design and evidence model.
 
 ## Decision Record 0.1
 
@@ -305,7 +327,7 @@ These commands sum cost values already present in loosely shaped CSV files. They
 
 ## Pipeline compatibility
 
-AI Cost Lens `0.3.x` preserves the `ccac/1.0.0` compatibility path and can explicitly emit its canonical direct-AI scope through `ccac/1.1.0`. The existing AI-domain total remains non-additive, and Bedrock remains excluded from the canonical direct-AI scope because provider-billed native AI belongs to Cloud. Cloud Cost Guard and downstream consumers remain unchanged.
+AI Cost Lens `0.5.x` preserves the `ccac/1.0.0` compatibility path and can explicitly emit its canonical direct-AI scope through `ccac/1.1.0`. The existing AI-domain total remains non-additive, and Bedrock remains excluded from the canonical direct-AI scope because provider-billed native AI belongs to Cloud. Cloud Cost Guard and downstream consumers remain unchanged.
 
 ## Development
 

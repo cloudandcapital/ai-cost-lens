@@ -10,7 +10,7 @@ window.AI_COST_LENS_MODEL_ROUTE_DECISION = {
     "name": "Finance decision review",
     "description": "Ten bounded AI finance cases covering pricing, caching, commitments, policy, retries, benchmarks, human review, and currency boundaries.",
     "case_count": 10,
-    "evidence_label": "CONTROLLED SYNTHETIC PILOT",
+    "evidence_label": "ILLUSTRATIVE DATA",
     "conditions": [
       "Identical cases and input tokens",
       "Strict structured output",
@@ -234,7 +234,7 @@ window.AI_COST_LENS_MODEL_ROUTE_DECISION = {
     "title": "Luna cost 94% less. It still did not earn the finance default.",
     "finding": "The lower model bill survived reconciliation. The all-in savings claim did not.",
     "limitation": "Human correction time remains unmeasured.",
-    "source_line": "Controlled synthetic pilot · OpenAI API evidence · Not customer data"
+    "source_line": "OpenAI API evidence · reconciled test record"
   },
   "sources": [
     "OpenAI Responses API evidence archives",

@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudandcapital.com/schemas/ai-cost-lens-usage-review-1.1.schema.json",
+  "title": "AI Cost Lens usage review 1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "application_version", "pricing_catalog_version", "source", "currency", "event_count", "events", "reconciliation", "spend", "findings", "headline", "evidence_gate", "privacy"],
+  "properties": {
+    "schema_version": { "const": "ai-cost-lens-usage-review/1.1" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "application_version": { "type": "string" },
+    "pricing_catalog_version": { "type": ["string", "null"] },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "adapter", "sha256", "uploaded"],
+      "properties": {
+        "name": { "type": "string" },
+        "adapter": { "type": "string" },
+        "sha256": { "type": ["string", "null"] },
+        "uploaded": { "const": false }
+      }
+    },
+    "currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "const": "MIXED" }, { "type": "null" }] },
+    "event_count": { "type": "integer", "minimum": 1, "maximum": 20000 },
+    "events": { "type": "array", "minItems": 1, "maxItems": 20000, "items": { "$ref": "ai-cost-lens-usage-event-1.0.schema.json" } },
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider_reported_cost", "calculated_cost_used_when_reported_missing", "selected_observed_cost", "selected_cost_excluding_later_duplicate_rows", "priced_rows", "unpriced_rows", "duplicate_rows_flagged", "provider_reported_cost_precedence", "bill"],
+      "properties": {
+        "provider_reported_cost": { "type": ["number", "null"], "minimum": 0 },
+        "calculated_cost_used_when_reported_missing": { "type": ["number", "null"], "minimum": 0 },
+        "selected_observed_cost": { "type": ["number", "null"], "minimum": 0 },
+        "selected_cost_excluding_later_duplicate_rows": { "type": ["number", "null"], "minimum": 0 },
+        "priced_rows": { "type": "integer", "minimum": 0 },
+        "unpriced_rows": { "type": "integer", "minimum": 0 },
+        "duplicate_rows_flagged": { "type": "integer", "minimum": 0 },
+        "provider_reported_cost_precedence": { "const": true },
+        "bill": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "supplied_total", "supplied_currency", "same_scope_confirmed", "raw_selected_cost_difference", "duplicate_excluded_reference_difference", "method"],
+          "properties": {
+            "status": { "enum": ["NOT_SUPPLIED", "SCOPE_NOT_CONFIRMED", "REQUEST_COST_MISSING", "MIXED_CURRENCY", "REQUEST_CURRENCY_MISSING", "BILL_CURRENCY_MISSING", "CURRENCY_MISMATCH", "COMPARABLE"] },
+            "supplied_total": { "type": ["number", "null"], "minimum": 0 },
+            "supplied_currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "type": "null" }] },
+            "same_scope_confirmed": { "type": "boolean" },
+            "raw_selected_cost_difference": { "type": ["number", "null"] },
+            "duplicate_excluded_reference_difference": { "type": ["number", "null"] },
+            "method": { "type": "string" }
+          }
+        }
+      }
+    },
+    "spend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "period", "selected_cost", "cost_per_priced_request", "average_cost_per_calendar_day", "projected_30_day_cost", "run_rate_status", "run_rate_method", "run_rate_limitations", "budget", "period_variance", "operational_metrics", "breakdowns"],
+      "properties": {
+        "currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "const": "MIXED" }, { "type": "null" }] },
+        "period": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end", "calendar_days", "active_days", "timestamped_rows", "complete_period_confirmed"],
+          "properties": {
+            "start": { "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+            "end": { "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+            "calendar_days": { "type": ["integer", "null"], "minimum": 1 },
+            "active_days": { "type": "integer", "minimum": 0 },
+            "timestamped_rows": { "type": "integer", "minimum": 0 },
+            "complete_period_confirmed": { "type": "boolean" }
+          }
+        },
+        "selected_cost": { "type": ["number", "null"], "minimum": 0 },
+        "cost_per_priced_request": { "type": ["number", "null"], "minimum": 0 },
+        "average_cost_per_calendar_day": { "type": ["number", "null"], "minimum": 0 },
+        "projected_30_day_cost": { "type": ["number", "null"], "minimum": 0 },
+        "run_rate_status": { "enum": ["AVAILABLE", "NOT_SUPPORTED"] },
+        "run_rate_method": { "type": "string" },
+        "run_rate_limitations": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "monthly_budget", "warning_threshold", "projected_30_day_cost", "projected_utilization", "projected_variance_to_budget", "projected_budget_remaining", "currency", "method", "savings_claim_allowed"],
+          "properties": {
+            "status": { "enum": ["NOT_SUPPLIED", "RUN_RATE_UNAVAILABLE", "WITHIN", "WATCH", "OVER"] },
+            "monthly_budget": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+            "warning_threshold": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "projected_30_day_cost": { "type": ["number", "null"], "minimum": 0 },
+            "projected_utilization": { "type": ["number", "null"], "minimum": 0 },
+            "projected_variance_to_budget": { "type": ["number", "null"] },
+            "projected_budget_remaining": { "type": ["number", "null"] },
+            "currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "const": "MIXED" }, { "type": "null" }] },
+            "method": { "type": "string" },
+            "savings_claim_allowed": { "const": false }
+          }
+        },
+        "period_variance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "currency", "window_days", "excluded_leading_days", "prior_period", "current_period", "total_cost_change", "total_cost_change_rate", "request_volume_effect", "average_cost_per_request_effect", "top_provider_cost_changes", "top_model_cost_changes", "limitations", "method", "savings_claim_allowed"],
+          "properties": {
+            "status": { "enum": ["AVAILABLE", "NOT_SUPPORTED"] },
+            "currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "const": "MIXED" }, { "type": "null" }] },
+            "window_days": { "type": ["integer", "null"], "minimum": 1 },
+            "excluded_leading_days": { "type": ["integer", "null"], "minimum": 0 },
+            "prior_period": { "$ref": "#/$defs/variancePeriod" },
+            "current_period": { "$ref": "#/$defs/variancePeriod" },
+            "total_cost_change": { "type": ["number", "null"] },
+            "total_cost_change_rate": { "type": ["number", "null"] },
+            "request_volume_effect": { "type": ["number", "null"] },
+            "average_cost_per_request_effect": { "type": ["number", "null"] },
+            "top_provider_cost_changes": {
+              "type": "array",
+              "maxItems": 5,
+              "items": { "$ref": "#/$defs/costChange" }
+            },
+            "top_model_cost_changes": {
+              "type": "array",
+              "maxItems": 5,
+              "items": { "$ref": "#/$defs/costChange" }
+            },
+            "limitations": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+            "method": { "type": "string" },
+            "savings_claim_allowed": { "const": false }
+          }
+        },
+        "operational_metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status_coverage_rows", "failed_or_cancelled_rows", "failed_or_cancelled_rate", "retry_coverage_rows", "retry_linked_rows", "retry_linked_rate", "cache_coverage_rows", "cache_input_tokens", "cached_input_tokens", "cache_share", "latency_coverage_rows", "median_latency_ms", "p95_latency_ms", "outcome_coverage_rows"],
+          "properties": {
+            "status_coverage_rows": { "type": "integer", "minimum": 0 },
+            "failed_or_cancelled_rows": { "type": "integer", "minimum": 0 },
+            "failed_or_cancelled_rate": { "anyOf": [{ "$ref": "#/$defs/probability" }, { "type": "null" }] },
+            "retry_coverage_rows": { "type": "integer", "minimum": 0 },
+            "retry_linked_rows": { "type": "integer", "minimum": 0 },
+            "retry_linked_rate": { "anyOf": [{ "$ref": "#/$defs/probability" }, { "type": "null" }] },
+            "cache_coverage_rows": { "type": "integer", "minimum": 0 },
+            "cache_input_tokens": { "type": ["integer", "null"], "minimum": 0 },
+            "cached_input_tokens": { "type": ["integer", "null"], "minimum": 0 },
+            "cache_share": { "anyOf": [{ "$ref": "#/$defs/probability" }, { "type": "null" }] },
+            "latency_coverage_rows": { "type": "integer", "minimum": 0 },
+            "median_latency_ms": { "type": ["number", "null"], "minimum": 0 },
+            "p95_latency_ms": { "type": ["number", "null"], "minimum": 0 },
+            "outcome_coverage_rows": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "breakdowns": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "model", "project", "team_owner", "workload", "customer_product"],
+          "properties": {
+            "provider": { "$ref": "#/$defs/spendBreakdown" },
+            "model": { "$ref": "#/$defs/spendBreakdown" },
+            "project": { "$ref": "#/$defs/spendBreakdown" },
+            "team_owner": { "$ref": "#/$defs/spendBreakdown" },
+            "workload": { "$ref": "#/$defs/spendBreakdown" },
+            "customer_product": { "$ref": "#/$defs/spendBreakdown" }
+          }
+        }
+      }
+    },
+    "findings": { "type": "array" },
+    "headline": { "type": "object" },
+    "evidence_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "savings_claim_allowed", "reason"],
+      "properties": {
+        "status": { "const": "OBSERVED_REQUEST_REVIEW" },
+        "savings_claim_allowed": { "const": false },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parsed_locally", "prompt_text_required", "prompt_text_stored", "source_file_uploaded"],
+      "properties": {
+        "parsed_locally": { "const": true },
+        "prompt_text_required": { "const": false },
+        "prompt_text_stored": { "const": false },
+        "source_file_uploaded": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+    "costChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "prior_cost", "current_cost", "change"],
+      "properties": {
+        "label": { "type": "string" },
+        "prior_cost": { "type": "number", "minimum": 0 },
+        "current_cost": { "type": "number", "minimum": 0 },
+        "change": { "type": "number" }
+      }
+    },
+    "variancePeriod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "requests", "selected_cost", "cost_per_request"],
+      "properties": {
+        "start": { "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+        "end": { "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+        "requests": { "type": "integer", "minimum": 0 },
+        "selected_cost": { "type": ["number", "null"], "minimum": 0 },
+        "cost_per_request": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "spendBreakdown": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "event_count", "priced_rows", "selected_cost", "average_selected_cost_per_priced_row", "share_of_selected_cost"],
+        "properties": {
+          "label": { "type": "string" },
+          "event_count": { "type": "integer", "minimum": 1 },
+          "priced_rows": { "type": "integer", "minimum": 0 },
+          "selected_cost": { "type": ["number", "null"], "minimum": 0 },
+          "average_selected_cost_per_priced_row": { "type": ["number", "null"], "minimum": 0 },
+          "share_of_selected_cost": { "anyOf": [{ "$ref": "#/$defs/probability" }, { "type": "null" }] }
+        }
+      }
+    }
+  }
+}

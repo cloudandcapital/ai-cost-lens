@@ -1,8 +1,10 @@
 # Competitive landscape and product gap
 
-Research date: 2026-08-31
+Research updated: 2026-09-21
 
 This document is a product design input, not a vendor ranking. It records where current tools are already strong so AI Cost Lens does not copy mature products, and where a finance review layer can add something useful.
+
+The dated, feature-by-feature release assessment is in [Competitor capability ledger](competitor-parity-2026-09-21.md). That ledger is the source for parity claims; this document explains the product strategy.
 
 ## Current product categories
 
@@ -15,6 +17,12 @@ This document is a product design input, not a vendor ranking. It records where 
 | Provider reporting | OpenAI, Anthropic, AWS, Google Cloud | Official usage and cost APIs, exports, cloud billing, request or project metadata | Provider boundaries differ. Request metadata and billed dollars may live in separate systems, and provider reporting does not establish business value |
 
 ## What the current tools tell us
+
+### Local optimization has a stronger automation benchmark
+
+Optimaizr is a close functional neighbor because it connects local or live usage analysis to ranked findings, explanation, simulation, verification, and an apply/report loop. AI Cost Lens should match the parts that remain honest in a browser-local finance product: deterministic findings, explicit overlap, simulation, paired verification, and clear next actions. It should not claim parity with transcript scanning or automatic replay until authentic versioned fixtures and a credential-safe design exist.
+
+Pricing directories set a different benchmark. Price Per Token, TokenCost, and Artificial Analysis offer much broader discovery catalogs and, in some cases, benchmark dimensions. AI Cost Lens should keep a smaller official shortlist and connect it to the user's own output evidence rather than pretending catalog breadth is finance evidence.
 
 ### Observability is not the missing product
 
@@ -84,3 +92,7 @@ It accepts local evidence files rather than credentials, preserves cost provenan
 - [AWS Bedrock cost attribution](https://docs.aws.amazon.com/bedrock/latest/userguide/cost-management.html)
 - [AWS per request metadata](https://docs.aws.amazon.com/bedrock/latest/userguide/cost-mgmt-request-metadata.html)
 - [Vantage custom LLM enrichment](https://docs.vantage.sh/custom_llm_enrichment)
+- [Optimaizr](https://www.optimaizr.com/) and [source repository](https://github.com/blendbunjaku/optimaizr)
+- [Price Per Token](https://pricepertoken.com/)
+- [TokenCost](https://tokencost.app/)
+- [Artificial Analysis model comparison](https://artificialanalysis.ai/models)

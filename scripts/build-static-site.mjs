@@ -17,11 +17,24 @@ await copyFile(resolve(pdfjs, "LICENSE"), resolve(vendor, "PDFJS-LICENSE.txt"));
 await cp(resolve(pdfjs, "wasm"), resolve(vendor, "wasm"), { recursive: true });
 await cp(resolve(pdfjs, "standard_fonts"), resolve(vendor, "standard_fonts"), { recursive: true });
 
-await import("./build-model-route-decision-preview.mjs");
 await import("./build-web-preview.mjs");
 await rm(build, { recursive: true, force: true });
 await mkdir(build, { recursive: true });
 await cp(web, build, { recursive: true });
+const nonPublicArtifacts = [
+  "README.md",
+  "model-route-decision-preview.html",
+  "model-route-decision.css",
+  "model-route-decision.html",
+  "model-route-decision.js",
+  "model-route-review-preview.html",
+  "model-route-review.css",
+  "model-route-review.html",
+  "model-route-review.js",
+  "data/model-route-decision-v1.js",
+  "data/model-route-review-packet.js",
+];
+await Promise.all(nonPublicArtifacts.map((path) => rm(resolve(build, path), { recursive: true, force: true })));
 await copyFile(resolve(web, "preview.html"), resolve(build, "index.html"));
 
 console.log("Built the static Site with the illustrative review available on first paint");

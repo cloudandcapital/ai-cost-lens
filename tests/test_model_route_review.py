@@ -109,3 +109,9 @@ def test_review_builder_supports_the_smaller_follow_up_pilot():
     assert "response_count: expectedResponses * 2" in script
     assert "const responseCount = packet.response_count || packet.items.length" in app
     assert "${route.accepted}/${reviewed}" in app
+
+
+def test_review_csv_export_neutralizes_spreadsheet_formulas():
+    script = (WEB / "model-route-review.js").read_text()
+    assert r"/^[\s]*[=+\-@]/.test(raw)" in script
+    assert "? `'${raw}` : raw" in script
