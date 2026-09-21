@@ -4,7 +4,7 @@
   "title": "AI Cost Lens usage review 1.1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "generated_at", "application_version", "pricing_catalog_version", "source", "currency", "event_count", "events", "reconciliation", "spend", "findings", "headline", "evidence_gate", "privacy"],
+  "required": ["schema_version", "generated_at", "application_version", "pricing_catalog_version", "source", "currency", "event_count", "events", "reconciliation", "spend", "evidence_layers", "findings", "headline", "evidence_gate", "privacy"],
   "properties": {
     "schema_version": { "const": "ai-cost-lens-usage-review/1.1" },
     "generated_at": { "type": "string", "format": "date-time" },
@@ -56,7 +56,7 @@
     "spend": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["currency", "period", "selected_cost", "cost_per_priced_request", "average_cost_per_calendar_day", "projected_30_day_cost", "run_rate_status", "run_rate_method", "run_rate_limitations", "budget", "period_variance", "operational_metrics", "breakdowns"],
+      "required": ["currency", "period", "selected_cost", "cost_per_priced_request", "average_cost_per_calendar_day", "projected_30_day_cost", "run_rate_status", "run_rate_method", "run_rate_limitations", "cost_stack", "allocation", "budget", "period_variance", "operational_metrics", "breakdowns"],
       "properties": {
         "currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "const": "MIXED" }, { "type": "null" }] },
         "period": {
@@ -79,6 +79,8 @@
         "run_rate_status": { "enum": ["AVAILABLE", "NOT_SUPPORTED"] },
         "run_rate_method": { "type": "string" },
         "run_rate_limitations": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "cost_stack": { "$ref": "#/$defs/costStack" },
+        "allocation": { "$ref": "#/$defs/allocationSummary" },
         "budget": {
           "type": "object",
           "additionalProperties": false,
@@ -150,18 +152,25 @@
         "breakdowns": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["provider", "model", "project", "team_owner", "workload", "customer_product"],
+          "required": ["provider", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "customer_product"],
           "properties": {
             "provider": { "$ref": "#/$defs/spendBreakdown" },
             "model": { "$ref": "#/$defs/spendBreakdown" },
             "project": { "$ref": "#/$defs/spendBreakdown" },
             "team_owner": { "$ref": "#/$defs/spendBreakdown" },
+            "feature": { "$ref": "#/$defs/spendBreakdown" },
+            "customer": { "$ref": "#/$defs/spendBreakdown" },
+            "product": { "$ref": "#/$defs/spendBreakdown" },
             "workload": { "$ref": "#/$defs/spendBreakdown" },
+            "workflow": { "$ref": "#/$defs/spendBreakdown" },
+            "session_id": { "$ref": "#/$defs/spendBreakdown" },
+            "environment": { "$ref": "#/$defs/spendBreakdown" },
             "customer_product": { "$ref": "#/$defs/spendBreakdown" }
           }
         }
       }
     },
+    "evidence_layers": { "$ref": "#/$defs/evidenceLayers" },
     "findings": { "type": "array" },
     "headline": { "type": "object" },
     "evidence_gate": {
@@ -209,6 +218,135 @@
         "requests": { "type": "integer", "minimum": 0 },
         "selected_cost": { "type": ["number", "null"], "minimum": 0 },
         "cost_per_request": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "costStack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "currency", "provider_request_cost", "categories", "known_adjacent_cost", "known_operating_cost", "fully_loaded_cost", "missing_categories", "method", "savings_claim_allowed"],
+      "properties": {
+        "status": { "enum": ["NOT_COMPARABLE", "PROVIDER_ONLY", "PARTIAL", "FULLY_LOADED"] },
+        "currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "const": "MIXED" }, { "type": "null" }] },
+        "provider_request_cost": { "type": ["number", "null"], "minimum": 0 },
+        "categories": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "label", "amount", "supplied"],
+            "properties": {
+              "key": { "enum": ["compute_cost", "retrieval_data_cost", "network_cost", "tooling_cost", "pipeline_cost", "human_review_cost"] },
+              "label": { "type": "string", "minLength": 1 },
+              "amount": { "type": ["number", "null"], "minimum": 0 },
+              "supplied": { "type": "boolean" }
+            }
+          }
+        },
+        "known_adjacent_cost": { "type": ["number", "null"], "minimum": 0 },
+        "known_operating_cost": { "type": ["number", "null"], "minimum": 0 },
+        "fully_loaded_cost": { "type": ["number", "null"], "minimum": 0 },
+        "missing_categories": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "method": { "type": "string", "minLength": 1 },
+        "savings_claim_allowed": { "const": false }
+      }
+    },
+    "allocationDimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "allocated_priced_rows", "unallocated_priced_rows", "allocated_cost", "unallocated_cost", "unallocated_cost_pct"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "allocated_priced_rows": { "type": "integer", "minimum": 0 },
+        "unallocated_priced_rows": { "type": "integer", "minimum": 0 },
+        "allocated_cost": { "type": ["number", "null"], "minimum": 0 },
+        "unallocated_cost": { "type": ["number", "null"], "minimum": 0 },
+        "unallocated_cost_pct": { "anyOf": [{ "$ref": "#/$defs/probability" }, { "type": "null" }] }
+      }
+    },
+    "allocationSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cost_basis", "total_known_operating_cost", "period_level_cost_kept_unallocated", "dimensions", "decision_support", "method"],
+      "properties": {
+        "cost_basis": { "const": "known_operating_cost" },
+        "total_known_operating_cost": { "type": ["number", "null"], "minimum": 0 },
+        "period_level_cost_kept_unallocated": { "type": ["number", "null"], "minimum": 0 },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment"],
+          "properties": {
+            "project": { "$ref": "#/$defs/allocationDimension" },
+            "team_owner": { "$ref": "#/$defs/allocationDimension" },
+            "feature": { "$ref": "#/$defs/allocationDimension" },
+            "customer": { "$ref": "#/$defs/allocationDimension" },
+            "product": { "$ref": "#/$defs/allocationDimension" },
+            "workload": { "$ref": "#/$defs/allocationDimension" },
+            "workflow": { "$ref": "#/$defs/allocationDimension" },
+            "session_id": { "$ref": "#/$defs/allocationDimension" },
+            "environment": { "$ref": "#/$defs/allocationDimension" }
+          }
+        },
+        "decision_support": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["basis", "warning_threshold", "status", "decision_ready", "reason", "policy_note", "savings_claim_allowed"],
+          "properties": {
+            "basis": { "enum": ["project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment"] },
+            "warning_threshold": { "$ref": "#/$defs/probability" },
+            "status": { "enum": ["NOT_SUPPORTED", "PASS", "WARN"] },
+            "decision_ready": { "type": "boolean" },
+            "reason": { "type": "string", "minLength": 1 },
+            "policy_note": { "type": "string", "minLength": 1 },
+            "savings_claim_allowed": { "const": false }
+          }
+        },
+        "method": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidenceLayers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["usage_telemetry", "request_cost", "billing_evidence", "precedence_rule"],
+      "properties": {
+        "usage_telemetry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "rows_with_usage_signals", "total_rows", "purpose"],
+          "properties": {
+            "status": { "enum": ["AVAILABLE", "PARTIAL", "NOT_SUPPLIED"] },
+            "rows_with_usage_signals": { "type": "integer", "minimum": 0 },
+            "total_rows": { "type": "integer", "minimum": 1 },
+            "purpose": { "type": "string", "minLength": 1 }
+          }
+        },
+        "request_cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "provider_reported_rows", "calculated_rows", "unpriced_rows", "purpose"],
+          "properties": {
+            "status": { "enum": ["PROVIDER_REPORTED", "CALCULATED", "MIXED", "UNPRICED"] },
+            "provider_reported_rows": { "type": "integer", "minimum": 0 },
+            "calculated_rows": { "type": "integer", "minimum": 0 },
+            "unpriced_rows": { "type": "integer", "minimum": 0 },
+            "purpose": { "type": "string", "minLength": 1 }
+          }
+        },
+        "billing_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "source_status", "supplied_total", "raw_request_cost_difference", "purpose"],
+          "properties": {
+            "status": { "enum": ["NOT_SUPPLIED", "NOT_COMPARABLE", "RECONCILED", "VARIANCE"] },
+            "source_status": { "type": "string", "minLength": 1 },
+            "supplied_total": { "type": ["number", "null"], "minimum": 0 },
+            "raw_request_cost_difference": { "type": ["number", "null"] },
+            "purpose": { "type": "string", "minLength": 1 }
+          }
+        },
+        "precedence_rule": { "type": "string", "minLength": 1 }
       }
     },
     "spendBreakdown": {

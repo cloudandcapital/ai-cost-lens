@@ -22,6 +22,10 @@ It is comparable to model-price directories, LLM observability products, and loc
 7. A realized-savings state still requires real source evidence, implementation, comparable periods, provider-reported cost, complete outcomes, quality, and approval.
 8. Official list rates and user-supplied rates remain visibly distinct.
 9. Internal synthetic model-route pilots are not linked or copied into the deployable static build; only the clearly labeled illustrative review ships as example data.
+10. Period-level compute, retrieval/data, network, tooling, pipeline, and human costs are never allocated automatically across request dimensions.
+11. `fully_loaded_cost` remains unavailable unless every additional operating-cost category is explicitly supplied; blank never means confirmed zero.
+12. Allocation coverage uses known cost and an explicit user-selected dimension and threshold. A warning cannot become a savings claim.
+13. Usage telemetry, request cost, and billing evidence remain separate evidence layers.
 
 ## 0.5 scope to review
 
@@ -30,7 +34,11 @@ It is comparable to model-price directories, LLM observability products, and loc
 - Equal-window period variance that reconciles total cost change into request-volume and average-cost-per-request effects.
 - Provider and provider-model cost-change tables.
 - Status, retry-link, cache, latency, and outcome coverage with missing-evidence behavior.
-- Complete provider, model, project, workload, team/owner, and customer/product breakdowns.
+- Complete provider/model plus project, team/owner, feature, customer, product, workload, workflow, session, and environment breakdowns.
+- Cost-weighted unallocated percentages and a user-set allocation decision check.
+- Optional compute, retrieval/data, network, tooling/observability, pipeline/orchestration, and human-review cost stack with fail-closed fully loaded cost.
+- Separate usage-telemetry, request-cost, and billing-evidence status.
+- Plain optimization categories and a finance posture of fund change, fix evidence, stop change, or insufficient evidence.
 - Downloadable `ai-cost-lens-usage-review/1.1` JSON.
 - One local custom/contract prompt-pricing route with explicit `user_supplied` provenance.
 - Downloadable `ai-cost-lens-prompt-price-estimate/0.5` JSON.
@@ -65,7 +73,7 @@ uv run --frozen flake8 ai_cost_lens tests --count --select=E9,F63,F7,F82,F401 --
 uv run --frozen pytest tests/ -q
 ```
 
-The local release-candidate run completed with 238 tests passed and 5 expected skips. Those five checks require the separately released CCAC validator that CI installs. `npm audit --audit-level=high` and the locked runtime `pip-audit` both reported no known vulnerabilities. The wheel installed in a fresh virtual environment as `ai-cost-lens==0.5.0`, and its CCAC 1.0 and 1.1 demo artifacts were deterministic across repeated runs.
+The local release-candidate run completed with 242 tests passed and 5 expected skips. Those five checks require the separately released CCAC validator that CI installs. Generated full, minimal, mixed-currency, and unpriced usage reviews validate against the published event and review schemas. `npm audit --audit-level=high` and the locked runtime `pip-audit` both reported no known vulnerabilities. The wheel installed in a fresh virtual environment as `ai-cost-lens==0.5.0`, and its CCAC 1.0 and 1.1 demo artifacts were deterministic across repeated runs.
 
 ## Adversarial cases
 
@@ -84,6 +92,11 @@ Try to make the product overstate certainty:
 11. Send any price estimate to Review. The comparison must remain `TEST_FIRST`, clear the quality sample fields, and keep `savings_claim_allowed: false`.
 12. Put spreadsheet-formula prefixes in normalized CSV text fields. The download must neutralize them.
 13. Inspect `build/` after `npm run build`. It must not contain the internal `model-route-decision*`, `model-route-review*`, or corresponding pilot data files.
+14. Omit the selected project/team/feature/customer/product/workload/workflow/session/environment field from enough priced rows to exceed the allocation threshold. The review must warn, preserve every row, and make no savings claim. Add an unpriced row and confirm that allocation decision support becomes unavailable.
+15. Add period-level operating costs. Confirm that they increase known operating cost but remain unallocated to request dimensions. Blank one category and verify that fully loaded cost becomes unavailable; enter an explicit zero and verify that it counts as supplied.
+16. Supply usage fields without a bill, then add a comparable bill with a variance, then reconcile it. Telemetry, request cost, and billing evidence must retain separate statuses throughout.
+17. Confirm that every deterministic request finding carries a useful category and that routing, caching, context, output, reasoning, or tool candidates remain test-first rather than savings.
+18. Exercise route decisions that should fund, fix evidence, stop the proposed change, or report insufficient evidence. The compact posture and detailed next action must not contradict one another.
 
 ## Manual browser review still required
 
@@ -91,7 +104,7 @@ The automated DOM harness tests real event handlers and state transitions, but i
 
 - opening-path hierarchy and keyboard focus;
 - Price a prompt, custom rate, JSON download, and Review handoff;
-- request import, budget states, 14-day variance, coverage states, both downloads, and filters;
+- request import, allocation warnings, partial and fully loaded cost states, evidence layers, budget states, 14-day variance, coverage states, both downloads, and filters;
 - blind verification, saved-review reopen, and print/PDF output;
 - dialog overflow, tables, focus return, reduced widths, browser console, and network panel.
 

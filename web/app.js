@@ -2088,8 +2088,10 @@
     c.normalized_proposed_cost_at_baseline_volume = round(b.measures.cost_per_usable_result * a.outcomes.usable_results);
     c.normalized_cost_difference = round(c.normalized_proposed_cost_at_baseline_volume - a.costs.recurring_operating_cost);
     c.payback_usable_results = c.cost_per_usable_result_difference < 0 && b.costs.one_time_change_cost > 0 ? Math.ceil(b.costs.one_time_change_cost / -c.cost_per_usable_result_difference) : null;
-    c.recommendation = decisionFor(data).reason;
-    c.decision_code = decisionFor(data).code;
+    const decision = decisionFor(data);
+    c.recommendation = decision.reason;
+    c.decision_code = decision.code;
+    c.finance_posture = decision.posture;
   }
 
   function validateResult(data) {
@@ -3572,6 +3574,39 @@
       <article><span>Imported UTC period</span><strong>${escapeHtml(periodLabel)}</strong><p>${wholeNumber(period.active_days)} active day${period.active_days === 1 ? "" : "s"}; ${wholeNumber(period.timestamped_rows)} of ${wholeNumber(review.event_count)} rows timestamped.</p></article>
       <article><span>Cost per priced request</span><strong>${requestReviewMoney(spend.cost_per_priced_request, spend.currency)}</strong><p>Selected comparable cost divided by ${wholeNumber(review.reconciliation.priced_rows)} priced row${review.reconciliation.priced_rows === 1 ? "" : "s"}; unpriced rows stay excluded.</p></article>
       <article><span>30-day run rate</span><strong>${requestReviewMoney(spend.projected_30_day_cost, spend.currency)}</strong><p>${escapeHtml(runRateCopy)}</p></article>`;
+    const evidence = review.evidence_layers;
+    document.getElementById("request-evidence-layers").innerHTML = `
+      <div class="request-explorer-head"><div><p class="kicker">EVIDENCE LAYERS</p><h4>Fast signals and finance proof stay separate</h4></div><p>Telemetry diagnoses · billing confirms</p></div>
+      <div class="request-spend-context">
+        <article><span>Usage telemetry</span><strong>${escapeHtml(evidence.usage_telemetry.status.replaceAll("_", " "))}</strong><p>${wholeNumber(evidence.usage_telemetry.rows_with_usage_signals)} of ${wholeNumber(evidence.usage_telemetry.total_rows)} rows carry usage or operating signals. This is not an invoice.</p></article>
+        <article><span>Request cost</span><strong>${escapeHtml(evidence.request_cost.status.replaceAll("_", " "))}</strong><p>${wholeNumber(evidence.request_cost.provider_reported_rows)} provider-reported, ${wholeNumber(evidence.request_cost.calculated_rows)} calculated, ${wholeNumber(evidence.request_cost.unpriced_rows)} unpriced.</p></article>
+        <article><span>Billing evidence</span><strong>${escapeHtml(evidence.billing_evidence.status.replaceAll("_", " "))}</strong><p>${escapeHtml(evidence.billing_evidence.purpose)}</p></article>
+      </div>
+      <p class="request-variance-note">${escapeHtml(evidence.precedence_rule)}</p>`;
+    const costStack = spend.cost_stack;
+    const categoryRows = costStack.categories.map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${item.supplied ? requestReviewMoney(item.amount, costStack.currency) : "Unknown"}</td></tr>`).join("");
+    const fullyLoadedCopy = costStack.status === "FULLY_LOADED"
+      ? "Every declared category was supplied, including confirmed zeros."
+      : costStack.status === "NOT_COMPARABLE"
+        ? "Request cost is missing or not in one comparable currency, so no fully loaded claim is shown."
+        : `${wholeNumber(costStack.missing_categories.length)} categories remain unknown, so no fully loaded claim is shown.`;
+    document.getElementById("request-cost-stack").innerHTML = `
+      <div class="request-explorer-head"><div><p class="kicker">FULL COST BOUNDARY</p><h4>What sits beyond the model or provider charge?</h4></div><p>${escapeHtml(costStack.status.replaceAll("_", " "))}</p></div>
+      <div class="request-spend-context">
+        <article><span>Provider request cost</span><strong>${requestReviewMoney(costStack.provider_request_cost, costStack.currency)}</strong><p>The selected row-level provider or calculated cost.</p></article>
+        <article><span>Known operating cost</span><strong>${requestReviewMoney(costStack.known_operating_cost, costStack.currency)}</strong><p>Provider request cost plus only the additional period costs supplied below.</p></article>
+        <article><span>Fully loaded cost</span><strong>${requestReviewMoney(costStack.fully_loaded_cost, costStack.currency)}</strong><p>${fullyLoadedCopy}</p></article>
+      </div>
+      <div class="request-variance-table-wrap"><table><thead><tr><th>Additional category</th><th>Same-period amount</th></tr></thead><tbody>${categoryRows}</tbody></table></div>
+      <p class="request-variance-note">${escapeHtml(costStack.method)}</p>`;
+    const allocation = spend.allocation;
+    const allocationDecision = allocation.decision_support;
+    const allocationRows = Object.entries(allocation.dimensions).map(([key, item]) => `<tr${key === allocationDecision.basis ? ' class="is-selected"' : ""}><th>${escapeHtml(item.label)}</th><td>${wholeNumber(item.allocated_priced_rows)}</td><td>${requestReviewMoney(item.unallocated_cost, spend.currency)}</td><td>${item.unallocated_cost_pct === null ? "Not available" : `${(item.unallocated_cost_pct * 100).toFixed(1)}%`}</td></tr>`).join("");
+    document.getElementById("request-allocation-status").innerHTML = `
+      <div class="request-explorer-head"><div><p class="kicker">ALLOCATION COVERAGE</p><h4>Does known cost clear the allocation check?</h4></div><p>${escapeHtml(allocationDecision.status.replaceAll("_", " "))}</p></div>
+      <article class="allocation-${allocationDecision.status.toLowerCase().replaceAll("_", "-")}"><strong>${escapeHtml(allocationDecision.reason)}</strong><p>${escapeHtml(allocationDecision.policy_note)}</p></article>
+      <div class="request-variance-table-wrap"><table><thead><tr><th>Dimension</th><th>Allocated priced rows</th><th>Unallocated cost</th><th>Unallocated share</th></tr></thead><tbody>${allocationRows}</tbody></table></div>
+      <p class="request-variance-note">${escapeHtml(allocation.method)}</p>`;
     const budget = spend.budget;
     const budgetPresentation = {
       NOT_SUPPLIED: ["No budget supplied", "Add an optional monthly budget before analyzing to check the supported run rate against a local threshold."],
@@ -3621,9 +3656,14 @@
       ["provider", "Provider"],
       ["model", "Model"],
       ["project", "Project"],
-      ["workload", "Workload"],
       ["team_owner", "Team or owner"],
-      ["customer_product", "Customer or product"],
+      ["feature", "Feature"],
+      ["customer", "Customer"],
+      ["product", "Product"],
+      ["workload", "Workload"],
+      ["workflow", "Workflow"],
+      ["session_id", "Session"],
+      ["environment", "Environment"],
     ];
     document.getElementById("request-spend-breakdowns").innerHTML = dimensions.map(([key, label]) => {
       const rows = spend.breakdowns[key];
@@ -3695,7 +3735,7 @@
       const idCopy = ids.length ? `${wholeNumber(ids.length)} row${ids.length === 1 ? "" : "s"}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ` + ${ids.length - 3} more` : ""}` : "No individual row IDs";
       return `<article class="workbench-finding request-finding">
         <span>${String(index + 1).padStart(2, "0")}</span>
-        <div><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.explanation)}</p><details><summary>Calculation and limitation</summary><p><strong>Calculation:</strong> ${escapeHtml(item.calculation)}</p><p><strong>Limitation:</strong> ${escapeHtml(item.limitations)}</p></details></div>
+        <div><p class="kicker">${escapeHtml(item.category || "Investigation")}</p><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.explanation)}</p><details><summary>Calculation and limitation</summary><p><strong>Calculation:</strong> ${escapeHtml(item.calculation)}</p><p><strong>Limitation:</strong> ${escapeHtml(item.limitations)}</p></details></div>
         <dl class="finding-meta">
           <div><dt>Affected requests</dt><dd>${escapeHtml(idCopy)}</dd></div>
           <div><dt>Potential amount</dt><dd>${requestReviewMoney(amount, currency)}</dd></div>
@@ -3705,7 +3745,7 @@
         <div class="finding-action"><strong>${escapeHtml(item.action.replaceAll("_", " "))}</strong><p>${escapeHtml(item.verification_requirement)}</p></div>
       </article>`;
     }).join("") : '<p class="workbench-empty">No supported request-level finding was detected. That does not prove the workload is optimized; it means the imported fields did not trigger a deterministic rule.</p>';
-    const fields = ["event_id", "timestamp", "provider", "model", "project", "team_owner", "workload", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "provider_reported_cost", "currency", "request_status", "retry_parent_event_id", "prefix_fingerprint", "tool_call_count", "outcome_status"];
+    const fields = ["event_id", "timestamp", "provider", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "provider_reported_cost", "currency", "request_status", "retry_parent_event_id", "prefix_fingerprint", "tool_call_count", "outcome_status"];
     const coverage = fields.map((field) => {
       const supplied = review.events.filter((event) => event[field] !== null && event[field] !== undefined).length;
       return `<div><dt>${escapeHtml(field.replaceAll("_", " "))}</dt><dd>${wholeNumber(supplied)} of ${wholeNumber(review.event_count)}</dd></div>`;
@@ -3750,6 +3790,16 @@
         budget_warning_threshold: document.getElementById("request-budget-warning").value.trim() === ""
           ? null
           : finiteNumber(document.getElementById("request-budget-warning").value, "Budget warning threshold") / 100,
+        allocation_basis: document.getElementById("request-allocation-basis").value,
+        allocation_warning_threshold: document.getElementById("request-allocation-warning").value.trim() === ""
+          ? null
+          : finiteNumber(document.getElementById("request-allocation-warning").value, "Allocation warning threshold") / 100,
+        compute_cost: document.getElementById("request-compute-cost").value.trim() || null,
+        retrieval_data_cost: document.getElementById("request-retrieval-data-cost").value.trim() || null,
+        network_cost: document.getElementById("request-network-cost").value.trim() || null,
+        tooling_cost: document.getElementById("request-tooling-cost").value.trim() || null,
+        pipeline_cost: document.getElementById("request-pipeline-cost").value.trim() || null,
+        human_review_cost: document.getElementById("request-human-review-cost").value.trim() || null,
       });
       state.usageReview = review;
       renderRequestAnalysis(review);
@@ -4409,36 +4459,45 @@
     const b = proposed.measures.cost_per_usable_result;
     const delta = b - a;
     let code, reason;
+    let posture;
     if (!comparison.both_policy_approved) {
       code = "CHECK APPROVAL";
+      posture = "INSUFFICIENT EVIDENCE";
       reason = "Policy approval for both options has not been established. Resolve approval before testing or switching.";
     } else if (!comparison.quality_holds) {
       code = "QUALITY BELOW MINIMUM";
+      posture = "STOP CHANGE";
       reason = "The other option does not meet your minimum usable-result rate. A lower cost does not override that requirement.";
     } else if (comparison.human_cost_included === false) {
       code = "ADD MISSING TIME";
+      posture = "INSUFFICIENT EVIDENCE";
       reason = "Review and fixing time is missing. Add it before deciding which option costs less overall.";
     } else if (Math.abs(delta) < 0.000001) {
       code = "NO COST ADVANTAGE";
+      posture = "STOP CHANGE";
       reason = "The options have the same cost per qualifying result at the precision shown. This comparison establishes no cost advantage.";
     } else if (delta > 0) {
       code = "KEEP CURRENT ROUTE";
+      posture = "STOP CHANGE";
       reason = "The other option costs more per qualifying result on the inputs supplied. This comparison does not support switching to save money.";
     } else {
       code = comparison.savings_claim_allowed ? "SAVE NOW" : "TEST FIRST";
+      posture = comparison.savings_claim_allowed ? "FUND CHANGE" : "FIX EVIDENCE";
       reason = comparison.savings_claim_allowed ? "The supplied evidence supports a lower cost per qualifying result for this workload and period." : "The other option costs less per qualifying result in this estimate. Repeat the comparison before treating the difference as savings.";
     }
     if (data.experience !== "simple" && !comparison.savings_claim_allowed) {
       const gates = failedSavingsGateText(comparison, baseline, proposed);
       reason += ` ${sentenceCase(gates)} still ${/,| and /.test(gates) ? "block" : "blocks"} a savings claim.`;
     }
-    return { code, reason, delta, percent: a > 0 ? delta / a * 100 : null };
+    return { code, posture, reason, delta, percent: a > 0 ? delta / a * 100 : null };
   }
 
   function renderDecisionConsistency() {
     if ([singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version)) return;
     const decision = decisionFor(state.data);
+    state.data.comparison.finance_posture = decision.posture;
     for (const id of ["decision-code", "memo-decision-code"]) document.getElementById(id).textContent = decision.code;
+    document.getElementById("finance-posture").textContent = `Finance posture: ${decision.posture}`;
     for (const id of ["decision-title", "memo-decision-title", "memo-next-step", "lumen-panel-copy"]) document.getElementById(id).textContent = decision.reason;
     document.getElementById("lumen-panel-title").textContent = sentenceCase(decision.code.toLowerCase());
     const decisionHeading = document.querySelector(".decision-table-heading strong");

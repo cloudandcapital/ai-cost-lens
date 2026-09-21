@@ -289,6 +289,7 @@
             </div>
             <h2 id="decision-title"></h2>
             <div class="decision-meta">
+              <span id="finance-posture"></span>
               <span id="claim-status"></span>
               <span id="payback-status"></span>
             </div>
@@ -364,9 +365,23 @@
               <label><span>Request currency fallback</span><input id="request-default-currency" type="text" maxlength="3" placeholder="Only if the file omits it" /></label>
               <label><span>Optional monthly budget</span><input id="request-monthly-budget" type="number" min="0.01" step="any" placeholder="Not supplied" /></label>
               <label><span>Budget warning threshold</span><div class="input-suffix"><input id="request-budget-warning" type="number" min="0.1" max="100" step="0.1" value="80" /><em>%</em></div></label>
+              <label><span>Decision allocation field</span><select id="request-allocation-basis"><option value="workload">Workload</option><option value="project">Project</option><option value="team_owner">Team or owner</option><option value="feature">Feature</option><option value="customer">Customer</option><option value="product">Product</option><option value="workflow">Workflow</option><option value="session_id">Session</option><option value="environment">Environment</option></select></label>
+              <label><span>Maximum unallocated cost</span><div class="input-suffix"><input id="request-allocation-warning" type="number" min="0" max="100" step="0.1" value="10" /><em>%</em></div><small>Your review policy, not an industry standard.</small></label>
               <label class="check-field"><input id="request-bill-scope-confirmed" type="checkbox" /><span>The bill and request log cover the same provider, account, currency, and period</span></label>
               <label class="check-field"><input id="request-period-complete" type="checkbox" /><span>The log covers one complete, continuous period from its first through last UTC date</span></label>
             </div>
+            <details class="request-data-details request-cost-boundary-inputs">
+              <summary>Optional: add the rest of the operating cost</summary>
+              <p>Use totals for the same period and currency as the request log. Enter only costs not already included in provider request cost or another category. Blank means unknown. Enter zero only when you confirmed there was no cost. AI Cost Lens shows a fully loaded total only when every category is supplied.</p>
+              <div class="request-reconciliation-inputs">
+                <label><span>Compute</span><input id="request-compute-cost" type="number" min="0" step="any" placeholder="Unknown" /></label>
+                <label><span>Retrieval and data</span><input id="request-retrieval-data-cost" type="number" min="0" step="any" placeholder="Unknown" /></label>
+                <label><span>Network and egress</span><input id="request-network-cost" type="number" min="0" step="any" placeholder="Unknown" /></label>
+                <label><span>Tooling and observability</span><input id="request-tooling-cost" type="number" min="0" step="any" placeholder="Unknown" /></label>
+                <label><span>Pipeline and orchestration</span><input id="request-pipeline-cost" type="number" min="0" step="any" placeholder="Unknown" /></label>
+                <label><span>Human review and correction</span><input id="request-human-review-cost" type="number" min="0" step="any" placeholder="Unknown" /></label>
+              </div>
+            </details>
             <div class="builder-error" id="request-log-error" role="alert"></div>
             <div id="request-analysis-results" hidden>
               <div class="request-analysis-head">
@@ -384,6 +399,9 @@
                   <p>Local snapshot · not live monitoring</p>
                 </div>
                 <div class="request-spend-context" id="request-spend-context"></div>
+                <div class="request-evidence-layers" id="request-evidence-layers"></div>
+                <div class="request-cost-stack" id="request-cost-stack"></div>
+                <div class="request-allocation-status" id="request-allocation-status"></div>
                 <div class="request-budget-status" id="request-budget-status"></div>
                 <section class="request-operational-section" aria-labelledby="request-operational-title">
                   <div class="request-explorer-head">

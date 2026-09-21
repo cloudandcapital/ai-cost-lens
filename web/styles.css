@@ -3673,7 +3673,8 @@ body.story-mode .cockpit-grid {
 }
 
 .request-reconciliation-inputs input[type="number"],
-.request-reconciliation-inputs input[type="text"] {
+.request-reconciliation-inputs input[type="text"],
+.request-reconciliation-inputs select {
   width: 100%;
   min-height: 40px;
   padding: 8px 10px;
@@ -3681,6 +3682,30 @@ body.story-mode .cockpit-grid {
   border-radius: 0;
   background: var(--surface);
   color: var(--ink);
+}
+
+.request-reconciliation-inputs small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.request-cost-boundary-inputs {
+  margin-top: 12px;
+  padding: 0 18px 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-light);
+}
+
+.request-cost-boundary-inputs > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.request-cost-boundary-inputs .request-reconciliation-inputs {
+  margin-top: 14px;
 }
 
 .request-reconciliation-inputs .check-field {
@@ -3784,6 +3809,49 @@ body.story-mode .cockpit-grid {
 
 .request-budget-status {
   margin: 0 0 22px;
+}
+
+.request-evidence-layers,
+.request-cost-stack,
+.request-allocation-status {
+  margin: 0 0 22px;
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-light);
+}
+
+.request-allocation-status > article {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-left: 4px solid var(--sage);
+  background: var(--surface-soft);
+}
+
+.request-allocation-status > article.allocation-warn {
+  border-left-color: var(--clay);
+  background: var(--clay-soft);
+}
+
+.request-allocation-status > article strong,
+.request-allocation-status > article p {
+  display: block;
+}
+
+.request-allocation-status > article strong {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.request-allocation-status > article p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.request-variance-table-wrap tr.is-selected {
+  background: var(--sage-soft);
 }
 
 .request-budget-status article {

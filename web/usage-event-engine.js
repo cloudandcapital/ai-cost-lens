@@ -8,6 +8,25 @@
   const SCHEMA = "ai-cost-lens-usage-event/1.0";
   const REVIEW_SCHEMA = "ai-cost-lens-usage-review/1.1";
   const MAX_ROWS = 20000;
+  const ALLOCATION_DIMENSIONS = Object.freeze([
+    ["project", "Project"],
+    ["team_owner", "Team or owner"],
+    ["feature", "Feature"],
+    ["customer", "Customer"],
+    ["product", "Product"],
+    ["workload", "Workload"],
+    ["workflow", "Workflow"],
+    ["session_id", "Session"],
+    ["environment", "Environment"],
+  ]);
+  const OPERATING_COST_CATEGORIES = Object.freeze([
+    ["compute_cost", "Compute"],
+    ["retrieval_data_cost", "Retrieval and data"],
+    ["network_cost", "Network and egress"],
+    ["tooling_cost", "Tooling and observability"],
+    ["pipeline_cost", "Pipeline and orchestration"],
+    ["human_review_cost", "Human review and correction"],
+  ]);
   const round = (value, digits = 8) => Number(Number(value).toFixed(digits));
   const normalizeKey = (value) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
   const aliases = Object.freeze({
@@ -18,8 +37,14 @@
     model: ["model", "model_id", "model_name"],
     project: ["project", "project_id", "project_name"],
     team_owner: ["team_owner", "team", "owner"],
-    workload: ["workload", "use_case", "feature", "route"],
-    customer_product: ["customer_product", "customer", "product"],
+    workload: ["workload", "use_case"],
+    feature: ["feature", "feature_name"],
+    workflow: ["workflow", "workflow_name", "route"],
+    session_id: ["session_id", "session", "trace_id", "conversation_id"],
+    environment: ["environment", "environment_name", "deployment_environment", "env"],
+    customer: ["customer", "customer_id", "tenant", "tenant_id"],
+    product: ["product", "product_id", "application", "application_id"],
+    customer_product: ["customer_product"],
     input_tokens: ["input_tokens", "prompt_tokens", "usage_details_input", "input_usage"],
     output_tokens: ["output_tokens", "completion_tokens", "usage_details_output", "output_usage"],
     reasoning_tokens: ["reasoning_tokens", "output_reasoning_tokens", "usage_details_reasoning"],
@@ -169,6 +194,12 @@
       project: text(pick(map, "project"), `Row ${index + 1} project`),
       team_owner: text(pick(map, "team_owner"), `Row ${index + 1} team or owner`),
       workload: text(pick(map, "workload"), `Row ${index + 1} workload`) || "Unassigned workload",
+      feature: text(pick(map, "feature"), `Row ${index + 1} feature`),
+      workflow: text(pick(map, "workflow"), `Row ${index + 1} workflow`),
+      session_id: text(pick(map, "session_id"), `Row ${index + 1} session ID`),
+      environment: text(pick(map, "environment"), `Row ${index + 1} environment`),
+      customer: text(pick(map, "customer"), `Row ${index + 1} customer`),
+      product: text(pick(map, "product"), `Row ${index + 1} product`),
       customer_product: text(pick(map, "customer_product"), `Row ${index + 1} customer or product`),
       input_tokens: number(pick(map, "input_tokens"), `Row ${index + 1} input tokens`, { integer: true }),
       output_tokens: number(pick(map, "output_tokens"), `Row ${index + 1} output tokens`, { integer: true }),
@@ -191,6 +222,7 @@
       outcome_status: text(pick(map, "outcome_status"), `Row ${index + 1} outcome status`),
       duplicate_group: null,
     };
+    if (!event.customer_product) event.customer_product = [event.customer, event.product].filter(Boolean).join(" · ") || null;
     if (event.currency && !/^[A-Z]{3}$/.test(event.currency)) throw new Error(`Row ${index + 1} currency must be a three-letter code.`);
     if (event.reasoning_tokens !== null && event.output_tokens !== null && event.reasoning_tokens > event.output_tokens) {
       throw new Error(`Row ${index + 1} reasoning tokens cannot exceed output tokens.`);
@@ -282,6 +314,7 @@
     const total = Object.values(amounts).reduce((sum, value) => sum + value, 0);
     return {
       schema_version: "ai-cost-lens-opportunity/1.0",
+      category: "Investigation",
       title: "",
       explanation: "",
       affected_scope: "",
@@ -304,8 +337,14 @@
     };
   }
 
+  function analysisWorkload(event) {
+    return allocationValuePresent(event.workload)
+      ? event.workload
+      : event.workflow || event.feature || "Unassigned workload";
+  }
+
   function scope(events) {
-    const workloads = [...new Set(events.map((event) => event.workload))];
+    const workloads = [...new Set(events.map(analysisWorkload))];
     return workloads.length === 1 ? workloads[0] : `${workloads.length} workloads`;
   }
 
@@ -355,6 +394,7 @@
       findings.push(finding({
         id: "duplicate-billed-event",
         kind: "duplicate_billed_event",
+        category: "Billing integrity",
         title: "Repeated event identifiers need reconciliation",
         explanation: "The same provider and event identifier appears more than once. Rows remain intact; the later copies are flagged, not deleted.",
         affected_scope: scope(duplicateCopies),
@@ -379,6 +419,7 @@
       findings.push(finding({
         id: "failed-or-retried-request-cost",
         kind: "failed_or_retried_request_cost",
+        category: "Reliability",
         title: "Failed and retried calls consumed priced usage",
         explanation: "These calls are linked to a failure, cancellation, or retry. The amount is a review boundary, not proof that every retry was avoidable.",
         affected_scope: scope(failedOrRetried),
@@ -407,6 +448,7 @@
     if (loopEvents.length) findings.push(finding({
       id: "repeated-error-loop",
       kind: "repeated_error_loop",
+      category: "Reliability",
       title: "Some requests entered repeated retry chains",
       explanation: "At least two retries point to the same parent event. Fixing the cause may be safer than increasing retry limits.",
       affected_scope: scope(loopEvents),
@@ -427,7 +469,7 @@
 
     const prefixGroups = new Map();
     events.filter((event) => event.prefix_fingerprint && event.input_tokens !== null).forEach((event) => {
-      const key = `${event.workload}\u0000${event.prefix_fingerprint}`;
+      const key = `${analysisWorkload(event)}\u0000${event.prefix_fingerprint}`;
       if (!prefixGroups.has(key)) prefixGroups.set(key, []);
       prefixGroups.get(key).push(event);
     });
@@ -441,6 +483,7 @@
       findings.push(finding({
         id: "low-cache-use-with-repeated-prefix",
         kind: "low_cache_use_with_repeated_prefix",
+        category: "Caching",
         title: "Repeated prefixes show little or no cache reuse",
         explanation: "A supplied prefix fingerprint repeats at least three times, while the affected rows report no cached input.",
         affected_scope: scope(cacheCandidates),
@@ -462,8 +505,9 @@
 
     const byWorkload = new Map();
     events.forEach((event) => {
-      if (!byWorkload.has(event.workload)) byWorkload.set(event.workload, []);
-      byWorkload.get(event.workload).push(event);
+      const workload = analysisWorkload(event);
+      if (!byWorkload.has(workload)) byWorkload.set(workload, []);
+      byWorkload.get(workload).push(event);
     });
     const oversizedInput = [];
     const excessiveOutput = [];
@@ -487,7 +531,7 @@
         return rate === null ? null : (event.input_tokens - item.median) * rate / 1_000_000;
       });
       findings.push(finding({
-        id: "oversized-input-candidate", kind: "oversized_input_candidate", title: "Some inputs are more than twice their workload median",
+        id: "oversized-input-candidate", kind: "oversized_input_candidate", category: "Context reduction", title: "Some inputs are more than twice their workload median",
         explanation: "These calls carry substantially more input than comparable calls in the same imported workload.", affected_scope: scope(oversizedInput.map((item) => item.event)),
         current_cost: round(oversizedInput.reduce((sum, item) => sum + (item.event.selected_cost || 0), 0)), event_avoidable_costs: amounts,
         calculation: "Estimated token-rate difference between each affected input and its workload median.", evidence_basis: "inferred", confidence: "medium",
@@ -504,7 +548,7 @@
         return rate === null ? null : (event.output_tokens - item.median) * rate / 1_000_000;
       });
       findings.push(finding({
-        id: "excessive-output-candidate", kind: "excessive_output_candidate", title: "Some outputs are more than twice their workload median",
+        id: "excessive-output-candidate", kind: "excessive_output_candidate", category: "Output control", title: "Some outputs are more than twice their workload median",
         explanation: "These calls produced materially more output than comparable calls in the same workload.", affected_scope: scope(excessiveOutput.map((item) => item.event)),
         current_cost: round(excessiveOutput.reduce((sum, item) => sum + (item.event.selected_cost || 0), 0)), event_avoidable_costs: amounts,
         calculation: "Estimated output-token-rate difference between each affected output and its workload median.", evidence_basis: "inferred", confidence: "medium",
@@ -515,7 +559,7 @@
       }));
     }
     if (reasoning.length) findings.push(finding({
-      id: "reasoning-intensity-candidate", kind: "reasoning_intensity_candidate", title: "Reasoning tokens dominate some short-output calls",
+      id: "reasoning-intensity-candidate", kind: "reasoning_intensity_candidate", category: "Reasoning control", title: "Reasoning tokens dominate some short-output calls",
       explanation: "Reasoning represents at least 60% of output tokens on affected calls whose total output is near the workload median.", affected_scope: scope(reasoning),
       current_cost: round(reasoning.reduce((sum, event) => sum + (event.selected_cost || 0), 0)), evidence_basis: "observed", confidence: "medium",
       overlap_group: "output-efficiency", affected_event_ids: reasoning.map((event) => event.record_id), verification_requirement: "Test a lower reasoning setting on the same tasks and score quality.",
@@ -523,7 +567,7 @@
       limitations: "Token shape does not reveal task difficulty or prove that reasoning was unnecessary.", headline_eligible: false,
     }));
     if (repeatedTools.length) findings.push(finding({
-      id: "repeated-tool-call-candidate", kind: "repeated_tool_call_candidate", title: "Tool-call counts are unusually high for their workload",
+      id: "repeated-tool-call-candidate", kind: "repeated_tool_call_candidate", category: "Tooling", title: "Tool-call counts are unusually high for their workload",
       explanation: "Affected calls use at least four tools and at least twice their workload median.", affected_scope: scope(repeatedTools),
       current_cost: round(repeatedTools.reduce((sum, event) => sum + (event.selected_cost || 0), 0)), evidence_basis: "observed", confidence: "medium",
       overlap_group: "request-waste", affected_event_ids: repeatedTools.map((event) => event.record_id), verification_requirement: "Inspect tool-selection traces for loops, invalid arguments, and redundant reads.",
@@ -557,7 +601,7 @@
       });
     }
     if (mismatchEvents.length) findings.push(finding({
-      id: "model-mismatch-candidate", kind: "model_mismatch_candidate", title: "A lower-priced model already appears in the same workload",
+      id: "model-mismatch-candidate", kind: "model_mismatch_candidate", category: "Routing and downsizing", title: "A lower-priced model already appears in the same workload",
       explanation: "Affected calls use a catalog model whose token-shape price is at least 50% above another model observed in that workload. This nominates a route test; it does not prove the tasks or quality are equivalent.",
       affected_scope: scope(mismatchEvents), current_cost: round(mismatchEvents.reduce((sum, event) => sum + (event.selected_cost || 0), 0)), event_avoidable_costs: mismatchAmounts,
       calculation: "Reprice each affected call's observed input, cached-input, output, and batch shape with the lowest-priced catalog model already present in that workload.",
@@ -572,7 +616,7 @@
     const pricedTotal = currencyComparable ? pricedEvents.reduce((sum, event) => sum + event.selected_cost, 0) : null;
     const noOutcomeCost = currencyComparable ? noOutcome.reduce((sum, event) => sum + event.selected_cost, 0) : null;
     if (noOutcome.length && noOutcomeHasCost) findings.push(finding({
-      id: "spend-without-outcome-evidence", kind: "spend_without_outcome_evidence", title: "Some priced usage has no outcome evidence",
+      id: "spend-without-outcome-evidence", kind: "spend_without_outcome_evidence", category: "Evidence", title: "Some priced usage has no outcome evidence",
       explanation: currencyComparable
         ? `${round(noOutcomeCost / pricedTotal * 100, 1)}% of selected request cost cannot be connected to a supplied result status.`
         : `${noOutcome.length} of ${pricedEvents.length} priced requests cannot be connected to a supplied result status. A cost share is not calculated because the request currency boundary is not comparable.`,
@@ -593,7 +637,7 @@
     const totalCost = pricedByWorkload.reduce((sum, item) => sum + item.cost, 0);
     const largest = pricedByWorkload.sort((left, right) => right.cost - left.cost)[0];
     if (largest && totalCost > 0 && pricedByWorkload.length > 1 && largest.cost / totalCost >= 0.5) findings.push(finding({
-      id: "spend-concentration", kind: "spend_concentration", title: "One workload drives most observed request cost",
+      id: "spend-concentration", kind: "spend_concentration", category: "Allocation", title: "One workload drives most observed request cost",
       explanation: `${largest.name} accounts for ${round(largest.cost / totalCost * 100, 1)}% of priced request cost in this import.`, affected_scope: largest.name,
       current_cost: round(largest.cost), calculation: "Largest workload selected cost divided by total selected cost.", evidence_basis: "calculated", confidence: "high",
       overlap_group: "spend-concentration", affected_event_ids: largest.events.map((event) => event.record_id), verification_requirement: "Confirm workload ownership and unit economics before prioritizing changes.",
@@ -634,6 +678,7 @@
       findings.push(finding({
         id: "cost-spike-unexplained-by-volume",
         kind: "cost_spike_unexplained_by_volume",
+        category: "Variance",
         title: "Request cost spiked beyond what call volume explains",
         explanation: `${spikeDays.length} UTC day${spikeDays.length === 1 ? "" : "s"} cost at least twice the preceding seven active-day median and at least 50% above the preceding per-request cost applied to that day's volume. Observed cost was ${round(observed, 4)} versus a volume-adjusted reference of ${round(expected, 4)} ${pricedCurrencies[0] || "currency units"}.`,
         affected_scope: scope(affected),
@@ -746,7 +791,9 @@
     if (events.some((event) => event.selected_cost === null)) limitations.push("Some rows are unpriced");
     if (!currencyComparable || !currency) limitations.push("Request currency is missing or mixed");
     if (period.calendar_days === null || period.calendar_days < 14) limitations.push("Fewer than 14 calendar days supplied");
-    const windowDays = period.calendar_days === null ? null : Math.floor(period.calendar_days / 2);
+    const windowDays = period.calendar_days === null || period.calendar_days < 2
+      ? null
+      : Math.floor(period.calendar_days / 2);
     let priorStart = null;
     let priorEnd = null;
     let currentStart = null;
@@ -874,6 +921,156 @@
     };
   }
 
+  function operatingCostStack(rawOptions, selectedObservedCost, currency, currencyComparable) {
+    const categories = OPERATING_COST_CATEGORIES.map(([key, label]) => {
+      const amount = number(rawOptions[key], label);
+      return { key, label, amount: amount === null ? null : round(amount), supplied: amount !== null };
+    });
+    const supplied = categories.filter((item) => item.supplied);
+    const knownAdjacentCost = supplied.length
+      ? round(supplied.reduce((sum, item) => sum + item.amount, 0))
+      : null;
+    const comparableProviderCost = currencyComparable && selectedObservedCost !== null
+      ? round(selectedObservedCost)
+      : null;
+    const knownOperatingCost = comparableProviderCost === null
+      ? null
+      : round(comparableProviderCost + (knownAdjacentCost || 0));
+    const complete = categories.every((item) => item.supplied);
+    const status = comparableProviderCost === null
+      ? "NOT_COMPARABLE"
+      : complete
+        ? "FULLY_LOADED"
+        : supplied.length
+          ? "PARTIAL"
+          : "PROVIDER_ONLY";
+    return {
+      status,
+      currency,
+      provider_request_cost: comparableProviderCost,
+      categories,
+      known_adjacent_cost: knownAdjacentCost,
+      known_operating_cost: knownOperatingCost,
+      fully_loaded_cost: complete ? knownOperatingCost : null,
+      missing_categories: categories.filter((item) => !item.supplied).map((item) => item.key),
+      method: "Known operating cost equals selected provider request cost plus only the period-level cost categories explicitly supplied. Additional categories must exclude charges already included in provider request cost or another category. Fully loaded cost appears only when compute, retrieval/data, network, tooling, pipeline, and human review are each supplied; enter zero only when confirmed none. These totals are not spread across requests or allocation dimensions.",
+      savings_claim_allowed: false,
+    };
+  }
+
+  function allocationValuePresent(value) {
+    if (value === null || value === undefined || String(value).trim() === "") return false;
+    return !/^(unattributed|unassigned|unassigned workload|not supplied|unknown|n\/a)$/i.test(String(value).trim());
+  }
+
+  function allocationSummary(events, rawOptions, costStack, currencyComparable) {
+    const basis = normalizeKey(rawOptions.allocation_basis || "workload");
+    if (!ALLOCATION_DIMENSIONS.some(([key]) => key === basis)) {
+      throw new Error(`Allocation basis must be one of: ${ALLOCATION_DIMENSIONS.map(([key]) => key).join(", ")}.`);
+    }
+    const rawThreshold = rawOptions.allocation_warning_threshold;
+    const threshold = rawThreshold === null || rawThreshold === undefined || String(rawThreshold).trim() === ""
+      ? 0.1
+      : number(rawThreshold, "Allocation warning threshold");
+    if (threshold > 1) throw new Error("Allocation warning threshold cannot exceed 100%.");
+    const total = currencyComparable ? costStack.known_operating_cost : null;
+    const adjacentUnallocated = costStack.known_adjacent_cost || 0;
+    const priced = events.filter((event) => event.selected_cost !== null);
+    const unpricedRows = events.length - priced.length;
+    const dimensions = Object.fromEntries(ALLOCATION_DIMENSIONS.map(([key, label]) => {
+      const allocated = currencyComparable
+        ? priced.filter((event) => allocationValuePresent(event[key])).reduce((sum, event) => sum + event.selected_cost, 0)
+        : null;
+      const allocatedRows = priced.filter((event) => allocationValuePresent(event[key])).length;
+      const unallocated = total === null || allocated === null ? null : Math.max(0, total - allocated);
+      return [key, {
+        label,
+        allocated_priced_rows: allocatedRows,
+        unallocated_priced_rows: priced.length - allocatedRows,
+        allocated_cost: allocated === null ? null : round(allocated),
+        unallocated_cost: unallocated === null ? null : round(unallocated),
+        unallocated_cost_pct: total && unallocated !== null ? round(unallocated / total, 6) : null,
+      }];
+    }));
+    const selected = dimensions[basis];
+    let status = "NOT_SUPPORTED";
+    let reason = "Comparable positive cost is required before allocation coverage can support a decision.";
+    if (currencyComparable && unpricedRows) {
+      reason = `${unpricedRows} request row${unpricedRows === 1 ? " is" : "s are"} unpriced. Price every row before using allocation coverage to support a decision.`;
+    } else if (total > 0 && selected.unallocated_cost_pct !== null) {
+      status = selected.unallocated_cost_pct > threshold ? "WARN" : "PASS";
+      reason = status === "PASS"
+        ? `${selected.label} leaves ${(selected.unallocated_cost_pct * 100).toFixed(1)}% of known operating cost unallocated, within the ${(threshold * 100).toFixed(1)}% review limit.`
+        : `${selected.label} leaves ${(selected.unallocated_cost_pct * 100).toFixed(1)}% of known operating cost unallocated, above the ${(threshold * 100).toFixed(1)}% review limit. Improve attribution or narrow the decision scope before relying on this dimension.`;
+    }
+    return {
+      cost_basis: "known_operating_cost",
+      total_known_operating_cost: total,
+      period_level_cost_kept_unallocated: currencyComparable && costStack.known_adjacent_cost !== null
+        ? round(adjacentUnallocated)
+        : null,
+      dimensions,
+      decision_support: {
+        basis,
+        warning_threshold: threshold,
+        status,
+        decision_ready: status === "PASS",
+        reason,
+        policy_note: "The threshold is a user-set AI Cost Lens review policy, not an industry standard. A pass clears only this allocation check, not the other evidence or savings gates.",
+        savings_claim_allowed: false,
+      },
+      method: "Allocation percentages use known operating cost. Request-level provider cost is allocated only when the selected field is present. Period-level compute, retrieval/data, network, tooling, pipeline, and human costs remain unallocated; AI Cost Lens never spreads them automatically.",
+    };
+  }
+
+  function evidenceLayers(events, bill) {
+    const usageRows = events.filter((event) => [
+      event.input_tokens,
+      event.output_tokens,
+      event.cached_input_tokens,
+      event.request_status,
+      event.latency_ms,
+      event.tool_call_count,
+      event.outcome_status,
+    ].some((value) => value !== null && value !== undefined));
+    const reportedRows = events.filter((event) => event.provider_reported_cost !== null).length;
+    const calculatedRows = events.filter((event) => event.provider_reported_cost === null && event.calculated_cost !== null).length;
+    const requestCostStatus = reportedRows && calculatedRows
+      ? "MIXED"
+      : reportedRows
+        ? "PROVIDER_REPORTED"
+        : calculatedRows
+          ? "CALCULATED"
+          : "UNPRICED";
+    let billingStatus = bill.status === "NOT_SUPPLIED" ? "NOT_SUPPLIED" : "NOT_COMPARABLE";
+    if (bill.status === "COMPARABLE") {
+      billingStatus = bill.raw_selected_cost_difference === 0 ? "RECONCILED" : "VARIANCE";
+    }
+    return {
+      usage_telemetry: {
+        status: usageRows.length === events.length ? "AVAILABLE" : usageRows.length ? "PARTIAL" : "NOT_SUPPLIED",
+        rows_with_usage_signals: usageRows.length,
+        total_rows: events.length,
+        purpose: "Fast operational evidence for request shape, reliability, cache, latency, routing, and outcome coverage. It is not an invoice.",
+      },
+      request_cost: {
+        status: requestCostStatus,
+        provider_reported_rows: reportedRows,
+        calculated_rows: calculatedRows,
+        unpriced_rows: events.length - reportedRows - calculatedRows,
+        purpose: "Request-level cost supports diagnosis. Provider-reported values take precedence over catalog calculations for the same row.",
+      },
+      billing_evidence: {
+        status: billingStatus,
+        source_status: bill.status,
+        supplied_total: bill.supplied_total,
+        raw_request_cost_difference: bill.raw_selected_cost_difference,
+        purpose: "Billing evidence confirms finance actuals for a matching provider, account, currency, and period. A reconciled bill still does not prove business value or savings.",
+      },
+      precedence_rule: "Use telemetry to investigate quickly, then use comparable billing evidence to confirm the financial boundary. Keep calculated cost, request cost, and billed cost visibly separate.",
+    };
+  }
+
   function spendSummary(events, rawOptions, currency, selectedObservedCost, currencyComparable) {
     const dated = events.filter((event) => event.timestamp);
     const dates = dated.map((event) => event.timestamp.slice(0, 10)).sort();
@@ -902,6 +1099,7 @@
       complete_period_confirmed: completePeriodConfirmed,
     };
     const projected30DayCost = runRateAvailable ? round(selectedObservedCost / calendarDays * 30) : null;
+    const costStack = operatingCostStack(rawOptions, selectedObservedCost, currency, currencyComparable);
     return {
       currency,
       period,
@@ -914,6 +1112,8 @@
       run_rate_status: runRateAvailable ? "AVAILABLE" : "NOT_SUPPORTED",
       run_rate_method: "Selected request cost divided by the inclusive UTC calendar span, multiplied by 30. Requires a user-confirmed complete period of at least seven days with every row timestamped, priced, and in one comparable currency.",
       run_rate_limitations: runRateLimitations,
+      cost_stack: costStack,
+      allocation: allocationSummary(events, rawOptions, costStack, currencyComparable),
       budget: budgetSummary(rawOptions, runRateAvailable ? "AVAILABLE" : "NOT_SUPPORTED", projected30DayCost, currency),
       period_variance: periodVariance(events, period, currency, currencyComparable),
       operational_metrics: operationalSummary(events, rawOptions.source_rows || []),
@@ -922,7 +1122,13 @@
         model: spendBreakdown(events, "model", currencyComparable, selectedObservedCost),
         project: spendBreakdown(events, "project", currencyComparable, selectedObservedCost),
         team_owner: spendBreakdown(events, "team_owner", currencyComparable, selectedObservedCost),
+        feature: spendBreakdown(events, "feature", currencyComparable, selectedObservedCost),
+        customer: spendBreakdown(events, "customer", currencyComparable, selectedObservedCost),
+        product: spendBreakdown(events, "product", currencyComparable, selectedObservedCost),
         workload: spendBreakdown(events, "workload", currencyComparable, selectedObservedCost),
+        workflow: spendBreakdown(events, "workflow", currencyComparable, selectedObservedCost),
+        session_id: spendBreakdown(events, "session_id", currencyComparable, selectedObservedCost),
+        environment: spendBreakdown(events, "environment", currencyComparable, selectedObservedCost),
         customer_product: spendBreakdown(events, "customer_product", currencyComparable, selectedObservedCost),
       },
     };
@@ -1000,6 +1206,16 @@
           : "No cross-currency amount is calculated. Filter or split the import by currency, or supply an explicit FX method outside this local review.",
       };
     }
+    const bill = {
+      status: billStatus,
+      supplied_total: billTotal,
+      supplied_currency: billCurrency,
+      same_scope_confirmed: billScopeConfirmed,
+      raw_selected_cost_difference: billDifference,
+      duplicate_excluded_reference_difference: billDuplicateExcludedDifference,
+      method: "Billed total minus selected request cost. The duplicate-excluded difference retains the first source row in each repeated-ID group as a review reference only; no row is deleted or presumed invalid.",
+    };
+    const spend = spendSummary(events, reviewOptions, reviewCurrency, selectedObservedCost, !currencyNotComparable);
     return {
       schema_version: REVIEW_SCHEMA,
       generated_at: rawOptions.generated_at || new Date().toISOString(),
@@ -1018,17 +1234,10 @@
         unpriced_rows: events.length - priced.length,
         duplicate_rows_flagged: events.filter((event) => event.duplicate_group).length,
         provider_reported_cost_precedence: true,
-        bill: {
-          status: billStatus,
-          supplied_total: billTotal,
-          supplied_currency: billCurrency,
-          same_scope_confirmed: billScopeConfirmed,
-          raw_selected_cost_difference: billDifference,
-          duplicate_excluded_reference_difference: billDuplicateExcludedDifference,
-          method: "Billed total minus selected request cost. The duplicate-excluded difference retains the first source row in each repeated-ID group as a review reference only; no row is deleted or presumed invalid.",
-        },
+        bill,
       },
-      spend: spendSummary(events, reviewOptions, reviewCurrency, selectedObservedCost, !currencyNotComparable),
+      spend,
+      evidence_layers: evidenceLayers(events, bill),
       findings,
       headline: reviewHeadline,
       evidence_gate: {
@@ -1049,9 +1258,9 @@
 
   function normalizedCsv(review) {
     if (!review || review.schema_version !== REVIEW_SCHEMA || !Array.isArray(review.events)) throw new Error("A normalized usage review is required.");
-    const fields = ["record_id", "event_id", "timestamp", "provider", "billing_channel", "model", "project", "team_owner", "workload", "customer_product", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_duration_seconds", "batch", "tool_charges", "provider_reported_cost", "calculated_cost", "selected_cost", "cost_basis", "currency", "request_status", "retry_parent_event_id", "latency_ms", "evidence_source", "source_file_hash", "prefix_fingerprint", "tool_call_count", "outcome_status", "duplicate_group"];
+    const fields = ["record_id", "event_id", "timestamp", "provider", "billing_channel", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "customer_product", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_duration_seconds", "batch", "tool_charges", "provider_reported_cost", "calculated_cost", "selected_cost", "cost_basis", "currency", "request_status", "retry_parent_event_id", "latency_ms", "evidence_source", "source_file_hash", "prefix_fingerprint", "tool_call_count", "outcome_status", "duplicate_group"];
     return `${fields.join(",")}\n${review.events.map((event) => fields.map((field) => csvCell(event[field])).join(",")).join("\n")}\n`;
   }
 
-  return Object.freeze({ SCHEMA, REVIEW_SCHEMA, aliases, normalizeRows, analyzeEvents, buildReview, normalizedCsv, detectAdapter, spendSummary, operationalSummary, periodVariance, budgetSummary });
+  return Object.freeze({ SCHEMA, REVIEW_SCHEMA, aliases, normalizeRows, analyzeEvents, buildReview, normalizedCsv, detectAdapter, spendSummary, operationalSummary, periodVariance, budgetSummary, operatingCostStack, allocationSummary, evidenceLayers });
 });

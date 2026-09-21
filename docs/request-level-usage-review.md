@@ -17,7 +17,7 @@ The adapter detector recognizes common flat field names from:
 
 This is field compatibility, not a claim that every current export from those products has been production validated. Nested trace payloads must be flattened before import. Source formats can change, and the import coverage panel shows what was actually recognized.
 
-The local spend explorer filters the normalized events by date, provider, model, project, workload, and request status. It shows the first 100 matching rows in the browser and keeps the complete set in the normalized download, avoiding an unbounded DOM render for the 20,000-row import limit. The complete prompt-free analysis record can also be downloaded as JSON for review or audit.
+The local spend explorer filters the normalized events by date, provider, model, project, workload, and request status. The canonical record also preserves optional team, feature, customer, product, workflow, session, and environment allocation fields without copying unknown source columns. It shows the first 100 matching rows in the browser and keeps the complete set in the normalized download, avoiding an unbounded DOM render for the 20,000-row import limit. The complete prompt-free analysis record can also be downloaded as JSON for review or audit.
 
 OpenRouter documents native-tokenizer counts, cached and reasoning token details, cost, and server-tool cost in its normalized response usage. Langfuse documents ingested versus inferred usage and cost, with ingested values taking priority. AI Cost Lens follows the same conservative precedence rule: provider-reported row cost wins over calculated token cost for that row.
 
@@ -37,7 +37,11 @@ Sources checked September 21, 2026:
 - Provider-reported cost takes precedence over calculated cost on the same event.
 - Repeated provider/event-ID pairs are assigned a reversible `duplicate_group`; no row is deleted.
 - An optional billed total is compared only after the user confirms that bill and request records cover the same provider, account, currency, and period. The review shows both the raw difference and a duplicate-excluded reference without changing the imported rows. Missing request cost, request currency, or bill currency is reported as missing evidence rather than zero or a generic mismatch.
-- Provider, model, project, team, workload, and customer/product breakdowns retain request counts, priced-row counts, selected cost, and cost share. Dollar fields remain unavailable when currency is missing or mixed.
+- Provider, model, project, team, feature, customer, product, workload, workflow, session, and environment breakdowns retain request counts, priced-row counts, selected cost, and cost share. Dollar fields remain unavailable when currency is missing or mixed.
+- Allocation coverage is cost-weighted. The user chooses the dimension that must support the decision and a maximum unallocated share. The default 10% warning is an explicit AI Cost Lens review policy, not an industry standard. The result is `PASS`, `WARN`, or `NOT_SUPPORTED`; it never authorizes a savings claim, and it remains unsupported while any request row is unpriced.
+- Optional same-period compute, retrieval/data, network, tooling/observability, pipeline/orchestration, and human-review totals extend the cost boundary beyond the provider charge. Users must exclude charges already included in provider request cost or another category. Blank stays unknown, zero means confirmed none, and `fully_loaded_cost` remains unavailable until every category is supplied.
+- Period-level operating costs remain unallocated to project, team, feature, customer, product, workload, workflow, session, and environment. AI Cost Lens never spreads shared cost across requests without an allocation method supplied outside this static review.
+- Usage telemetry, request cost, and billing evidence are separate exported layers. Telemetry supports faster operational diagnosis; comparable billed evidence confirms the financial boundary; neither proves business value or savings.
 - A straight-line 30-day run rate is available only after the user confirms a complete continuous period of at least seven calendar days and every row is timestamped, priced, and in one comparable currency. It is labeled as a local run rate, not a forecast or live monitor.
 - An optional monthly budget is compared only with that eligible run rate. The configured warning threshold produces a static `WITHIN`, `WATCH`, or `OVER` result; it is not a live alert, enforcement control, forecast, or savings claim.
 - A period-over-period bridge is available only for a confirmed complete period of at least 14 days with every row timestamped, priced, and in one comparable currency. It compares the two most recent equal UTC windows and reconciles total cost change exactly into request-volume effect and average-cost-per-request effect. The latter is not labeled a rate-card change because model mix, token shape, cache, tools, tier, and price can all contribute.
@@ -67,7 +71,7 @@ The first request-level library covers:
 
 Only duplicate, failed, retry, and error-loop event cost enters the high-confidence headline boundary. The engine unions affected event records, so one event is counted once even when several findings overlap. That boundary is still not a savings claim: retries can be necessary, duplicate identifiers can be legitimate, and the provider bill may require reconciliation.
 
-Cache, prompt-size, output-size, reasoning, tool, and model-route findings are candidates. They require a controlled workload test because request shape does not prove task difficulty, quality, latency, policy compatibility, or human rework.
+Every finding carries a plain optimization category: billing integrity, reliability, caching, context reduction, output control, reasoning control, tooling, routing and downsizing, evidence, allocation, or variance. Cache, prompt-size, output-size, reasoning, tool, and model-route findings remain candidates. They require a controlled workload test because request shape does not prove task difficulty, quality, latency, policy compatibility, or human rework.
 
 The cost-spike finding is also an investigation signal. It names the affected rows and reports observed versus volume-adjusted reference cost, but assigns no avoidable amount. Model mix, token shape, cache behavior, tools, service tier, pricing changes, task difficulty, or incomplete days can all explain the difference.
 
@@ -86,5 +90,8 @@ The cost-spike finding is also an investigation signal. It names the affected ro
 11. Enter a monthly budget and warning level. Confirm that the threshold status uses only the eligible run rate and becomes unavailable with it.
 12. Use a complete 14-day-or-longer period and confirm that prior plus volume effect plus average-cost effect equals current cost. Confirm that the record keeps `savings_claim_allowed: false`.
 13. Confirm that missing latency, status, cache, retry, or outcome fields reduce the corresponding coverage instead of appearing as observed zeroes.
+14. Choose a decision allocation dimension, omit it from enough priced rows to exceed the selected warning level, and confirm that the review warns rather than inventing attribution.
+15. Supply all six additional operating-cost categories and confirm that fully loaded cost appears. Blank any one category and confirm that fully loaded cost becomes unavailable while known partial cost remains visible.
+16. Reconcile a same-scope bill and confirm that usage telemetry, request cost, and billing evidence remain three separate layers in the exported review.
 
 The automated equivalents live in `tests/test_usage_event_engine.py` and `tests/test_local_privacy.py`.

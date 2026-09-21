@@ -6,6 +6,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator, FormatChecker
+from referencing import Registry, Resource
 
 ROOT = Path(__file__).parents[1]
 WEB = ROOT / "web"
@@ -490,6 +492,129 @@ console.log(JSON.stringify({watch, over, incomplete, missingSignals, volumeOnly,
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_allocation_cost_stack_and_evidence_layers_fail_closed():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const rows = [
+  {
+    event_id: "a", timestamp: "2026-09-01T00:00:00Z", provider: "OpenAI", model: "gpt-5.6-sol",
+    project: "Atlas", team: "Platform", feature: "Answer", customer: "tenant-01", product: "Copilot",
+    workload: "Summaries", route: "Primary", session: "session-1", env: "production",
+    input_tokens: 100, output_tokens: 20, provider_reported_cost: 100, currency: "USD", status: "success",
+  },
+  {
+    event_id: "b", timestamp: "2026-09-01T00:01:00Z", provider: "OpenAI", model: "gpt-5.6-sol",
+    project: "Atlas", workload: "Summaries", input_tokens: 100, output_tokens: 20,
+    provider_reported_cost: 100, currency: "USD", status: "success",
+  },
+];
+const full = engine.buildReview(rows, {
+  billed_total: 200, billed_currency: "USD", bill_scope_confirmed: true,
+  allocation_basis: "team_owner", allocation_warning_threshold: .2,
+  compute_cost: 20, retrieval_data_cost: 10, network_cost: 5,
+  tooling_cost: 5, pipeline_cost: 10, human_review_cost: 10,
+});
+const partial = engine.buildReview(rows, {compute_cost: 20, allocation_basis: "workload", allocation_warning_threshold: .3});
+const confirmedZero = engine.buildReview(rows, {
+  compute_cost: 0, retrieval_data_cost: 0, network_cost: 0,
+  tooling_cost: 0, pipeline_cost: 0, human_review_cost: 0,
+});
+const unpriced = engine.buildReview([...rows, {
+  event_id: "c", timestamp: "2026-09-01T00:02:00Z", provider: "OpenAI", model: "unknown-model",
+  workload: "Summaries", team: "Platform", input_tokens: 100, output_tokens: 20, currency: "USD",
+}], {allocation_basis: "team_owner"});
+const billVariance = engine.buildReview(rows, {
+  billed_total: 200.005, billed_currency: "USD", bill_scope_confirmed: true,
+});
+let thresholdRejected = false;
+try { engine.buildReview(rows, {allocation_warning_threshold: 1.01}); } catch (_error) { thresholdRejected = true; }
+console.log(JSON.stringify({full, partial, confirmedZero, unpriced, billVariance, thresholdRejected}));
+""",
+        ENGINE,
+    )
+    review = result["full"]
+    first = review["events"][0]
+    assert first["feature"] == "Answer"
+    assert first["customer"] == "tenant-01"
+    assert first["product"] == "Copilot"
+    assert first["customer_product"] == "tenant-01 · Copilot"
+    assert first["workflow"] == "Primary"
+    assert first["session_id"] == "session-1"
+    assert first["environment"] == "production"
+
+    stack = review["spend"]["cost_stack"]
+    assert stack["status"] == "FULLY_LOADED"
+    assert stack["provider_request_cost"] == 200
+    assert stack["known_adjacent_cost"] == 60
+    assert stack["known_operating_cost"] == 260
+    assert stack["fully_loaded_cost"] == 260
+    assert stack["missing_categories"] == []
+    assert stack["savings_claim_allowed"] is False
+
+    allocation = review["spend"]["allocation"]
+    assert allocation["dimensions"]["team_owner"]["allocated_cost"] == 100
+    assert allocation["dimensions"]["team_owner"]["unallocated_cost"] == 160
+    assert allocation["dimensions"]["team_owner"]["unallocated_cost_pct"] == 0.615385
+    assert allocation["period_level_cost_kept_unallocated"] == 60
+    assert allocation["decision_support"]["status"] == "WARN"
+    assert allocation["decision_support"]["decision_ready"] is False
+    assert allocation["decision_support"]["savings_claim_allowed"] is False
+
+    layers = review["evidence_layers"]
+    assert layers["usage_telemetry"]["status"] == "AVAILABLE"
+    assert layers["request_cost"]["status"] == "PROVIDER_REPORTED"
+    assert layers["billing_evidence"]["status"] == "RECONCILED"
+    assert "telemetry" in layers["precedence_rule"].lower()
+    assert "billing" in layers["precedence_rule"].lower()
+
+    partial = result["partial"]["spend"]
+    assert partial["cost_stack"]["status"] == "PARTIAL"
+    assert partial["cost_stack"]["fully_loaded_cost"] is None
+    assert partial["allocation"]["decision_support"]["status"] == "PASS"
+    confirmed_zero = result["confirmedZero"]["spend"]
+    assert confirmed_zero["cost_stack"]["status"] == "FULLY_LOADED"
+    assert confirmed_zero["cost_stack"]["known_adjacent_cost"] == 0
+    assert confirmed_zero["cost_stack"]["fully_loaded_cost"] == 200
+    assert confirmed_zero["allocation"]["period_level_cost_kept_unallocated"] == 0
+    assert (
+        result["unpriced"]["spend"]["allocation"]["decision_support"]["status"]
+        == "NOT_SUPPORTED"
+    )
+    assert (
+        result["unpriced"]["spend"]["allocation"]["decision_support"]["decision_ready"]
+        is False
+    )
+    assert (
+        result["billVariance"]["evidence_layers"]["billing_evidence"]["status"]
+        == "VARIANCE"
+    )
+    assert result["thresholdRejected"] is True
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_request_findings_have_plain_optimization_categories():
+    result = run_node(
+        r"""
+const fs = require("fs");
+const engine = require(process.argv[1]);
+const text = fs.readFileSync(process.argv[2], "utf8").trim();
+const lines = text.split(/\r?\n/);
+const headers = lines[0].split(",");
+const rows = lines.slice(1).map((line) => Object.fromEntries(line.split(",").map((value, index) => [headers[index], value])));
+console.log(JSON.stringify(engine.buildReview(rows, {})));
+""",
+        ENGINE,
+        FIXTURE,
+    )
+    categories = {item["id"]: item["category"] for item in result["findings"]}
+    assert categories["low-cache-use-with-repeated-prefix"] == "Caching"
+    assert categories["oversized-input-candidate"] == "Context reduction"
+    assert categories["repeated-tool-call-candidate"] == "Tooling"
+    assert categories["failed-or-retried-request-cost"] == "Reliability"
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_bill_reconciliation_preserves_rows_and_labels_duplicate_reference():
     result = run_node(
         r"""
@@ -598,6 +723,7 @@ def test_usage_event_engine_has_valid_syntax():
 
 def test_request_log_template_and_browser_asset_are_present():
     html = (WEB / "index.html").read_text()
+    app = (WEB / "app.js").read_text()
     assert (WEB / "templates" / "ai-cost-lens-request-log-template.csv").is_file()
     # The browser integration is added with the request-level engine, not left as a hidden library.
     assert 'src="usage-event-engine.js"' in html
@@ -606,7 +732,15 @@ def test_request_log_template_and_browser_asset_are_present():
     assert 'id="request-period-complete"' in html
     assert 'id="request-monthly-budget"' in html
     assert 'id="request-budget-warning"' in html
+    assert 'id="request-allocation-basis"' in html
+    assert 'id="request-allocation-warning"' in html
+    assert 'id="request-compute-cost"' in html
+    assert 'id="request-human-review-cost"' in html
     assert 'id="request-spend-context"' in html
+    assert 'id="request-evidence-layers"' in html
+    assert 'id="request-cost-stack"' in html
+    assert 'id="request-allocation-status"' in html
+    assert "Request cost is missing or not in one comparable currency" in app
     assert 'id="request-budget-status"' in html
     assert 'id="request-operational-metrics"' in html
     assert 'id="request-variance"' in html
@@ -640,6 +774,14 @@ def test_usage_event_and_review_schemas_are_versioned_and_fail_closed():
     )
     assert event_schema["additionalProperties"] is False
     assert "selected_cost" in event_schema["required"]
+    assert {
+        "feature",
+        "customer",
+        "product",
+        "workflow",
+        "session_id",
+        "environment",
+    }.issubset(event_schema["required"])
     assert (
         review_schema["properties"]["schema_version"]["const"]
         == "ai-cost-lens-usage-review/1.1"
@@ -675,9 +817,14 @@ def test_usage_event_and_review_schemas_are_versioned_and_fail_closed():
         "AVAILABLE",
         "NOT_SUPPORTED",
     ]
-    assert {"budget", "period_variance", "operational_metrics"}.issubset(
-        spend["required"]
-    )
+    assert {
+        "cost_stack",
+        "allocation",
+        "budget",
+        "period_variance",
+        "operational_metrics",
+    }.issubset(spend["required"])
+    assert "evidence_layers" in review_schema["required"]
     assert (
         spend["properties"]["budget"]["properties"]["savings_claim_allowed"]["const"]
         is False
@@ -688,3 +835,70 @@ def test_usage_event_and_review_schemas_are_versioned_and_fail_closed():
         ]
         is False
     )
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_generated_usage_review_conforms_to_published_schemas():
+    reviews = run_node(
+        r"""
+const fs = require("fs");
+const engine = require(process.argv[1]);
+const text = fs.readFileSync(process.argv[2], "utf8").trim();
+const lines = text.split(/\r?\n/);
+const headers = lines[0].split(",");
+const rows = lines.slice(1).map((line) => Object.fromEntries(
+  line.split(",").map((value, index) => [headers[index], value]),
+));
+const generated_at = "2026-09-21T00:00:00Z";
+const full = engine.buildReview(rows, {
+  generated_at,
+  billed_total: 0.0448,
+  billed_currency: "USD",
+  bill_scope_confirmed: true,
+  allocation_basis: "workload",
+  compute_cost: 0,
+  retrieval_data_cost: 0,
+  network_cost: 0,
+  tooling_cost: 0,
+  pipeline_cost: 0,
+  human_review_cost: 0,
+});
+const minimal = engine.buildReview(rows.slice(0, 1), {generated_at});
+const mixed = engine.buildReview([
+  rows[0],
+  {...rows[1], event_id: "mixed-currency", currency: "EUR"},
+], {generated_at});
+const unpriced = engine.buildReview([{
+  event_id: "unpriced", timestamp: "2026-09-01T12:00:00Z",
+  provider: "Unknown", model: "unknown", workload: "Unknown",
+  input_tokens: 10, output_tokens: 5,
+}], {generated_at});
+console.log(JSON.stringify({full, minimal, mixed, unpriced}));
+""",
+        ENGINE,
+        FIXTURE,
+    )
+    event_schema = json.loads(
+        (ROOT / "schemas" / "ai-cost-lens-usage-event-1.0.schema.json").read_text()
+    )
+    review_schema = json.loads(
+        (ROOT / "schemas" / "ai-cost-lens-usage-review-1.1.schema.json").read_text()
+    )
+    Draft202012Validator.check_schema(event_schema)
+    Draft202012Validator.check_schema(review_schema)
+    registry = Registry().with_resource(
+        event_schema["$id"], Resource.from_contents(event_schema)
+    )
+    review_validator = Draft202012Validator(
+        review_schema,
+        registry=registry,
+        format_checker=FormatChecker(),
+    )
+    event_validator = Draft202012Validator(
+        event_schema,
+        format_checker=FormatChecker(),
+    )
+    for review in reviews.values():
+        review_validator.validate(review)
+        for event in review["events"]:
+            event_validator.validate(event)

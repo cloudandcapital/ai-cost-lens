@@ -51,8 +51,48 @@ console.log(JSON.stringify(decide(JSON.parse(process.argv[1]))));
     )
     decision = json.loads(result.stdout)
     assert decision["code"] == expected
+    expected_posture = {
+        "KEEP CURRENT ROUTE": "STOP CHANGE",
+        "NO COST ADVANTAGE": "STOP CHANGE",
+        "QUALITY BELOW MINIMUM": "STOP CHANGE",
+        "CHECK APPROVAL": "INSUFFICIENT EVIDENCE",
+        "ADD MISSING TIME": "INSUFFICIENT EVIDENCE",
+        "TEST FIRST": "FIX EVIDENCE",
+    }[expected]
+    assert decision["posture"] == expected_posture
     if current == 0:
         assert decision["percent"] is None
+
+
+def test_verified_lower_unit_cost_maps_to_fund_change_posture():
+    data = {
+        "experience": "detailed",
+        "baseline": {"measures": {"cost_per_usable_result": 2}},
+        "proposed": {"measures": {"cost_per_usable_result": 1}},
+        "comparison": {
+            "quality_holds": True,
+            "both_policy_approved": True,
+            "human_cost_included": True,
+            "savings_claim_allowed": True,
+        },
+    }
+    script = """
+const fs = require('fs');
+let source = fs.readFileSync('web/app.js', 'utf8');
+source = source.replace('  function renderAll() {', '  globalThis.decide = decisionFor; return;\\n  function renderAll() {');
+eval(source);
+console.log(JSON.stringify(decide(JSON.parse(process.argv[1]))));
+"""
+    result = subprocess.run(
+        ["node", "-e", script, json.dumps(data)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    decision = json.loads(result.stdout)
+    assert decision["code"] == "SAVE NOW"
+    assert decision["posture"] == "FUND CHANGE"
 
 
 def test_simple_evidence_is_not_a_provider_invoice():
@@ -88,6 +128,7 @@ function render(d,code) {
  api.setData(d); api.renderAll();
  assert.equal(elements['decision-code'].textContent,code);
  assert.equal(elements['memo-decision-code'].textContent,code);
+ assert.match(elements['finance-posture'].textContent,/Finance posture: (FUND CHANGE|FIX EVIDENCE|STOP CHANGE|INSUFFICIENT EVIDENCE)/);
  assert.equal(elements['decision-title'].textContent,elements['memo-next-step'].textContent);
  for (const kind of ['why','changed','cfo']) assert.ok(api.lumenResponse(kind).includes(d.comparison.recommendation));
  for (const [id,e] of Object.entries(elements)) assert.ok(!/NaN|Infinity|>undefined</.test(e.textContent+' '+e.innerHTML), id+': '+e.textContent+' '+e.innerHTML);
@@ -160,6 +201,7 @@ eval(source);
  handlers['download-review:click']();
  const saved = JSON.parse(await blob.text());
  assert.equal(saved.comparison.decision_code,'QUALITY BELOW MINIMUM');
+ assert.equal(saved.comparison.finance_posture,'STOP CHANGE');
  assert.deepEqual(saved.baseline.costs,data.baseline.costs);
  assert.equal(elements.anchor.download,'ai-cost-lens-contract-risk-summaries.json');
  handlers['print-memo:click']();assert.ok(printed);
