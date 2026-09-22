@@ -2,7 +2,7 @@
 
 Research checked: September 22, 2026
 
-This is the release truth for AI Cost Lens 0.5. It is not a marketing comparison and it does not declare overall parity. A capability is marked implemented only when the repository contains a working path and a testable evidence boundary.
+This is the release truth for AI Cost Lens 1.0. It is not a marketing comparison and it does not declare overall parity. A capability is marked implemented only when the repository contains a working path and a testable evidence boundary.
 
 ## Bottom line
 
@@ -16,7 +16,7 @@ The defensible claim is therefore:
 
 ## Evidence-based comparison
 
-| Capability | Market reference | AI Cost Lens 0.5 evidence | Status |
+| Capability | Market reference | AI Cost Lens 1.0 evidence | Status |
 |---|---|---|---|
 | Browser-local use without an account or API key | [Optimaizr](https://www.optimaizr.com/) emphasizes local analysis | Static browser application; local file parsing; source records state `uploaded: false`; prompt and output text are omitted from saved estimate and verification records | Implemented |
 | Prompt and model price comparison | [Price Per Token](https://pricepertoken.com/) and [TokenCost by AgentOps](https://github.com/AgentOps-AI/tokencost) specialize in model price comparison or programmatic token-cost calculation | Dated, source-linked OpenAI, Anthropic, and Google catalog; per-call, per-1,000-call, monthly, annual, cache-read, cache-write, cache-storage, processing-mode, geography, retry, and usable-result calculations | Implemented, deliberately narrow |

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ai-cost-lens"
-version = "0.5.0"
+version = "1.0.0"
 description = "Strict AI usage cost analysis with pricing provenance and CCAC output"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,7 +12,7 @@ license = { text = "MIT" }
 authors = [{ name = "Diana Molski" }]
 keywords = ["finops", "ai", "openai", "anthropic", "bedrock", "cost", "focus", "cli"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",

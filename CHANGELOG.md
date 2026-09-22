@@ -2,7 +2,9 @@
 
 All notable changes to AI Cost Lens are documented here.
 
-## [0.5.0]: source release, 2026-09-22; tag pending
+## [1.0.0] - 2026-09-22
+
+- First stable release of the local-first AI cost decision workbench after independent product, privacy, finance, accessibility, and cross-browser review.
 
 - Added a one-click, unmistakably illustrative request-log walkthrough so a first-time visitor can exercise the local usage analysis without preparing a file.
 - Replaced first-screen finance shorthand with clearer definitions while retaining the existing evidence and savings gates.

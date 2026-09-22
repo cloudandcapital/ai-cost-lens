@@ -8186,7 +8186,7 @@ body{min-width:0}
     const rateSourceScope = userSuppliedRateCount && officialRateCount ? "mixed" : userSuppliedRateCount ? "user_supplied_only" : "official_list_only";
     return {
       schema_version: "ai-cost-lens-prompt-price-estimate/0.6",
-      application_version: "0.5.0",
+      application_version: "1.0.0",
       created_at: createdAt || new Date().toISOString(),
       catalog: {
         schema_version: catalog.schema_version,
@@ -9801,7 +9801,7 @@ body{min-width:0}
     return {
       schema_version: REVIEW_SCHEMA,
       generated_at: rawOptions.generated_at || new Date().toISOString(),
-      application_version: "0.5.0",
+      application_version: "1.0.0",
       pricing_catalog_version: rawOptions.catalog?.catalog_version || null,
       source: { name: rawOptions.source_name || "Local request-log import", adapter: detectAdapter(rows), sha256: rawOptions.source_file_hash || null, uploaded: false },
       currency: reviewCurrency,
@@ -10361,7 +10361,7 @@ body{min-width:0}
     const failedCases = caseResults.filter((item) => !item.candidate.passed || item.candidate.outcome_status === "needs_escalation").map((item) => item.case_id);
     return {
       schema_version: SCHEMA,
-      application_version: "0.5.0",
+      application_version: "1.0.0",
       generated_at: options.generated_at,
       source: { name: options.source_name, sha256: options.source_file_hash, uploaded: false },
       method: {

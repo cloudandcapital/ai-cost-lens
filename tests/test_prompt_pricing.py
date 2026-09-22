@@ -90,7 +90,7 @@ console.log(JSON.stringify({catalog, comparison, record}));
     assert alternative["monthly_difference_from_current_usd"] == -7.205
 
     record = payload["record"]
-    assert record["application_version"] == "0.5.0"
+    assert record["application_version"] == "1.0.0"
     assert record["evidence_gate"]["decision"] == "TEST_FIRST"
     assert record["evidence_gate"]["savings_claim_allowed"] is False
     assert record["estimate_basis"]["prompt_text_stored"] is False

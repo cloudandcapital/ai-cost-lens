@@ -1304,7 +1304,7 @@
     return {
       schema_version: REVIEW_SCHEMA,
       generated_at: rawOptions.generated_at || new Date().toISOString(),
-      application_version: "0.5.0",
+      application_version: "1.0.0",
       pricing_catalog_version: rawOptions.catalog?.catalog_version || null,
       source: { name: rawOptions.source_name || "Local request-log import", adapter: detectAdapter(rows), sha256: rawOptions.source_file_hash || null, uploaded: false },
       currency: reviewCurrency,

@@ -78,12 +78,14 @@ The public demo needs no credentials and uses entirely illustrative data.
 
 Python 3.10 or newer is required.
 
-The current source release is 0.5.0. The latest immutable Git tag remains v0.3.3; install the current source release from `main` until the v0.5.0 tag is published.
+The current stable release is v1.0.0.
 
 ```bash
-pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@main"
+pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v1.0.0"
 ai-cost-lens --help
 ```
+
+Product releases follow semantic versioning: patch releases such as `1.0.1` contain compatible fixes, minor releases such as `1.1.0` add compatible features, and `2.0.0` is reserved for a breaking product contract. Pricing-catalog and exported-record schema versions advance independently so a rate refresh does not imply a breaking application release.
 
 For development from a clone:
 
@@ -341,7 +343,7 @@ These commands sum cost values already present in loosely shaped CSV files. They
 
 ## Pipeline compatibility
 
-AI Cost Lens `0.5.x` preserves the `ccac/1.0.0` compatibility path and can explicitly emit its canonical direct-AI scope through `ccac/1.1.0`. The existing AI-domain total remains non-additive, and Bedrock remains excluded from the canonical direct-AI scope because provider-billed native AI belongs to Cloud. Cloud Cost Guard and downstream consumers remain unchanged.
+AI Cost Lens `1.x` preserves the `ccac/1.0.0` compatibility path and can explicitly emit its canonical direct-AI scope through `ccac/1.1.0`. The existing AI-domain total remains non-additive, and Bedrock remains excluded from the canonical direct-AI scope because provider-billed native AI belongs to Cloud. Cloud Cost Guard and downstream consumers remain unchanged.
 
 ## Development
 

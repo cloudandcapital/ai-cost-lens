@@ -378,7 +378,7 @@
     const failedCases = caseResults.filter((item) => !item.candidate.passed || item.candidate.outcome_status === "needs_escalation").map((item) => item.case_id);
     return {
       schema_version: SCHEMA,
-      application_version: "0.5.0",
+      application_version: "1.0.0",
       generated_at: options.generated_at,
       source: { name: options.source_name, sha256: options.source_file_hash, uploaded: false },
       method: {

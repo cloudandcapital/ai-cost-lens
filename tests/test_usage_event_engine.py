@@ -459,7 +459,7 @@ console.log(JSON.stringify({watch, over, incomplete, missingSignals, volumeOnly,
     )
     review = result["watch"]
     assert review["schema_version"] == "ai-cost-lens-usage-review/1.1"
-    assert review["application_version"] == "0.5.0"
+    assert review["application_version"] == "1.0.0"
     budget = review["spend"]["budget"]
     assert budget == {
         "status": "WATCH",

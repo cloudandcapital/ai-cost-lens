@@ -1,7 +1,7 @@
-# AI Cost Lens 0.5 independent review brief
+# AI Cost Lens 1.0 independent review brief
 
-Prepared: September 21, 2026
-Branch: `feat/ai-cost-lens-product-readiness`
+Prepared: September 21, 2026; finalized September 22, 2026
+Release branch: `release/v1.0.0`
 
 This brief is for an independent Codex or Claude review before merge or deployment. Treat the implementation as a release candidate, not as approved production software.
 
@@ -27,7 +27,7 @@ It is comparable to model-price directories, LLM observability products, and loc
 12. Allocation coverage uses known cost and an explicit user-selected dimension and threshold. A warning cannot become a savings claim.
 13. Usage telemetry, request cost, and billing evidence remain separate evidence layers.
 
-## 0.5 scope to review
+## 1.0 scope to review
 
 - Direct opening paths for **Price a prompt** and **Review AI usage**.
 - Local monthly-budget status against the evidence-gated 30-day run rate.
@@ -42,7 +42,7 @@ It is comparable to model-price directories, LLM observability products, and loc
 - Downloadable `ai-cost-lens-usage-review/1.1` JSON.
 - One local custom/contract prompt-pricing route with explicit `user_supplied` provenance.
 - Downloadable `ai-cost-lens-prompt-price-estimate/0.6` JSON.
-- Application/package version `0.5.0`.
+- Application/package version `1.0.0`.
 
 ## Primary files
 
@@ -74,7 +74,7 @@ uv run --frozen flake8 ai_cost_lens tests --count --select=E9,F63,F7,F82,F401 --
 uv run --frozen pytest tests/ -q
 ```
 
-The local release-candidate run completed with 242 tests passed and 5 expected skips. Those five checks require the separately released CCAC validator that CI installs. Generated full, minimal, mixed-currency, and unpriced usage reviews validate against the published event and review schemas. `npm audit --audit-level=high` and the locked runtime `pip-audit` both reported no known vulnerabilities. The wheel installed in a fresh virtual environment as `ai-cost-lens==0.5.0`, and its CCAC 1.0 and 1.1 demo artifacts were deterministic across repeated runs.
+The final local release-candidate run completed with 250 tests passed and 5 expected skips. Those five checks require the separately released CCAC validator that CI installs. Generated full, minimal, mixed-currency, and unpriced usage reviews validate against the published event and review schemas. `npm audit --audit-level=high` and the locked runtime `pip-audit` both reported no known vulnerabilities. The wheel installed in a fresh virtual environment as `ai-cost-lens==1.0.0`, and its CCAC 1.0 and 1.1 demo artifacts were deterministic across repeated runs.
 
 ## Adversarial cases
 
