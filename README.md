@@ -10,6 +10,15 @@ The calculations are deterministic. Costs reported by a provider stay separate f
 
 It does not connect to provider APIs, fetch live prices, certify invoices, enforce production budgets, or identify redundant models from names alone. Review files stay local. The browser interface does not upload them. The OpenAI and Claude importers read files that the user saved locally; they never receive an API key.
 
+## Choose the right data path
+
+| Path | Use it for | Data grain |
+| --- | --- | --- |
+| Browser **Review AI usage** | Request behavior, allocation, retries, latency, caching, tools, and outcome coverage | One request or trace observation per row |
+| Python CLI canonical input | Strict cost reconciliation and CCAC output | Daily or period usage buckets that may summarize many requests |
+
+These contracts are deliberately different and are not interchangeable templates. Request telemetry explains behavior; a billing ledger and provider bill establish the finance boundary. See the [data-contract boundary and field guide](docs/data-contract-boundaries.md).
+
 ## What it does
 
 - Strict `ai-cost-lens/2.0` canonical CSV input
@@ -69,10 +78,10 @@ The public demo needs no credentials and uses entirely illustrative data.
 
 Python 3.10 or newer is required.
 
-The latest tagged release is v0.3.3. This branch prepares the v0.5.0 product-readiness update.
+The current source release is 0.5.0. The latest immutable Git tag remains v0.3.3; install the current source release from `main` until the v0.5.0 tag is published.
 
 ```bash
-pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v0.3.3"
+pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@main"
 ai-cost-lens --help
 ```
 
@@ -150,7 +159,7 @@ Then open the local URL printed by Vite. Use **Price a prompt** for a list-price
 
 **Price a prompt** uses catalog version `2026-09-22`, with source URLs and a review-by date embedded in every estimate. Current calculations stop after that review date until the official rates are rechecked. Prompt text stays in the page and is not copied into the estimate record. OpenAI raw text is counted locally with the bundled `o200k_base` encoder; chat framing, tools, images, audio, and provider-added wrapper tokens are excluded. Anthropic and Google use a disclosed four-characters-per-token approximation unless the user supplies a token count. The calculator models published direct API text-token prices by route, including supported processing modes, cache reads, cache writes, cache storage, long-context treatment, and inference geography. It excludes negotiated discounts, taxes, server-side tools, grounding, data transfer, and other unentered workload costs. Its handoff preloads the existing sampled Review and requires comparable output checks. It never converts a lower list-price estimate into a savings claim.
 
-The **Opportunities** view also accepts a flat request-log CSV or JSON file. It normalizes common universal, OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone field names into versioned canonical events, then points to the exact affected rows for duplicate identifiers, failed and retried calls, repeated retry chains, evidenced cache candidates, unusually large inputs or outputs, reasoning intensity, repeated tool use, model-route candidates, outcome gaps, spend concentration, and cost spikes unexplained by volume. Optional project, team, feature, customer, product, workload, workflow, session, and environment fields support cost-weighted allocation coverage. Optional same-period compute, retrieval/data, network, tooling, pipeline, and human-review totals extend the visible cost boundary without silently spreading shared cost. Usage telemetry, request cost, and billing evidence remain separate. This is local field compatibility, not a promise that every vendor export version is supported. Nested traces must be flattened. Unknown models and incomplete rows remain visible and unpriced; missing currency stays unknown and mixed currencies are never added. An optional billed total can be reconciled only after the user confirms matching scope; suspected duplicate rows remain present. Downloaded normalized usage neutralizes spreadsheet formulas. See the [request-level usage review](docs/request-level-usage-review.md).
+The **Opportunities** view also accepts a flat request-log CSV or JSON file. It normalizes common universal, OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone field names into versioned canonical events, then points to the exact affected rows for duplicate identifiers, failed and retried calls, repeated retry chains, evidenced cache candidates, unusually large inputs or outputs, reasoning intensity, repeated tool use, model-route candidates, outcome gaps, spend concentration, and cost spikes unexplained by volume. Optional project, team, feature, customer, product, workload, workflow, session, and environment fields support cost-weighted allocation coverage. Optional same-period compute, retrieval/data, network, tooling, pipeline, and human-review totals extend the visible cost boundary without silently spreading shared cost. Usage telemetry, request cost, and billing evidence remain separate. This is local field compatibility, not a promise that every vendor export version is supported. Nested traces must be flattened. Unknown models and incomplete rows remain visible and unpriced; missing currency stays unknown and mixed currencies are never added. An optional billed total can be reconciled only after the user confirms matching scope; suspected duplicate rows remain present. Downloaded normalized usage neutralizes spreadsheet formulas. See the [request-level usage review](docs/request-level-usage-review.md) and [data-contract boundary guide](docs/data-contract-boundaries.md).
 
 The unified upload inspects files locally and routes exact supported formats first:
 

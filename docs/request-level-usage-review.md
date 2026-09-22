@@ -2,6 +2,8 @@
 
 AI Cost Lens can analyze a flat CSV or JSON request log entirely in the browser. The import creates versioned `ai-cost-lens-usage-event/1.0` records and an `ai-cost-lens-usage-review/1.1` review. It does not call a provider, ask for an API key, upload the source file, or require prompt text.
 
+This is a request-level telemetry contract, not a second spelling of the CLI's period-level `ai-cost-lens/2.x` billing ledger. Use the [data-contract boundary and field guide](data-contract-boundaries.md) before translating between them; several fields are intentionally not lossless.
+
 ## Supported local inputs
 
 Use the browser template at `web/templates/ai-cost-lens-request-log-template.csv`, or a flat export whose headings match the deterministic aliases in `web/usage-event-engine.js`.

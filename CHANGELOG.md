@@ -2,7 +2,12 @@
 
 All notable changes to AI Cost Lens are documented here.
 
-## [0.5.0]: release candidate, not yet tagged
+## [0.5.0]: source release, 2026-09-22; tag pending
+
+- Added a one-click, unmistakably illustrative request-log walkthrough so a first-time visitor can exercise the local usage analysis without preparing a file.
+- Replaced first-screen finance shorthand with clearer definitions while retaining the existing evidence and savings gates.
+- Documented the deliberate boundary between request-level browser events and period-level CLI billing ledgers, including the non-lossless field relationships.
+- Made the optional full operating-cost categories legible from the collapsed control without forcing six advanced inputs into the default first-run form.
 
 - Direct **Price a prompt** and **Review AI usage** paths in the opening chooser so the two high-frequency workflows are no longer hidden inside the workbench.
 - Optional local monthly-budget checks against the evidence-gated 30-day run rate, with configurable warning level and explicit `WITHIN`, `WATCH`, `OVER`, `NOT_SUPPLIED`, or unavailable status.
@@ -25,7 +30,7 @@ All notable changes to AI Cost Lens are documented here.
 - New schema, finance-reconciliation tests, front-door interaction coverage, and competitor-readiness documentation for the expanded local review.
 - Removed the old synthetic Pilot 002 links from the public workbench and excluded all internal model-route pilot pages and records from the deployable static build; the single clearly labeled illustrative review remains the only bundled example.
 
-## [0.4.0]: release candidate, not yet tagged
+## [0.4.0]: development milestone, not tagged
 
 - A browser-local **Price a prompt** workspace for comparing direct API token prices without an API key.
 - A versioned `ai-cost-lens-pricing-catalog/0.4` snapshot with dated official source URLs for OpenAI, Anthropic, and Google.
@@ -57,7 +62,7 @@ All notable changes to AI Cost Lens are documented here.
 - Verification-to-Review provenance that carries the output-free record into the finance decision while leaving the existing savings gates in control.
 - Strict prompt-estimate and verification schemas, a blank verification template, golden request fixtures, privacy/network assertions, and competitor-challenge acceptance tests.
 
-## [0.3.3]: release candidate, not yet tagged
+## [0.3.3]: 2026-09-04
 
 - A simple local invoice form for starting a useful bill review without preparing a CSV.
 - Direct local import for the documented Claude Team and Enterprise spend report.

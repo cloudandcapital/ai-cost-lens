@@ -15,6 +15,7 @@
     invoicePdfCandidate: null,
     priceEstimate: null,
     usageReview: null,
+    usageReviewIllustrative: false,
     verificationRecord: null,
     verificationSession: null,
     verificationScores: [],
@@ -2350,11 +2351,11 @@
     document.getElementById("truth-summary").textContent = simple
       ? "A cheaper subscription can cost more when it creates extra reviewing and fixing work."
       : humanIncluded
-      ? `Four numbers tell the story. ${sentenceCase(providerTerm)} can fall while the cost of usable work rises.`
+      ? `A ready result is finished work that cleared the stated quality rule. ${sentenceCase(providerTerm)} can fall while the cost of usable work rises.`
       : `This first pass connects the bill to usable work. Human review time was not supplied, so the unit cost remains directional.`;
     document.getElementById("unit-economics-card").innerHTML = `
       <div class="decision-table-heading">
-        <div><span>${simple ? "COST COMPARISON" : "DECISION LEDGER"}</span><strong>${simple ? lower ? "The other option costs less per usable result in this sample." : "The cheaper subscription did not produce cheaper usable work." : lower ? humanIncluded ? "The proposed route is cheaper per ready result." : "The proposed route is lower on the costs supplied." : humanIncluded ? "The cheaper bill did not produce cheaper work." : "The proposed route is not cheaper on the costs supplied."}</strong></div>
+        <div><span>${simple ? "COST COMPARISON" : "DECISION CHECK"}</span><strong>${simple ? lower ? "The other option costs less per usable result in this sample." : "The cheaper subscription did not produce cheaper usable work." : lower ? humanIncluded ? "The proposed route is cheaper per ready result." : "The proposed route is lower on the costs supplied." : humanIncluded ? "The cheaper bill did not produce cheaper work." : "The proposed route is not cheaper on the costs supplied."}</strong></div>
         <span class="evidence-pill ${state.data.mode === "illustrative" ? "is-illustrative" : sampled ? "is-sampled" : "is-observed"}">${escapeHtml(evidenceLabel)}</span>
       </div>
       <div class="decision-table-wrap" role="region" aria-label="Route decision comparison" tabindex="0">
@@ -2449,10 +2450,10 @@
       },
     ];
     document.getElementById("truth-summary").textContent =
-      `Four numbers tell the story. ${sentenceCase(providerTerm)} can fall while the cost of usable work rises.`;
+      `A ready result is finished work that cleared the stated quality rule. ${sentenceCase(providerTerm)} can fall while the cost of usable work rises.`;
     document.getElementById("unit-economics-card").innerHTML = `
       <div class="decision-table-heading">
-        <div><span>DECISION LEDGER</span><strong>${lower ? "The proposed route is cheaper per ready result." : "The cheaper bill did not produce cheaper work."}</strong></div>
+        <div><span>DECISION CHECK</span><strong>${lower ? "The proposed route is cheaper per ready result." : "The cheaper bill did not produce cheaper work."}</strong></div>
         <span class="evidence-pill ${state.data.mode === "illustrative" ? "is-illustrative" : sampled ? "is-sampled" : "is-observed"}">${escapeHtml(evidenceLabel)}</span>
       </div>
       <div class="decision-table-wrap" role="region" aria-label="Route decision comparison" tabindex="0">
@@ -3688,6 +3689,12 @@
     const result = document.getElementById("request-analysis-results");
     const summary = document.getElementById("request-analysis-summary");
     const list = document.getElementById("request-finding-list");
+    document.getElementById("request-analysis-mode").textContent = state.usageReviewIllustrative
+      ? "ILLUSTRATIVE DATA"
+      : "OBSERVED REQUEST REVIEW";
+    document.getElementById("request-analysis-title").textContent = state.usageReviewIllustrative
+      ? "What the example calls show"
+      : "What the imported calls support";
     const currency = review.currency;
     const headline = currency === "MIXED" ? null : review.headline.conservative_non_additive_opportunity;
     const bill = review.reconciliation.bill;
@@ -3762,41 +3769,18 @@
   }
 
   function initializeRequestLogAnalysis() {
-  // A result belongs to the options used to calculate it, not subsequent edits.
-  document.querySelectorAll(".request-review-panel input:not([type=file]), .request-review-panel select").forEach((input) => {
-    if (input.id.startsWith("request-filter-")) return;
-    input.addEventListener("input", () => {
-      if (!state.usageReview) return;
-      state.usageReview = null;
-      document.getElementById("request-analysis-results").hidden = true;
-      showToast("Review inputs changed. Choose Analyze locally to update the results.");
-    });
-  });
-  document.getElementById("request-log-file").addEventListener("change", (event) => {
-    const [file] = event.target.files;
-    document.getElementById("request-log-file-status").textContent = file
-      ? `${file.name} selected. It will be read only when you choose Analyze locally.`
-      : "Up to 20,000 flat rows or 5 MiB. Unknown fields, including prompt text, are not copied into the normalized record.";
-    document.getElementById("request-analysis-results").hidden = true;
-    document.getElementById("request-log-error").classList.remove("visible");
-    state.usageReview = null;
-  });
-
-  document.getElementById("analyze-request-log").addEventListener("click", async () => {
+  async function runRequestLogAnalysis(button, idleText, loadInput) {
     const error = document.getElementById("request-log-error");
-    const button = document.getElementById("analyze-request-log");
     error.classList.remove("visible");
     try {
       if (!usageEventEngine) throw new Error("Request-level analysis is unavailable in this build.");
-      const [file] = document.getElementById("request-log-file").files;
-      if (!file) throw new Error("Choose a request-log CSV or JSON file first.");
       button.disabled = true;
       button.textContent = "Analyzing…";
-      const text = await readLocalFile(file);
-      const rows = parseRequestLog(text, file.name);
+      const { text, filename, illustrative } = await loadInput();
+      const rows = parseRequestLog(text, filename);
       const review = usageEventEngine.buildReview(rows, {
         catalog: globalThis.AI_COST_LENS_PRICING_CATALOG,
-        source_name: file.name,
+        source_name: illustrative ? "Illustrative request log bundled with AI Cost Lens" : filename,
         source_file_hash: await sha256(text),
         default_currency: document.getElementById("request-default-currency").value.trim() || null,
         billed_total: document.getElementById("request-billed-total").value.trim() || null,
@@ -3819,18 +3803,65 @@
         human_review_cost: document.getElementById("request-human-review-cost").value.trim() || null,
       });
       state.usageReview = review;
+      state.usageReviewIllustrative = illustrative;
       renderRequestAnalysis(review);
       document.getElementById("request-analysis-results").scrollIntoView({ behavior: "smooth", block: "start" });
-      showToast(`${wholeNumber(review.event_count)} request records analyzed locally. Nothing was uploaded.`);
+      showToast(illustrative
+        ? `${wholeNumber(review.event_count)} illustrative request records analyzed locally.`
+        : `${wholeNumber(review.event_count)} request records analyzed locally. Nothing was uploaded.`);
     } catch (caught) {
       state.usageReview = null;
+      state.usageReviewIllustrative = false;
       document.getElementById("request-analysis-results").hidden = true;
       error.textContent = caught instanceof TypeError || caught instanceof RangeError ? "The request log could not be analyzed. Check the flat file structure and numeric fields." : caught.message || "The request log could not be analyzed.";
       error.classList.add("visible");
     } finally {
       button.disabled = false;
-      button.textContent = "Analyze locally";
+      button.textContent = idleText;
     }
+  }
+
+  // A result belongs to the options used to calculate it, not subsequent edits.
+  document.querySelectorAll(".request-review-panel input:not([type=file]), .request-review-panel select").forEach((input) => {
+    if (input.id.startsWith("request-filter-")) return;
+    input.addEventListener("input", () => {
+      if (!state.usageReview) return;
+      state.usageReview = null;
+      state.usageReviewIllustrative = false;
+      document.getElementById("request-analysis-results").hidden = true;
+      showToast("Review inputs changed. Choose Analyze locally to update the results.");
+    });
+  });
+  document.getElementById("request-log-file").addEventListener("change", (event) => {
+    const [file] = event.target.files;
+    document.getElementById("request-log-file-status").textContent = file
+      ? `${file.name} selected. It will be read only when you choose Analyze locally.`
+      : "Up to 20,000 flat rows or 5 MiB. Unknown fields, including prompt text, are not copied into the normalized record.";
+    document.getElementById("request-analysis-results").hidden = true;
+    document.getElementById("request-log-error").classList.remove("visible");
+    state.usageReview = null;
+    state.usageReviewIllustrative = false;
+  });
+
+  document.getElementById("analyze-request-log").addEventListener("click", async () => {
+    const button = document.getElementById("analyze-request-log");
+    await runRequestLogAnalysis(button, "Analyze locally", async () => {
+      const [file] = document.getElementById("request-log-file").files;
+      if (!file) throw new Error("Choose a request-log CSV or JSON file first.");
+      const text = await readLocalFile(file);
+      return { text, filename: file.name, illustrative: false };
+    });
+  });
+
+  document.getElementById("try-illustrative-request-log").addEventListener("click", async () => {
+    const button = document.getElementById("try-illustrative-request-log");
+    await runRequestLogAnalysis(button, "Try illustrative data", async () => {
+      const template = document.getElementById("illustrative-request-log-data");
+      const text = template.content.textContent.trim();
+      document.getElementById("request-log-file").value = "";
+      document.getElementById("request-log-file-status").textContent = "Using the bundled illustrative request log. Choose a local file at any time to replace it.";
+      return { text, filename: "illustrative-request-log.json", illustrative: true };
+    });
   });
 
   document.getElementById("download-normalized-usage").addEventListener("click", () => {
@@ -4522,7 +4553,7 @@
     const decision = decisionFor(state.data);
     state.data.comparison.finance_posture = decision.posture;
     for (const id of ["decision-code", "memo-decision-code"]) document.getElementById(id).textContent = decision.code;
-    document.getElementById("finance-posture").textContent = `Finance posture: ${decision.posture}`;
+    document.getElementById("finance-posture").textContent = `Finance recommendation: ${decision.posture}`;
     for (const id of ["decision-title", "memo-decision-title", "memo-next-step", "lumen-panel-copy"]) document.getElementById(id).textContent = decision.reason;
     document.getElementById("lumen-panel-title").textContent = sentenceCase(decision.code.toLowerCase());
     const decisionHeading = document.querySelector(".decision-table-heading strong");
