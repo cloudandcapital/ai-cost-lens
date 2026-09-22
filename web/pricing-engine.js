@@ -415,7 +415,7 @@
     const rateSourceScope = userSuppliedRateCount && officialRateCount ? "mixed" : userSuppliedRateCount ? "user_supplied_only" : "official_list_only";
     return {
       schema_version: "ai-cost-lens-prompt-price-estimate/0.6",
-      application_version: "0.5.0",
+      application_version: "1.0.0",
       created_at: createdAt || new Date().toISOString(),
       catalog: {
         schema_version: catalog.schema_version,
