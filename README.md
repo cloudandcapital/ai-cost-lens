@@ -78,10 +78,10 @@ The public demo needs no credentials and uses entirely illustrative data.
 
 Python 3.10 or newer is required.
 
-The current tagged release is v0.5.0.
+The current source release is 0.5.0. The latest immutable Git tag remains v0.3.3; install the current source release from `main` until the v0.5.0 tag is published.
 
 ```bash
-pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@v0.5.0"
+pipx install "git+https://github.com/cloudandcapital/ai-cost-lens.git@main"
 ai-cost-lens --help
 ```
 
