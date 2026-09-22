@@ -41,7 +41,7 @@ It is comparable to model-price directories, LLM observability products, and loc
 - Plain optimization categories and a finance posture of fund change, fix evidence, stop change, or insufficient evidence.
 - Downloadable `ai-cost-lens-usage-review/1.1` JSON.
 - One local custom/contract prompt-pricing route with explicit `user_supplied` provenance.
-- Downloadable `ai-cost-lens-prompt-price-estimate/0.5` JSON.
+- Downloadable `ai-cost-lens-prompt-price-estimate/0.6` JSON.
 - Application/package version `0.5.0`.
 
 ## Primary files
@@ -52,7 +52,7 @@ It is comparable to model-price directories, LLM observability products, and loc
 - `web/index.html`
 - `web/styles.css`
 - `schemas/ai-cost-lens-usage-review-1.1.schema.json`
-- `schemas/ai-cost-lens-prompt-price-estimate-0.5.schema.json`
+- `schemas/ai-cost-lens-prompt-price-estimate-0.6.schema.json`
 - `tests/test_usage_event_engine.py`
 - `tests/test_prompt_pricing.py`
 - `scripts/check-builder-state.mjs`

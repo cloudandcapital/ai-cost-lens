@@ -12,7 +12,16 @@ All notable changes to AI Cost Lens are documented here.
 - Complete team/owner and customer/product breakdowns in the request review, with average selected cost per priced row across every ownership view.
 - Downloadable `ai-cost-lens-usage-review/1.1` JSON in addition to formula-safe normalized CSV; neither the budget check nor variance bridge permits a savings claim.
 - One local custom/contract route in **Price a prompt**, with required rate date and source label, optional batch and token limits, explicit `user_supplied` provenance, and no contract upload or false verification claim.
-- Downloadable `ai-cost-lens-prompt-price-estimate/0.5` JSON for an auditable handoff; user-supplied rates add their own confirmation requirement and remain `TEST_FIRST`.
+- Downloadable `ai-cost-lens-prompt-price-estimate/0.6` JSON for an auditable handoff; user-supplied rates add their own confirmation requirement and remain `TEST_FIRST`.
+- A reverified `ai-cost-lens-pricing-catalog/0.5` snapshot with 14 curated OpenAI, Anthropic, and Google routes, effective and review dates, provider-specific Standard, Batch, Flex, Fast, and Priority modes where published, cache-write and cache-storage rates, long-context treatment, and geography multipliers.
+- Per-route processing mode and inference geography in prompt estimates, plus explicit cache-refresh duration and cache-storage token-hour assumptions. Refreshes replace cache reads rather than being double counted.
+- Labeled model-rate cards replace the ambiguous wide catalog table, keeping input, cached-input, cache-write or storage, and output units visible at narrow widths.
+- Request-log analysis now preserves processing mode, inference geography, cache-write tokens, and cache-storage token-hours; supported rows can use those dimensions for automatic catalog pricing, spend breakdowns, and period-variance investigation.
+- A visible custom-rate shortcut, one intentionally open comparison slot, and fail-closed add behavior prevent catalog actions from silently replacing an existing route.
+- Mobile masthead actions now use one menu, and the seven-section navigation becomes a native section picker at tablet and phone widths.
+- Darkened sage and clay interface tokens meet WCAG AA contrast against the primary light surfaces used by labels and status text.
+- The production build now uses same-origin assets under a restrictive Content Security Policy and excludes self-contained offline preview files from deployment while retaining them for local use.
+- Corrected the TokenCost research source and removed an unverified dead Optimaizr repository link.
 - New schema, finance-reconciliation tests, front-door interaction coverage, and competitor-readiness documentation for the expanded local review.
 - Removed the old synthetic Pilot 002 links from the public workbench and excluded all internal model-route pilot pages and records from the deployable static build; the single clearly labeled illustrative review remains the only bundled example.
 

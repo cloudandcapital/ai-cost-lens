@@ -87,7 +87,12 @@ def test_web_assets_and_brand_contract_are_present():
     assert 'id="lumen-dialog"' in html
     assert 'id="lumen-form"' not in html
     assert "deterministic record explainer, not a general AI chat" in html
-    assert "Share view" in html
+    assert "Presentation view" in html
+    assert 'id="header-menu-toggle"' in html
+    assert 'aria-controls="header-actions"' in html
+    assert 'id="mobile-section-nav"' in html
+    assert ".header-actions.open" in css
+    assert ".mobile-section-picker:not([hidden])" in css
     assert "body.story-mode .masthead," not in css
     assert "body.story-mode .header-actions > :not(#story-toggle)" in css
     assert "Download decision record (JSON)" in html
@@ -146,17 +151,59 @@ def test_web_assets_and_brand_contract_are_present():
     assert "color: #171816" in memo_next
 
 
+def test_brand_text_colors_clear_wcag_aa_on_page_background():
+    css = (WEB / "styles.css").read_text()
+
+    def color(name: str) -> str:
+        match = re.search(rf"--{name}:\s*(#[0-9a-fA-F]{{6}})", css)
+        assert match, name
+        return match.group(1)
+
+    def luminance(value: str) -> float:
+        channels = [int(value[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+        linear = [
+            (
+                channel / 12.92
+                if channel <= 0.04045
+                else ((channel + 0.055) / 1.055) ** 2.4
+            )
+            for channel in channels
+        ]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    def contrast(foreground: str, background: str) -> float:
+        first, second = luminance(foreground), luminance(background)
+        return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+
+    paper = color("paper")
+    assert contrast(color("sage"), paper) >= 4.5
+    assert contrast(color("clay"), paper) >= 4.5
+
+
+def test_competitor_research_does_not_cite_disputed_or_dead_sources():
+    text = "\n".join(
+        (ROOT / path).read_text()
+        for path in (
+            "docs/competitive-landscape.md",
+            "docs/competitor-parity-2026-09-21.md",
+        )
+    )
+    assert "tokencost.app" not in text
+    assert "github.com/blendbunjaku/optimaizr" not in text
+    assert "github.com/AgentOps-AI/tokencost" in text
+
+
 def test_single_file_preview_embeds_assets_and_data():
     preview = (WEB / "preview.html").read_text()
     assert '<link rel="stylesheet" href="styles.css"' not in preview
     assert '<script src="app.js"' not in preview
     assert '<script src="pricing-engine.js"' not in preview
-    assert '<script src="data/pricing-catalog-v0.4.js"' not in preview
+    assert '<script src="data/pricing-catalog-v0.5.js"' not in preview
     assert '<script src="opportunity-engine.js"' not in preview
     assert '<script src="scenario-engine.js"' not in preview
     assert '<script src="actuals-engine.js"' not in preview
     assert '"schema_version": "ai-cost-lens-review-result/1.0"' in preview
-    assert 'schema_version: "ai-cost-lens-pricing-catalog/0.4"' in preview
+    assert 'schema_version: "ai-cost-lens-pricing-catalog/0.5"' in preview
     assert 'schema_version: "ai-cost-lens-opportunity-set/1.0"' in preview
     assert 'schema_version: "ai-cost-lens-scenario/1.0"' in preview
     assert 'schema_version: "ai-cost-lens-realized-savings/1.0"' in preview
@@ -166,17 +213,20 @@ def test_single_file_preview_embeds_assets_and_data():
     assert "data:text/csv;base64," in preview
 
 
-def test_static_site_build_uses_the_self_contained_review_as_index():
+def test_static_site_build_deploys_same_origin_assets_and_excludes_offline_preview():
     script = (ROOT / "scripts" / "build-static-site.mjs").read_text()
     assert 'import("./build-model-route-decision-preview.mjs")' not in script
     assert (
-        'copyFile(resolve(web, "preview.html"), resolve(build, "index.html"))' in script
+        'copyFile(resolve(web, "preview.html"), resolve(build, "index.html"))'
+        not in script
     )
+    assert "await cp(web, build, { recursive: true })" in script
     assert '"model-route-decision.html"' in script
     assert '"model-route-review.html"' in script
     assert '"data/model-route-decision-v1.js"' in script
     assert '"data/model-route-review-packet.js"' in script
     assert '"README.md"' in script
+    assert '"preview.html"' in script
 
 
 def test_public_workbench_does_not_link_internal_synthetic_pilots():

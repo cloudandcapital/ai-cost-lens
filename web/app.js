@@ -1341,6 +1341,7 @@
         days_with_usage: new Set(usageRows.map((row) => row.date)).size,
         by_model: groupOpenAIUsage(usageRows, "model"),
         by_project: groupOpenAIUsage(usageRows, "project"),
+        by_service_tier: groupOpenAIUsage(usageRows, "service_tier"),
       },
       coverage: {
         usage_model: rowCoverage(usageRows, "model"),
@@ -3641,7 +3642,7 @@
     } else {
       const changeRate = variance.total_cost_change_rate === null ? "Not available" : `${variance.total_cost_change_rate > 0 ? "+" : ""}${(variance.total_cost_change_rate * 100).toFixed(1)}%`;
       const leading = variance.excluded_leading_days ? ` ${wholeNumber(variance.excluded_leading_days)} leading day${variance.excluded_leading_days === 1 ? " was" : "s were"} excluded so the windows are equal.` : "";
-      const costChangeTable = (title, rows) => `<div class="request-variance-table-wrap"><h4>${escapeHtml(title)}</h4><table><thead><tr><th>${escapeHtml(title)}</th><th>Prior</th><th>Recent</th><th>Change</th></tr></thead><tbody>${rows.map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${requestReviewMoney(item.prior_cost, variance.currency)}</td><td>${requestReviewMoney(item.current_cost, variance.currency)}</td><td>${escapeHtml(signedCost(item.change))}</td></tr>`).join("")}</tbody></table></div>`;
+      const costChangeTable = (title, rows) => rows?.length ? `<div class="request-variance-table-wrap"><h4>${escapeHtml(title)}</h4><table><thead><tr><th>${escapeHtml(title)}</th><th>Prior</th><th>Recent</th><th>Change</th></tr></thead><tbody>${rows.map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${requestReviewMoney(item.prior_cost, variance.currency)}</td><td>${requestReviewMoney(item.current_cost, variance.currency)}</td><td>${escapeHtml(signedCost(item.change))}</td></tr>`).join("")}</tbody></table></div>` : "";
       document.getElementById("request-variance").innerHTML = `
         <div class="request-variance-cards">
           <article><span>Prior ${wholeNumber(variance.window_days)} days</span><strong>${requestReviewMoney(variance.prior_period.selected_cost, variance.currency)}</strong><p>${wholeNumber(variance.prior_period.requests)} requests · ${requestReviewMoney(variance.prior_period.cost_per_request, variance.currency)} each</p></article>
@@ -3652,11 +3653,15 @@
         </div>
         <p class="request-variance-note">${escapeHtml(variance.prior_period.start)} to ${escapeHtml(variance.prior_period.end)} versus ${escapeHtml(variance.current_period.start)} to ${escapeHtml(variance.current_period.end)}.${escapeHtml(leading)} The two effects reconcile to total cost change; neither is automatically avoidable.</p>
         ${costChangeTable("Provider", variance.top_provider_cost_changes)}
-        ${costChangeTable("Provider · model", variance.top_model_cost_changes)}`;
+        ${costChangeTable("Provider · model", variance.top_model_cost_changes)}
+        ${costChangeTable("Processing mode", variance.top_processing_mode_cost_changes || [])}
+        ${costChangeTable("Inference geography", variance.top_geography_cost_changes || [])}`;
     }
     const dimensions = [
       ["provider", "Provider"],
       ["model", "Model"],
+      ["processing_mode", "Processing mode"],
+      ["inference_geography", "Inference geography"],
       ["project", "Project"],
       ["team_owner", "Team or owner"],
       ["feature", "Feature"],
@@ -3667,8 +3672,8 @@
       ["session_id", "Session"],
       ["environment", "Environment"],
     ];
-    document.getElementById("request-spend-breakdowns").innerHTML = dimensions.map(([key, label]) => {
-      const rows = spend.breakdowns[key];
+    document.getElementById("request-spend-breakdowns").innerHTML = dimensions.filter(([key]) => spend.breakdowns[key] || !["processing_mode", "inference_geography"].includes(key)).map(([key, label]) => {
+      const rows = spend.breakdowns[key] || [];
       const visible = rows.slice(0, 6);
       return `<article>
         <h4>By ${escapeHtml(label.toLowerCase())}</h4>
@@ -3747,12 +3752,12 @@
         <div class="finding-action"><strong>${escapeHtml(item.action.replaceAll("_", " "))}</strong><p>${escapeHtml(item.verification_requirement)}</p></div>
       </article>`;
     }).join("") : '<p class="workbench-empty">No supported request-level finding was detected. That does not prove the workload is optimized; it means the imported fields did not trigger a deterministic rule.</p>';
-    const fields = ["event_id", "timestamp", "provider", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "provider_reported_cost", "currency", "request_status", "retry_parent_event_id", "prefix_fingerprint", "tool_call_count", "outcome_status"];
+    const fields = ["event_id", "timestamp", "provider", "model", "processing_mode", "inference_geography", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_storage_token_hours", "provider_reported_cost", "currency", "request_status", "retry_parent_event_id", "prefix_fingerprint", "tool_call_count", "outcome_status"];
     const coverage = fields.map((field) => {
       const supplied = review.events.filter((event) => event[field] !== null && event[field] !== undefined).length;
       return `<div><dt>${escapeHtml(field.replaceAll("_", " "))}</dt><dd>${wholeNumber(supplied)} of ${wholeNumber(review.event_count)}</dd></div>`;
     }).join("");
-    document.getElementById("request-import-coverage").innerHTML = `<p><strong>Detected adapter:</strong> ${escapeHtml(review.source.adapter)}. AI Cost Lens accepts universal flat files plus flat OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone field names; it does not send credentials or query those services.</p><dl>${coverage}</dl><p>Source SHA-256: ${escapeHtml(review.source.sha256 || "Unavailable in this browser")}. Prompt contents and unknown source fields were not copied. Automatic catalog pricing requires a timestamp inside the catalog validity window, matching USD currency, and explicit batch, cached-input, and tool-charge values. Missing inputs leave the row unpriced. ${review.reconciliation.duplicate_rows_flagged ? `${wholeNumber(review.reconciliation.duplicate_rows_flagged)} rows share a repeated event ID and remain in the export with a duplicate-group flag. The duplicate-excluded total is a reconciliation reference only: AI Cost Lens does not delete, allocate, or presume any row is invalid.` : "No repeated provider/event-ID group was detected."}</p>`;
+    document.getElementById("request-import-coverage").innerHTML = `<p><strong>Detected adapter:</strong> ${escapeHtml(review.source.adapter)}. AI Cost Lens accepts universal flat files plus flat OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone field names; it does not send credentials or query those services.</p><dl>${coverage}</dl><p>Source SHA-256: ${escapeHtml(review.source.sha256 || "Unavailable in this browser")}. Prompt contents and unknown source fields were not copied. Automatic catalog pricing requires a timestamp inside the catalog validity window, matching USD currency, a supported processing mode or batch flag, cached-input tokens, and tool charges. Routes with separate cache-write or storage charges also require explicit write tokens, duration where applicable, and storage token-hours. Missing inputs leave the row unpriced. ${review.reconciliation.duplicate_rows_flagged ? `${wholeNumber(review.reconciliation.duplicate_rows_flagged)} rows share a repeated event ID and remain in the export with a duplicate-group flag. The duplicate-excluded total is a reconciliation reference only: AI Cost Lens does not delete, allocate, or presume any row is invalid.` : "No repeated provider/event-ID group was detected."}</p>`;
     result.hidden = false;
   }
 
@@ -4181,6 +4186,7 @@
     document.getElementById("bill-mix-note").textContent = "These are observed usage measures. They are not billed dollars by model.";
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Model</th><th>Requests</th><th>Input</th><th>Output</th><th>Cache share</th><th>Billed cost</th></tr>";
     const { bill, usage, period, reconciliation, limitations } = state.data;
+    const serviceTiers = usage.by_service_tier || [];
     const completeValue = (field) => openAIFieldCoverage(usage, field).status === "complete" ? usage.totals[field] : null;
     const requests = completeValue("requests");
     const totalInput = completeValue("input_tokens");
@@ -4214,6 +4220,7 @@
       ["Blended cost per request", costPerRequestLabel, costPerRequest === null ? "Available only when every usage row supplies requests and the total is greater than zero" : "Full exported cost divided by observed requests; not a model price"],
       ["Input tokens", openAIReportedValue(usage, "input_tokens"), openAICoverageNote(usage, "input_tokens", cacheShare === null ? "Cache share is unavailable" : `${pct(cacheShare, 1)} read from cache`)],
       ["Output tokens", openAIReportedValue(usage, "output_tokens"), openAICoverageNote(usage, "output_tokens", `${usage.days_with_usage} day${usage.days_with_usage === 1 ? "" : "s"} with usage`)],
+      ["Processing tiers", serviceTiers.length ? compact(serviceTiers.length) : "Unavailable", serviceTiers.length ? serviceTiers.map((row) => row.service_tier).join(", ") : "This saved review predates processing-tier grouping or the export did not provide it"],
       ["Average input per request", averageInput === null ? "Unavailable" : compact(averageInput), "A prompt-size baseline for this exported period"],
       ["Average output per request", averageOutput === null ? "Unavailable" : compact(averageOutput), "An output-length baseline for this exported period"],
       ["Human effort", "Optional", "Add only when people actively review or correct the output"],
@@ -4262,7 +4269,7 @@
         : `Start with ${topModel.model}, the route handling ${topRequestShareLabel} of requests.`
       : "Export matching usage and cost periods before investigating optimization.";
     document.getElementById("bill-boundary-copy").textContent = period.aligned
-      ? `${usage.by_model.length} model route${usage.by_model.length === 1 ? "" : "s"} and ${usage.by_project.length} project record${usage.by_project.length === 1 ? "" : "s"} are visible. Check prompt size, output length, caching, and whether a smaller model meets quality on one repeatable job. Human review is optional; add outcomes only when you need to test value or savings.`
+      ? `${usage.by_model.length} model route${usage.by_model.length === 1 ? "" : "s"}, ${usage.by_project.length} project record${usage.by_project.length === 1 ? "" : "s"}, and ${serviceTiers.length} processing tier${serviceTiers.length === 1 ? "" : "s"} are visible. Check prompt size, output length, caching, tier mix, and whether a smaller model meets quality on one repeatable job. Human review is optional; add outcomes only when you need to test value or savings.`
       : "The usage and cost date buckets do not align. Export the same date range again before using this review for a financial decision.";
   }
 
@@ -4425,7 +4432,9 @@
     const isSingle = state.data.schema_version === singleBillSchema;
     const isBill = isSingle || state.data.schema_version === "ai-cost-lens-openai-bill-review/0.1";
     const reviewNav = document.querySelector(".question-nav");
+    const mobileNav = document.querySelector(".mobile-section-picker");
     reviewNav.hidden = isBill;
+    mobileNav.hidden = isBill;
     reviewNav.setAttribute("aria-hidden", String(isBill));
     reviewNav.querySelectorAll("button").forEach((button) => {
       button.disabled = isBill;
@@ -4451,6 +4460,10 @@
       : new Set([...document.querySelectorAll(".nav-item")].map((item) => item.dataset.view));
     reviewNav.querySelectorAll("button").forEach((button) => {
       button.hidden = !availableViews.has(button.dataset.view);
+    });
+    document.getElementById("mobile-section-nav").querySelectorAll("option").forEach((option) => {
+      option.hidden = !availableViews.has(option.value);
+      option.disabled = !availableViews.has(option.value);
     });
     if (!availableViews.has(state.view)) state.view = "review";
     document.getElementById("story-toggle").hidden = false;
@@ -4534,6 +4547,7 @@
     const target = [...document.querySelectorAll(".nav-item")].find((item) => item.dataset.view === view && !item.hidden);
     if (!target) return;
     state.view = view;
+    document.getElementById("mobile-section-nav").value = view;
     document.querySelectorAll(".nav-item").forEach((item) => {
       item.classList.toggle("active", item.dataset.view === view);
       item.setAttribute("aria-current", item.dataset.view === view ? "page" : "false");
@@ -4543,6 +4557,8 @@
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  document.getElementById("mobile-section-nav").addEventListener("change", (event) => setView(event.currentTarget.value));
 
   function showToast(message) {
     const toast = document.getElementById("toast");
@@ -4871,8 +4887,24 @@
   document.getElementById("story-toggle").addEventListener("click", (event) => {
     state.story = !state.story;
     document.body.classList.toggle("story-mode", state.story);
-    event.currentTarget.textContent = state.story ? "Full review" : "Share view";
+    event.currentTarget.textContent = state.story ? "Full review" : "Presentation view";
     if (state.story) setView("review");
+    showToast(state.story ? "Presentation view on. Interface controls are hidden." : "Full review restored.");
+  });
+
+  const headerMenuToggle = document.getElementById("header-menu-toggle");
+  const headerActions = document.getElementById("header-actions");
+  headerMenuToggle.addEventListener("click", () => {
+    const open = !headerActions.classList.contains("open");
+    headerActions.classList.toggle("open", open);
+    headerMenuToggle.setAttribute("aria-expanded", String(open));
+    headerMenuToggle.textContent = open ? "Close" : "Menu";
+  });
+  headerActions.addEventListener("click", (event) => {
+    if (!event.target.closest("button, label")) return;
+    headerActions.classList.remove("open");
+    headerMenuToggle.setAttribute("aria-expanded", "false");
+    headerMenuToggle.textContent = "Menu";
   });
 
   const reviewDialog = document.getElementById("review-dialog");
@@ -4962,7 +4994,7 @@
       state.view = "opportunities";
       state.story = false;
       document.body.classList.remove("story-mode");
-      document.getElementById("story-toggle").textContent = "Share view";
+      document.getElementById("story-toggle").textContent = "Presentation view";
       const navigation = document.querySelector(".question-nav");
       navigation.hidden = false;
       navigation.setAttribute("aria-hidden", "false");
@@ -4982,7 +5014,7 @@
       state.view = "review";
       state.story = false;
       document.body.classList.remove("story-mode");
-      document.getElementById("story-toggle").textContent = "Share view";
+      document.getElementById("story-toggle").textContent = "Presentation view";
       renderAll(); setView("review"); reviewDialog.close(); showToast("Worked example open. No files needed."); return;
     }
     document.querySelectorAll(".builder-mode").forEach((item) => {
@@ -5038,6 +5070,12 @@
   let openAITokenizerLoad = null;
   let pendingPriceRecord = null;
   const customPromptRateId = "custom/user-supplied-rate";
+  const promptRouteControls = Object.freeze([
+    { model: "prompt-current-model", mode: "prompt-current-mode", geography: "prompt-current-geography", wrapper: "prompt-current-rate-controls" },
+    { model: "prompt-alt-1", mode: "prompt-alt-1-mode", geography: "prompt-alt-1-geography", wrapper: "prompt-alt-1-rate-controls" },
+    { model: "prompt-alt-2", mode: "prompt-alt-2-mode", geography: "prompt-alt-2-geography", wrapper: "prompt-alt-2-rate-controls" },
+    { model: "prompt-alt-3", mode: "prompt-alt-3-mode", geography: "prompt-alt-3-geography", wrapper: "prompt-alt-3-rate-controls" },
+  ]);
 
   if (pricingCatalog && pricingEngine) {
 
@@ -5065,7 +5103,53 @@
   }
 
   function selectedPromptModelIds() {
-    return ["prompt-current-model", "prompt-alt-1", "prompt-alt-2", "prompt-alt-3"].map((id) => document.getElementById(id).value);
+    return promptRouteControls.map((route) => document.getElementById(route.model).value);
+  }
+
+  function promptModel(modelId) {
+    if (modelId === customPromptRateId) return {
+      id: customPromptRateId,
+      standard: {},
+      batch: {},
+      geography_multipliers: { global: 1 },
+    };
+    return pricingCatalog.models.find((model) => model.id === modelId) || null;
+  }
+
+  function modeLabel(mode) {
+    return ({ standard: "Standard", batch: "Batch", flex: "Flex", fast: "Fast", priority: "Priority" })[mode] || mode;
+  }
+
+  function geographyLabel(geography, multiplier) {
+    const base = ({ global: "Global / default", regional: "Regional processing", us: "US-only inference" })[geography] || geography;
+    return multiplier > 1 ? `${base} (+${((multiplier - 1) * 100).toFixed(0)}%)` : base;
+  }
+
+  function updatePromptRouteControl(route) {
+    const modelId = document.getElementById(route.model).value;
+    const wrapper = document.getElementById(route.wrapper);
+    wrapper.hidden = !modelId;
+    if (!modelId) return;
+    const model = promptModel(modelId);
+    if (!model) return;
+    const modeSelect = document.getElementById(route.mode);
+    const geographySelect = document.getElementById(route.geography);
+    const previousMode = modeSelect.value;
+    const previousGeography = geographySelect.value;
+    const modes = pricingEngine.availableProcessingModes(model);
+    modeSelect.innerHTML = modes.map((mode) => `<option value="${escapeHtml(mode)}">${escapeHtml(modeLabel(mode))}</option>`).join("");
+    modeSelect.value = modes.includes(previousMode) ? previousMode : "standard";
+    const geographies = Object.entries(model.geography_multipliers || { global: 1 });
+    geographySelect.innerHTML = geographies.map(([geography, multiplier]) => `<option value="${escapeHtml(geography)}">${escapeHtml(geographyLabel(geography, multiplier))}</option>`).join("");
+    geographySelect.value = geographies.some(([geography]) => geography === previousGeography) ? previousGeography : "global";
+  }
+
+  function selectedPromptRoutes() {
+    return promptRouteControls.map((route) => ({
+      model_id: document.getElementById(route.model).value,
+      processing_mode: document.getElementById(route.mode).value || "standard",
+      geography: document.getElementById(route.geography).value || "global",
+    })).filter((route) => route.model_id);
   }
 
   function revealSelectedCustomRate() {
@@ -5087,11 +5171,13 @@
       standard: {
         input: value("prompt-custom-input"),
         cached_input: value("prompt-custom-cached"),
+        cache_write: value("prompt-custom-cache-write"),
         output: value("prompt-custom-output"),
       },
       batch: {
         input: value("prompt-custom-batch-input"),
         cached_input: value("prompt-custom-batch-cached"),
+        cache_write: value("prompt-custom-batch-cache-write"),
         output: value("prompt-custom-batch-output"),
       },
       context_window_tokens: value("prompt-custom-context"),
@@ -5145,17 +5231,22 @@
     });
     document.getElementById("model-catalog-rows").innerHTML = models.map((model) => {
       const context = model.context_window_tokens || model.input_token_limit;
-      return `<tr>
-        <th><a href="${escapeHtml(model.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(model.label)}</a><span>${escapeHtml(model.provider)} · checked ${escapeHtml(model.verified_at)}</span></th>
-        <td>${modelRate(model.standard.input)}</td>
-        <td>${modelRate(model.standard.cached_input)}</td>
-        <td>${modelRate(model.standard.output)}</td>
-        <td>${compact(context)}</td>
-        <td class="model-workload-signals"><div>${model.workload_tags.map((tag) => `<span>${escapeHtml(tagLabels[tag])}</span>`).join("")}</div><a href="${escapeHtml(model.capability_source_url)}" target="_blank" rel="noreferrer">Provider notes</a></td>
-        <td><button class="text-button catalog-add-model" type="button" data-model-id="${escapeHtml(model.id)}">Add</button></td>
-      </tr>`;
-    }).join("") || '<tr><td colspan="7">No model matches this filter.</td></tr>';
-    document.getElementById("model-catalog-count").textContent = `${models.length} of ${pricingCatalog.models.length} models · USD per 1M tokens · provider-described workload signals are reference only`;
+      const cacheSupplement = model.standard.cache_write !== undefined
+        ? ["Cache write", model.standard.cache_write]
+        : model.standard.cache_write_5m !== undefined
+          ? ["Cache write · 5m", model.standard.cache_write_5m]
+          : model.standard.cache_storage_per_1m_token_hour !== undefined
+            ? ["Cache storage / hr", model.standard.cache_storage_per_1m_token_hour]
+            : ["Cache extra", null];
+      const rates = [["Input", model.standard.input], ["Cached input", model.standard.cached_input], cacheSupplement, ["Output", model.standard.output]];
+      const modes = pricingEngine.availableProcessingModes(model).map(modeLabel).join(" · ");
+      return `<article class="model-catalog-card" role="listitem">
+        <div class="model-catalog-card-head"><div><a href="${escapeHtml(model.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(model.label)}</a><span>${escapeHtml(model.provider)} · checked ${escapeHtml(model.verified_at)}</span></div><button class="text-button catalog-add-model" type="button" data-model-id="${escapeHtml(model.id)}">Add</button></div>
+        <div class="model-catalog-rates" aria-label="Standard USD rates. Token rates are per 1 million tokens; cache storage is per 1 million token-hours.">${rates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${value === null ? "Not listed" : modelRate(value)}</strong></div>`).join("")}</div>
+        <div class="model-catalog-card-foot"><div><span class="model-catalog-context">${compact(context)} token context · ${escapeHtml(modes)}</span><div class="model-workload-signals">${model.workload_tags.map((tag) => `<span>${escapeHtml(tagLabels[tag])}</span>`).join("")}</div></div><a class="model-catalog-provider-notes" href="${escapeHtml(model.capability_source_url)}" target="_blank" rel="noreferrer">Provider notes</a></div>
+      </article>`;
+    }).join("") || '<p class="model-catalog-empty">No model matches this filter.</p>';
+    document.getElementById("model-catalog-count").textContent = `${models.length} of ${pricingCatalog.models.length} models · token rates per 1M tokens; storage per 1M token-hours · provider-described workload signals are reference only`;
     document.querySelectorAll(".catalog-add-model").forEach((button) => {
       button.addEventListener("click", () => {
         const modelId = button.dataset.modelId;
@@ -5164,8 +5255,13 @@
           showToast("That model is already in the comparison.");
           return;
         }
-        const target = selects.slice(1).find((select) => !select.value) || selects[3];
+        const target = selects.slice(1).find((select) => !select.value);
+        if (!target) {
+          showToast("All four comparison routes are in use. Clear an alternative before adding another model.");
+          return;
+        }
         target.value = modelId;
+        updatePromptRouteControl(promptRouteControls.find((route) => route.model === target.id));
         showToast(`${pricingCatalog.models.find((model) => model.id === modelId).label} added to the comparison.`);
       });
     });
@@ -5180,18 +5276,42 @@
     document.getElementById("prompt-current-model").value = "openai/gpt-5.6-sol";
     document.getElementById("prompt-alt-1").value = "anthropic/claude-sonnet-5";
     document.getElementById("prompt-alt-2").value = "google/gemini-3.8-flash";
-    document.getElementById("prompt-alt-3").value = "openai/gpt-5.6-luna";
-    document.getElementById("prompt-custom-effective").value = new Date().toISOString().slice(0, 10);
-    for (const id of ["prompt-current-model", "prompt-alt-1", "prompt-alt-2", "prompt-alt-3"]) {
-      document.getElementById(id).addEventListener("change", revealSelectedCustomRate);
-    }
+    document.getElementById("prompt-alt-3").value = "";
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById("prompt-custom-effective").value = today;
+    const pricingDateInput = document.getElementById("prompt-pricing-date");
+    pricingDateInput.min = pricingCatalog.effective_at;
+    pricingDateInput.max = pricingCatalog.review_by;
+    pricingDateInput.value = today < pricingCatalog.effective_at ? pricingCatalog.effective_at : today > pricingCatalog.review_by ? pricingCatalog.review_by : today;
+    promptRouteControls.forEach((route) => {
+      updatePromptRouteControl(route);
+      document.getElementById(route.model).addEventListener("change", () => {
+        revealSelectedCustomRate();
+        updatePromptRouteControl(route);
+      });
+    });
     const sources = pricingCatalog.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.provider)}</a>`).join(", ");
-    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Official list prices checked ${escapeHtml(pricingCatalog.effective_at)}: ${sources}. Review again by ${escapeHtml(pricingCatalog.review_by)}.`;
+    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Official list prices checked ${escapeHtml(pricingCatalog.effective_at)}: ${sources}. Review again by ${escapeHtml(pricingCatalog.review_by)}. Processing mode, cache-write treatment, and geography are recorded per route.`;
     const providers = [...new Set(pricingCatalog.models.map((model) => model.provider))];
     document.getElementById("model-catalog-provider").innerHTML = '<option value="">All providers</option>' + providers.map((provider) => `<option value="${escapeHtml(provider)}">${escapeHtml(provider)}</option>`).join("");
     document.getElementById("model-catalog-search").addEventListener("input", renderModelCatalog);
     document.getElementById("model-catalog-provider").addEventListener("change", renderModelCatalog);
     document.getElementById("model-catalog-task").addEventListener("change", renderModelCatalog);
+    document.getElementById("add-custom-prompt-rate").addEventListener("click", () => {
+      const selects = promptRouteControls.slice(1).map((route) => document.getElementById(route.model));
+      let target = selects.find((select) => select.value === customPromptRateId);
+      if (!target) target = selects.find((select) => !select.value);
+      if (!target) {
+        showToast("All four comparison routes are in use. Clear an alternative before adding a custom rate.");
+        return;
+      }
+      target.value = customPromptRateId;
+      updatePromptRouteControl(promptRouteControls.find((route) => route.model === target.id));
+      const customCard = document.getElementById("prompt-custom-rate");
+      customCard.open = true;
+      customCard.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.setTimeout(() => document.getElementById("prompt-custom-label").focus(), 250);
+    });
     renderModelCatalog();
   }
 
@@ -5207,8 +5327,13 @@
       calls_per_month: finiteNumber(document.getElementById("prompt-calls").value, "Calls per month", { integer: true }),
       retry_rate: percent("prompt-retry-rate", "Retry rate"),
       cached_input_share: percent("prompt-cache-share", "Cached-input share"),
+      cache_refreshes_per_month: finiteNumber(document.getElementById("prompt-cache-refreshes").value || 0, "Cache refreshes per month", { integer: true }),
+      cache_write_duration: document.getElementById("prompt-cache-duration").value,
+      cache_storage_token_hours_per_month: finiteNumber(document.getElementById("prompt-cache-storage-token-hours").value || 0, "Cache storage token-hours per month"),
+      pricing_date: document.getElementById("prompt-pricing-date").value,
+      processing_mode: "standard",
+      geography: "global",
       usable_rate: percent("prompt-usable-rate", "Expected usable rate", true),
-      batch: document.getElementById("prompt-batch").checked,
     };
   }
 
@@ -5222,7 +5347,7 @@
       const usable = result.estimated_cost_per_usable_result_usd === null ? "Not modeled" : promptPriceMoney(result.estimated_cost_per_usable_result_usd);
       const priceBasis = result.pricing_basis === "user_supplied" ? `user-supplied · effective ${result.pricing_effective_at}` : `official list · checked ${result.pricing_verified_at}`;
       return `<tr>
-        <td class="price-route-name"><strong>${escapeHtml(result.label)}</strong><span>${escapeHtml(result.provider)} · ${escapeHtml(result.rate_tier)}${result.pricing_adjustment === "long_context" ? " · long-context rates" : ""}${result.role === "current" ? " · current" : ""}</span><small>${wholeNumber(result.input_tokens)} input · ${result.input_token_method === "openai_o200k_base_exact_raw_text" ? "exact raw-text count" : result.input_token_method === "manual" ? "entered count" : "estimated count"} · ${escapeHtml(priceBasis)}</small></td>
+        <td class="price-route-name"><strong>${escapeHtml(result.label)}</strong><span>${escapeHtml(result.provider)} · ${escapeHtml(modeLabel(result.processing_mode))} · ${escapeHtml(geographyLabel(result.geography, result.geography_multiplier))}${result.pricing_adjustment === "long_context" ? " · long-context rates" : ""}${result.role === "current" ? " · current" : ""}</span><small>${wholeNumber(result.input_tokens)} input · ${result.input_token_method === "openai_o200k_base_exact_raw_text" ? "exact raw-text count" : result.input_token_method === "manual" ? "entered count" : "estimated count"} · ${escapeHtml(priceBasis)}</small></td>
         <td>${promptPriceMoney(result.estimated_cost_per_call_usd)}</td>
         <td>${promptPriceMoney(result.estimated_cost_per_1000_calls_usd)}</td>
         <td>${promptPriceMoney(result.estimated_monthly_cost_usd)}</td>
@@ -5256,11 +5381,20 @@
     const contextCopy = longContextRoutes.length
       ? `Published long-context multipliers apply to ${longContextRoutes.map((result) => result.label).join(", ")}. ${tokenLimitCopy}`
       : tokenLimitCopy;
+    const routeRateCopy = record.comparison.map((result) => `${result.label}: ${modeLabel(result.processing_mode)}, ${geographyLabel(result.geography, result.geography_multiplier)}`).join("; ");
+    const cacheCopy = basis.cache_refreshes_per_month
+      ? `${(basis.cached_input_share * 100).toFixed(1)}% of input is treated as a repeated prefix, with ${wholeNumber(basis.cache_refreshes_per_month)} ${basis.cache_write_duration === "1h" ? "one-hour" : basis.cache_write_duration === "5m" ? "five-minute" : "provider-default"} cache refreshes per month. Each refresh replaces one cache-read call.`
+      : `${(basis.cached_input_share * 100).toFixed(1)}% of input uses published cache-read rates. No cache refresh is included.`;
+    const storageCopy = basis.cache_storage_token_hours_per_month
+      ? `${wholeNumber(basis.cache_storage_token_hours_per_month)} cache token-hours per month are priced only on routes with a separately published storage rate; routes without a separate storage line add zero for this component.`
+      : "No separate cache-storage token-hours are included.";
     document.getElementById("price-assumptions").innerHTML = [
       tokenMethods.has("manual")
         ? "The entered input-token count is applied to every route; provider tokenizers can differ."
         : `${tokenMethods.has("openai_o200k_base_exact_raw_text") ? "OpenAI raw text is counted locally with o200k_base; chat, tool, image, audio, and provider wrapper tokens are excluded. " : ""}${tokenMethods.has("character_estimate_4_to_1") ? "Non-OpenAI input tokens use a disclosed 4-characters-per-token approximation; provider tokenizers can differ." : ""}`,
-      `${basis.batch ? "Published batch rates" : "Standard rates"} and ${(basis.cached_input_share * 100).toFixed(1)}% cached input. Cache writes and storage are excluded.`,
+      `Route rate controls: ${routeRateCopy}.`,
+      cacheCopy,
+      storageCopy,
       contextCopy,
       retryCopy,
       usableCopy,
@@ -5269,7 +5403,7 @@
         : "Every route uses a provider list price from the dated local catalog.",
       record.comparison.some((result) => result.pricing_basis === "official_list")
         ? `Official catalog routes: ${pricingCatalog.scope}`
-        : "The custom rate covers only the entered input, cached-input, and output token categories. Taxes and unentered charges remain excluded.",
+        : "The custom rate covers only the token categories entered. Taxes and unentered charges remain excluded.",
       "Model quality, latency, tool calls, reasoning-token behavior, and human review effort are not inferred.",
     ].map((item) => `<li>${escapeHtml(item)}</li>`).join("");
     document.getElementById("price-results").hidden = false;
@@ -5295,8 +5429,9 @@
     button.disabled = true;
     button.textContent = "Calculating…";
     try {
-      const pricingDate = new Date().toISOString().slice(0, 10);
-      const modelIds = selectedPromptModelIds();
+      const pricingDate = document.getElementById("prompt-pricing-date").value;
+      const routes = selectedPromptRoutes();
+      const modelIds = routes.map((route) => route.model_id);
       const customModels = modelIds.includes(customPromptRateId) ? [readPromptCustomModel(pricingDate)] : [];
       if (modelIds.some((id) => id && id !== customPromptRateId)) pricingEngine.requireCatalogDateCoverage(pricingCatalog, pricingDate);
       const promptText = document.getElementById("prompt-text").value;
@@ -5315,13 +5450,13 @@
         model.id,
         pricingEngine.estimateInputTokens(promptText, manualTokens, model.provider, openAITokenizer?.countTokens),
       ]));
-      const tokenEstimate = modelTokenEstimates[modelIds[0]];
+      const tokenEstimate = modelTokenEstimates[routes[0].model_id];
       const scenario = promptPriceScenario(tokenEstimate);
       if (scenario.calls_per_month < 1) throw new Error("Calls per month must be at least 1.");
       if (scenario.retry_rate > 1 || scenario.cached_input_share > 1 || (scenario.usable_rate !== null && scenario.usable_rate > 1)) {
         throw new Error("Retry, cache, and usable rates cannot be greater than 100%.");
       }
-      const comparison = pricingEngine.compareModels(pricingCatalog, modelIds, scenario, modelTokenEstimates, customModels);
+      const comparison = pricingEngine.compareModels(pricingCatalog, routes, scenario, modelTokenEstimates, customModels);
       pendingPriceRecord = pricingEngine.buildEstimateRecord(pricingCatalog, comparison, scenario, tokenEstimate);
       renderPromptPrice(pendingPriceRecord);
     } catch (caught) {

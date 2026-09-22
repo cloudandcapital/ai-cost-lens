@@ -83,7 +83,7 @@ console.log(JSON.stringify(engine.simulateRoute(review, catalog, {
 })));
 """,
         WEB / "scenario-engine.js",
-        WEB / "data" / "pricing-catalog-v0.4.js",
+        WEB / "data" / "pricing-catalog-v0.5.js",
         WEB / "data" / "illustrative-review-result.json",
     )
     assert result["schema_version"] == "ai-cost-lens-scenario/1.0"
@@ -131,7 +131,7 @@ console.log(JSON.stringify({findings, scenarioRejected, actualsRejected}));
         WEB / "opportunity-engine.js",
         WEB / "scenario-engine.js",
         WEB / "actuals-engine.js",
-        WEB / "data" / "pricing-catalog-v0.4.js",
+        WEB / "data" / "pricing-catalog-v0.5.js",
     )
     assert result["scenarioRejected"] is True
     assert result["actualsRejected"] is True
@@ -166,7 +166,7 @@ try {
 console.log(JSON.stringify({rejected, missingRejected, currencyRejected}));
 """,
         WEB / "scenario-engine.js",
-        WEB / "data" / "pricing-catalog-v0.4.js",
+        WEB / "data" / "pricing-catalog-v0.5.js",
     )
     assert result["rejected"] is True
     assert result["missingRejected"] is True

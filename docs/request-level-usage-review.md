@@ -21,7 +21,7 @@ The local spend explorer filters the normalized events by date, provider, model,
 
 OpenRouter documents native-tokenizer counts, cached and reasoning token details, cost, and server-tool cost in its normalized response usage. Langfuse documents ingested versus inferred usage and cost, with ingested values taking priority. AI Cost Lens follows the same conservative precedence rule: provider-reported row cost wins over calculated token cost for that row.
 
-Sources checked September 21, 2026:
+Sources checked September 22, 2026:
 
 - <https://openrouter.ai/docs/api_reference/overview>
 - <https://langfuse.com/docs/observability/features/token-and-cost-tracking>
@@ -33,11 +33,12 @@ Sources checked September 21, 2026:
 
 - Blank values remain `null`; they do not become zero.
 - Rows that cannot be priced remain in the review with `cost_basis: unpriced`.
-- Automatic catalog pricing requires an event timestamp inside the catalog's effective/review window, the catalog currency, and explicit batch, cached-input, and tool-charge values. Missing fields are not assumed to be standard tier, zero cache, or zero tool cost.
+- Automatic catalog pricing requires an event timestamp inside the catalog's effective/review window, the catalog currency, a supported processing mode or explicit batch flag, cached-input tokens, cache-write tokens when the selected rate has a separate write charge, cache-storage token-hours when a separate storage rate applies to cached input, and explicit tool charges. Missing fields are not assumed to be standard tier, zero cache activity, zero storage, or zero tool cost.
+- Canonical `input_tokens` is the total input token count, including cache-read and cache-write categories. When raw Anthropic-compatible `cache_read_input_tokens` or `cache_creation_input_tokens` fields are detected, they are added to Anthropic's uncached `input_tokens` before the canonical total is built. Canonical field names are never reinterpreted this way.
 - Provider-reported cost takes precedence over calculated cost on the same event.
 - Repeated provider/event-ID pairs are assigned a reversible `duplicate_group`; no row is deleted.
 - An optional billed total is compared only after the user confirms that bill and request records cover the same provider, account, currency, and period. The review shows both the raw difference and a duplicate-excluded reference without changing the imported rows. Missing request cost, request currency, or bill currency is reported as missing evidence rather than zero or a generic mismatch.
-- Provider, model, project, team, feature, customer, product, workload, workflow, session, and environment breakdowns retain request counts, priced-row counts, selected cost, and cost share. Dollar fields remain unavailable when currency is missing or mixed.
+- Provider, model, processing-mode, inference-geography, project, team, feature, customer, product, workload, workflow, session, and environment breakdowns retain request counts, priced-row counts, selected cost, and cost share. Dollar fields remain unavailable when currency is missing or mixed.
 - Allocation coverage is cost-weighted. The user chooses the dimension that must support the decision and a maximum unallocated share. The default 10% warning is an explicit AI Cost Lens review policy, not an industry standard. The result is `PASS`, `WARN`, or `NOT_SUPPORTED`; it never authorizes a savings claim, and it remains unsupported while any request row is unpriced.
 - Optional same-period compute, retrieval/data, network, tooling/observability, pipeline/orchestration, and human-review totals extend the cost boundary beyond the provider charge. Users must exclude charges already included in provider request cost or another category. Blank stays unknown, zero means confirmed none, and `fully_loaded_cost` remains unavailable until every category is supplied.
 - Period-level operating costs remain unallocated to project, team, feature, customer, product, workload, workflow, session, and environment. AI Cost Lens never spreads shared cost across requests without an allocation method supplied outside this static review.

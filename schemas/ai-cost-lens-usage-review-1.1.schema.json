@@ -123,6 +123,16 @@
               "maxItems": 5,
               "items": { "$ref": "#/$defs/costChange" }
             },
+            "top_processing_mode_cost_changes": {
+              "type": "array",
+              "maxItems": 5,
+              "items": { "$ref": "#/$defs/costChange" }
+            },
+            "top_geography_cost_changes": {
+              "type": "array",
+              "maxItems": 5,
+              "items": { "$ref": "#/$defs/costChange" }
+            },
             "limitations": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
             "method": { "type": "string" },
             "savings_claim_allowed": { "const": false }
@@ -156,6 +166,8 @@
           "properties": {
             "provider": { "$ref": "#/$defs/spendBreakdown" },
             "model": { "$ref": "#/$defs/spendBreakdown" },
+            "processing_mode": { "$ref": "#/$defs/spendBreakdown" },
+            "inference_geography": { "$ref": "#/$defs/spendBreakdown" },
             "project": { "$ref": "#/$defs/spendBreakdown" },
             "team_owner": { "$ref": "#/$defs/spendBreakdown" },
             "feature": { "$ref": "#/$defs/spendBreakdown" },

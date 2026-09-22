@@ -45,7 +45,7 @@ console.log(JSON.stringify({catalog, comparison, record}));
             "node",
             "-e",
             script,
-            str(WEB / "data" / "pricing-catalog-v0.4.js"),
+            str(WEB / "data" / "pricing-catalog-v0.5.js"),
             str(WEB / "pricing-engine.js"),
         ],
         check=False,
@@ -55,8 +55,8 @@ console.log(JSON.stringify({catalog, comparison, record}));
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     catalog = payload["catalog"]
-    assert catalog["schema_version"] == "ai-cost-lens-pricing-catalog/0.4"
-    assert catalog["catalog_version"] == "2026-09-21"
+    assert catalog["schema_version"] == "ai-cost-lens-pricing-catalog/0.5"
+    assert catalog["catalog_version"] == "2026-09-22"
     assert {model["provider"] for model in catalog["models"]} == {
         "OpenAI",
         "Anthropic",
@@ -66,7 +66,7 @@ console.log(JSON.stringify({catalog, comparison, record}));
     assert all(
         model["source_url"].startswith("https://") for model in catalog["models"]
     )
-    assert all(model["verified_at"] == "2026-09-21" for model in catalog["models"])
+    assert all(model["verified_at"] == "2026-09-22" for model in catalog["models"])
     assert all(
         model["capability_source_url"].startswith("https://")
         for model in catalog["models"]
@@ -97,7 +97,7 @@ console.log(JSON.stringify({catalog, comparison, record}));
     assert "prompt" not in record["estimate_basis"]
     schema = json.loads(
         (
-            ROOT / "schemas" / "ai-cost-lens-prompt-price-estimate-0.5.schema.json"
+            ROOT / "schemas" / "ai-cost-lens-prompt-price-estimate-0.6.schema.json"
         ).read_text()
     )
     assert set(record) == set(schema["required"])
@@ -112,13 +112,13 @@ console.log(JSON.stringify({catalog, comparison, record}));
 def test_prompt_price_estimate_schema_is_versioned_private_and_fail_closed():
     schema = json.loads(
         (
-            ROOT / "schemas" / "ai-cost-lens-prompt-price-estimate-0.5.schema.json"
+            ROOT / "schemas" / "ai-cost-lens-prompt-price-estimate-0.6.schema.json"
         ).read_text()
     )
     assert schema["additionalProperties"] is False
     assert (
         schema["properties"]["schema_version"]["const"]
-        == "ai-cost-lens-prompt-price-estimate/0.5"
+        == "ai-cost-lens-prompt-price-estimate/0.6"
     )
     assert (
         schema["properties"]["estimate_basis"]["properties"]["prompt_text_stored"][
@@ -142,7 +142,7 @@ const catalog = require(process.argv[1]);
 console.log(JSON.stringify(Object.fromEntries(catalog.models.map((model) => [model.id, {standard: model.standard, batch: model.batch}]))));
 """
     result = subprocess.run(
-        ["node", "-e", script, str(WEB / "data" / "pricing-catalog-v0.4.js")],
+        ["node", "-e", script, str(WEB / "data" / "pricing-catalog-v0.5.js")],
         check=False,
         capture_output=True,
         text=True,
@@ -154,6 +154,7 @@ console.log(JSON.stringify(Object.fromEntries(catalog.models.map((model) => [mod
         "openai/gpt-5.6-sol": ((4, 0.4, 20), (2, 0.2, 10)),
         "openai/gpt-5.6-terra": ((2, 0.2, 12), (1, 0.1, 6)),
         "openai/gpt-5.6-luna": ((0.2, 0.02, 1.2), (0.1, 0.01, 0.6)),
+        "anthropic/claude-fable-5.1": ((10, 0.25, 50), (5, 0.125, 25)),
         "anthropic/claude-opus-5": ((5, 0.5, 25), (2.5, 0.25, 12.5)),
         "anthropic/claude-sonnet-5": ((2, 0.2, 10), (1, 0.1, 5)),
         "anthropic/claude-sonnet-4.6": ((3, 0.3, 15), (1.5, 0.15, 7.5)),
@@ -166,12 +167,73 @@ console.log(JSON.stringify(Object.fromEntries(catalog.models.map((model) => [mod
     }
     assert set(actual) == set(expected)
     for model_id, (standard, batch) in expected.items():
-        assert actual[model_id]["standard"] == dict(
-            zip(("input", "cached_input", "output"), standard, strict=True)
-        )
-        assert actual[model_id]["batch"] == dict(
-            zip(("input", "cached_input", "output"), batch, strict=True)
-        )
+        for field, value in zip(
+            ("input", "cached_input", "output"), standard, strict=True
+        ):
+            assert actual[model_id]["standard"][field] == value
+        for field, value in zip(
+            ("input", "cached_input", "output"), batch, strict=True
+        ):
+            assert actual[model_id]["batch"][field] == value
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_provider_specific_modes_cache_writes_geography_and_storage_are_explicit():
+    script = r"""
+const catalog = require(process.argv[1]);
+const engine = require(process.argv[2]);
+const byId = Object.fromEntries(catalog.models.map((model) => [model.id, model]));
+const base = {input_tokens: 1000, output_tokens: 0, calls_per_month: 100, retry_rate: 0,
+  cached_input_share: .5, usable_rate: null, pricing_date: "2026-09-22"};
+const claude = engine.priceModel(byId["anthropic/claude-sonnet-5"], {
+  ...base, cache_refreshes_per_month: 10, cache_write_duration: "1h",
+}, {processing_mode: "standard", geography: "us"});
+const gemini = engine.priceModel(byId["google/gemini-3.8-flash"], {
+  ...base, cached_input_share: 0, cache_storage_token_hours_per_month: 2_000_000,
+}, {processing_mode: "priority", geography: "global"});
+const openai = engine.priceModel(byId["openai/gpt-5.6-sol"], {
+  ...base, input_tokens: 300000, output_tokens: 1000,
+}, {processing_mode: "flex", geography: "regional"});
+let unsupported = false;
+try { engine.priceModel(byId["anthropic/claude-sonnet-5"], base, {processing_mode: "flex"}); }
+catch (_error) { unsupported = true; }
+console.log(JSON.stringify({claude, gemini, openai, unsupported}));
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "data" / "pricing-catalog-v0.5.js"),
+            str(WEB / "pricing-engine.js"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    claude = payload["claude"]
+    assert claude["processing_mode"] == "standard"
+    assert claude["geography"] == "us"
+    assert claude["geography_multiplier"] == 1.1
+    assert claude["cache_write_rate_field"] == "cache_write_1h"
+    assert claude["rates_per_1m_tokens"]["cache_write_1h"] == 4.4
+    assert claude["estimated_monthly_cost_usd"] == 0.1419
+    gemini = payload["gemini"]
+    assert gemini["processing_mode"] == "priority"
+    assert gemini["estimated_monthly_cost_breakdown_usd"]["cache_storage"] == 1
+    openai = payload["openai"]
+    assert openai["processing_mode"] == "flex"
+    assert openai["pricing_adjustment"] == "long_context"
+    assert openai["geography_multiplier"] == 1.1
+    assert openai["rates_per_1m_tokens"] == {
+        "input": 4.4,
+        "cached_input": 0.44,
+        "cache_write": 5.5,
+        "output": 16.5,
+    }
+    assert payload["unsupported"] is True
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -202,7 +264,7 @@ console.log(JSON.stringify({estimated, manual, exact, otherProvider, priced, rej
             "node",
             "-e",
             script,
-            str(WEB / "data" / "pricing-catalog-v0.4.js"),
+            str(WEB / "data" / "pricing-catalog-v0.5.js"),
             str(WEB / "pricing-engine.js"),
         ],
         check=False,
@@ -267,7 +329,7 @@ console.log(JSON.stringify({custom, comparison, record, partialBatchRejected, mi
             "node",
             "-e",
             script,
-            str(WEB / "data" / "pricing-catalog-v0.4.js"),
+            str(WEB / "data" / "pricing-catalog-v0.5.js"),
             str(WEB / "pricing-engine.js"),
         ],
         check=False,
@@ -284,7 +346,7 @@ console.log(JSON.stringify({custom, comparison, record, partialBatchRejected, mi
     assert custom["pricing_effective_at"] == "2026-09-01"
     assert custom["estimated_monthly_cost_usd"] == 3.3125
     record = payload["record"]
-    assert record["schema_version"] == "ai-cost-lens-prompt-price-estimate/0.5"
+    assert record["schema_version"] == "ai-cost-lens-prompt-price-estimate/0.6"
     assert record["estimate_basis"]["rate_source_scope"] == "mixed"
     assert record["estimate_basis"]["user_supplied_rate_count"] == 1
     assert any(
@@ -315,7 +377,7 @@ try {
             "node",
             "-e",
             script,
-            str(WEB / "data" / "pricing-catalog-v0.4.js"),
+            str(WEB / "data" / "pricing-catalog-v0.5.js"),
             str(WEB / "pricing-engine.js"),
         ],
         check=False,
@@ -348,7 +410,7 @@ console.log(JSON.stringify(record));
             "node",
             "-e",
             script,
-            str(WEB / "data" / "pricing-catalog-v0.4.js"),
+            str(WEB / "data" / "pricing-catalog-v0.5.js"),
             str(WEB / "pricing-engine.js"),
         ],
         cwd=ROOT,
@@ -463,7 +525,7 @@ console.log(JSON.stringify({selected: selected.catalog_version, longContext, con
             "node",
             "-e",
             script,
-            str(WEB / "data" / "pricing-catalog-v0.4.js"),
+            str(WEB / "data" / "pricing-catalog-v0.5.js"),
             str(WEB / "pricing-engine.js"),
         ],
         check=False,
@@ -477,6 +539,7 @@ console.log(JSON.stringify({selected: selected.catalog_version, longContext, con
     assert payload["longContext"]["rates_per_1m_tokens"] == {
         "input": 8,
         "cached_input": 0.8,
+        "cache_write": 10,
         "output": 30,
     }
     assert payload["longContext"]["estimated_monthly_cost_usd"] == 2.7
@@ -513,6 +576,12 @@ def test_price_a_prompt_ui_and_review_handoff_keep_the_evidence_gate():
     assert 'id="model-catalog-provider"' in html
     assert 'id="model-catalog-task"' in html
     assert 'id="model-catalog-rows"' in html
+    assert 'class="model-catalog-list"' in html
+    assert 'class="model-catalog-card"' in app
+    assert 'class="model-catalog-rate"' in app
+    assert "Token rates are per 1 million tokens" in app
+    assert 'id="add-custom-prompt-rate"' in html
+    assert "All four comparison routes are in use" in app
     assert "Price is not a capability or quality score" in html
     assert "renderModelCatalog" in app
     assert "provider-described workload signals are reference only" in app
@@ -530,7 +599,7 @@ def test_price_a_prompt_ui_and_review_handoff_keep_the_evidence_gate():
     "asset",
     [
         WEB / "pricing-engine.js",
-        WEB / "data" / "pricing-catalog-v0.4.js",
+        WEB / "data" / "pricing-catalog-v0.5.js",
     ],
 )
 def test_prompt_pricing_javascript_has_valid_syntax(asset: Path):
