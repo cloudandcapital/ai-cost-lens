@@ -23,6 +23,7 @@ await mkdir(build, { recursive: true });
 await cp(web, build, { recursive: true });
 const nonPublicArtifacts = [
   "README.md",
+  "preview.html",
   "model-route-decision-preview.html",
   "model-route-decision.css",
   "model-route-decision.html",
@@ -35,6 +36,4 @@ const nonPublicArtifacts = [
   "data/model-route-review-packet.js",
 ];
 await Promise.all(nonPublicArtifacts.map((path) => rm(resolve(build, path), { recursive: true, force: true })));
-await copyFile(resolve(web, "preview.html"), resolve(build, "index.html"));
-
-console.log("Built the static Site with the illustrative review available on first paint");
+console.log("Built the static Site with same-origin assets; the self-contained preview remains a repo-only artifact");

@@ -92,7 +92,7 @@ It accepts local evidence files rather than credentials, preserves cost provenan
 - [AWS Bedrock cost attribution](https://docs.aws.amazon.com/bedrock/latest/userguide/cost-management.html)
 - [AWS per request metadata](https://docs.aws.amazon.com/bedrock/latest/userguide/cost-mgmt-request-metadata.html)
 - [Vantage custom LLM enrichment](https://docs.vantage.sh/custom_llm_enrichment)
-- [Optimaizr](https://www.optimaizr.com/) and [source repository](https://github.com/blendbunjaku/optimaizr)
+- [Optimaizr](https://www.optimaizr.com/). No public source repository was linked from the official site when checked on September 22, 2026.
 - [Price Per Token](https://pricepertoken.com/)
-- [TokenCost](https://tokencost.app/)
+- [TokenCost by AgentOps](https://github.com/AgentOps-AI/tokencost)
 - [Artificial Analysis model comparison](https://artificialanalysis.ai/models)

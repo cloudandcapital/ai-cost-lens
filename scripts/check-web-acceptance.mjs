@@ -30,7 +30,7 @@ assert.ok(boundary > 0);
 const elements = new Map();
 const navButtons = [];
 const element = (id) => {
-  if (!elements.has(id)) elements.set(id, { id, innerHTML: '', textContent: '', value: '1', dataset: {}, style: { setProperty() {} }, classList: { add() {}, remove() {}, toggle() {} }, setAttribute() {}, replaceChildren() {}, querySelectorAll() { return id === '.question-nav' ? navButtons : []; } });
+  if (!elements.has(id)) elements.set(id, { id, innerHTML: '', textContent: '', value: '1', dataset: {}, style: { setProperty() {} }, classList: { add() {}, remove() {}, toggle() {} }, addEventListener() {}, setAttribute() {}, replaceChildren() {}, querySelectorAll() { return id === '.question-nav' ? navButtons : []; } });
   return elements.get(id);
 };
 navButtons.push(element('review-tab'), element('anatomy-tab'), element('evidence-tab'));

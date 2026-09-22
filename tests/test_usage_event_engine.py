@@ -12,7 +12,7 @@ from referencing import Registry, Resource
 ROOT = Path(__file__).parents[1]
 WEB = ROOT / "web"
 ENGINE = WEB / "usage-event-engine.js"
-CATALOG = WEB / "data" / "pricing-catalog-v0.4.js"
+CATALOG = WEB / "data" / "pricing-catalog-v0.5.js"
 FIXTURE = ROOT / "tests" / "fixtures" / "request-events-multi-provider.csv"
 
 
@@ -73,19 +73,20 @@ def test_catalog_cost_requires_explicit_pricing_inputs_and_matching_currency_dat
 const engine = require(process.argv[1]);
 const catalog = require(process.argv[2]);
 const complete = {
-  event_id: "priced", timestamp: "2026-09-21T12:00:00Z", model: "gpt-5.6-sol",
-  input_tokens: 1000, output_tokens: 500, cached_input_tokens: 250,
+  event_id: "priced", timestamp: "2026-09-22T12:00:00Z", model: "gpt-5.6-sol",
+  input_tokens: 1000, output_tokens: 500, cached_input_tokens: 250, cache_write_tokens: 0,
   batch: false, tool_charges: 0, currency: "USD",
 };
 const variants = [
   complete,
   {...complete, event_id: "cache-missing", cached_input_tokens: ""},
+  {...complete, event_id: "cache-write-missing", cache_write_tokens: ""},
   {...complete, event_id: "batch-missing", batch: ""},
   {...complete, event_id: "tool-cost-missing", tool_charges: ""},
   {...complete, event_id: "wrong-currency", currency: "EUR"},
-  {...complete, event_id: "before-catalog", timestamp: "2026-09-20T12:00:00Z"},
+  {...complete, event_id: "before-catalog", timestamp: "2026-09-21T12:00:00Z"},
 ];
-console.log(JSON.stringify(engine.buildReview(variants, {catalog, generated_at: "2026-09-21T00:00:00Z"})));
+console.log(JSON.stringify(engine.buildReview(variants, {catalog, generated_at: "2026-09-22T00:00:00Z"})));
 """,
         ENGINE,
         CATALOG,
@@ -95,6 +96,7 @@ console.log(JSON.stringify(engine.buildReview(variants, {catalog, generated_at: 
     assert events["priced"]["cost_basis"] == "calculated"
     for event_id in (
         "cache-missing",
+        "cache-write-missing",
         "batch-missing",
         "tool-cost-missing",
         "wrong-currency",
@@ -102,6 +104,58 @@ console.log(JSON.stringify(engine.buildReview(variants, {catalog, generated_at: 
     ):
         assert events[event_id]["calculated_cost"] is None
         assert events[event_id]["cost_basis"] == "unpriced"
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_usage_pricing_preserves_unknown_tiers_and_normalizes_provider_specific_evidence():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const catalog = require(process.argv[2]);
+const rows = [
+  {
+    event_id: "openai-priority", timestamp: "2026-09-22T12:00:00Z", provider: "OpenAI", model: "gpt-5.6-sol",
+    input_tokens: 1000, output_tokens: 100, cached_input_tokens: 0, cache_write_tokens: 0,
+    service_tier: "priority", tool_charges: 0, currency: "USD",
+  },
+  {
+    event_id: "openai-scale", timestamp: "2026-09-22T12:00:00Z", provider: "OpenAI", model: "gpt-5.6-sol",
+    input_tokens: 1000, output_tokens: 100, cached_input_tokens: 0, cache_write_tokens: 0,
+    service_tier: "scale", tool_charges: 0, currency: "USD",
+  },
+  {
+    event_id: "anthropic-exclusive-cache", timestamp: "2026-09-22T12:00:00Z", provider: "Anthropic", model: "claude-sonnet-5",
+    input_tokens: 700, output_tokens: 100, cache_read_input_tokens: 200, cache_creation_input_tokens: 100,
+    cache_write_duration_seconds: 300, batch: false, tool_charges: 0, currency: "USD",
+  },
+  {
+    event_id: "google-storage-missing", timestamp: "2026-09-22T12:00:00Z", provider: "Google", model: "gemini-3.8-flash",
+    input_tokens: 1000, output_tokens: 100, cached_input_tokens: 100, processing_mode: "standard",
+    tool_charges: 0, currency: "USD",
+  },
+  {
+    event_id: "google-no-storage-charge", timestamp: "2026-09-22T12:00:00Z", provider: "Google", model: "gemini-3.8-flash",
+    input_tokens: 1000, output_tokens: 100, cached_input_tokens: 100, cache_storage_token_hours: 0, processing_mode: "standard",
+    tool_charges: 0, currency: "USD",
+  },
+];
+console.log(JSON.stringify(engine.buildReview(rows, {catalog, generated_at: "2026-09-22T00:00:00Z"})));
+""",
+        ENGINE,
+        CATALOG,
+    )
+    events = {event["event_id"]: event for event in result["events"]}
+    assert events["openai-priority"]["processing_mode"] == "priority"
+    assert events["openai-priority"]["calculated_cost"] == 0.012
+    assert events["openai-scale"]["processing_mode"] == "scale"
+    assert events["openai-scale"]["calculated_cost"] is None
+    anthropic = events["anthropic-exclusive-cache"]
+    assert anthropic["input_tokens"] == 1000
+    assert anthropic["cached_input_tokens"] == 200
+    assert anthropic["cache_write_tokens"] == 100
+    assert anthropic["calculated_cost"] == 0.00269
+    assert events["google-storage-missing"]["calculated_cost"] is None
+    assert events["google-no-storage-charge"]["calculated_cost"] == 0.0010575
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -774,6 +828,10 @@ def test_usage_event_and_review_schemas_are_versioned_and_fail_closed():
     )
     assert event_schema["additionalProperties"] is False
     assert "selected_cost" in event_schema["required"]
+    assert "processing_mode" in event_schema["properties"]
+    assert "processing_mode" not in event_schema["required"]
+    assert "cache_storage_token_hours" in event_schema["properties"]
+    assert "cache_storage_token_hours" not in event_schema["required"]
     assert {
         "feature",
         "customer",

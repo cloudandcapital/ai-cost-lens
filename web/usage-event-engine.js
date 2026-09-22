@@ -34,6 +34,8 @@
     timestamp: ["timestamp", "created_at", "start_time", "date", "time"],
     provider: ["provider", "provider_name"],
     billing_channel: ["billing_channel", "channel", "api_type"],
+    processing_mode: ["processing_mode", "service_tier", "tier", "processing_tier"],
+    inference_geography: ["inference_geography", "inference_geo", "data_region", "processing_region"],
     model: ["model", "model_id", "model_name"],
     project: ["project", "project_id", "project_name"],
     team_owner: ["team_owner", "team", "owner"],
@@ -51,6 +53,7 @@
     cached_input_tokens: ["cached_input_tokens", "cache_read_input_tokens", "cached_tokens", "usage_details_cached_tokens"],
     cache_write_tokens: ["cache_write_tokens", "cache_creation_input_tokens", "usage_details_cache_write_tokens"],
     cache_write_duration_seconds: ["cache_write_duration_seconds", "cache_duration_seconds"],
+    cache_storage_token_hours: ["cache_storage_token_hours", "cached_token_hours", "context_cache_token_hours"],
     batch: ["batch", "is_batch"],
     tool_charges: ["tool_charges", "tool_cost", "tool_cost_usd"],
     provider_reported_cost: ["provider_reported_cost", "provider_cost", "cost_usd", "total_cost", "cost"],
@@ -112,6 +115,18 @@
     throw new Error(`${label} must be true, false, yes, no, 1, 0, or blank.`);
   }
 
+  function processingMode(value, batch, label) {
+    if (value === null || value === undefined || String(value).trim() === "") return batch === null ? null : batch ? "batch" : "standard";
+    const raw = text(value, label, 40).toLowerCase().replace(/[-\s]+/g, "_");
+    if (!/^[a-z0-9][a-z0-9._]*$/.test(raw)) throw new Error(`${label} contains unsupported characters.`);
+    const normalized = raw === "default" ? "standard" : raw;
+    const pricedModes = ["standard", "batch", "flex", "fast", "priority"];
+    if (batch !== null && pricedModes.includes(normalized) && ((batch && normalized !== "batch") || (!batch && normalized === "batch"))) {
+      throw new Error(`${label} conflicts with the batch flag.`);
+    }
+    return normalized;
+  }
+
   function timestamp(value, label) {
     const result = text(value, label, 80);
     if (result === null) return null;
@@ -141,26 +156,51 @@
   function calculatedTokenCost(event, catalog) {
     const model = findModel(catalog, event.provider, event.model);
     if (!model || event.input_tokens === null || event.output_tokens === null) return null;
-    if (event.currency !== catalog.currency || event.batch === null || event.cached_input_tokens === null || event.tool_charges === null || !event.timestamp) return null;
+    if (event.currency !== catalog.currency || event.processing_mode === null || event.cached_input_tokens === null || event.tool_charges === null || !event.timestamp) return null;
     const eventDate = event.timestamp.slice(0, 10);
     if (eventDate < catalog.effective_at || eventDate > catalog.review_by) return null;
-    if (event.cache_write_tokens && /Anthropic/i.test(model.provider)) return null;
+    const pricedMode = event.processing_mode === "priority" && model.provider === "OpenAI" && model.fast ? "fast" : event.processing_mode;
+    const base = model[pricedMode];
+    if (!base) return null;
+    const hasSeparateWriteRate = ["cache_write", "cache_write_5m", "cache_write_1h"].some((field) => base[field] !== null && base[field] !== undefined);
+    if (hasSeparateWriteRate && event.cache_write_tokens === null) return null;
+    if (base.cache_storage_per_1m_token_hour !== null && base.cache_storage_per_1m_token_hour !== undefined && event.cached_input_tokens > 0 && event.cache_storage_token_hours === null) return null;
     if (event.cached_input_tokens + (event.cache_write_tokens || 0) > event.input_tokens) return null;
     if (model.context_window_tokens && event.input_tokens + event.output_tokens > model.context_window_tokens) return null;
     if (model.input_token_limit && event.input_tokens > model.input_token_limit) return null;
     if (model.max_output_tokens && event.output_tokens > model.max_output_tokens) return null;
-    const base = event.batch ? model.batch : model.standard;
-    if (!base) return null;
     const inputThreshold = model.long_context?.input_threshold_tokens;
     const longContext = inputThreshold && event.input_tokens > inputThreshold;
-    const rates = longContext ? {
-      input: base.input * model.long_context.input_multiplier,
-      cached_input: base.cached_input * model.long_context.cached_input_multiplier,
-      output: base.output * model.long_context.output_multiplier,
-    } : base;
+    const geography = event.inference_geography || "global";
+    const geographyMultiplier = model.geography_multipliers?.[geography];
+    if (geographyMultiplier === null || geographyMultiplier === undefined) return null;
+    const multiplier = (field) => {
+      if (!longContext) return geographyMultiplier;
+      if (field === "input") return model.long_context.input_multiplier * geographyMultiplier;
+      if (field === "cached_input") return model.long_context.cached_input_multiplier * geographyMultiplier;
+      if (field.startsWith("cache_write")) return (model.long_context.cache_write_multiplier || model.long_context.input_multiplier) * geographyMultiplier;
+      if (field === "output") return model.long_context.output_multiplier * geographyMultiplier;
+      return geographyMultiplier;
+    };
+    const rates = Object.fromEntries(Object.entries(base).map(([field, value]) => [field, value * multiplier(field)]));
     const cached = event.cached_input_tokens;
-    const uncached = event.input_tokens - cached;
-    const tokenCost = (uncached * rates.input + cached * rates.cached_input + event.output_tokens * rates.output) / 1_000_000;
+    const cacheWrite = event.cache_write_tokens || 0;
+    let cacheWriteRate = rates.cache_write;
+    if (cacheWrite && (cacheWriteRate === null || cacheWriteRate === undefined)) {
+      if (event.cache_write_duration_seconds === null || event.cache_write_duration_seconds <= 0) return null;
+      cacheWriteRate = event.cache_write_duration_seconds > 300 ? rates.cache_write_1h : rates.cache_write_5m;
+      if (cacheWriteRate === null || cacheWriteRate === undefined) return null;
+    }
+    const uncached = event.input_tokens - cached - cacheWrite;
+    const storageCost = event.cache_storage_token_hours === null
+      ? 0
+      : event.cache_storage_token_hours * (rates.cache_storage_per_1m_token_hour || 0) / 1_000_000;
+    const tokenCost = (
+      uncached * rates.input
+      + cached * rates.cached_input
+      + cacheWrite * (cacheWriteRate || 0)
+      + event.output_tokens * rates.output
+    ) / 1_000_000 + storageCost;
     return round(tokenCost + event.tool_charges);
   }
 
@@ -183,6 +223,18 @@
     const reported = number(pick(map, "provider_reported_cost"), `Row ${index + 1} provider-reported cost`);
     const suppliedCalculated = number(pick(map, "calculated_cost"), `Row ${index + 1} calculated cost`);
     const currencyRaw = text(pick(map, "currency"), `Row ${index + 1} currency`, 3);
+    const batch = boolean(pick(map, "batch"), `Row ${index + 1} batch flag`);
+    const mode = processingMode(pick(map, "processing_mode"), batch, `Row ${index + 1} processing mode`);
+    const rawInputTokens = number(pick(map, "input_tokens"), `Row ${index + 1} input tokens`, { integer: true });
+    const cachedInputTokens = number(pick(map, "cached_input_tokens"), `Row ${index + 1} cached input tokens`, { integer: true });
+    const cacheWriteTokens = number(pick(map, "cache_write_tokens"), `Row ${index + 1} cache-write tokens`, { integer: true });
+    const rawAnthropicCacheFields = String(provider || "").toLowerCase() === "anthropic"
+      && !map.has("cached_input_tokens")
+      && !map.has("cache_write_tokens")
+      && (map.has("cache_read_input_tokens") || map.has("cache_creation_input_tokens"));
+    const inputTokens = rawAnthropicCacheFields && rawInputTokens !== null
+      ? rawInputTokens + (cachedInputTokens || 0) + (cacheWriteTokens || 0)
+      : rawInputTokens;
     const event = {
       schema_version: SCHEMA,
       record_id: `row-${String(index + 1).padStart(6, "0")}`,
@@ -190,6 +242,8 @@
       timestamp: timestamp(pick(map, "timestamp"), `Row ${index + 1} timestamp`),
       provider,
       billing_channel: text(pick(map, "billing_channel"), `Row ${index + 1} billing channel`),
+      processing_mode: mode,
+      inference_geography: text(pick(map, "inference_geography"), `Row ${index + 1} inference geography`, 40)?.toLowerCase() || null,
       model,
       project: text(pick(map, "project"), `Row ${index + 1} project`),
       team_owner: text(pick(map, "team_owner"), `Row ${index + 1} team or owner`),
@@ -201,13 +255,14 @@
       customer: text(pick(map, "customer"), `Row ${index + 1} customer`),
       product: text(pick(map, "product"), `Row ${index + 1} product`),
       customer_product: text(pick(map, "customer_product"), `Row ${index + 1} customer or product`),
-      input_tokens: number(pick(map, "input_tokens"), `Row ${index + 1} input tokens`, { integer: true }),
+      input_tokens: inputTokens,
       output_tokens: number(pick(map, "output_tokens"), `Row ${index + 1} output tokens`, { integer: true }),
       reasoning_tokens: number(pick(map, "reasoning_tokens"), `Row ${index + 1} reasoning tokens`, { integer: true }),
-      cached_input_tokens: number(pick(map, "cached_input_tokens"), `Row ${index + 1} cached input tokens`, { integer: true }),
-      cache_write_tokens: number(pick(map, "cache_write_tokens"), `Row ${index + 1} cache-write tokens`, { integer: true }),
+      cached_input_tokens: cachedInputTokens,
+      cache_write_tokens: cacheWriteTokens,
       cache_write_duration_seconds: number(pick(map, "cache_write_duration_seconds"), `Row ${index + 1} cache duration`),
-      batch: boolean(pick(map, "batch"), `Row ${index + 1} batch flag`),
+      cache_storage_token_hours: number(pick(map, "cache_storage_token_hours"), `Row ${index + 1} cache storage token-hours`),
+      batch: batch === null ? mode === null ? null : mode === "batch" : batch,
       tool_charges: number(pick(map, "tool_charges"), `Row ${index + 1} tool charges`),
       provider_reported_cost: reported,
       calculated_cost: suppliedCalculated,
@@ -836,6 +891,8 @@
         average_cost_per_request_effect: null,
         top_provider_cost_changes: [],
         top_model_cost_changes: [],
+        top_processing_mode_cost_changes: [],
+        top_geography_cost_changes: [],
         limitations,
         method: "Two equal consecutive UTC windows. Total cost change equals request-volume effect plus average-cost-per-request effect; the latter can reflect model mix, token shape, cache, tools, service tier, or price and is not treated as a rate-card change.",
         savings_claim_allowed: false,
@@ -887,6 +944,16 @@
         priorEvents,
         currentEvents,
         (event) => `${event.provider || "Provider not supplied"} · ${event.model || "Model not supplied"}`,
+      ),
+      top_processing_mode_cost_changes: topChanges(
+        priorEvents,
+        currentEvents,
+        (event) => event.processing_mode || "Processing mode not supplied",
+      ),
+      top_geography_cost_changes: topChanges(
+        priorEvents,
+        currentEvents,
+        (event) => event.inference_geography || "Geography not supplied",
       ),
       limitations: [],
       method: "Two equal consecutive UTC windows. Total cost change equals request-volume effect plus average-cost-per-request effect; the latter can reflect model mix, token shape, cache, tools, service tier, or price and is not treated as a rate-card change.",
@@ -1041,6 +1108,9 @@
       event.input_tokens,
       event.output_tokens,
       event.cached_input_tokens,
+      event.cache_write_tokens,
+      event.processing_mode,
+      event.inference_geography,
       event.request_status,
       event.latency_ms,
       event.tool_call_count,
@@ -1133,6 +1203,8 @@
       breakdowns: {
         provider: spendBreakdown(events, "provider", currencyComparable, selectedObservedCost),
         model: spendBreakdown(events, "model", currencyComparable, selectedObservedCost),
+        processing_mode: spendBreakdown(events, "processing_mode", currencyComparable, selectedObservedCost),
+        inference_geography: spendBreakdown(events, "inference_geography", currencyComparable, selectedObservedCost),
         project: spendBreakdown(events, "project", currencyComparable, selectedObservedCost),
         team_owner: spendBreakdown(events, "team_owner", currencyComparable, selectedObservedCost),
         feature: spendBreakdown(events, "feature", currencyComparable, selectedObservedCost),
@@ -1271,7 +1343,7 @@
 
   function normalizedCsv(review) {
     if (!review || review.schema_version !== REVIEW_SCHEMA || !Array.isArray(review.events)) throw new Error("A normalized usage review is required.");
-    const fields = ["record_id", "event_id", "timestamp", "provider", "billing_channel", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "customer_product", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_duration_seconds", "batch", "tool_charges", "provider_reported_cost", "calculated_cost", "selected_cost", "cost_basis", "currency", "request_status", "retry_parent_event_id", "latency_ms", "evidence_source", "source_file_hash", "prefix_fingerprint", "tool_call_count", "outcome_status", "duplicate_group"];
+    const fields = ["record_id", "event_id", "timestamp", "provider", "billing_channel", "processing_mode", "inference_geography", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "customer_product", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_duration_seconds", "cache_storage_token_hours", "batch", "tool_charges", "provider_reported_cost", "calculated_cost", "selected_cost", "cost_basis", "currency", "request_status", "retry_parent_event_id", "latency_ms", "evidence_source", "source_file_hash", "prefix_fingerprint", "tool_call_count", "outcome_status", "duplicate_group"];
     return `${fields.join(",")}\n${review.events.map((event) => fields.map((field) => csvCell(event[field])).join(",")).join("\n")}\n`;
   }
 

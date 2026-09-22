@@ -1,6 +1,6 @@
 # Competitor capability ledger
 
-Research checked: September 21, 2026
+Research checked: September 22, 2026
 
 This is the release truth for AI Cost Lens 0.5. It is not a marketing comparison and it does not declare overall parity. A capability is marked implemented only when the repository contains a working path and a testable evidence boundary.
 
@@ -19,8 +19,8 @@ The defensible claim is therefore:
 | Capability | Market reference | AI Cost Lens 0.5 evidence | Status |
 |---|---|---|---|
 | Browser-local use without an account or API key | [Optimaizr](https://www.optimaizr.com/) emphasizes local analysis | Static browser application; local file parsing; source records state `uploaded: false`; prompt and output text are omitted from saved estimate and verification records | Implemented |
-| Prompt and model price comparison | [Price Per Token](https://pricepertoken.com/) and [TokenCost](https://tokencost.app/) specialize in model price comparison | Dated, source-linked OpenAI, Anthropic, and Google catalog; per-call, per-1,000-call, monthly, annual, cache, batch, retry, and usable-result calculations | Implemented, deliberately narrow |
-| Very broad model directory | Price Per Token advertises 300+ models, [TokenCost](https://tokencost.app/) advertises 151+, and [Artificial Analysis](https://artificialanalysis.ai/models) lists hundreds with benchmark dimensions | 13 curated models from three providers, plus one explicitly user-supplied custom or contract route | Directory breadth is not at parity; private-rate coverage is implemented |
+| Prompt and model price comparison | [Price Per Token](https://pricepertoken.com/) and [TokenCost by AgentOps](https://github.com/AgentOps-AI/tokencost) specialize in model price comparison or programmatic token-cost calculation | Dated, source-linked OpenAI, Anthropic, and Google catalog; per-call, per-1,000-call, monthly, annual, cache-read, cache-write, cache-storage, processing-mode, geography, retry, and usable-result calculations | Implemented, deliberately narrow |
+| Very broad model directory | Price Per Token advertises 300+ models, [TokenCost by AgentOps](https://github.com/AgentOps-AI/tokencost) states support for 400+ models, and [Artificial Analysis](https://artificialanalysis.ai/models) lists hundreds with benchmark dimensions | 14 curated models from three providers, plus one explicitly user-supplied custom or contract route | Directory breadth is not at parity; private-rate coverage is implemented |
 | Model-aware input counting | TokenCost emphasizes provider/model tokenization | Exact local `o200k_base` raw-text count for OpenAI; disclosed four-character estimate for Anthropic and Google; manual override for provider-reported counts | Partial |
 | Capability or task filters | Price Per Token and Artificial Analysis put capability or benchmark context beside price | Provider-sourced workload signals for general, reasoning, coding, high volume, long context, and multimodal; no generic benchmark is treated as task proof | Implemented as a shortlist, not a benchmark leaderboard |
 | Import observed request cost | [Helicone](https://docs.helicone.ai/guides/cookbooks/cost-tracking), [Braintrust](https://www.braintrust.dev/docs/observe/dashboards), and Langfuse collect request data continuously | Local flat CSV/JSON normalization with common OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone field aliases; strict OpenAI and Claude bill paths remain separate | Implemented with named compatibility limits |
@@ -101,9 +101,9 @@ These are not optional polish. They are the conditions for a responsible public 
 
 ## Sources
 
-- [Optimaizr website](https://www.optimaizr.com/) and [source repository](https://github.com/blendbunjaku/optimaizr)
+- [Optimaizr website](https://www.optimaizr.com/). No public source repository was linked from the official site when checked on September 22, 2026.
 - [Price Per Token](https://pricepertoken.com/)
-- [TokenCost](https://tokencost.app/)
+- [TokenCost by AgentOps](https://github.com/AgentOps-AI/tokencost)
 - [Artificial Analysis model comparison](https://artificialanalysis.ai/models)
 - [Helicone cost tracking](https://docs.helicone.ai/guides/cookbooks/cost-tracking)
 - [Braintrust dashboards](https://www.braintrust.dev/docs/observe/dashboards) and [evaluation](https://www.braintrust.dev/docs/evaluate)

@@ -28,7 +28,7 @@ const verificationTemplate = await readFile(
 );
 let app = await readFile(resolve(web, "app.js"), "utf8");
 const pricingCatalog = await readFile(
-  resolve(web, "data", "pricing-catalog-v0.4.js"),
+  resolve(web, "data", "pricing-catalog-v0.5.js"),
   "utf8",
 );
 const pricingEngine = await readFile(resolve(web, "pricing-engine.js"), "utf8");
@@ -66,7 +66,7 @@ html = html
     'href="templates/ai-cost-lens-verification-template.csv"',
     `href="data:text/csv;base64,${verificationTemplate.toString("base64")}"`,
   )
-  .replace('<script src="data/pricing-catalog-v0.4.js"></script>', () => `<script>${pricingCatalog}</script>`)
+  .replace('<script src="data/pricing-catalog-v0.5.js"></script>', () => `<script>${pricingCatalog}</script>`)
   .replace('<script src="pricing-engine.js"></script>', () => `<script>${pricingEngine}</script>`)
   .replace('<script src="opportunity-engine.js"></script>', () => `<script>${opportunityEngine}</script>`)
   .replace('<script src="usage-event-engine.js"></script>', () => `<script>${usageEventEngine}</script>`)

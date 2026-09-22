@@ -6,6 +6,16 @@
   "use strict";
 
   const round = (value, digits = 8) => Number(Number(value).toFixed(digits));
+  const PROCESSING_MODES = Object.freeze(["standard", "batch", "flex", "fast", "priority"]);
+  const RATE_FIELDS = Object.freeze([
+    "input",
+    "cached_input",
+    "cache_write",
+    "cache_write_5m",
+    "cache_write_1h",
+    "cache_storage_per_1m_token_hour",
+    "output",
+  ]);
 
   function number(value, label, { integer = false, max = Infinity } = {}) {
     if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
@@ -55,8 +65,17 @@
     return { tokens: Math.max(1, Math.ceil(characters / 4)), method: "character_estimate_4_to_1" };
   }
 
+  function validateRateProfile(profile, label) {
+    if (!profile || typeof profile !== "object" || Array.isArray(profile)) throw new Error(`${label} is missing.`);
+    for (const field of ["input", "cached_input", "output"]) number(profile[field], `${label} ${field}`);
+    for (const field of RATE_FIELDS.slice(2, -1)) {
+      if (profile[field] !== null && profile[field] !== undefined) number(profile[field], `${label} ${field}`);
+    }
+    return profile;
+  }
+
   function validateCatalog(catalog) {
-    if (!catalog || catalog.schema_version !== "ai-cost-lens-pricing-catalog/0.4") throw new Error("The pricing catalog is missing or incompatible.");
+    if (!catalog || catalog.schema_version !== "ai-cost-lens-pricing-catalog/0.5") throw new Error("The pricing catalog is missing or incompatible.");
     isoDate(catalog.catalog_version, "Catalog version");
     isoDate(catalog.effective_at, "Catalog effective date");
     isoDate(catalog.review_by, "Catalog review date");
@@ -98,15 +117,30 @@
         }
       }
       if (!model.context_window_tokens && !model.input_token_limit) throw new Error(`${model.id} needs a published context or input-token limit.`);
-      for (const tier of ["standard", "batch"]) {
-        for (const field of ["input", "cached_input", "output"]) number(model[tier]?.[field], `${model.id} ${tier} ${field}`);
+      for (const mode of ["standard", "batch"]) validateRateProfile(model[mode], `${model.id} ${mode}`);
+      for (const mode of PROCESSING_MODES.slice(2)) {
+        if (model[mode] !== null && model[mode] !== undefined) validateRateProfile(model[mode], `${model.id} ${mode}`);
       }
+      const geographies = model.geography_multipliers;
+      if (!geographies || geographies.global !== 1) throw new Error(`${model.id} needs a global geography multiplier of 1.`);
+      Object.entries(geographies).forEach(([key, value]) => {
+        if (!/^[a-z][a-z0-9_]*$/.test(key)) throw new Error(`${model.id} has an invalid geography key.`);
+        number(value, `${model.id} ${key} geography multiplier`);
+        if (value < 1) throw new Error(`${model.id} geography multipliers cannot be below 1.`);
+      });
       if (model.long_context) {
         number(model.long_context.input_threshold_tokens, `${model.id} long-context threshold`, { integer: true });
-        for (const field of ["input_multiplier", "cached_input_multiplier", "output_multiplier"]) {
+        for (const field of ["input_multiplier", "cached_input_multiplier", "cache_write_multiplier", "output_multiplier"]) {
+          if (field === "cache_write_multiplier" && model.long_context[field] === undefined) continue;
           number(model.long_context[field], `${model.id} ${field}`);
           if (model.long_context[field] < 1) throw new Error(`${model.id} ${field} cannot be below 1.`);
         }
+      }
+      if (model.scheduled_rate_change) {
+        isoDate(model.scheduled_rate_change.effective_at, `${model.id} scheduled rate date`);
+        number(model.scheduled_rate_change.multiplier, `${model.id} scheduled rate multiplier`);
+        if (model.scheduled_rate_change.multiplier <= 0) throw new Error(`${model.id} scheduled rate multiplier must be positive.`);
+        if (model.scheduled_rate_change.status !== "published_not_active") throw new Error(`${model.id} scheduled rate status is unsupported.`);
       }
     });
     return catalog;
@@ -141,18 +175,29 @@
     const label = requiredText(input?.label, "Custom route name", 120);
     const effectiveAt = isoDate(input?.effective_at, "Custom rate effective date");
     const sourceNote = requiredText(input?.pricing_source_note, "Custom rate source note", 200);
+    const customCacheWrite = input?.standard?.cache_write;
     const standard = {
       input: number(input?.standard?.input, "Custom input rate"),
       cached_input: number(input?.standard?.cached_input, "Custom cached-input rate"),
       output: number(input?.standard?.output, "Custom output rate"),
+      ...(customCacheWrite === null || customCacheWrite === undefined || String(customCacheWrite).trim() === ""
+        ? {}
+        : { cache_write: number(customCacheWrite, "Custom cache-write rate") }),
     };
     const batchValues = [input?.batch?.input, input?.batch?.cached_input, input?.batch?.output];
     const batchSupplied = batchValues.filter((value) => value !== null && value !== undefined && String(value).trim() !== "").length;
     if (batchSupplied && batchSupplied !== 3) throw new Error("Supply all three custom batch rates or leave all three blank.");
+    if (!batchSupplied && input?.batch?.cache_write !== null && input?.batch?.cache_write !== undefined && String(input.batch.cache_write).trim() !== "") {
+      throw new Error("Supply all three custom batch rates before adding a custom batch cache-write rate.");
+    }
+    const customBatchCacheWrite = input?.batch?.cache_write;
     const batch = batchSupplied ? {
       input: number(batchValues[0], "Custom batch input rate"),
       cached_input: number(batchValues[1], "Custom batch cached-input rate"),
       output: number(batchValues[2], "Custom batch output rate"),
+      ...(customBatchCacheWrite === null || customBatchCacheWrite === undefined || String(customBatchCacheWrite).trim() === ""
+        ? {}
+        : { cache_write: number(customBatchCacheWrite, "Custom batch cache-write rate") }),
     } : null;
     const contextWindow = optionalPositiveInteger(input?.context_window_tokens, "Custom context window");
     const maxOutput = optionalPositiveInteger(input?.max_output_tokens, "Custom maximum output tokens");
@@ -166,6 +211,10 @@
       model: requiredText(input?.model || label, "Custom model name", 120),
       standard,
       batch,
+      flex: null,
+      fast: null,
+      priority: null,
+      geography_multipliers: { global: 1 },
       long_context: null,
       context_window_tokens: contextWindow,
       input_token_limit: null,
@@ -180,20 +229,80 @@
   }
 
   function normalizeScenario(input) {
+    const processingMode = String(input.processing_mode || (input.batch ? "batch" : "standard")).trim().toLowerCase();
+    if (!PROCESSING_MODES.includes(processingMode)) throw new Error(`Processing mode must be one of: ${PROCESSING_MODES.join(", ")}.`);
+    const cacheWriteDuration = String(input.cache_write_duration || "provider_default").trim().toLowerCase();
+    if (!["provider_default", "5m", "1h"].includes(cacheWriteDuration)) throw new Error("Cache-write duration must be provider default, 5m, or 1h.");
+    const pricingDate = input.pricing_date === null || input.pricing_date === undefined || String(input.pricing_date).trim() === ""
+      ? null
+      : isoDate(String(input.pricing_date), "Pricing date");
     return {
       input_tokens: number(input.input_tokens, "Input tokens", { integer: true }),
       output_tokens: number(input.output_tokens, "Expected output tokens", { integer: true }),
       calls_per_month: number(input.calls_per_month, "Calls per month", { integer: true }),
       retry_rate: number(input.retry_rate || 0, "Retry rate", { max: 1 }),
       cached_input_share: number(input.cached_input_share || 0, "Cached-input share", { max: 1 }),
-      batch: Boolean(input.batch),
+      cache_refreshes_per_month: number(input.cache_refreshes_per_month || 0, "Cache refreshes per month", { integer: true }),
+      cache_storage_token_hours_per_month: number(input.cache_storage_token_hours_per_month || 0, "Cache storage token-hours per month"),
+      cache_write_duration: cacheWriteDuration,
+      processing_mode: processingMode,
+      geography: String(input.geography || "global").trim().toLowerCase(),
+      pricing_date: pricingDate,
+      batch: processingMode === "batch",
       usable_rate: input.usable_rate === "" || input.usable_rate === null || input.usable_rate === undefined
         ? null
         : number(input.usable_rate, "Expected usable rate", { max: 1 }),
     };
   }
 
-  function priceModel(model, rawScenario) {
+  function availableProcessingModes(model) {
+    return PROCESSING_MODES.filter((mode) => model?.[mode]);
+  }
+
+  function resolveRateProfile(model, scenario, routeOptions = {}) {
+    const processingMode = String(routeOptions.processing_mode || scenario.processing_mode || (scenario.batch ? "batch" : "standard")).trim().toLowerCase();
+    if (!PROCESSING_MODES.includes(processingMode)) throw new Error(`Processing mode must be one of: ${PROCESSING_MODES.join(", ")}.`);
+    const baseRates = model[processingMode];
+    if (!baseRates) {
+      const available = availableProcessingModes(model).map((mode) => mode.replaceAll("_", " ")).join(", ");
+      throw new Error(`${model.label} has no published ${processingMode} rate in this catalog. Available modes: ${available}.`);
+    }
+    const geography = String(routeOptions.geography || scenario.geography || "global").trim().toLowerCase();
+    const geographyMultiplier = model.geography_multipliers?.[geography];
+    if (geographyMultiplier === null || geographyMultiplier === undefined) {
+      const available = Object.keys(model.geography_multipliers || { global: 1 }).join(", ");
+      throw new Error(`${model.label} has no published ${geography} geography rate in this catalog. Available locations: ${available}.`);
+    }
+    const longContext = Boolean(model.long_context && scenario.input_tokens > model.long_context.input_threshold_tokens);
+    const contextRates = Object.fromEntries(RATE_FIELDS.flatMap((field) => {
+      if (baseRates[field] === null || baseRates[field] === undefined) return [];
+      let multiplier = 1;
+      if (longContext) {
+        if (field === "input") multiplier = model.long_context.input_multiplier;
+        else if (field === "cached_input") multiplier = model.long_context.cached_input_multiplier;
+        else if (field.startsWith("cache_write")) multiplier = model.long_context.cache_write_multiplier || model.long_context.input_multiplier;
+        else if (field === "output") multiplier = model.long_context.output_multiplier;
+      }
+      return [[field, round(baseRates[field] * multiplier * geographyMultiplier)]];
+    }));
+    return {
+      processing_mode: processingMode,
+      geography,
+      geography_multiplier: geographyMultiplier,
+      pricing_adjustment: longContext ? "long_context" : "standard_context",
+      rates: contextRates,
+    };
+  }
+
+  function cacheWriteRate(rates, duration) {
+    if (rates.cache_write !== null && rates.cache_write !== undefined) return { field: "cache_write", rate: rates.cache_write };
+    if (duration === "1h" && rates.cache_write_1h !== null && rates.cache_write_1h !== undefined) return { field: "cache_write_1h", rate: rates.cache_write_1h };
+    if (rates.cache_write_5m !== null && rates.cache_write_5m !== undefined) return { field: "cache_write_5m", rate: rates.cache_write_5m };
+    if (rates.cache_write_1h !== null && rates.cache_write_1h !== undefined) return { field: "cache_write_1h", rate: rates.cache_write_1h };
+    return { field: null, rate: null };
+  }
+
+  function priceModel(model, rawScenario, routeOptions = {}) {
     const scenario = normalizeScenario(rawScenario);
     if (model.context_window_tokens && scenario.input_tokens + scenario.output_tokens > model.context_window_tokens) {
       throw new Error(`${model.label} cannot fit ${scenario.input_tokens + scenario.output_tokens} total tokens in its ${model.context_window_tokens}-token context window.`);
@@ -204,31 +313,37 @@
     if (model.max_output_tokens && scenario.output_tokens > model.max_output_tokens) {
       throw new Error(`${model.label} cannot return more than ${model.max_output_tokens} output tokens.`);
     }
-    const baseRates = scenario.batch ? model.batch : model.standard;
-    if (!baseRates) throw new Error(`${model.label} has no supplied batch rate. Turn off batch pricing or enter all three custom batch rates.`);
-    const longContext = model.long_context && scenario.input_tokens > model.long_context.input_threshold_tokens;
-    const rates = longContext
-      ? {
-          input: baseRates.input * model.long_context.input_multiplier,
-          cached_input: baseRates.cached_input * model.long_context.cached_input_multiplier,
-          output: baseRates.output * model.long_context.output_multiplier,
-        }
-      : { ...baseRates };
+    const profile = resolveRateProfile(model, scenario, routeOptions);
+    const rates = profile.rates;
     const billedCalls = scenario.calls_per_month * (1 + scenario.retry_rate);
-    const cachedTokens = scenario.input_tokens * scenario.cached_input_share;
-    const uncachedTokens = scenario.input_tokens - cachedTokens;
-    const inputCost = (uncachedTokens * rates.input + cachedTokens * rates.cached_input) / 1_000_000;
-    const outputCost = scenario.output_tokens * rates.output / 1_000_000;
-    const perCall = inputCost + outputCost;
-    const monthly = perCall * billedCalls;
+    if (scenario.cache_refreshes_per_month > billedCalls) throw new Error("Cache refreshes per month cannot exceed billed calls after retries.");
+    const cachedTokensPerCall = scenario.input_tokens * scenario.cached_input_share;
+    const uncachedTokensPerCall = scenario.input_tokens - cachedTokensPerCall;
+    const cacheReadCalls = billedCalls - scenario.cache_refreshes_per_month;
+    const writeRate = cacheWriteRate(rates, scenario.cache_write_duration);
+    if (scenario.cache_refreshes_per_month && cachedTokensPerCall && writeRate.rate === null) {
+      throw new Error(`${model.label} has no separately published cache-write token rate in this catalog. Set cache refreshes to zero or compare a route with a published write rate.`);
+    }
+    const uncachedInputCost = uncachedTokensPerCall * billedCalls * rates.input / 1_000_000;
+    const cacheReadCost = cachedTokensPerCall * cacheReadCalls * rates.cached_input / 1_000_000;
+    const cacheWriteCost = cachedTokensPerCall * scenario.cache_refreshes_per_month * (writeRate.rate || 0) / 1_000_000;
+    const cacheStorageTokenHours = scenario.cache_storage_token_hours_per_month;
+    const cacheStorageCost = cacheStorageTokenHours * (rates.cache_storage_per_1m_token_hour || 0) / 1_000_000;
+    const outputCost = scenario.output_tokens * billedCalls * rates.output / 1_000_000;
+    const monthly = uncachedInputCost + cacheReadCost + cacheWriteCost + cacheStorageCost + outputCost;
+    const perCall = billedCalls ? monthly / billedCalls : 0;
     const expectedUsable = scenario.usable_rate === null ? null : scenario.calls_per_month * scenario.usable_rate;
     return {
       model_id: model.id,
       provider: model.provider,
       label: model.label,
-      rate_tier: scenario.batch ? "batch" : "standard",
+      rate_tier: profile.processing_mode,
+      processing_mode: profile.processing_mode,
+      geography: profile.geography,
+      geography_multiplier: profile.geography_multiplier,
       rates_per_1m_tokens: { ...rates },
-      pricing_adjustment: longContext ? "long_context" : "standard_context",
+      cache_write_rate_field: writeRate.field,
+      pricing_adjustment: profile.pricing_adjustment,
       context_compatible: true,
       context_window_tokens: model.context_window_tokens || model.input_token_limit || null,
       max_output_tokens: model.max_output_tokens ?? null,
@@ -237,6 +352,14 @@
       pricing_source_note: model.pricing_source_note || null,
       pricing_verified_at: model.verified_at || null,
       pricing_effective_at: model.effective_at || null,
+      pricing_date: scenario.pricing_date || model.effective_at || null,
+      estimated_monthly_cost_breakdown_usd: {
+        uncached_input: round(uncachedInputCost),
+        cache_read: round(cacheReadCost),
+        cache_write: round(cacheWriteCost),
+        cache_storage: round(cacheStorageCost),
+        output: round(outputCost),
+      },
       estimated_cost_per_call_usd: round(perCall),
       estimated_cost_per_1000_calls_usd: round(perCall * 1000),
       estimated_monthly_cost_usd: round(monthly),
@@ -254,18 +377,23 @@
       if (byId.has(model.id)) throw new Error(`Custom rate ID ${model.id} conflicts with another route.`);
       byId.set(model.id, model);
     });
-    const selectedIds = modelIds.filter(Boolean);
-    const uniqueIds = [...new Set(selectedIds)];
-    if (!uniqueIds.length) throw new Error("Choose a current model.");
-    if (uniqueIds.length !== selectedIds.length) throw new Error("Choose each comparison route only once.");
+    const selectedRoutes = modelIds.filter((route) => typeof route === "string" ? Boolean(route) : Boolean(route?.model_id || route?.id)).map((route) => (
+      typeof route === "string"
+        ? { model_id: route }
+        : { ...route, model_id: route.model_id || route.id }
+    ));
+    const uniqueIds = [...new Set(selectedRoutes.map((route) => route.model_id))];
+    if (!selectedRoutes.length) throw new Error("Choose a current model.");
+    if (uniqueIds.length !== selectedRoutes.length) throw new Error("Choose each comparison model only once. Change its processing mode inside the existing route instead of adding it twice.");
     if (uniqueIds.length > 4) throw new Error("Compare no more than four routes at once.");
-    const results = uniqueIds.map((id) => {
+    const results = selectedRoutes.map((route) => {
+      const id = route.model_id;
       const model = byId.get(id);
       if (!model) throw new Error(`Model ${id} is not in pricing catalog ${catalog.catalog_version}.`);
       const estimate = tokenEstimates[id] || { tokens: scenario.input_tokens, method: "shared_scenario" };
       const inputTokens = number(estimate.tokens, `${model.label} input tokens`, { integer: true });
       return {
-        ...priceModel(model, { ...scenario, input_tokens: inputTokens }),
+        ...priceModel(model, { ...scenario, input_tokens: inputTokens }, route),
         input_tokens: inputTokens,
         input_token_method: estimate.method || "shared_scenario",
       };
@@ -286,7 +414,7 @@
     const officialRateCount = comparison.length - userSuppliedRateCount;
     const rateSourceScope = userSuppliedRateCount && officialRateCount ? "mixed" : userSuppliedRateCount ? "user_supplied_only" : "official_list_only";
     return {
-      schema_version: "ai-cost-lens-prompt-price-estimate/0.5",
+      schema_version: "ai-cost-lens-prompt-price-estimate/0.6",
       application_version: "0.5.0",
       created_at: createdAt || new Date().toISOString(),
       catalog: {
@@ -312,7 +440,16 @@
         calls_per_month: normalized.calls_per_month,
         retry_rate: normalized.retry_rate,
         cached_input_share: normalized.cached_input_share,
-        batch: normalized.batch,
+        cache_refreshes_per_month: normalized.cache_refreshes_per_month,
+        cache_write_duration: normalized.cache_write_duration,
+        cache_storage_token_hours_per_month: normalized.cache_storage_token_hours_per_month,
+        pricing_date: normalized.pricing_date || catalog.catalog_version,
+        routes: comparison.map((result) => ({
+          model_id: result.model_id,
+          processing_mode: result.processing_mode,
+          geography: result.geography,
+        })),
+        batch: comparison.every((result) => result.processing_mode === "batch"),
         expected_usable_rate: normalized.usable_rate,
         rate_source_scope: rateSourceScope,
         user_supplied_rate_count: userSuppliedRateCount,
@@ -333,5 +470,18 @@
     };
   }
 
-  return Object.freeze({ estimateInputTokens, validateCatalog, selectCatalog, requireCatalogDateCoverage, normalizeCustomModel, normalizeScenario, priceModel, compareModels, buildEstimateRecord });
+  return Object.freeze({
+    PROCESSING_MODES,
+    estimateInputTokens,
+    validateCatalog,
+    selectCatalog,
+    requireCatalogDateCoverage,
+    normalizeCustomModel,
+    normalizeScenario,
+    availableProcessingModes,
+    resolveRateProfile,
+    priceModel,
+    compareModels,
+    buildEstimateRecord,
+  });
 });

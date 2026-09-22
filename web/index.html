@@ -29,10 +29,13 @@
           <span>CLOUD &amp; CAPITAL</span>
           <small>AI COST LENS</small>
         </a>
-        <div class="header-actions">
+        <button class="header-menu-toggle" id="header-menu-toggle" type="button" aria-controls="header-actions" aria-expanded="false">
+          Menu
+        </button>
+        <div class="header-actions" id="header-actions">
           <button class="text-button price-prompt-launch" id="price-prompt" type="button">Price a prompt</button>
           <button class="text-button" id="review-usage" type="button">Review AI usage</button>
-          <button class="text-button" id="story-toggle" type="button">Share view</button>
+          <button class="text-button" id="story-toggle" type="button">Presentation view</button>
           <button class="text-button" id="download-review" type="button" title="Save the complete machine-readable review">Download decision record (JSON)</button>
           <button class="text-button" id="print-memo" type="button" title="Open the print dialog, where you can save the memo as a PDF">Print finance memo</button>
           <button class="file-button primary-action" id="start-review" type="button">Start a review</button>
@@ -64,6 +67,19 @@
           Actuals
         </button>
       </nav>
+
+      <label class="mobile-section-picker" for="mobile-section-nav">
+        <span>Review section</span>
+        <select id="mobile-section-nav">
+          <option value="review">Overview</option>
+          <option value="anatomy">Spend</option>
+          <option value="opportunities">Opportunities</option>
+          <option value="simulate">Simulate</option>
+          <option value="verify">Verify</option>
+          <option value="evidence">Evidence</option>
+          <option value="actuals">Actuals</option>
+        </select>
+      </label>
 
       <main>
         <section class="bill-review-screen" id="bill-review-screen" aria-labelledby="bill-review-title">
@@ -102,7 +118,7 @@
               </div>
               <p id="bill-mix-note">These are observed usage measures. They are not billed dollars by model.</p>
             </div>
-            <div class="usage-table-wrap">
+            <div class="usage-table-wrap" role="region" aria-label="Provider usage by model" tabindex="0">
               <table class="usage-table">
                 <thead id="bill-model-head"><tr><th>Model</th><th>Requests</th><th>Input</th><th>Output</th><th>Cache share</th><th>Billed cost</th></tr></thead>
                 <tbody id="bill-model-rows"></tbody>
@@ -251,7 +267,7 @@
                   <strong id="planning-label"></strong>
                   <span>Same workload and period</span>
                 </div>
-                <div class="planning-table-wrap">
+                <div class="planning-table-wrap" role="region" aria-label="Plan and actual comparison" tabindex="0">
                   <table class="planning-table">
                     <thead><tr><th>Measure</th><th>Plan</th><th>Actual</th><th>Variance</th></tr></thead>
                     <tbody id="planning-rows"></tbody>
@@ -435,7 +451,7 @@
                   <label><span>Status</span><select id="request-filter-status"></select></label>
                   <button class="text-button" id="reset-request-filters" type="button">Reset filters</button>
                 </div>
-                <div class="request-event-table-wrap">
+                <div class="request-event-table-wrap" role="region" aria-label="Request event details" tabindex="0">
                   <table class="request-event-table">
                     <thead><tr><th>Event</th><th>Time</th><th>Provider · model</th><th>Project · workload</th><th>Status</th><th>Input</th><th>Output</th><th>Cache</th><th>Selected cost</th></tr></thead>
                     <tbody id="request-event-rows"></tbody>
@@ -562,7 +578,7 @@
               </div>
               <div class="verification-result-summary" id="verification-result-summary"></div>
               <p class="verification-result-conclusion" id="verification-result-conclusion"></p>
-              <div class="verification-case-table-wrap">
+              <div class="verification-case-table-wrap" role="region" aria-label="Verification case results" tabindex="0">
                 <table class="verification-case-table">
                   <thead><tr><th>Case</th><th>Baseline checks</th><th>Candidate checks</th><th>Baseline outcome</th><th>Candidate outcome</th></tr></thead>
                   <tbody id="verification-case-rows"></tbody>
@@ -641,7 +657,7 @@
           </form>
           <section class="actuals-result" id="actuals-result" hidden>
             <div class="actuals-result-head"><div><p class="kicker">SAVINGS LEDGER</p><h2 id="actuals-status"></h2></div><button class="text-button" id="download-actuals" type="button">Download ledger (JSON)</button></div>
-            <div class="savings-stages" id="savings-stages"></div>
+            <div class="savings-stages" id="savings-stages" role="region" aria-label="Savings evidence stages" tabindex="0"></div>
             <div class="savings-waterfall" id="savings-waterfall"></div>
             <p class="actuals-conclusion" id="actuals-conclusion"></p>
           </section>
@@ -933,7 +949,7 @@
             <div class="template-links">
               <a href="templates/ai-cost-lens-spend-template.csv" download>Download spend template</a>
             </div>
-            <div class="transfer-guide" aria-label="Universal spend template guide">
+            <div class="transfer-guide" role="group" aria-label="Universal spend template guide">
               <div class="transfer-guide-head">
                 <strong>Start with the reports you already have</strong>
                 <span>The source differs by provider. The finished universal file always uses the same columns.</span>
@@ -1239,7 +1255,7 @@
             <div class="path-requirements"><strong>What you need</strong><span>A Claude Team/Enterprise spend-report CSV, or complete Messages Usage and Cost Admin API JSON exports. AI Cost Lens never asks for an API key.</span></div>
             <section class="builder-step"><div class="step-number">02</div><div>
               <h3>Add a documented Claude export</h3>
-              <p>Team and Enterprise spend reports include user email and account UUID. Those identifiers are discarded before the review is built and never appear in the review, JSON download, Share view, memo, browser storage, console, or errors.</p>
+              <p>Team and Enterprise spend reports include user email and account UUID. Those identifiers are discarded before the review is built and never appear in the review, JSON download, presentation view, memo, browser storage, console, or errors.</p>
               <div class="file-pair">
                 <label><span>Team/Enterprise spend CSV</span><input id="claude-spend-file" type="file" accept=".csv,text/csv" /><small id="claude-spend-file-name">Export from Settings → Analytics → How much is Claude costing?</small></label>
                 <label><span>Messages Usage API JSON</span><input id="claude-usage-file" type="file" accept=".json,application/json" /><small id="claude-usage-file-name">Optional when using the spend CSV; otherwise pair with Cost JSON.</small></label>
@@ -1289,11 +1305,21 @@
               <label><span>Known input tokens <small>optional override</small></span><input id="prompt-input-tokens" type="number" min="0" step="1" placeholder="Estimate from prompt" /></label>
               <label><span>Expected output tokens</span><input id="prompt-output-tokens" type="number" min="0" step="1" value="500" /></label>
               <label><span>Calls per month</span><input id="prompt-calls" type="number" min="0" step="1" value="1000" /></label>
+              <label><span>Pricing date</span><input id="prompt-pricing-date" type="date" /></label>
               <label><span>Retry calls</span><div class="input-suffix"><input id="prompt-retry-rate" type="number" min="0" max="100" step="0.1" value="0" /><em>%</em></div></label>
               <label><span>Cached input share</span><div class="input-suffix"><input id="prompt-cache-share" type="number" min="0" max="100" step="0.1" value="0" /><em>%</em></div></label>
               <label><span>Expected usable rate <small>optional</small></span><div class="input-suffix"><input id="prompt-usable-rate" type="number" min="0" max="100" step="0.1" placeholder="Not known" /><em>%</em></div></label>
             </div>
-            <label class="check-field price-batch-field"><input id="prompt-batch" type="checkbox" /><span>Use asynchronous batch pricing where the provider publishes it</span></label>
+            <details class="price-advanced-workload">
+              <summary>Advanced cache assumptions</summary>
+              <p>Cached input is treated as a repeated prefix. Add refreshes only when the provider publishes a separate cache-write rate. A refresh replaces one cache-read call; it is not added on top of the same call.</p>
+              <div class="price-field-grid">
+                <label><span>Cache refreshes / month</span><input id="prompt-cache-refreshes" type="number" min="0" step="1" value="0" /></label>
+                <label><span>Cache write duration</span><select id="prompt-cache-duration"><option value="provider_default">Provider default</option><option value="5m">5 minutes</option><option value="1h">1 hour</option></select></label>
+                <label><span>Cache token-hours / month</span><input id="prompt-cache-storage-token-hours" type="number" min="0" step="any" value="0" /></label>
+              </div>
+              <p class="price-field-note">For explicit caches, token-hours equal cached tokens multiplied by retained hours across the month. Separate storage cost is added only where the provider publishes that rate. Zero means storage is excluded, not free.</p>
+            </details>
           </section>
 
           <section class="price-model-panel" aria-labelledby="price-model-title">
@@ -1307,6 +1333,20 @@
               <label><span>Alternative 2</span><select id="prompt-alt-2"></select></label>
               <label><span>Alternative 3</span><select id="prompt-alt-3"></select></label>
             </div>
+            <div class="price-route-shortcuts">
+              <button class="text-button" id="add-custom-prompt-rate" type="button">Compare a custom or contract rate</button>
+              <span>Useful for negotiated prices and providers outside the curated catalog. The rate stays local and is never presented as provider-verified.</span>
+            </div>
+            <details class="route-rate-controls" id="prompt-route-rate-controls">
+              <summary>Advanced rate controls</summary>
+              <p>Each route defaults to standard processing and the provider's global or default location. Change these only when they match how the request will actually run.</p>
+              <div class="route-rate-grid">
+                <div id="prompt-current-rate-controls" data-route-control="prompt-current-model"><strong>Current</strong><label><span>Processing</span><select id="prompt-current-mode"></select></label><label><span>Location</span><select id="prompt-current-geography"></select></label></div>
+                <div id="prompt-alt-1-rate-controls" data-route-control="prompt-alt-1"><strong>Alternative 1</strong><label><span>Processing</span><select id="prompt-alt-1-mode"></select></label><label><span>Location</span><select id="prompt-alt-1-geography"></select></label></div>
+                <div id="prompt-alt-2-rate-controls" data-route-control="prompt-alt-2"><strong>Alternative 2</strong><label><span>Processing</span><select id="prompt-alt-2-mode"></select></label><label><span>Location</span><select id="prompt-alt-2-geography"></select></label></div>
+                <div id="prompt-alt-3-rate-controls" data-route-control="prompt-alt-3"><strong>Alternative 3</strong><label><span>Processing</span><select id="prompt-alt-3-mode"></select></label><label><span>Location</span><select id="prompt-alt-3-geography"></select></label></div>
+              </div>
+            </details>
             <details class="custom-rate-card" id="prompt-custom-rate">
               <summary>Use one custom or contract rate</summary>
               <p>Choose <strong>Custom or contract rate</strong> in any route above, then enter its USD rates per 1M tokens. The values stay local. Do not paste agreement text or secrets; use a short source label.</p>
@@ -1317,6 +1357,7 @@
                 <label><span>Source label</span><input id="prompt-custom-source" type="text" maxlength="200" placeholder="2026 contract rate card" /></label>
                 <label><span>Input rate</span><input id="prompt-custom-input" type="number" min="0" step="any" placeholder="USD / 1M" /></label>
                 <label><span>Cached-input rate</span><input id="prompt-custom-cached" type="number" min="0" step="any" placeholder="USD / 1M" /></label>
+                <label><span>Cache-write rate <small>optional</small></span><input id="prompt-custom-cache-write" type="number" min="0" step="any" placeholder="USD / 1M" /></label>
                 <label><span>Output rate</span><input id="prompt-custom-output" type="number" min="0" step="any" placeholder="USD / 1M" /></label>
                 <label><span>Context window <small>optional</small></span><input id="prompt-custom-context" type="number" min="1" step="1" placeholder="Tokens" /></label>
                 <label><span>Maximum output <small>optional</small></span><input id="prompt-custom-max-output" type="number" min="1" step="1" placeholder="Tokens" /></label>
@@ -1325,6 +1366,7 @@
               <div class="custom-rate-grid custom-rate-batch-grid">
                 <label><span>Batch input</span><input id="prompt-custom-batch-input" type="number" min="0" step="any" placeholder="Leave all three blank" /></label>
                 <label><span>Batch cached input</span><input id="prompt-custom-batch-cached" type="number" min="0" step="any" /></label>
+                <label><span>Batch cache write <small>optional</small></span><input id="prompt-custom-batch-cache-write" type="number" min="0" step="any" /></label>
                 <label><span>Batch output</span><input id="prompt-custom-batch-output" type="number" min="0" step="any" /></label>
               </div>
               <p class="price-field-note">Enter the same cached-input rate as input when your rate card has no cache discount. Enter zero only when the applicable source explicitly makes that token category free.</p>
@@ -1338,11 +1380,8 @@
                 <label><span>Provider</span><select id="model-catalog-provider"><option value="">All providers</option></select></label>
                 <label><span>Workload signal</span><select id="model-catalog-task"><option value="">All workload signals</option><option value="general">General</option><option value="reasoning">Reasoning</option><option value="coding">Coding</option><option value="high_volume">High-volume</option><option value="long_context">Long context</option><option value="multimodal">Multimodal</option></select></label>
               </div>
-              <div class="model-catalog-table-wrap">
-                <table class="model-catalog-table">
-                  <thead><tr><th>Model</th><th>Input</th><th>Cached</th><th>Output</th><th>Context</th><th>Workload signals</th><th></th></tr></thead>
-                  <tbody id="model-catalog-rows"></tbody>
-                </table>
+              <div class="model-catalog-table-wrap" role="region" aria-label="Model pricing catalog" tabindex="0">
+                <div class="model-catalog-list" id="model-catalog-rows" role="list"></div>
               </div>
               <p class="model-catalog-count" id="model-catalog-count"></p>
             </details>
@@ -1359,7 +1398,7 @@
             </div>
             <strong id="price-token-summary"></strong>
           </div>
-          <div class="price-table-wrap">
+          <div class="price-table-wrap" role="region" aria-label="Prompt price comparison" tabindex="0">
             <table class="price-table">
               <thead><tr><th>Route</th><th>Per call</th><th>Per 1,000 calls</th><th>Per month</th><th>Per year</th><th>Vs. current / month</th><th>Per usable result</th></tr></thead>
               <tbody id="price-result-rows"></tbody>
@@ -1389,8 +1428,8 @@
           <button class="dialog-close" id="close-lumen" type="button" aria-label="Close Lumen">Close</button>
         </header>
         <p class="lumen-boundary">This is a deterministic record explainer, not a general AI chat. It uses only the calculated review in this browser and does not contact an AI API. Your file is not uploaded.</p>
-        <div class="lumen-conversation" id="lumen-conversation" aria-live="polite"></div>
-        <div class="lumen-prompts" aria-label="Suggested questions">
+        <div class="lumen-conversation" id="lumen-conversation" role="log" tabindex="0" aria-live="polite"></div>
+        <div class="lumen-prompts" role="group" aria-label="Suggested questions">
           <button type="button" data-lumen-question="why">Why isn't the cheaper route cheaper?</button>
           <button type="button" data-lumen-question="changed">What changed?</button>
           <button type="button" data-lumen-question="improve">What has to improve?</button>
@@ -1402,7 +1441,7 @@
         </div>
       </div>
     </dialog>
-    <script src="data/pricing-catalog-v0.4.js"></script>
+    <script src="data/pricing-catalog-v0.5.js"></script>
     <script src="pricing-engine.js"></script>
     <script src="opportunity-engine.js"></script>
     <script src="usage-event-engine.js"></script>
