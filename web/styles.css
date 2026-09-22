@@ -3796,8 +3796,18 @@ body.story-mode .cockpit-grid {
 
 .request-import-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   align-items: center;
+  justify-content: flex-end;
+}
+
+.request-format-note {
+  max-width: 900px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 .request-reconciliation-inputs {
@@ -5299,6 +5309,7 @@ body.story-mode .cockpit-grid {
   .request-import-actions {
     display: flex;
     align-items: stretch;
+    justify-content: flex-start;
   }
 
   .request-explorer-head > p {

@@ -29,6 +29,7 @@ class Element {
     const classes = new Set((attrs.class || '').split(' '));
     this.classList = { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c), toggle: (c, force = !classes.has(c)) => force ? classes.add(c) : classes.delete(c) };
     this.style = { setProperty() {} };
+    if (tag === 'template') this.content = this;
     if (this.id) nodes.set(this.id, this);
   }
   get value() { return this._value; }
@@ -341,6 +342,14 @@ assert.match(el('opportunity-summary').innerHTML,/Largest supported amount/);
 assert.match(el('opportunity-workbench-list').innerHTML,/Retries deserve a closer look/);
 await click('start-review'); await mode('usage');
 assert.equal(el('view-opportunities').classList.contains('active'),true);
+await click('try-illustrative-request-log');
+assert.equal(api.state.usageReview.event_count,7);
+assert.equal(api.state.usageReviewIllustrative,true);
+assert.equal(api.state.usageReview.evidence_gate.savings_claim_allowed,false);
+assert.match(api.state.usageReview.source.name,/Illustrative request log/);
+assert.equal(el('request-analysis-mode').textContent,'ILLUSTRATIVE DATA');
+assert.equal(el('request-analysis-title').textContent,'What the example calls show');
+assert.equal(el('request-analysis-results').hidden,false);
 await click('start-review'); await mode('price');
 assert.equal(el('price-prompt-dialog').open,true);
 await click('close-price-prompt');
@@ -350,6 +359,7 @@ const requestCsv = [
   ...Array.from({length:14},(_,index) => `request-${index + 1},2026-09-${String(index + 1).padStart(2,'0')}T12:00:00Z,${index < 7 ? 'OpenAI' : 'Anthropic'},${index < 7 ? 'gpt-5.6-sol' : 'claude-sonnet-5'},Product,Platform,Summaries,Internal,100,20,${index < 7 ? 10 : 20},USD,success,${100 + index * 10},ready_to_use`),
 ].join('\n');
 await file('request-log-file',requestCsv,'request-log.csv');
+assert.equal(api.state.usageReviewIllustrative,false);
 el('request-period-complete').checked = true;
 el('request-monthly-budget').value = '500';
 el('request-compute-cost').value = '6';

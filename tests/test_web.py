@@ -77,7 +77,12 @@ def test_web_assets_and_brand_contract_are_present():
     assert 'aria-pressed="false"' in html
     assert "SAVE NOW" in (WEB / "app.js").read_text()
     assert "Quick sample" in html
-    assert "How this number is built" in html
+    assert "How this works and what the terms mean" in html
+    assert "Try illustrative data" in html
+    assert 'id="illustrative-request-log-data"' in html
+    assert "The CLI canonical CSV is a separate period-level billing format" in html
+    assert "Cost missing the selected ownership field" in html
+    assert "Add compute, data, network, tooling, pipeline, and human costs" in html
     assert "BREAK EVEN EXPLORER" in html
     assert "PLAN CHECK" in html
     assert 'id="planning-section"' in html
@@ -104,6 +109,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert 'id="proposed-policy-approved"' in html
     assert 'id="policy-approved"' not in html
     app = (WEB / "app.js").read_text()
+    assert "DECISION CHECK" in app
     assert "builderMode: null" in app
     assert "retryRequests > Math.max(modelRequests - 1, 0)" in app
     assert "state.demoData = cloneData(state.data)" in app
@@ -116,6 +122,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert 'document.body.classList.remove("printing-memo"), 1500' not in app
     assert "The provider bill fell" in app
     assert "The cost of a ready result rose" in app
+    assert "A ready result is finished work that cleared the stated quality rule" in app
     assert "buildPlanningRecord" in app
     assert "NO OPERATING PAYBACK" in app
     assert "What happened versus plan?" in html

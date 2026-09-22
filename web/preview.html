@@ -3818,8 +3818,18 @@ body.story-mode .cockpit-grid {
 
 .request-import-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   align-items: center;
+  justify-content: flex-end;
+}
+
+.request-format-note {
+  max-width: 900px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 .request-reconciliation-inputs {
@@ -5321,6 +5331,7 @@ body.story-mode .cockpit-grid {
   .request-import-actions {
     display: flex;
     align-items: stretch;
+    justify-content: flex-start;
   }
 
   .request-explorer-head > p {
@@ -6243,10 +6254,13 @@ body{min-width:0}
               </aside>
             </div>
             <details class="methodology-note">
-              <summary>How this number is built</summary>
+              <summary>How this works and what the terms mean</summary>
               <div>
+                <p><strong>Ready result</strong> = finished work that met the same stated quality rule on both routes.</p>
                 <p><strong>Full recurring cost</strong> = provider spend + shared infrastructure included in the review + human review and correction.</p>
                 <p><strong>Cost per ready result</strong> = full recurring cost ÷ results that met the quality bar.</p>
+                <p><strong>Evidence check</strong> = the required cost, quality, policy, and coverage checks that must agree before a difference can be called savings.</p>
+                <p><strong>Finance recommendation</strong> = fund the change, fix the evidence, stop the change, or report insufficient evidence. It is bounded to this review.</p>
                 <p>Observed logs, samples, estimates, and missing evidence remain visibly different. A sampled or user-estimated result cannot become proven savings.</p>
               </div>
             </details>
@@ -6397,10 +6411,12 @@ body{min-width:0}
                 <small id="request-log-file-status">Up to 20,000 flat rows or 5 MiB. Unknown fields, including prompt text, are not copied into the normalized record.</small>
               </label>
               <div class="request-import-actions">
+                <button class="text-button" id="try-illustrative-request-log" type="button">Try illustrative data</button>
                 <a class="text-button" href="data:text/csv;base64,ZXZlbnRfaWQsdGltZXN0YW1wLHByb3ZpZGVyLGJpbGxpbmdfY2hhbm5lbCxwcm9jZXNzaW5nX21vZGUsaW5mZXJlbmNlX2dlb2dyYXBoeSxtb2RlbCxwcm9qZWN0LHRlYW1fb3duZXIsZmVhdHVyZSxjdXN0b21lcixwcm9kdWN0LHdvcmtsb2FkLHdvcmtmbG93LHNlc3Npb25faWQsZW52aXJvbm1lbnQsaW5wdXRfdG9rZW5zLG91dHB1dF90b2tlbnMscmVhc29uaW5nX3Rva2VucyxjYWNoZWRfaW5wdXRfdG9rZW5zLGNhY2hlX3dyaXRlX3Rva2VucyxjYWNoZV93cml0ZV9kdXJhdGlvbl9zZWNvbmRzLGNhY2hlX3N0b3JhZ2VfdG9rZW5faG91cnMsYmF0Y2gsdG9vbF9jaGFyZ2VzLHByb3ZpZGVyX3JlcG9ydGVkX2Nvc3QsY2FsY3VsYXRlZF9jb3N0LGN1cnJlbmN5LHJlcXVlc3Rfc3RhdHVzLHJldHJ5X3BhcmVudF9ldmVudF9pZCxsYXRlbmN5X21zLGV2aWRlbmNlX3NvdXJjZSxwcmVmaXhfZmluZ2VycHJpbnQsdG9vbF9jYWxsX2NvdW50LG91dGNvbWVfc3RhdHVzCg==" download>Download template</a>
                 <button class="build-button" id="analyze-request-log" type="button">Analyze locally</button>
               </div>
             </div>
+            <p class="request-format-note">Use one row per AI request or trace observation. The CLI canonical CSV is a separate period-level billing format and is not interchangeable with this request log.</p>
             <div class="request-reconciliation-inputs">
               <label><span>Optional billed total</span><input id="request-billed-total" type="number" min="0" step="any" placeholder="Not supplied" /></label>
               <label><span>Bill currency</span><input id="request-billed-currency" type="text" maxlength="3" placeholder="USD" /></label>
@@ -6408,12 +6424,12 @@ body{min-width:0}
               <label><span>Optional monthly budget</span><input id="request-monthly-budget" type="number" min="0.01" step="any" placeholder="Not supplied" /></label>
               <label><span>Budget warning threshold</span><div class="input-suffix"><input id="request-budget-warning" type="number" min="0.1" max="100" step="0.1" value="80" /><em>%</em></div></label>
               <label><span>Decision allocation field</span><select id="request-allocation-basis"><option value="workload">Workload</option><option value="project">Project</option><option value="team_owner">Team or owner</option><option value="feature">Feature</option><option value="customer">Customer</option><option value="product">Product</option><option value="workflow">Workflow</option><option value="session_id">Session</option><option value="environment">Environment</option></select></label>
-              <label><span>Maximum unallocated cost</span><div class="input-suffix"><input id="request-allocation-warning" type="number" min="0" max="100" step="0.1" value="10" /><em>%</em></div><small>Your review policy, not an industry standard.</small></label>
+              <label><span>Maximum unallocated cost</span><div class="input-suffix"><input id="request-allocation-warning" type="number" min="0" max="100" step="0.1" value="10" /><em>%</em></div><small>Cost missing the selected ownership field. This threshold is your review policy, not an industry standard.</small></label>
               <label class="check-field"><input id="request-bill-scope-confirmed" type="checkbox" /><span>The bill and request log cover the same provider, account, currency, and period</span></label>
               <label class="check-field"><input id="request-period-complete" type="checkbox" /><span>The log covers one complete, continuous period from its first through last UTC date</span></label>
             </div>
             <details class="request-data-details request-cost-boundary-inputs">
-              <summary>Optional: add the rest of the operating cost</summary>
+              <summary>Add compute, data, network, tooling, pipeline, and human costs</summary>
               <p>Use totals for the same period and currency as the request log. Enter only costs not already included in provider request cost or another category. Blank means unknown. Enter zero only when you confirmed there was no cost. AI Cost Lens shows a fully loaded total only when every request is priced and every category is supplied.</p>
               <div class="request-reconciliation-inputs">
                 <label><span>Compute</span><input id="request-compute-cost" type="number" min="0" step="any" placeholder="Unknown" /></label>
@@ -6427,7 +6443,7 @@ body{min-width:0}
             <div class="builder-error" id="request-log-error" role="alert"></div>
             <div id="request-analysis-results" hidden>
               <div class="request-analysis-head">
-                <div><p class="kicker">OBSERVED REQUEST REVIEW</p><h3 id="request-analysis-title">What the imported calls support</h3></div>
+                <div><p class="kicker" id="request-analysis-mode">OBSERVED REQUEST REVIEW</p><h3 id="request-analysis-title">What the imported calls support</h3></div>
                 <div class="request-analysis-actions">
                   <button class="text-button" id="download-normalized-usage" type="button">Download normalized usage</button>
                   <button class="text-button" id="download-usage-review" type="button">Download analysis record</button>
@@ -7466,6 +7482,17 @@ body{min-width:0}
         </div>
       </div>
     </dialog>
+    <template id="illustrative-request-log-data">
+      [
+        {"event_id":"example-001","timestamp":"2026-09-01T10:00:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-101","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":80,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"success","latency_ms":820,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
+        {"event_id":"example-002","timestamp":"2026-09-01T10:01:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"failed","latency_ms":1400,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"needs_escalation"},
+        {"event_id":"example-003","timestamp":"2026-09-01T10:02:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"retried","retry_parent_event_id":"example-002","latency_ms":900,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
+        {"event_id":"example-004","timestamp":"2026-09-01T10:03:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"retried","retry_parent_event_id":"example-002","latency_ms":930,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
+        {"event_id":"example-004","timestamp":"2026-09-01T10:03:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"retried","retry_parent_event_id":"example-002","latency_ms":930,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
+        {"event_id":"example-006","timestamp":"2026-09-01T10:05:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-103","environment":"production","input_tokens":6000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0264,"currency":"USD","request_status":"success","latency_ms":1200,"prefix_fingerprint":"support-v2","tool_call_count":1,"outcome_status":"ready_to_use"},
+        {"event_id":"example-007","timestamp":"2026-09-01T10:06:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":null,"team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-104","environment":"production","input_tokens":1000,"output_tokens":900,"reasoning_tokens":700,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.022,"currency":"USD","request_status":"success","latency_ms":2100,"prefix_fingerprint":"support-v2","tool_call_count":7,"outcome_status":"needs_correction"}
+      ]
+    </template>
     <script>(function attachPricingCatalog(root, factory) {
   const catalog = factory();
   if (typeof module === "object" && module.exports) module.exports = catalog;
@@ -10499,6 +10526,7 @@ body{min-width:0}
     invoicePdfCandidate: null,
     priceEstimate: null,
     usageReview: null,
+    usageReviewIllustrative: false,
     verificationRecord: null,
     verificationSession: null,
     verificationScores: [],
@@ -12834,11 +12862,11 @@ body{min-width:0}
     document.getElementById("truth-summary").textContent = simple
       ? "A cheaper subscription can cost more when it creates extra reviewing and fixing work."
       : humanIncluded
-      ? `Four numbers tell the story. ${sentenceCase(providerTerm)} can fall while the cost of usable work rises.`
+      ? `A ready result is finished work that cleared the stated quality rule. ${sentenceCase(providerTerm)} can fall while the cost of usable work rises.`
       : `This first pass connects the bill to usable work. Human review time was not supplied, so the unit cost remains directional.`;
     document.getElementById("unit-economics-card").innerHTML = `
       <div class="decision-table-heading">
-        <div><span>${simple ? "COST COMPARISON" : "DECISION LEDGER"}</span><strong>${simple ? lower ? "The other option costs less per usable result in this sample." : "The cheaper subscription did not produce cheaper usable work." : lower ? humanIncluded ? "The proposed route is cheaper per ready result." : "The proposed route is lower on the costs supplied." : humanIncluded ? "The cheaper bill did not produce cheaper work." : "The proposed route is not cheaper on the costs supplied."}</strong></div>
+        <div><span>${simple ? "COST COMPARISON" : "DECISION CHECK"}</span><strong>${simple ? lower ? "The other option costs less per usable result in this sample." : "The cheaper subscription did not produce cheaper usable work." : lower ? humanIncluded ? "The proposed route is cheaper per ready result." : "The proposed route is lower on the costs supplied." : humanIncluded ? "The cheaper bill did not produce cheaper work." : "The proposed route is not cheaper on the costs supplied."}</strong></div>
         <span class="evidence-pill ${state.data.mode === "illustrative" ? "is-illustrative" : sampled ? "is-sampled" : "is-observed"}">${escapeHtml(evidenceLabel)}</span>
       </div>
       <div class="decision-table-wrap" role="region" aria-label="Route decision comparison" tabindex="0">
@@ -12933,10 +12961,10 @@ body{min-width:0}
       },
     ];
     document.getElementById("truth-summary").textContent =
-      `Four numbers tell the story. ${sentenceCase(providerTerm)} can fall while the cost of usable work rises.`;
+      `A ready result is finished work that cleared the stated quality rule. ${sentenceCase(providerTerm)} can fall while the cost of usable work rises.`;
     document.getElementById("unit-economics-card").innerHTML = `
       <div class="decision-table-heading">
-        <div><span>DECISION LEDGER</span><strong>${lower ? "The proposed route is cheaper per ready result." : "The cheaper bill did not produce cheaper work."}</strong></div>
+        <div><span>DECISION CHECK</span><strong>${lower ? "The proposed route is cheaper per ready result." : "The cheaper bill did not produce cheaper work."}</strong></div>
         <span class="evidence-pill ${state.data.mode === "illustrative" ? "is-illustrative" : sampled ? "is-sampled" : "is-observed"}">${escapeHtml(evidenceLabel)}</span>
       </div>
       <div class="decision-table-wrap" role="region" aria-label="Route decision comparison" tabindex="0">
@@ -14172,6 +14200,12 @@ body{min-width:0}
     const result = document.getElementById("request-analysis-results");
     const summary = document.getElementById("request-analysis-summary");
     const list = document.getElementById("request-finding-list");
+    document.getElementById("request-analysis-mode").textContent = state.usageReviewIllustrative
+      ? "ILLUSTRATIVE DATA"
+      : "OBSERVED REQUEST REVIEW";
+    document.getElementById("request-analysis-title").textContent = state.usageReviewIllustrative
+      ? "What the example calls show"
+      : "What the imported calls support";
     const currency = review.currency;
     const headline = currency === "MIXED" ? null : review.headline.conservative_non_additive_opportunity;
     const bill = review.reconciliation.bill;
@@ -14246,41 +14280,18 @@ body{min-width:0}
   }
 
   function initializeRequestLogAnalysis() {
-  // A result belongs to the options used to calculate it, not subsequent edits.
-  document.querySelectorAll(".request-review-panel input:not([type=file]), .request-review-panel select").forEach((input) => {
-    if (input.id.startsWith("request-filter-")) return;
-    input.addEventListener("input", () => {
-      if (!state.usageReview) return;
-      state.usageReview = null;
-      document.getElementById("request-analysis-results").hidden = true;
-      showToast("Review inputs changed. Choose Analyze locally to update the results.");
-    });
-  });
-  document.getElementById("request-log-file").addEventListener("change", (event) => {
-    const [file] = event.target.files;
-    document.getElementById("request-log-file-status").textContent = file
-      ? `${file.name} selected. It will be read only when you choose Analyze locally.`
-      : "Up to 20,000 flat rows or 5 MiB. Unknown fields, including prompt text, are not copied into the normalized record.";
-    document.getElementById("request-analysis-results").hidden = true;
-    document.getElementById("request-log-error").classList.remove("visible");
-    state.usageReview = null;
-  });
-
-  document.getElementById("analyze-request-log").addEventListener("click", async () => {
+  async function runRequestLogAnalysis(button, idleText, loadInput) {
     const error = document.getElementById("request-log-error");
-    const button = document.getElementById("analyze-request-log");
     error.classList.remove("visible");
     try {
       if (!usageEventEngine) throw new Error("Request-level analysis is unavailable in this build.");
-      const [file] = document.getElementById("request-log-file").files;
-      if (!file) throw new Error("Choose a request-log CSV or JSON file first.");
       button.disabled = true;
       button.textContent = "Analyzing…";
-      const text = await readLocalFile(file);
-      const rows = parseRequestLog(text, file.name);
+      const { text, filename, illustrative } = await loadInput();
+      const rows = parseRequestLog(text, filename);
       const review = usageEventEngine.buildReview(rows, {
         catalog: globalThis.AI_COST_LENS_PRICING_CATALOG,
-        source_name: file.name,
+        source_name: illustrative ? "Illustrative request log bundled with AI Cost Lens" : filename,
         source_file_hash: await sha256(text),
         default_currency: document.getElementById("request-default-currency").value.trim() || null,
         billed_total: document.getElementById("request-billed-total").value.trim() || null,
@@ -14303,18 +14314,65 @@ body{min-width:0}
         human_review_cost: document.getElementById("request-human-review-cost").value.trim() || null,
       });
       state.usageReview = review;
+      state.usageReviewIllustrative = illustrative;
       renderRequestAnalysis(review);
       document.getElementById("request-analysis-results").scrollIntoView({ behavior: "smooth", block: "start" });
-      showToast(`${wholeNumber(review.event_count)} request records analyzed locally. Nothing was uploaded.`);
+      showToast(illustrative
+        ? `${wholeNumber(review.event_count)} illustrative request records analyzed locally.`
+        : `${wholeNumber(review.event_count)} request records analyzed locally. Nothing was uploaded.`);
     } catch (caught) {
       state.usageReview = null;
+      state.usageReviewIllustrative = false;
       document.getElementById("request-analysis-results").hidden = true;
       error.textContent = caught instanceof TypeError || caught instanceof RangeError ? "The request log could not be analyzed. Check the flat file structure and numeric fields." : caught.message || "The request log could not be analyzed.";
       error.classList.add("visible");
     } finally {
       button.disabled = false;
-      button.textContent = "Analyze locally";
+      button.textContent = idleText;
     }
+  }
+
+  // A result belongs to the options used to calculate it, not subsequent edits.
+  document.querySelectorAll(".request-review-panel input:not([type=file]), .request-review-panel select").forEach((input) => {
+    if (input.id.startsWith("request-filter-")) return;
+    input.addEventListener("input", () => {
+      if (!state.usageReview) return;
+      state.usageReview = null;
+      state.usageReviewIllustrative = false;
+      document.getElementById("request-analysis-results").hidden = true;
+      showToast("Review inputs changed. Choose Analyze locally to update the results.");
+    });
+  });
+  document.getElementById("request-log-file").addEventListener("change", (event) => {
+    const [file] = event.target.files;
+    document.getElementById("request-log-file-status").textContent = file
+      ? `${file.name} selected. It will be read only when you choose Analyze locally.`
+      : "Up to 20,000 flat rows or 5 MiB. Unknown fields, including prompt text, are not copied into the normalized record.";
+    document.getElementById("request-analysis-results").hidden = true;
+    document.getElementById("request-log-error").classList.remove("visible");
+    state.usageReview = null;
+    state.usageReviewIllustrative = false;
+  });
+
+  document.getElementById("analyze-request-log").addEventListener("click", async () => {
+    const button = document.getElementById("analyze-request-log");
+    await runRequestLogAnalysis(button, "Analyze locally", async () => {
+      const [file] = document.getElementById("request-log-file").files;
+      if (!file) throw new Error("Choose a request-log CSV or JSON file first.");
+      const text = await readLocalFile(file);
+      return { text, filename: file.name, illustrative: false };
+    });
+  });
+
+  document.getElementById("try-illustrative-request-log").addEventListener("click", async () => {
+    const button = document.getElementById("try-illustrative-request-log");
+    await runRequestLogAnalysis(button, "Try illustrative data", async () => {
+      const template = document.getElementById("illustrative-request-log-data");
+      const text = template.content.textContent.trim();
+      document.getElementById("request-log-file").value = "";
+      document.getElementById("request-log-file-status").textContent = "Using the bundled illustrative request log. Choose a local file at any time to replace it.";
+      return { text, filename: "illustrative-request-log.json", illustrative: true };
+    });
   });
 
   document.getElementById("download-normalized-usage").addEventListener("click", () => {
@@ -15006,7 +15064,7 @@ body{min-width:0}
     const decision = decisionFor(state.data);
     state.data.comparison.finance_posture = decision.posture;
     for (const id of ["decision-code", "memo-decision-code"]) document.getElementById(id).textContent = decision.code;
-    document.getElementById("finance-posture").textContent = `Finance posture: ${decision.posture}`;
+    document.getElementById("finance-posture").textContent = `Finance recommendation: ${decision.posture}`;
     for (const id of ["decision-title", "memo-decision-title", "memo-next-step", "lumen-panel-copy"]) document.getElementById(id).textContent = decision.reason;
     document.getElementById("lumen-panel-title").textContent = sentenceCase(decision.code.toLowerCase());
     const decisionHeading = document.querySelector(".decision-table-heading strong");

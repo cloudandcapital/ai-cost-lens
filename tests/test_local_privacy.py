@@ -62,6 +62,8 @@ def test_browser_app_only_fetches_its_checked_in_example():
     app = (WEB / "app.js").read_text()
     calls = re.findall(r"fetch\(([^\n]+)", app)
     assert calls == ['"data/illustrative-review-result.json");']
+    assert "illustrative-request-log-data" in (WEB / "index.html").read_text()
+    assert 'fetch("data/illustrative-request-log' not in app
 
 
 def test_static_preview_inlines_request_engine_and_template():
