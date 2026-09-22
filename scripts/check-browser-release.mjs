@@ -101,7 +101,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#calculate-prompt-price").click();
   await page.locator("#price-results").waitFor({ state: "visible" });
   assert(await page.locator("#price-result-rows tr").count() === 3, `${engineName}: pricing comparison did not render three routes.`);
-  assert((await page.locator("#price-result-rows").innerText()).includes("Global / default"), `${engineName}: route geography is missing from results.`);
+  assert((await page.locator("#price-result-rows").innerText()).toLowerCase().includes("global / default"), `${engineName}: route geography is missing from results.`);
 
   await page.locator(".model-catalog-browser").evaluate((details) => { details.open = true; });
   const sonnet = page.locator(".model-catalog-card").filter({ hasText: "Claude Sonnet 5" });
@@ -120,14 +120,14 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   for (const selector of ["#simple-current-checked", "#simple-current-usable", "#simple-other-checked", "#simple-other-usable"]) {
     assert(await page.locator(selector).inputValue() === "", `${engineName}: estimated pricing prefilled quality evidence.`);
   }
-  assert((await page.locator("#builder-action-note").innerText()).includes("same task sample"), `${engineName}: Review handoff omitted the quality-evidence requirement.`);
+  assert((await page.locator("#builder-action-note").innerText()).toLowerCase().includes("same task sample"), `${engineName}: Review handoff omitted the quality-evidence requirement.`);
   await page.locator("#close-review").click();
 
   await page.locator("#review-usage").click();
   await page.locator("#request-log-file").setInputFiles(fixture);
   await page.locator("#analyze-request-log").click();
   await page.locator("#request-analysis-results").waitFor({ state: "visible" });
-  assert((await page.locator("#request-analysis-boundary").innerText()).includes("do not prove realized savings"), `${engineName}: usage review lost its evidence boundary.`);
+  assert((await page.locator("#request-analysis-boundary").innerText()).toLowerCase().includes("do not prove realized savings"), `${engineName}: usage review lost its evidence boundary.`);
   const usage = await saveJsonDownload(page, "#download-usage-review", `${engineName}-usage-review.json`);
   assert(usage.event_count === 7, `${engineName}: usage import did not retain all seven rows.`);
   assert(usage.evidence_gate.savings_claim_allowed === false, `${engineName}: usage review allowed a savings claim.`);
