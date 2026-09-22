@@ -25,6 +25,13 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function axeSummary(result) {
+  return result.violations.map((violation) => {
+    const targets = violation.nodes.flatMap((node) => node.target).join(", ");
+    return `${violation.id} (${targets})`;
+  }).join("; ");
+}
+
 function startServer() {
   const server = createServer(async (request, response) => {
     try {
@@ -164,12 +171,12 @@ async function mobileAndAccessibility(origin) {
 
   await page.locator("#mobile-section-nav").selectOption("review");
   const overviewA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
-  assert(overviewA11y.violations.length === 0, `mobile overview accessibility violations: ${overviewA11y.violations.map((item) => item.id).join(", ")}`);
+  assert(overviewA11y.violations.length === 0, `mobile overview accessibility violations: ${axeSummary(overviewA11y)}`);
 
   await page.locator("#header-menu-toggle").click();
   await page.locator("#price-prompt").click();
   const priceA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
-  assert(priceA11y.violations.length === 0, `mobile pricing accessibility violations: ${priceA11y.violations.map((item) => item.id).join(", ")}`);
+  assert(priceA11y.violations.length === 0, `mobile pricing accessibility violations: ${axeSummary(priceA11y)}`);
 
   assert(observed.egress.length === 0, `mobile: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `mobile: browser errors: ${observed.errors.join(" | ")}`);

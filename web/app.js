@@ -2277,7 +2277,7 @@
           <strong>${escapeHtml(scenario.label)}</strong>
           <span>${compact(counts.completed)} ${counts.sampled ? "reviewed" : "attempts"}</span>
         </div>
-        <div class="yield-bar" aria-label="${perHundred[0]} ready to use, ${perHundred[1]} need correction, and ${perHundred[2]} need escalation for every 100 ${counts.sampled ? "sampled results" : "attempts"}">
+        <div class="yield-bar" role="img" aria-label="${perHundred[0]} ready to use, ${perHundred[1]} need correction, and ${perHundred[2]} need escalation for every 100 ${counts.sampled ? "sampled results" : "attempts"}">
           <div class="yield-ready" style="width:${shares[0].toFixed(2)}%"></div>
           <div class="yield-correction" style="width:${shares[1].toFixed(2)}%"></div>
           <div class="yield-escalation" style="width:${shares[2].toFixed(2)}%"></div>
@@ -2357,7 +2357,7 @@
         <div><span>${simple ? "COST COMPARISON" : "DECISION LEDGER"}</span><strong>${simple ? lower ? "The other option costs less per usable result in this sample." : "The cheaper subscription did not produce cheaper usable work." : lower ? humanIncluded ? "The proposed route is cheaper per ready result." : "The proposed route is lower on the costs supplied." : humanIncluded ? "The cheaper bill did not produce cheaper work." : "The proposed route is not cheaper on the costs supplied."}</strong></div>
         <span class="evidence-pill ${state.data.mode === "illustrative" ? "is-illustrative" : sampled ? "is-sampled" : "is-observed"}">${escapeHtml(evidenceLabel)}</span>
       </div>
-      <div class="decision-table-wrap">
+      <div class="decision-table-wrap" role="region" aria-label="Route decision comparison" tabindex="0">
         <table class="decision-table">
           <thead><tr><th>Metric</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Change</th><th>What it includes</th></tr></thead>
           <tbody>
@@ -2455,7 +2455,7 @@
         <div><span>DECISION LEDGER</span><strong>${lower ? "The proposed route is cheaper per ready result." : "The cheaper bill did not produce cheaper work."}</strong></div>
         <span class="evidence-pill ${state.data.mode === "illustrative" ? "is-illustrative" : sampled ? "is-sampled" : "is-observed"}">${escapeHtml(evidenceLabel)}</span>
       </div>
-      <div class="decision-table-wrap">
+      <div class="decision-table-wrap" role="region" aria-label="Route decision comparison" tabindex="0">
         <table class="decision-table">
           <thead><tr><th>Metric</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Change</th><th>What it includes</th></tr></thead>
           <tbody>
@@ -3260,7 +3260,7 @@
           </div>
           <span>${money(recurring)}</span>
         </header>
-        <div class="stacked-bar" aria-label="Recurring cost composition">
+        <div class="stacked-bar" role="img" aria-label="Recurring cost composition">
           ${parts
             .map(
               ([, value, key]) =>
@@ -3600,7 +3600,7 @@
         <article><span>Known operating cost</span><strong>${requestReviewMoney(costStack.known_operating_cost, costStack.currency)}</strong><p>Provider request cost plus only the additional period costs supplied below.</p></article>
         <article><span>Fully loaded cost</span><strong>${requestReviewMoney(costStack.fully_loaded_cost, costStack.currency)}</strong><p>${fullyLoadedCopy}</p></article>
       </div>
-      <div class="request-variance-table-wrap"><table><thead><tr><th>Additional category</th><th>Same-period amount</th></tr></thead><tbody>${categoryRows}</tbody></table></div>
+      <div class="request-variance-table-wrap" role="region" aria-label="Additional cost categories" tabindex="0"><table><thead><tr><th>Additional category</th><th>Same-period amount</th></tr></thead><tbody>${categoryRows}</tbody></table></div>
       <p class="request-variance-note">${escapeHtml(costStack.method)}</p>`;
     const allocation = spend.allocation;
     const allocationDecision = allocation.decision_support;
@@ -3608,7 +3608,7 @@
     document.getElementById("request-allocation-status").innerHTML = `
       <div class="request-explorer-head"><div><p class="kicker">ALLOCATION COVERAGE</p><h4>Does known cost clear the allocation check?</h4></div><p>${escapeHtml(allocationDecision.status.replaceAll("_", " "))}</p></div>
       <article class="allocation-${allocationDecision.status.toLowerCase().replaceAll("_", "-")}"><strong>${escapeHtml(allocationDecision.reason)}</strong><p>${escapeHtml(allocationDecision.policy_note)}</p></article>
-      <div class="request-variance-table-wrap"><table><thead><tr><th>Dimension</th><th>Allocated priced rows</th><th>Unallocated cost</th><th>Unallocated share</th></tr></thead><tbody>${allocationRows}</tbody></table></div>
+      <div class="request-variance-table-wrap" role="region" aria-label="Allocation coverage by dimension" tabindex="0"><table><thead><tr><th>Dimension</th><th>Allocated priced rows</th><th>Unallocated cost</th><th>Unallocated share</th></tr></thead><tbody>${allocationRows}</tbody></table></div>
       <p class="request-variance-note">${escapeHtml(allocation.method)}</p>`;
     const budget = spend.budget;
     const budgetPresentation = {
@@ -3642,7 +3642,7 @@
     } else {
       const changeRate = variance.total_cost_change_rate === null ? "Not available" : `${variance.total_cost_change_rate > 0 ? "+" : ""}${(variance.total_cost_change_rate * 100).toFixed(1)}%`;
       const leading = variance.excluded_leading_days ? ` ${wholeNumber(variance.excluded_leading_days)} leading day${variance.excluded_leading_days === 1 ? " was" : "s were"} excluded so the windows are equal.` : "";
-      const costChangeTable = (title, rows) => rows?.length ? `<div class="request-variance-table-wrap"><h4>${escapeHtml(title)}</h4><table><thead><tr><th>${escapeHtml(title)}</th><th>Prior</th><th>Recent</th><th>Change</th></tr></thead><tbody>${rows.map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${requestReviewMoney(item.prior_cost, variance.currency)}</td><td>${requestReviewMoney(item.current_cost, variance.currency)}</td><td>${escapeHtml(signedCost(item.change))}</td></tr>`).join("")}</tbody></table></div>` : "";
+      const costChangeTable = (title, rows) => rows?.length ? `<div class="request-variance-table-wrap" role="region" aria-label="${escapeHtml(title)} cost changes" tabindex="0"><h4>${escapeHtml(title)}</h4><table><thead><tr><th>${escapeHtml(title)}</th><th>Prior</th><th>Recent</th><th>Change</th></tr></thead><tbody>${rows.map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${requestReviewMoney(item.prior_cost, variance.currency)}</td><td>${requestReviewMoney(item.current_cost, variance.currency)}</td><td>${escapeHtml(signedCost(item.change))}</td></tr>`).join("")}</tbody></table></div>` : "";
       document.getElementById("request-variance").innerHTML = `
         <div class="request-variance-cards">
           <article><span>Prior ${wholeNumber(variance.window_days)} days</span><strong>${requestReviewMoney(variance.prior_period.selected_cost, variance.currency)}</strong><p>${wholeNumber(variance.prior_period.requests)} requests · ${requestReviewMoney(variance.prior_period.cost_per_request, variance.currency)} each</p></article>
@@ -3677,7 +3677,7 @@
       const visible = rows.slice(0, 6);
       return `<article>
         <h4>By ${escapeHtml(label.toLowerCase())}</h4>
-        <div><table><thead><tr><th>${escapeHtml(label)}</th><th>Requests</th><th>Selected cost</th><th>Average</th><th>Share</th></tr></thead>
+        <div role="region" aria-label="Spend by ${escapeHtml(label.toLowerCase())}" tabindex="0"><table><thead><tr><th>${escapeHtml(label)}</th><th>Requests</th><th>Selected cost</th><th>Average</th><th>Share</th></tr></thead>
         <tbody>${visible.map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${wholeNumber(item.event_count)}<span>${wholeNumber(item.priced_rows)} priced</span></td><td>${requestReviewMoney(item.selected_cost, spend.currency)}</td><td>${requestReviewMoney(item.average_selected_cost_per_priced_row, spend.currency)}</td><td>${item.share_of_selected_cost === null ? "Not available" : `${(item.share_of_selected_cost * 100).toFixed(1)}%`}</td></tr>`).join("")}</tbody></table></div>
         ${rows.length > visible.length ? `<p>Showing the top ${visible.length} of ${rows.length} values. Use the local filters below for row-level review.</p>` : ""}
       </article>`;
@@ -4006,7 +4006,7 @@
     document.getElementById("verification-blind-rule").textContent = verificationRuleCopy(item.rule);
     document.getElementById("verification-blind-cards").innerHTML = item.presentations.map((presentation) => `<article class="blind-output-card">
       <strong id="blind-output-label-${presentation.slot}">Output ${presentation.slot}</strong>
-      <pre aria-labelledby="blind-output-label-${presentation.slot}">${escapeHtml(presentation.output_text)}</pre>
+      <pre role="region" tabindex="0" aria-labelledby="blind-output-label-${presentation.slot}">${escapeHtml(presentation.output_text)}</pre>
       <div class="blind-score-fields">
         <label><span>Human outcome · Output ${presentation.slot}</span><select id="blind-outcome-${presentation.slot}"><option value="">Choose one</option><option value="ready_to_use">Ready to use</option><option value="needs_correction">Needs correction</option><option value="needs_escalation">Needs escalation</option></select></label>
         <label><span>Review minutes · Output ${presentation.slot} · optional</span><input id="blind-minutes-${presentation.slot}" type="number" min="0" step="0.1" placeholder="Unknown" /></label>
@@ -5242,7 +5242,7 @@
       const modes = pricingEngine.availableProcessingModes(model).map(modeLabel).join(" · ");
       return `<article class="model-catalog-card" role="listitem">
         <div class="model-catalog-card-head"><div><a href="${escapeHtml(model.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(model.label)}</a><span>${escapeHtml(model.provider)} · checked ${escapeHtml(model.verified_at)}</span></div><button class="text-button catalog-add-model" type="button" data-model-id="${escapeHtml(model.id)}">Add</button></div>
-        <div class="model-catalog-rates" aria-label="Standard USD rates. Token rates are per 1 million tokens; cache storage is per 1 million token-hours.">${rates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${value === null ? "Not listed" : modelRate(value)}</strong></div>`).join("")}</div>
+        <div class="model-catalog-rates" role="group" aria-label="Standard USD rates. Token rates are per 1 million tokens; cache storage is per 1 million token-hours.">${rates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${value === null ? "Not listed" : modelRate(value)}</strong></div>`).join("")}</div>
         <div class="model-catalog-card-foot"><div><span class="model-catalog-context">${compact(context)} token context · ${escapeHtml(modes)}</span><div class="model-workload-signals">${model.workload_tags.map((tag) => `<span>${escapeHtml(tagLabels[tag])}</span>`).join("")}</div></div><a class="model-catalog-provider-notes" href="${escapeHtml(model.capability_source_url)}" target="_blank" rel="noreferrer">Provider notes</a></div>
       </article>`;
     }).join("") || '<p class="model-catalog-empty">No model matches this filter.</p>';
