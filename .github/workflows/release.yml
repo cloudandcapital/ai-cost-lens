@@ -1,0 +1,94 @@
+name: Publish release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - pyproject.toml
+      - CHANGELOG.md
+      - .github/workflows/release.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Tag and publish stable release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the exact merge commit
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate release metadata
+        id: release
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          version = pyproject["project"]["version"]
+
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+              raise SystemExit(f"Refusing to publish invalid stable version: {version}")
+
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          if f"## [{version}]" not in changelog:
+              raise SystemExit(
+                  f"Refusing to publish v{version}: CHANGELOG.md has no matching release heading"
+              )
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version}\n")
+              output.write(f"tag=v{version}\n")
+          PY
+
+      - name: Check whether the release already exists
+        id: existing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "$TAG is already published; leaving it unchanged."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish the release
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "AI Cost Lens $TAG" \
+            --generate-notes \
+            --latest
+
+      - name: Verify the published release
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          gh release view "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json tagName,targetCommitish,isDraft,isPrerelease,url
