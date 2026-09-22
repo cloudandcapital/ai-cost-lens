@@ -225,6 +225,18 @@ button,
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .bill-review-screen.active,
+  .view.active,
+  .bar-fill {
+    animation: none;
+  }
+}
+
 .eyebrow-row {
   display: flex;
   justify-content: space-between;

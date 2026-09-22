@@ -147,7 +147,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
 
 async function mobileAndAccessibility(origin) {
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   const observed = watchPage(page, origin);
   await page.goto(origin, { waitUntil: "networkidle" });
