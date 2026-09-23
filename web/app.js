@@ -313,6 +313,15 @@
     const period = { start: declaredStart || dates[0], end: declaredEnd || dates.at(-1), timezone: "UTC" };
     const basis = spendCostBasis(spend, "single bill");
     const totals = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true });
+    if (config.grossNet) {
+      const { gross, net, adjustment, classification } = config.grossNet;
+      if (config.reviewSource !== "claude_spend_report" || classification !== "unclassified_gross_to_net" ||
+          ![gross, net, adjustment].every((value) => typeof value === "number" && Number.isFinite(value)) ||
+          gross < 0 || net < 0 || Math.abs(round(gross - net) - adjustment) > 0.000001 ||
+          Math.abs(net - totals.providerCost) > 0.000001) {
+        throw new Error("Claude gross and net spend must reconcile to the imported provider cost; the adjustment is not automatically a credit.");
+      }
+    }
     const hasUsage = spend.some((row) => ["requests", "input_tokens", "output_tokens"].some((field) => row[field].trim() !== ""));
     const missing = [];
     for (const [field, label] of [["requests", "Requests"], ["processedInput", "Input tokens"], ["cachedInput", "Cache-read tokens"], ["cacheWriteInput", "Cache-write tokens"], ["outputTokens", "Output tokens"]]) {
@@ -1409,12 +1418,16 @@
       return normalized;
     });
     requireColumns(raw, claudeSpendColumns, "Claude Team/Enterprise spend report");
+    let grossTotal = 0;
+    let netTotal = 0;
     const rows = raw.map((row, index) => {
       const label = `Claude spend row ${index + 2}`;
       const product = safeImportedLabel(row.product, `${label} product`);
       const model = safeImportedLabel(row.model || row.model_family, `${label} model`);
       const net = costNumber(row.total_net_spend_usd, `${label} total_net_spend_usd`);
-      costNumber(row.total_gross_spend_usd, `${label} total_gross_spend_usd`);
+      const gross = costNumber(row.total_gross_spend_usd, `${label} total_gross_spend_usd`);
+      grossTotal += gross;
+      netTotal += net;
       const requests = optionalNumber(row.total_requests, `${label} total_requests`, { integer: true });
       const promptTokens = optionalNumber(row.total_prompt_tokens, `${label} total_prompt_tokens`, { integer: true });
       const completionTokens = optionalNumber(row.total_completion_tokens, `${label} total_completion_tokens`, { integer: true });
@@ -1427,7 +1440,8 @@
         provider_cost: String(net), cost_basis: "provider_reported", currency: "USD",
       };
     });
-    const review = await buildSingleBillReview(rowsToCsv(rows), "", { acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", serviceStart: period.start, serviceEnd: period.end, reviewSource: "claude_spend_report" });
+    const review = await buildSingleBillReview(rowsToCsv(rows), "", { acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", serviceStart: period.start, serviceEnd: period.end, reviewSource: "claude_spend_report",
+      grossNet: { gross: round(grossTotal), net: round(netTotal), adjustment: round(grossTotal - netTotal), classification: "unclassified_gross_to_net" } });
     const summary = summarizeSingleBill(review);
     return { review, confirmation: {
       provider: "Anthropic", period, products: [...new Set(rows.map((row) => row.route))], models: [...new Set(rows.map((row) => row.model))],
@@ -2133,6 +2147,9 @@
       shape(data, { currency: "string", source: {
         spend: [fields(singleSpendColumns.join(" "), "string")], work: [fields(singleWorkColumns.join(" "), "string")],
       }, config: { acceptanceRule: "string", verifier: "string", complete: "boolean", hourlyRate: "string", sharedCost: "string" } });
+      if (data.config.grossNet !== undefined) shape(data.config.grossNet, {
+        gross: "number", net: "number", adjustment: "number", classification: "string",
+      }, "config.grossNet");
       for (const row of [...data.source.spend, ...data.source.work]) {
         Object.values(row).forEach((value) => shape(value, "string", "source row"));
       }
@@ -4144,7 +4161,10 @@
       claude_admin_api: "Your saved Claude Admin API reports",
     };
     document.getElementById("bill-source-title").textContent = sourceTitles[state.data.config.reviewSource] || "Your completed universal template";
-    document.getElementById("bill-source-copy").textContent = "Start with the records you already have. Each additional layer deepens the review without replacing the bill.";
+    const grossNet = state.data.config.grossNet;
+    document.getElementById("bill-source-copy").textContent = grossNet
+      ? `Provider gross ${cost(grossNet.gross)}, reported net ${cost(grossNet.net)}, gross-to-net adjustment ${cost(grossNet.adjustment)}. The export does not identify that difference as a credit; reconcile credits, discounts, and taxes with the actual invoice. List-price estimates remain separate.`
+      : "Start with the records you already have. Each additional layer deepens the review without replacing the bill.";
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · supplied date buckets, not proof of service-period coverage`;
     document.getElementById("bill-mode-tag").textContent = stage.tag;
     document.getElementById("bill-finding-title").textContent = headline;
@@ -5246,7 +5266,7 @@
   }
 
   function modelRate(value) {
-    return `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: value < 1 ? 2 : 0, maximumFractionDigits: 3 })}`;
+    return `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: value < 1 ? 2 : 0, maximumFractionDigits: 5 })}`;
   }
 
   function renderModelCatalog() {
@@ -5272,7 +5292,7 @@
       const rates = [["Input", model.standard.input], ["Cached input", model.standard.cached_input], cacheSupplement, ["Output", model.standard.output]];
       const modes = pricingEngine.availableProcessingModes(model).map(modeLabel).join(" · ");
       return `<article class="model-catalog-card" role="listitem">
-        <div class="model-catalog-card-head"><div><a href="${escapeHtml(model.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(model.label)}</a><span>${escapeHtml(model.provider)} · checked ${escapeHtml(model.verified_at)}</span></div><button class="text-button catalog-add-model" type="button" data-model-id="${escapeHtml(model.id)}">Add</button></div>
+        <div class="model-catalog-card-head"><div><a href="${escapeHtml(model.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(model.label)}</a><span>${escapeHtml(model.provider)} · checked ${escapeHtml(model.verified_at)}${model.effective_at ? ` · catalog use from ${escapeHtml(model.effective_at)}` : ""}</span></div><button class="text-button catalog-add-model" type="button" data-model-id="${escapeHtml(model.id)}">Add</button></div>
         <div class="model-catalog-rates" role="group" aria-label="Standard USD rates. Token rates are per 1 million tokens; cache storage is per 1 million token-hours.">${rates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${value === null ? "Not listed" : modelRate(value)}</strong></div>`).join("")}</div>
         <div class="model-catalog-card-foot"><div><span class="model-catalog-context">${compact(context)} token context · ${escapeHtml(modes)}</span><div class="model-workload-signals">${model.workload_tags.map((tag) => `<span>${escapeHtml(tagLabels[tag])}</span>`).join("")}</div></div><a class="model-catalog-provider-notes" href="${escapeHtml(model.capability_source_url)}" target="_blank" rel="noreferrer">Provider notes</a></div>
       </article>`;
@@ -5321,8 +5341,8 @@
         updatePromptRouteControl(route);
       });
     });
-    const sources = pricingCatalog.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.provider)}</a>`).join(", ");
-    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Official list prices checked ${escapeHtml(pricingCatalog.effective_at)}: ${sources}. Review again by ${escapeHtml(pricingCatalog.review_by)}. Processing mode, cache-write treatment, and geography are recorded per route.`;
+    const sources = pricingCatalog.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.provider)} (checked ${escapeHtml(source.checked_at)})</a>`).join(", ");
+    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Direct API list-price sources: ${sources}. Model-specific start dates are shown below; review again by ${escapeHtml(pricingCatalog.review_by)}. Earlier pricing snapshots remain in the repository. Processing mode, cache-write treatment, and geography are recorded per route.`;
     const providers = [...new Set(pricingCatalog.models.map((model) => model.provider))];
     document.getElementById("model-catalog-provider").innerHTML = '<option value="">All providers</option>' + providers.map((provider) => `<option value="${escapeHtml(provider)}">${escapeHtml(provider)}</option>`).join("");
     document.getElementById("model-catalog-search").addEventListener("input", renderModelCatalog);

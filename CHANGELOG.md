@@ -2,6 +2,13 @@
 
 All notable changes to AI Cost Lens are documented here.
 
+## Unreleased — September 23 product-readiness work
+
+- Checked current direct API rates for GPT-6 Sol, GPT-6 Luna, and Claude Opus 5.5 against provider pricing; added their Standard, discounted, cache, and Fast profiles with source and catalog-use dates. Preserved the September 22 snapshot and refused to backfill the new models into earlier usage estimates.
+- The visible catalog now shows each provider's actual checked date and enough precision for small token rates.
+- Claude Team/Enterprise imports retain gross, net, and their reconciled difference separately. The difference is explicitly unclassified until the invoice identifies credits, discounts, or taxes.
+- Added price snapshots, historical-date and request-event checks, and three-provider browser card assertions. Local browser execution is still a pending release gate in this environment.
+
 ## [1.0.0] - 2026-09-22
 
 - First stable release of the local-first AI cost decision workbench after independent product, privacy, finance, accessibility, and cross-browser review.

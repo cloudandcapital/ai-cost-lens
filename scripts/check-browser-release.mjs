@@ -116,6 +116,18 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   for (const expected of ["INPUT\n$2", "CACHED INPUT\n$0.20", "CACHE WRITE · 5M\n$2.5", "OUTPUT\n$10"]) {
     assert(sonnetText.toUpperCase().includes(expected), `${engineName}: Claude Sonnet 5 card is missing ${expected.replace("\n", " ")}.`);
   }
+  const currentRates = [
+    ["GPT-6 Sol", ["INPUT\n$2", "CACHED INPUT\n$0.20", "CACHE WRITE\n$2.5", "OUTPUT\n$10"]],
+    ["GPT-6 Luna", ["INPUT\n$0.10", "CACHED INPUT\n$0.01", "CACHE WRITE\n$0.125", "OUTPUT\n$0.50"]],
+    ["Claude Opus 5.5", ["INPUT\n$4", "CACHED INPUT\n$0.20", "CACHE WRITE · 5M\n$5", "OUTPUT\n$20"]],
+  ];
+  for (const [name, expectedRates] of currentRates) {
+    const row = await page.locator(".model-catalog-card").filter({ hasText: name }).innerText();
+    for (const expected of expectedRates) {
+      assert(row.toUpperCase().includes(expected), `${engineName}: ${name} missing ${expected.replace("\n", " ")}.`);
+    }
+    assert(row.includes("checked 2026-09-23"), `${engineName}: ${name} is missing its checked date.`);
+  }
 
   const estimate = await saveJsonDownload(page, "#download-price-estimate", `${engineName}-prompt-estimate.json`);
   assert(estimate.schema_version === "ai-cost-lens-prompt-price-estimate/0.6", `${engineName}: prompt estimate schema is wrong.`);
