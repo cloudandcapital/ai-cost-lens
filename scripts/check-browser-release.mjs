@@ -100,7 +100,8 @@ async function verifyFinanceMemoPdf(page) {
   const bytes = await page.pdf({ format: "Letter", preferCSSPageSize: true, printBackground: true });
   assert(bytes.subarray(0, 5).toString() === "%PDF-", "print output is not a PDF.");
   await writeFile(join(output, "finance-memo-example.pdf"), bytes);
-  const document = await getDocument({ data: new Uint8Array(bytes), useSystemFonts: true }).promise;
+  const loadingTask = getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
+  const document = await loadingTask.promise;
   assert(document.numPages >= 1 && document.numPages <= 3, `finance memo PDF has ${document.numPages} pages.`);
   const pages = [];
   for (let index = 1; index <= document.numPages; index += 1) {
@@ -111,7 +112,7 @@ async function verifyFinanceMemoPdf(page) {
   for (const expected of ["ai spend decision memo", "the other option does not meet", "provider cost", "cost per ready result", "what finance can rely on", "not supported"]) {
     assert(text.includes(expected), `finance memo PDF is missing ${expected}.`);
   }
-  await document.destroy();
+  await loadingTask.destroy();
   return { pages: pages.length, bytes: bytes.length };
 }
 
