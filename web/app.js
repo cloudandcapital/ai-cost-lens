@@ -1722,12 +1722,15 @@
   }
 
   function extractInvoiceCandidate(text) {
+    const lineList = String(text).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (lineList.some((line) => /^(?:usage\s+)?credits?\s+qty\s*\d+\b/i.test(line)) && lineList.some((line) => /\b(?:amount\s+paid|total\s+due)\b/i.test(line))) {
+      return { supported: false, reason: "This is a prepaid usage-credit purchase receipt. The amount paid cannot be treated as the cost of work completed. Review the purchase and credit-use history separately; this PDF cannot be converted into a workload bill." };
+    }
     const providerSignals = [
       { provider: "OpenAI", matches: /\b(?:openai|chatgpt)\b/i.test(text) },
       { provider: "Anthropic", matches: /\b(?:anthropic|claude)\b/i.test(text) },
     ].filter((item) => item.matches);
     if (providerSignals.length !== 1) return { supported: false, reason: "The invoice provider could not be confirmed as OpenAI or Anthropic. Enter the invoice fields manually." };
-    const lineList = String(text).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     const dateFromLabel = (labels) => {
       for (const line of lineList) {
         const match = line.match(new RegExp(`^(?:${labels})\\s*:?\\s*(.+)$`, "i"));
