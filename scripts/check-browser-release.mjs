@@ -116,6 +116,23 @@ async function verifyFinanceMemoPdf(page) {
   return { pages: pages.length, bytes: bytes.length };
 }
 
+async function verifySavedReviewRoundTrip(page) {
+  const decision = await page.locator("#memo-decision-code").textContent();
+  const review = await saveJsonDownload(page, "#download-review", "worked-example-review.json");
+  assert(review.schema_version === "ai-cost-lens-review-result/1.0", "saved review schema is wrong.");
+  await page.reload({ waitUntil: "networkidle" });
+  const chooser = page.waitForEvent("filechooser");
+  await page.locator("#open-review").click();
+  await (await chooser).setFiles({
+    name: "worked-example-review.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(review)),
+  });
+  await page.waitForFunction(() => document.querySelector("#toast")?.textContent?.includes("worked-example-review.json is open"));
+  assert(await page.locator("#memo-decision-code").textContent() === decision, "saved review did not restore its decision.");
+  return review.schema_version;
+}
+
 async function priceAndUsageFlow(engineName, engine, origin) {
   const browser = await engine.launch({ headless: true });
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
@@ -183,10 +200,11 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert(usage.evidence_gate.savings_claim_allowed === false, `${engineName}: usage review allowed a savings claim.`);
 
   const financeMemoPdf = engineName === "chromium" ? await verifyFinanceMemoPdf(page) : null;
+  const savedReview = engineName === "chromium" ? await verifySavedReviewRoundTrip(page) : null;
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `${engineName}: browser errors: ${observed.errors.join(" | ")}`);
   await browser.close();
-  return { engine: engineName, prompt_routes: estimate.comparison.length, usage_rows: usage.event_count, finance_memo_pdf: financeMemoPdf, egress: 0 };
+  return { engine: engineName, prompt_routes: estimate.comparison.length, usage_rows: usage.event_count, finance_memo_pdf: financeMemoPdf, saved_review_reopened: savedReview, egress: 0 };
 }
 
 async function mobileAndAccessibility(origin) {
