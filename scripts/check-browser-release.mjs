@@ -133,6 +133,23 @@ async function verifySavedReviewRoundTrip(page) {
   return review.schema_version;
 }
 
+async function verifyOpenAIPartialBucket(page) {
+  const fixtureDir = join(root, "tests", "fixtures");
+  const usage = (await readFile(join(fixtureDir, "openai-dashboard-usage.csv"), "utf8"))
+    .replaceAll("1788307200,1788393600", "1788310800,1788393600");
+  await page.locator("#start-review").click();
+  await page.locator('[data-builder-mode="openai"]').click();
+  await page.locator("#openai-usage-file").setInputFiles({ name: "partial-usage.csv", mimeType: "text/csv", buffer: Buffer.from(usage) });
+  await page.locator("#openai-cost-file").setInputFiles(join(fixtureDir, "openai-dashboard-cost.csv"));
+  await page.locator("#build-review").click();
+  await page.locator("#bill-mode-tag").waitFor({ state: "visible" });
+  assert((await page.locator("#bill-mode-tag").innerText()) === "PERIOD MISMATCH", "Same-day partial usage bucket was accepted.");
+  assert((await page.locator("#bill-source-copy").innerText()).includes("do not match"), "Mismatch introduction describes exports as aligned.");
+  assert((await page.locator("#bill-finding-limit").innerText()).includes("same calendar dates"), "Mismatch warning omits partial UTC buckets.");
+  assert((await page.locator("#bill-metric-ledger").innerText()).includes("Unavailable until usage and cost UTC time buckets match"), "Mismatch did not suppress blended cost per request.");
+  assert((await page.locator("#bill-boundary-copy").innerText()).includes("even if their calendar dates match"), "Mismatch guidance blames dates that already match.");
+}
+
 async function priceAndUsageFlow(engineName, engine, origin) {
   const browser = await engine.launch({ headless: true });
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
@@ -201,6 +218,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
 
   const financeMemoPdf = engineName === "chromium" ? await verifyFinanceMemoPdf(page) : null;
   const savedReview = engineName === "chromium" ? await verifySavedReviewRoundTrip(page) : null;
+  if (engineName === "chromium") await verifyOpenAIPartialBucket(page);
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `${engineName}: browser errors: ${observed.errors.join(" | ")}`);
   await browser.close();
