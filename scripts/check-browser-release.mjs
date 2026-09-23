@@ -108,7 +108,7 @@ async function verifyFinanceMemoPdf(page) {
     pages.push(content.items.map((item) => item.str).join(" "));
   }
   const text = pages.join(" ").toLowerCase();
-  for (const expected of ["ai spend decision memo", "finance decision", "the numbers", "what finance can rely on"]) {
+  for (const expected of ["ai spend decision memo", "the other option does not meet", "provider cost", "cost per ready result", "what finance can rely on", "not supported"]) {
     assert(text.includes(expected), `finance memo PDF is missing ${expected}.`);
   }
   await document.destroy();
