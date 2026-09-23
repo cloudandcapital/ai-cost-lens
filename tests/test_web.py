@@ -475,7 +475,15 @@ eval(source);
     fs.readFileSync(process.argv[2], "utf8").replaceAll("1788307200,1788393600", "1788310800,1788393600"),
     fs.readFileSync(process.argv[3], "utf8"),
   );
-  console.log(JSON.stringify({result, partial}));
+  const source = fs.readFileSync(process.argv[2], "utf8");
+  const rows = source.trimEnd().split("\n").map((line) => line.split(","));
+  const cacheWriteIndex = rows[0].indexOf("input_cache_write_tokens");
+  const olderUsage = rows.map((row) => row.filter((_, index) => index !== cacheWriteIndex).join(",")).join("\n");
+  const older = await globalThis.__buildOpenAIBillReview(
+    olderUsage,
+    fs.readFileSync(process.argv[3], "utf8"),
+  );
+  console.log(JSON.stringify({result, partial, older}));
 })();
 """
     result = subprocess.run(
@@ -503,6 +511,11 @@ eval(source);
     assert partial["period"]["usage_dates"] == partial["period"]["cost_dates"]
     assert partial["period"]["aligned"] is False
     assert partial["reconciliation"]["status"] == "period_mismatch"
+    older = output["older"]
+    assert older["period"]["aligned"] is True
+    assert older["usage"]["totals"]["input_tokens"] == 16000
+    assert older["usage"]["totals"]["cache_write_input_tokens"] is None
+    assert older["bill"]["total"] == 12.75
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")

@@ -1248,7 +1248,7 @@
 
   const openAIUsageColumns = [
     "start_time", "end_time", "project_id", "num_model_requests", "model", "service_tier",
-    "input_tokens", "output_tokens", "input_cached_tokens", "input_cache_write_tokens", "input_uncached_tokens",
+    "input_tokens", "output_tokens", "input_cached_tokens", "input_uncached_tokens",
   ];
   const openAICostColumns = ["start_time", "end_time", "amount_value", "amount_currency", "line_item", "project_id"];
 
@@ -1273,13 +1273,18 @@
       const optionalUsageNumber = (value, field) => value === "" ? null : finiteNumber(value, `${label} ${field}`, { integer: true });
       const input = optionalUsageNumber(row.input_tokens, "input_tokens");
       const cached = optionalUsageNumber(row.input_cached_tokens, "input_cached_tokens");
-      const cacheWrite = optionalUsageNumber(row.input_cache_write_tokens, "input_cache_write_tokens");
+      // Older OpenAI completions exports omit this field; missing is unknown, not zero.
+      const cacheWrite = row.input_cache_write_tokens === undefined
+        ? null : optionalUsageNumber(row.input_cache_write_tokens, "input_cache_write_tokens");
       const suppliedUncached = optionalUsageNumber(row.input_uncached_tokens, "input_uncached_tokens");
       const uncached = suppliedUncached === null && input !== null && cached !== null && cacheWrite !== null
         ? input - cached - cacheWrite
         : suppliedUncached;
       if (input !== null && cached !== null && cacheWrite !== null && uncached !== null && (uncached < 0 || uncached + cached + cacheWrite !== input)) {
         throw new Error(`${label} input token categories do not reconcile to input_tokens.`);
+      }
+      if (input !== null && cached !== null && uncached !== null && cacheWrite === null && uncached + cached > input) {
+        throw new Error(`${label} input token categories exceed input_tokens.`);
       }
       return [{
         date: openAIBucketDay(row, label),

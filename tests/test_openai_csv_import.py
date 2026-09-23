@@ -1,3 +1,5 @@
+import csv
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -28,6 +30,31 @@ def test_builds_strict_bill_review_without_model_cost_allocation():
     assert result["reconciliation"]["model_cost_allocation_supported"] is False
     assert result["reconciliation"]["outcome_cost_supported"] is False
     assert result["reconciliation"]["savings_claim_allowed"] is False
+
+
+def test_older_completions_export_without_cache_write_header(tmp_path: Path):
+    source = (FIXTURES / "openai-dashboard-usage.csv").read_text()
+    reader = csv.DictReader(StringIO(source))
+    columns = [name for name in reader.fieldnames if name != "input_cache_write_tokens"]
+    output = StringIO()
+    writer = csv.DictWriter(output, fieldnames=columns, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(reader)
+    usage_path = tmp_path / "older-usage.csv"
+    usage_path.write_text(output.getvalue())
+
+    review = build_openai_csv_bill_review(
+        usage_path, FIXTURES / "openai-dashboard-cost.csv"
+    )
+    assert review["period"]["aligned"] is True
+    assert review["usage"]["totals"]["input_tokens"] == 16000
+    assert review["usage"]["totals"]["cache_write_input_tokens"] is None
+    assert review["usage"]["by_model"][0]["cache_write_input_tokens"] is None
+    assert review["bill"]["total"] == "12.750000"
+
+    usage_path.write_text(output.getvalue().replace("1000.0,6000.0", "1000.0,7000.0"))
+    with pytest.raises(OpenAICsvImportError, match="do not reconcile"):
+        build_openai_csv_bill_review(usage_path, FIXTURES / "openai-dashboard-cost.csv")
 
 
 def test_rejects_nonreconciling_input_token_categories(tmp_path: Path):
