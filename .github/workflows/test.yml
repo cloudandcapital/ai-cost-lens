@@ -40,6 +40,14 @@ jobs:
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run build
       - run: npm run check:browser
+        env:
+          BROWSER_ARTIFACT_DIR: browser-artifacts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: finance-memo-example
+          path: browser-artifacts/finance-memo-example.pdf
+          if-no-files-found: ignore
 
   quality:
     name: Quality and dependency audit

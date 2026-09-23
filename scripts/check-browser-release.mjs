@@ -1,15 +1,17 @@
 import { createServer } from "node:http";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { chromium, firefox, webkit } from "playwright";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const build = join(root, "build");
 const fixture = join(root, "tests", "fixtures", "request-events-multi-provider.csv");
-const output = await mkdtemp(join(tmpdir(), "ai-cost-lens-browser-check-"));
+const output = process.env.BROWSER_ARTIFACT_DIR || await mkdtemp(join(tmpdir(), "ai-cost-lens-browser-check-"));
+await mkdir(output, { recursive: true });
 
 const mime = {
   ".css": "text/css; charset=utf-8",
@@ -87,6 +89,32 @@ async function saveJsonDownload(page, selector, filename) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
+async function verifyFinanceMemoPdf(page) {
+  await page.locator("#start-review").click();
+  await page.locator('[data-builder-mode="example"]').click();
+  await page.waitForFunction(() => document.querySelector("#memo-decision-code")?.textContent?.trim());
+  await page.evaluate(() => { window.print = () => {}; });
+  await page.locator("#print-memo").click();
+  assert(await page.locator("body").evaluate((body) => body.classList.contains("printing-memo")), "print button did not activate the finance memo layout.");
+
+  const bytes = await page.pdf({ format: "Letter", preferCSSPageSize: true, printBackground: true });
+  assert(bytes.subarray(0, 5).toString() === "%PDF-", "print output is not a PDF.");
+  await writeFile(join(output, "finance-memo-example.pdf"), bytes);
+  const document = await getDocument({ data: new Uint8Array(bytes), useSystemFonts: true }).promise;
+  assert(document.numPages >= 1 && document.numPages <= 3, `finance memo PDF has ${document.numPages} pages.`);
+  const pages = [];
+  for (let index = 1; index <= document.numPages; index += 1) {
+    const content = await (await document.getPage(index)).getTextContent();
+    pages.push(content.items.map((item) => item.str).join(" "));
+  }
+  const text = pages.join(" ").toLowerCase();
+  for (const expected of ["ai spend decision memo", "finance decision", "the numbers", "what finance can rely on"]) {
+    assert(text.includes(expected), `finance memo PDF is missing ${expected}.`);
+  }
+  await document.destroy();
+  return { pages: pages.length, bytes: bytes.length };
+}
+
 async function priceAndUsageFlow(engineName, engine, origin) {
   const browser = await engine.launch({ headless: true });
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
@@ -122,11 +150,13 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     ["Claude Opus 5.5", ["INPUT\n$4", "CACHED INPUT\n$0.20", "CACHE WRITE · 5M\n$5", "OUTPUT\n$20"]],
   ];
   for (const [name, expectedRates] of currentRates) {
-    const row = await page.locator(".model-catalog-card").filter({ hasText: name }).innerText();
+    const card = page.locator(".model-catalog-card").filter({ hasText: name });
+    const row = await card.innerText();
     for (const expected of expectedRates) {
       assert(row.toUpperCase().includes(expected), `${engineName}: ${name} missing ${expected.replace("\n", " ")}.`);
     }
-    assert(row.includes("checked 2026-09-23"), `${engineName}: ${name} is missing its checked date.`);
+    const provenance = await card.locator(".model-catalog-card-head span").textContent();
+    assert(provenance.includes("checked 2026-09-23"), `${engineName}: ${name} is missing its checked date: ${provenance}`);
   }
 
   const estimate = await saveJsonDownload(page, "#download-price-estimate", `${engineName}-prompt-estimate.json`);
@@ -151,10 +181,11 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert(usage.event_count === 7, `${engineName}: usage import did not retain all seven rows.`);
   assert(usage.evidence_gate.savings_claim_allowed === false, `${engineName}: usage review allowed a savings claim.`);
 
+  const financeMemoPdf = engineName === "chromium" ? await verifyFinanceMemoPdf(page) : null;
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `${engineName}: browser errors: ${observed.errors.join(" | ")}`);
   await browser.close();
-  return { engine: engineName, prompt_routes: estimate.comparison.length, usage_rows: usage.event_count, egress: 0 };
+  return { engine: engineName, prompt_routes: estimate.comparison.length, usage_rows: usage.event_count, finance_memo_pdf: financeMemoPdf, egress: 0 };
 }
 
 async function mobileAndAccessibility(origin) {
