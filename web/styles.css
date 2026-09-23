@@ -3503,6 +3503,13 @@ body.story-mode .cockpit-grid {
     font-weight: 400;
   }
 
+  .memo-plan-basis {
+    margin: 5px 0 0;
+    color: #55534f;
+    font-size: 8pt;
+    line-height: 1.3;
+  }
+
   .memo-next {
     margin-top: 10px;
     padding: 9px 12px;
