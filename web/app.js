@@ -4459,11 +4459,14 @@
         ? "No operating payback"
         : `${payback.payback_months.toFixed(1)} months`;
       document.getElementById("memo-plan-grid").innerHTML = [
-        ["Recurring cost variance", signedMoney(planning.variance.recurring_operating_cost)],
-        ["Ready results variance", `${planning.variance.ready_results >= 0 ? "+" : "−"}${compact(Math.abs(planning.variance.ready_results))}`],
-        ["Monthly savings or shortfall", signedMoney(payback.monthly_operating_savings)],
-        ["Payback", paybackLabel],
+        ["Current cost vs plan", signedMoney(planning.variance.recurring_operating_cost)],
+        ["Current ready results vs plan", `${planning.variance.ready_results >= 0 ? "+" : "−"}${compact(Math.abs(planning.variance.ready_results))}`],
+        ["Proposed monthly scenario", signedMoney(payback.monthly_operating_savings)],
+        ["Proposed change payback", paybackLabel],
       ].map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+      document.getElementById("memo-plan-basis").textContent =
+        `Plan: ${money(planning.plan.recurring_operating_cost)} and ${compact(planning.plan.ready_results)} ready results. ` +
+        `Monthly scenario compares route unit costs at ${compact(payback.expected_ready_results_per_month)} expected ready results per month; modeled, not booked savings.`;
     } else {
       memoPlanning.hidden = true;
     }
