@@ -7273,8 +7273,8 @@ body{min-width:0}
             <div>
               <h3 id="openai-files-title">Add the two OpenAI exports</h3>
               <p>
-                Export Activity data for Completions and Cost data from the same date range
-                in the OpenAI Usage dashboard. Blank daily buckets are fine; the review checks the period.
+                Export Activity data for Completions and Cost data for matching completed UTC intervals
+                in the OpenAI Usage dashboard. Blank buckets are fine; the review checks exact start and end times.
               </p>
               <div class="file-pair">
                 <label>
@@ -14829,7 +14829,9 @@ body{min-width:0}
     document.getElementById("bill-review-kicker").textContent = "WALK · EXPLAIN THE USAGE";
     document.getElementById("bill-review-title").textContent = "Where is the AI cost going?";
     document.getElementById("bill-source-title").textContent = "Saved dashboard exports";
-    document.getElementById("bill-source-copy").textContent = "The matching exports create a cost and usage baseline. Outcomes and human effort are optional next layers.";
+    document.getElementById("bill-source-copy").textContent = state.data.period.aligned
+      ? "These aligned exports create a cost and usage baseline. Outcomes and human effort are optional next layers."
+      : "These exports can be inspected separately, but their UTC time buckets do not match. No combined cost per request is available.";
     document.getElementById("model-mix-title").textContent = "Where the requests and tokens went";
     document.getElementById("bill-mix-note").textContent = "These are observed usage measures. They are not billed dollars by model.";
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Model</th><th>Requests</th><th>Input</th><th>Output</th><th>Cache share</th><th>Billed cost</th></tr>";
@@ -14859,13 +14861,13 @@ body{min-width:0}
               ? `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. Request volume was not supplied.`
               : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} for the exported period. No requests were recorded, so blended cost per request is unavailable.`
           : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} across ${compact(requests)} requests, or ${costPerRequestLabel} per observed request.`
-        : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} in the cost export. Usage covers different daily buckets; these totals are not a matched financial review.`;
+        : `OpenAI reported ${money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2)} in the cost export. Usage covers different UTC time buckets; these totals are not a matched financial review.`;
     document.getElementById("bill-finding-limit").textContent = period.aligned ? `This is a useful cost and usage baseline. ${limitations[0]} Human effort is not required for this review.`
-      : "PERIOD MISMATCH: usage and cost exports cover different daily buckets. Export the same date range again before using this review for a financial decision.";
+      : "PERIOD MISMATCH: usage and cost exports have different UTC bucket start or end times. The same calendar dates may still include a partial bucket. Use matching completed intervals before making a financial decision.";
     const metrics = [
       ["Provider reported cost", money(Number(bill.total), Number(bill.total) < 1 ? 4 : 2), `${bill.populated_rows} populated cost row${bill.populated_rows === 1 ? "" : "s"}`],
       ["Requests", openAIReportedValue(usage, "requests"), openAICoverageNote(usage, "requests", `${usage.by_model.length} model${usage.by_model.length === 1 ? "" : "s"} observed`)],
-      ["Blended cost per request", costPerRequestLabel, costPerRequest === null ? "Available only when every usage row supplies requests and the total is greater than zero" : "Full exported cost divided by observed requests; not a model price"],
+      ["Blended cost per request", costPerRequestLabel, !period.aligned ? "Unavailable until usage and cost UTC time buckets match" : costPerRequest === null ? "Available only when every usage row supplies requests and the total is greater than zero" : "Full exported cost divided by observed requests; not a model price"],
       ["Input tokens", openAIReportedValue(usage, "input_tokens"), openAICoverageNote(usage, "input_tokens", cacheShare === null ? "Cache share is unavailable" : `${pct(cacheShare, 1)} read from cache`)],
       ["Output tokens", openAIReportedValue(usage, "output_tokens"), openAICoverageNote(usage, "output_tokens", `${usage.days_with_usage} day${usage.days_with_usage === 1 ? "" : "s"} with usage`)],
       ["Processing tiers", serviceTiers.length ? compact(serviceTiers.length) : "Unavailable", serviceTiers.length ? serviceTiers.map((row) => row.service_tier).join(", ") : "This saved review predates processing-tier grouping or the export did not provide it"],
@@ -14901,7 +14903,7 @@ body{min-width:0}
       ["test", "TEST FIRST", "Try a cheaper route on one repeatable job", "Bounded test", "Keep the job and quality rule fixed. Outcomes can be a small sample first; human effort is optional unless people actually review the work."],
       ["leave", "LEAVE ALONE", "Do not spread the total bill across models", "Unsupported", "Token share shows usage. The saved cost export does not support billed dollars by model."],
     ] : [
-      ["fix", "FIX FIRST", "Match the usage and cost periods", "Required", "Export the same daily buckets again. A blended unit cost would be misleading until the periods align."],
+      ["fix", "FIX FIRST", "Match the usage and cost periods", "Required", "Compare UTC bucket start and end times; retry with matching completed intervals. The same dates alone do not establish alignment."],
       ["leave", "LEAVE ALONE", "Do not compare the unmatched totals", "Unsupported", "Keep each export intact and avoid normalizing or allocating the difference by assumption."],
     ];
     document.getElementById("bill-opportunity-ledger").innerHTML = ledger.map(([kind, label, title, value, note]) => `
@@ -14915,10 +14917,10 @@ body{min-width:0}
       ? topRequestShare === null
         ? requestCoverage.status === "complete" ? `Start with ${topModel.model}, the busiest visible route in this export.` : "Complete the request coverage before using request volume to prioritize a route."
         : `Start with ${topModel.model}, the route handling ${topRequestShareLabel} of requests.`
-      : "Export matching usage and cost periods before investigating optimization.";
+      : "Export matching UTC usage and cost time buckets before investigating optimization.";
     document.getElementById("bill-boundary-copy").textContent = period.aligned
       ? `${usage.by_model.length} model route${usage.by_model.length === 1 ? "" : "s"}, ${usage.by_project.length} project record${usage.by_project.length === 1 ? "" : "s"}, and ${serviceTiers.length} processing tier${serviceTiers.length === 1 ? "" : "s"} are visible. Check prompt size, output length, caching, tier mix, and whether a smaller model meets quality on one repeatable job. Human review is optional; add outcomes only when you need to test value or savings.`
-      : "The usage and cost date buckets do not align. Export the same date range again before using this review for a financial decision.";
+      : "The usage and cost UTC bucket boundaries do not align, even if their calendar dates match. Use matching completed intervals before making a financial decision.";
   }
 
   function memoList(pairs) {
@@ -14962,7 +14964,7 @@ body{min-width:0}
           : `${money(total, total < 1 ? 4 : 2)} across ${compact(requests)} observed requests creates a ${costPerRequestLabel} blended baseline.`
         : `${money(total, total < 1 ? 4 : 2)} of provider spend and the supplied usage cover different periods.`;
       document.getElementById("memo-decision-limit").textContent = period.aligned ? `${limitations[0]} One bill does not prove savings. Outcomes and human effort are optional next layers.`
-        : "Usage and cost exports cover different daily buckets. Export the same date range again before using this review for a financial decision.";
+        : "Usage and cost exports have different UTC bucket start or end times. The same dates alone do not establish alignment; use matching completed intervals.";
       document.getElementById("memo-numbers-title").textContent = "What the cost and usage exports show";
       document.getElementById("memo-table-head").innerHTML = "<tr><th>Measure</th><th>Observed</th><th>What it proves</th></tr>";
       const billRows = [
