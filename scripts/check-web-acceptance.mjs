@@ -353,6 +353,9 @@ assert.equal(api.extractInvoiceCandidate(await api.extractPdfText(pdfFile('anthr
 const ambiguous = api.extractInvoiceCandidate(['Claude subscription from Anthropic', 'Invoice date: 2026-08-31', 'Subtotal USD 100.00', 'Tax USD 8.00', 'Credit USD 10.00', 'Amount due USD 98.00'].join('\n'));
 assert.equal(ambiguous.amountCandidates.length, 4);
 assert.equal(ambiguous.suggestedAmount, null);
+const prepaidReceipt = api.extractInvoiceCandidate(['OpenAI', 'Credits Qty 2500', '$100.00 $0.04 each', 'Subtotal $100.00', '10% off credit purchases -$10.00', 'Total due $90.00', 'Amount paid $90.00'].join('\n'));
+assert.equal(prepaidReceipt.supported, false);
+assert.match(prepaidReceipt.reason, /prepaid usage-credit purchase/);
 assert.equal(api.extractInvoiceCandidate('Other Cloud Inc\nInvoice date: 2026-08-31\nTotal USD 10.00').supported, false);
 await assert.rejects(api.extractPdfText(pdfFile('blank.pdf', makeTextPdf([])), pdfjs || textPdfModule([])), /No extractable/);
 const malformedPdfModule = { getDocument: () => ({ promise: Promise.reject(new Error('Invalid PDF structure')) }) };

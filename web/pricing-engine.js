@@ -109,7 +109,16 @@
       }
       if (new Set(model.workload_tags).size !== model.workload_tags.length) throw new Error(`${model.id} has duplicate workload tags.`);
       isoDate(model.verified_at, `${model.id} verified date`);
-      if (model.verified_at < catalog.effective_at) throw new Error(`${model.id} was not verified on or after the catalog effective date.`);
+      if (model.effective_at) {
+        isoDate(model.effective_at, `${model.id} effective date`);
+        if (model.effective_at < catalog.effective_at || model.effective_at > catalog.catalog_version) {
+          throw new Error(`${model.id} has an effective date outside the catalog snapshot.`);
+        }
+      }
+      const matchingSource = catalog.sources.find((source) => source.provider === model.provider && source.url === model.source_url);
+      if (model.verified_at > matchingSource.checked_at || model.verified_at > catalog.catalog_version) {
+        throw new Error(`${model.id} verification date is later than its provider source check or catalog version.`);
+      }
       for (const field of ["context_window_tokens", "input_token_limit", "max_output_tokens"]) {
         if (model[field] !== null && model[field] !== undefined) {
           number(model[field], `${model.id} ${field}`, { integer: true });
@@ -150,8 +159,8 @@
     const candidates = (Array.isArray(catalogs) ? catalogs : [catalogs]).map(validateCatalog);
     isoDate(usageDate, "Usage date");
     const eligible = candidates
-      .filter((catalog) => catalog.effective_at <= usageDate)
-      .sort((left, right) => right.effective_at.localeCompare(left.effective_at));
+      .filter((catalog) => catalog.effective_at <= usageDate && catalog.catalog_version <= usageDate)
+      .sort((left, right) => right.catalog_version.localeCompare(left.catalog_version));
     if (!eligible.length) throw new Error(`No pricing catalog is effective for ${usageDate}.`);
     return eligible[0];
   }
@@ -304,6 +313,9 @@
 
   function priceModel(model, rawScenario, routeOptions = {}) {
     const scenario = normalizeScenario(rawScenario);
+    if (scenario.pricing_date && model.effective_at && scenario.pricing_date < model.effective_at) {
+      throw new Error(`${model.label} has no verified list price before ${model.effective_at}.`);
+    }
     if (model.context_window_tokens && scenario.input_tokens + scenario.output_tokens > model.context_window_tokens) {
       throw new Error(`${model.label} cannot fit ${scenario.input_tokens + scenario.output_tokens} total tokens in its ${model.context_window_tokens}-token context window.`);
     }
@@ -372,7 +384,7 @@
 
   function compareModels(catalog, modelIds, scenario, tokenEstimates = {}, customModels = []) {
     validateCatalog(catalog);
-    const byId = new Map(catalog.models.map((model) => [model.id, { ...model, effective_at: catalog.effective_at }]));
+    const byId = new Map(catalog.models.map((model) => [model.id, { ...model, effective_at: model.effective_at || catalog.effective_at }]));
     customModels.map(normalizeCustomModel).forEach((model) => {
       if (byId.has(model.id)) throw new Error(`Custom rate ID ${model.id} conflicts with another route.`);
       byId.set(model.id, model);

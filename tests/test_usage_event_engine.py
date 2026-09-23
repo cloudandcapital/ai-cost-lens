@@ -1025,3 +1025,27 @@ console.log(JSON.stringify({missing,euro,unpriced}));
     cache = next(f for f in result["euro"]["findings"] if f["category"] == "Caching")
     assert cache["estimated_avoidable_cost"] is None
     assert result["unpriced"]["findings"][0]["current_cost"] is None
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_new_model_list_price_never_backfills_before_effective_date():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const catalog = require(process.argv[2]);
+const base = {provider:"OpenAI",model:"gpt-6-sol",input_tokens:1000,
+ output_tokens:100,cached_input_tokens:0,cache_write_tokens:0,
+ processing_mode:"standard",tool_charges:0,currency:"USD"};
+const rows = [
+ {...base,event_id:"before",timestamp:"2026-09-22T12:00:00Z"},
+ {...base,event_id:"after",timestamp:"2026-09-23T12:00:00Z"},
+];
+console.log(JSON.stringify(engine.buildReview(rows,{catalog}).events.map(event => ({
+ id:event.event_id,basis:event.cost_basis,cost:event.effective_cost,
+}))));
+""",
+        ENGINE,
+        CATALOG,
+    )
+    assert result[0]["basis"] == "unpriced"
+    assert result[1]["basis"] == "calculated"

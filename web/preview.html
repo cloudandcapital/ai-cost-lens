@@ -3315,6 +3315,7 @@ body.story-mode .cockpit-grid {
     margin: 0.35in;
   }
 
+  html,
   body {
     background: #fff;
   }
@@ -6863,6 +6864,7 @@ body{min-width:0}
             <div>
               <h3>Start with one bill</h3>
               <p>For a simple subscription or invoice, enter the bill below. No CSV is required.</p>
+              <p><strong>Purchased usage credits?</strong> A credit purchase receipt records cash paid in advance, not the cost of work completed on the invoice date. Do not enter the purchase as provider cost for that work. Review the purchase and remaining balance separately; attributing consumed credits to a period or workload needs usage records.</p>
               <div id="invoice-pdf-status" class="path-requirements" role="status" hidden></div>
               <label id="invoice-amount-choice-label" hidden><span>Choose the invoice amount to review</span><select id="invoice-amount-choice"><option value="">Review the invoice totals</option></select><small>Choose only after checking the label and amount against the invoice.</small></label>
               <div class="field-grid compact-fields invoice-entry">
@@ -7502,15 +7504,15 @@ body{min-width:0}
 
   return Object.freeze({
     schema_version: "ai-cost-lens-pricing-catalog/0.5",
-    catalog_version: "2026-09-22",
+    catalog_version: "2026-09-23",
     effective_at: "2026-09-22",
     review_by: "2026-11-21",
     currency: "USD",
     unit: "per_1m_tokens",
     scope: "Direct API list prices for text input, cached input, cache writes, output, and published processing modes. Taxes, negotiated discounts, tools, grounding, and data-transfer charges are excluded; Gemini cache storage is listed but only calculated when token-hours are supplied.",
     sources: [
-      { provider: "OpenAI", checked_at: "2026-09-22", url: "https://developers.openai.com/api/docs/pricing" },
-      { provider: "Anthropic", checked_at: "2026-09-22", url: "https://platform.claude.com/docs/en/about-claude/pricing" },
+      { provider: "OpenAI", checked_at: "2026-09-23", url: "https://developers.openai.com/api/docs/pricing" },
+      { provider: "Anthropic", checked_at: "2026-09-23", url: "https://platform.claude.com/docs/en/about-claude/pricing" },
       { provider: "Google", checked_at: "2026-09-22", url: "https://ai.google.dev/gemini-api/docs/pricing" },
     ],
     models: [
@@ -7524,7 +7526,7 @@ body{min-width:0}
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-09-23",
         standard: { input: 10, cached_input: 1, cache_write: 12.5, output: 50 },
         batch: { input: 5, cached_input: 0.5, cache_write: 6.25, output: 25 },
         flex: { input: 5, cached_input: 0.5, cache_write: 6.25, output: 25 },
@@ -7533,6 +7535,46 @@ body{min-width:0}
         long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
         unsupported_combinations: ["fast+eu_regional"],
         note: "Direct API. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional-processing rates are represented. Fast mode is not available with EU data residency.",
+      },
+      {
+        id: "openai/gpt-6-sol",
+        effective_at: "2026-09-23",
+        provider: "OpenAI",
+        label: "GPT-6 Sol",
+        model: "gpt-6-sol",
+        context_window_tokens: 1050000,
+        max_output_tokens: 128000,
+        source_url: "https://developers.openai.com/api/docs/pricing",
+        capability_source_url: "https://developers.openai.com/api/docs/models",
+        workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
+        verified_at: "2026-09-23",
+        standard: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 10 },
+        batch: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 5 },
+        flex: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 5 },
+        fast: { input: 4, cached_input: 0.4, cache_write: 5, output: 20 },
+        geography_multipliers: { global: 1, regional: 1.1 },
+        long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
+        note: "Direct API list rate. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional rates are represented; EU data residency supports Standard only.",
+      },
+      {
+        id: "openai/gpt-6-luna",
+        effective_at: "2026-09-23",
+        provider: "OpenAI",
+        label: "GPT-6 Luna",
+        model: "gpt-6-luna",
+        context_window_tokens: 1050000,
+        max_output_tokens: 128000,
+        source_url: "https://developers.openai.com/api/docs/pricing",
+        capability_source_url: "https://developers.openai.com/api/docs/models",
+        workload_tags: ["general", "reasoning", "high_volume", "long_context", "multimodal"],
+        verified_at: "2026-09-23",
+        standard: { input: 0.1, cached_input: 0.01, cache_write: 0.125, output: 0.5 },
+        batch: { input: 0.05, cached_input: 0.005, cache_write: 0.0625, output: 0.25 },
+        flex: { input: 0.05, cached_input: 0.005, cache_write: 0.0625, output: 0.25 },
+        fast: { input: 0.2, cached_input: 0.02, cache_write: 0.25, output: 1 },
+        geography_multipliers: { global: 1, regional: 1.1 },
+        long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
+        note: "Direct API list rate. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional rates are represented; EU data residency supports Standard only.",
       },
       {
         id: "openai/gpt-5.6-sol",
@@ -7544,7 +7586,7 @@ body{min-width:0}
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-09-23",
         standard: { input: 4, cached_input: 0.4, cache_write: 5, output: 20 },
         batch: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 10 },
         flex: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 10 },
@@ -7563,7 +7605,7 @@ body{min-width:0}
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models",
         workload_tags: ["general", "reasoning", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-09-23",
         standard: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 12 },
         batch: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 6 },
         flex: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 6 },
@@ -7582,7 +7624,7 @@ body{min-width:0}
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models",
         workload_tags: ["general", "reasoning", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-09-23",
         standard: { input: 0.2, cached_input: 0.02, cache_write: 0.25, output: 1.2 },
         batch: { input: 0.1, cached_input: 0.01, cache_write: 0.125, output: 0.6 },
         flex: { input: 0.1, cached_input: 0.01, cache_write: 0.125, output: 0.6 },
@@ -7601,11 +7643,30 @@ body{min-width:0}
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-09-23",
         standard: { input: 10, cached_input: 0.25, cache_write_5m: 12.5, cache_write_1h: 20, output: 50 },
         batch: { input: 5, cached_input: 0.125, cache_write_5m: 6.25, cache_write_1h: 10, output: 25 },
         geography_multipliers: { global: 1, us: 1.1 },
         note: "Direct Claude API. The catalog represents 5-minute and 1-hour cache writes, the 50% Batch discount, and the 10% US-only inference multiplier. Server-side tools remain excluded.",
+      },
+      {
+        id: "anthropic/claude-opus-5.5",
+        effective_at: "2026-09-23",
+        provider: "Anthropic",
+        label: "Claude Opus 5.5",
+        model: "claude-opus-5-5",
+        context_window_tokens: 1000000,
+        max_output_tokens: 128000,
+        source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
+        capability_source_url: "https://platform.claude.com/docs/en/models/overview",
+        workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
+        verified_at: "2026-09-23",
+        standard: { input: 4, cached_input: 0.2, cache_write_5m: 5, cache_write_1h: 8, output: 20 },
+        batch: { input: 2, cached_input: 0.1, cache_write_5m: 2.5, cache_write_1h: 4, output: 10 },
+        fast: { input: 8, cached_input: 0.4, cache_write_5m: 10, cache_write_1h: 16, output: 40 },
+        geography_multipliers: { global: 1, us: 1.1 },
+        unsupported_combinations: ["fast+batch"],
+        note: "Direct Claude API. Cache hits use 5% of base input rather than the usual 10%. Batch, Fast, and US-only inference are represented; server tools are excluded.",
       },
       {
         id: "anthropic/claude-opus-5",
@@ -7617,7 +7678,7 @@ body{min-width:0}
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-09-23",
         standard: { input: 5, cached_input: 0.5, cache_write_5m: 6.25, cache_write_1h: 10, output: 25 },
         batch: { input: 2.5, cached_input: 0.25, cache_write_5m: 3.125, cache_write_1h: 5, output: 12.5 },
         fast: { input: 10, cached_input: 1, cache_write_5m: 12.5, cache_write_1h: 20, output: 50 },
@@ -7635,7 +7696,7 @@ body{min-width:0}
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-09-23",
         standard: { input: 2, cached_input: 0.2, cache_write_5m: 2.5, cache_write_1h: 4, output: 10 },
         batch: { input: 1, cached_input: 0.1, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 },
         geography_multipliers: { global: 1, us: 1.1 },
@@ -7651,7 +7712,7 @@ body{min-width:0}
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-09-23",
         standard: { input: 3, cached_input: 0.3, cache_write_5m: 3.75, cache_write_1h: 6, output: 15 },
         batch: { input: 1.5, cached_input: 0.15, cache_write_5m: 1.875, cache_write_1h: 3, output: 7.5 },
         geography_multipliers: { global: 1, us: 1.1 },
@@ -7667,7 +7728,7 @@ body{min-width:0}
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/overview",
         workload_tags: ["general", "reasoning", "high_volume", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-09-23",
         standard: { input: 1, cached_input: 0.1, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 },
         batch: { input: 0.5, cached_input: 0.05, cache_write_5m: 0.625, cache_write_1h: 1, output: 2.5 },
         geography_multipliers: { global: 1 },
@@ -7880,7 +7941,16 @@ body{min-width:0}
       }
       if (new Set(model.workload_tags).size !== model.workload_tags.length) throw new Error(`${model.id} has duplicate workload tags.`);
       isoDate(model.verified_at, `${model.id} verified date`);
-      if (model.verified_at < catalog.effective_at) throw new Error(`${model.id} was not verified on or after the catalog effective date.`);
+      if (model.effective_at) {
+        isoDate(model.effective_at, `${model.id} effective date`);
+        if (model.effective_at < catalog.effective_at || model.effective_at > catalog.catalog_version) {
+          throw new Error(`${model.id} has an effective date outside the catalog snapshot.`);
+        }
+      }
+      const matchingSource = catalog.sources.find((source) => source.provider === model.provider && source.url === model.source_url);
+      if (model.verified_at > matchingSource.checked_at || model.verified_at > catalog.catalog_version) {
+        throw new Error(`${model.id} verification date is later than its provider source check or catalog version.`);
+      }
       for (const field of ["context_window_tokens", "input_token_limit", "max_output_tokens"]) {
         if (model[field] !== null && model[field] !== undefined) {
           number(model[field], `${model.id} ${field}`, { integer: true });
@@ -7921,8 +7991,8 @@ body{min-width:0}
     const candidates = (Array.isArray(catalogs) ? catalogs : [catalogs]).map(validateCatalog);
     isoDate(usageDate, "Usage date");
     const eligible = candidates
-      .filter((catalog) => catalog.effective_at <= usageDate)
-      .sort((left, right) => right.effective_at.localeCompare(left.effective_at));
+      .filter((catalog) => catalog.effective_at <= usageDate && catalog.catalog_version <= usageDate)
+      .sort((left, right) => right.catalog_version.localeCompare(left.catalog_version));
     if (!eligible.length) throw new Error(`No pricing catalog is effective for ${usageDate}.`);
     return eligible[0];
   }
@@ -8075,6 +8145,9 @@ body{min-width:0}
 
   function priceModel(model, rawScenario, routeOptions = {}) {
     const scenario = normalizeScenario(rawScenario);
+    if (scenario.pricing_date && model.effective_at && scenario.pricing_date < model.effective_at) {
+      throw new Error(`${model.label} has no verified list price before ${model.effective_at}.`);
+    }
     if (model.context_window_tokens && scenario.input_tokens + scenario.output_tokens > model.context_window_tokens) {
       throw new Error(`${model.label} cannot fit ${scenario.input_tokens + scenario.output_tokens} total tokens in its ${model.context_window_tokens}-token context window.`);
     }
@@ -8143,7 +8216,7 @@ body{min-width:0}
 
   function compareModels(catalog, modelIds, scenario, tokenEstimates = {}, customModels = []) {
     validateCatalog(catalog);
-    const byId = new Map(catalog.models.map((model) => [model.id, { ...model, effective_at: catalog.effective_at }]));
+    const byId = new Map(catalog.models.map((model) => [model.id, { ...model, effective_at: model.effective_at || catalog.effective_at }]));
     customModels.map(normalizeCustomModel).forEach((model) => {
       if (byId.has(model.id)) throw new Error(`Custom rate ID ${model.id} conflicts with another route.`);
       byId.set(model.id, model);
@@ -8655,7 +8728,7 @@ body{min-width:0}
     if (!model || event.input_tokens === null || event.output_tokens === null) return null;
     if (event.currency !== catalog.currency || event.processing_mode === null || event.cached_input_tokens === null || event.tool_charges === null || !event.timestamp) return null;
     const eventDate = event.timestamp.slice(0, 10);
-    if (eventDate < catalog.effective_at || eventDate > catalog.review_by) return null;
+    if (eventDate < (model.effective_at || catalog.effective_at) || eventDate > catalog.review_by) return null;
     const pricedMode = event.processing_mode === "priority" && model.provider === "OpenAI" && model.fast ? "fast" : event.processing_mode;
     const base = model[pricedMode];
     if (!base) return null;
@@ -10824,6 +10897,15 @@ body{min-width:0}
     const period = { start: declaredStart || dates[0], end: declaredEnd || dates.at(-1), timezone: "UTC" };
     const basis = spendCostBasis(spend, "single bill");
     const totals = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true });
+    if (config.grossNet) {
+      const { gross, net, adjustment, classification } = config.grossNet;
+      if (config.reviewSource !== "claude_spend_report" || classification !== "unclassified_gross_to_net" ||
+          ![gross, net, adjustment].every((value) => typeof value === "number" && Number.isFinite(value)) ||
+          gross < 0 || net < 0 || Math.abs(round(gross - net) - adjustment) > 0.000001 ||
+          Math.abs(net - totals.providerCost) > 0.000001) {
+        throw new Error("Claude gross and net spend must reconcile to the imported provider cost; the adjustment is not automatically a credit.");
+      }
+    }
     const hasUsage = spend.some((row) => ["requests", "input_tokens", "output_tokens"].some((field) => row[field].trim() !== ""));
     const missing = [];
     for (const [field, label] of [["requests", "Requests"], ["processedInput", "Input tokens"], ["cachedInput", "Cache-read tokens"], ["cacheWriteInput", "Cache-write tokens"], ["outputTokens", "Output tokens"]]) {
@@ -11920,12 +12002,16 @@ body{min-width:0}
       return normalized;
     });
     requireColumns(raw, claudeSpendColumns, "Claude Team/Enterprise spend report");
+    let grossTotal = 0;
+    let netTotal = 0;
     const rows = raw.map((row, index) => {
       const label = `Claude spend row ${index + 2}`;
       const product = safeImportedLabel(row.product, `${label} product`);
       const model = safeImportedLabel(row.model || row.model_family, `${label} model`);
       const net = costNumber(row.total_net_spend_usd, `${label} total_net_spend_usd`);
-      costNumber(row.total_gross_spend_usd, `${label} total_gross_spend_usd`);
+      const gross = costNumber(row.total_gross_spend_usd, `${label} total_gross_spend_usd`);
+      grossTotal += gross;
+      netTotal += net;
       const requests = optionalNumber(row.total_requests, `${label} total_requests`, { integer: true });
       const promptTokens = optionalNumber(row.total_prompt_tokens, `${label} total_prompt_tokens`, { integer: true });
       const completionTokens = optionalNumber(row.total_completion_tokens, `${label} total_completion_tokens`, { integer: true });
@@ -11938,7 +12024,8 @@ body{min-width:0}
         provider_cost: String(net), cost_basis: "provider_reported", currency: "USD",
       };
     });
-    const review = await buildSingleBillReview(rowsToCsv(rows), "", { acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", serviceStart: period.start, serviceEnd: period.end, reviewSource: "claude_spend_report" });
+    const review = await buildSingleBillReview(rowsToCsv(rows), "", { acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", serviceStart: period.start, serviceEnd: period.end, reviewSource: "claude_spend_report",
+      grossNet: { gross: round(grossTotal), net: round(netTotal), adjustment: round(grossTotal - netTotal), classification: "unclassified_gross_to_net" } });
     const summary = summarizeSingleBill(review);
     return { review, confirmation: {
       provider: "Anthropic", period, products: [...new Set(rows.map((row) => row.route))], models: [...new Set(rows.map((row) => row.model))],
@@ -12219,12 +12306,15 @@ body{min-width:0}
   }
 
   function extractInvoiceCandidate(text) {
+    const lineList = String(text).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (lineList.some((line) => /^(?:usage\s+)?credits?\s+qty\s*\d+\b/i.test(line)) && lineList.some((line) => /\b(?:amount\s+paid|total\s+due)\b/i.test(line))) {
+      return { supported: false, reason: "This is a prepaid usage-credit purchase receipt. The amount paid cannot be treated as the cost of work completed. Review the purchase and credit-use history separately; this PDF cannot be converted into a workload bill." };
+    }
     const providerSignals = [
       { provider: "OpenAI", matches: /\b(?:openai|chatgpt)\b/i.test(text) },
       { provider: "Anthropic", matches: /\b(?:anthropic|claude)\b/i.test(text) },
     ].filter((item) => item.matches);
     if (providerSignals.length !== 1) return { supported: false, reason: "The invoice provider could not be confirmed as OpenAI or Anthropic. Enter the invoice fields manually." };
-    const lineList = String(text).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     const dateFromLabel = (labels) => {
       for (const line of lineList) {
         const match = line.match(new RegExp(`^(?:${labels})\\s*:?\\s*(.+)$`, "i"));
@@ -12644,6 +12734,9 @@ body{min-width:0}
       shape(data, { currency: "string", source: {
         spend: [fields(singleSpendColumns.join(" "), "string")], work: [fields(singleWorkColumns.join(" "), "string")],
       }, config: { acceptanceRule: "string", verifier: "string", complete: "boolean", hourlyRate: "string", sharedCost: "string" } });
+      if (data.config.grossNet !== undefined) shape(data.config.grossNet, {
+        gross: "number", net: "number", adjustment: "number", classification: "string",
+      }, "config.grossNet");
       for (const row of [...data.source.spend, ...data.source.work]) {
         Object.values(row).forEach((value) => shape(value, "string", "source row"));
       }
@@ -14655,7 +14748,10 @@ body{min-width:0}
       claude_admin_api: "Your saved Claude Admin API reports",
     };
     document.getElementById("bill-source-title").textContent = sourceTitles[state.data.config.reviewSource] || "Your completed universal template";
-    document.getElementById("bill-source-copy").textContent = "Start with the records you already have. Each additional layer deepens the review without replacing the bill.";
+    const grossNet = state.data.config.grossNet;
+    document.getElementById("bill-source-copy").textContent = grossNet
+      ? `Provider gross ${cost(grossNet.gross)}, reported net ${cost(grossNet.net)}, gross-to-net adjustment ${cost(grossNet.adjustment)}. The export does not identify that difference as a credit; reconcile credits, discounts, and taxes with the actual invoice. List-price estimates remain separate.`
+      : "Start with the records you already have. Each additional layer deepens the review without replacing the bill.";
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · supplied date buckets, not proof of service-period coverage`;
     document.getElementById("bill-mode-tag").textContent = stage.tag;
     document.getElementById("bill-finding-title").textContent = headline;
@@ -15757,7 +15853,7 @@ body{min-width:0}
   }
 
   function modelRate(value) {
-    return `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: value < 1 ? 2 : 0, maximumFractionDigits: 3 })}`;
+    return `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: value < 1 ? 2 : 0, maximumFractionDigits: 5 })}`;
   }
 
   function renderModelCatalog() {
@@ -15783,7 +15879,7 @@ body{min-width:0}
       const rates = [["Input", model.standard.input], ["Cached input", model.standard.cached_input], cacheSupplement, ["Output", model.standard.output]];
       const modes = pricingEngine.availableProcessingModes(model).map(modeLabel).join(" · ");
       return `<article class="model-catalog-card" role="listitem">
-        <div class="model-catalog-card-head"><div><a href="${escapeHtml(model.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(model.label)}</a><span>${escapeHtml(model.provider)} · checked ${escapeHtml(model.verified_at)}</span></div><button class="text-button catalog-add-model" type="button" data-model-id="${escapeHtml(model.id)}">Add</button></div>
+        <div class="model-catalog-card-head"><div><a href="${escapeHtml(model.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(model.label)}</a><span>${escapeHtml(model.provider)} · checked ${escapeHtml(model.verified_at)}${model.effective_at ? ` · catalog use from ${escapeHtml(model.effective_at)}` : ""}</span></div><button class="text-button catalog-add-model" type="button" data-model-id="${escapeHtml(model.id)}">Add</button></div>
         <div class="model-catalog-rates" role="group" aria-label="Standard USD rates. Token rates are per 1 million tokens; cache storage is per 1 million token-hours.">${rates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${value === null ? "Not listed" : modelRate(value)}</strong></div>`).join("")}</div>
         <div class="model-catalog-card-foot"><div><span class="model-catalog-context">${compact(context)} token context · ${escapeHtml(modes)}</span><div class="model-workload-signals">${model.workload_tags.map((tag) => `<span>${escapeHtml(tagLabels[tag])}</span>`).join("")}</div></div><a class="model-catalog-provider-notes" href="${escapeHtml(model.capability_source_url)}" target="_blank" rel="noreferrer">Provider notes</a></div>
       </article>`;
@@ -15832,8 +15928,8 @@ body{min-width:0}
         updatePromptRouteControl(route);
       });
     });
-    const sources = pricingCatalog.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.provider)}</a>`).join(", ");
-    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Official list prices checked ${escapeHtml(pricingCatalog.effective_at)}: ${sources}. Review again by ${escapeHtml(pricingCatalog.review_by)}. Processing mode, cache-write treatment, and geography are recorded per route.`;
+    const sources = pricingCatalog.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.provider)} (checked ${escapeHtml(source.checked_at)})</a>`).join(", ");
+    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Direct API list-price sources: ${sources}. Model-specific start dates are shown below; review again by ${escapeHtml(pricingCatalog.review_by)}. Earlier pricing snapshots remain in the repository. Processing mode, cache-write treatment, and geography are recorded per route.`;
     const providers = [...new Set(pricingCatalog.models.map((model) => model.provider))];
     document.getElementById("model-catalog-provider").innerHTML = '<option value="">All providers</option>' + providers.map((provider) => `<option value="${escapeHtml(provider)}">${escapeHtml(provider)}</option>`).join("");
     document.getElementById("model-catalog-search").addEventListener("input", renderModelCatalog);

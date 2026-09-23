@@ -56,7 +56,7 @@ console.log(JSON.stringify({catalog, comparison, record}));
     payload = json.loads(result.stdout)
     catalog = payload["catalog"]
     assert catalog["schema_version"] == "ai-cost-lens-pricing-catalog/0.5"
-    assert catalog["catalog_version"] == "2026-09-22"
+    assert catalog["catalog_version"] == "2026-09-23"
     assert {model["provider"] for model in catalog["models"]} == {
         "OpenAI",
         "Anthropic",
@@ -66,7 +66,15 @@ console.log(JSON.stringify({catalog, comparison, record}));
     assert all(
         model["source_url"].startswith("https://") for model in catalog["models"]
     )
-    assert all(model["verified_at"] == "2026-09-22" for model in catalog["models"])
+    assert all(
+        model["verified_at"]
+        == next(
+            source["checked_at"]
+            for source in catalog["sources"]
+            if source["provider"] == model["provider"]
+        )
+        for model in catalog["models"]
+    )
     assert all(
         model["capability_source_url"].startswith("https://")
         for model in catalog["models"]
@@ -151,11 +159,14 @@ console.log(JSON.stringify(Object.fromEntries(catalog.models.map((model) => [mod
     actual = json.loads(result.stdout)
     expected = {
         "openai/gpt-6-astra": ((10, 1, 50), (5, 0.5, 25)),
+        "openai/gpt-6-sol": ((2, 0.2, 10), (1, 0.1, 5)),
+        "openai/gpt-6-luna": ((0.1, 0.01, 0.5), (0.05, 0.005, 0.25)),
         "openai/gpt-5.6-sol": ((4, 0.4, 20), (2, 0.2, 10)),
         "openai/gpt-5.6-terra": ((2, 0.2, 12), (1, 0.1, 6)),
         "openai/gpt-5.6-luna": ((0.2, 0.02, 1.2), (0.1, 0.01, 0.6)),
         "anthropic/claude-fable-5.1": ((10, 0.25, 50), (5, 0.125, 25)),
         "anthropic/claude-opus-5": ((5, 0.5, 25), (2.5, 0.25, 12.5)),
+        "anthropic/claude-opus-5.5": ((4, 0.2, 20), (2, 0.1, 10)),
         "anthropic/claude-sonnet-5": ((2, 0.2, 10), (1, 0.1, 5)),
         "anthropic/claude-sonnet-4.6": ((3, 0.3, 15), (1.5, 0.15, 7.5)),
         "anthropic/claude-haiku-4.5": ((1, 0.1, 5), (0.5, 0.05, 2.5)),
@@ -175,6 +186,65 @@ console.log(JSON.stringify(Object.fromEntries(catalog.models.map((model) => [mod
             ("input", "cached_input", "output"), batch, strict=True
         ):
             assert actual[model_id]["batch"][field] == value
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_september_23_rate_snapshot_preserves_model_dates_and_cache_exceptions():
+    script = r"""
+const catalog = require(process.argv[1]);
+const prior = require(process.argv[2]);
+const engine = require(process.argv[3]);
+const byId = Object.fromEntries(catalog.models.map(model => [model.id, model]));
+const scenario = {input_tokens: 300000, output_tokens: 100000, calls_per_month: 1,
+  cached_input_share: 0.5, pricing_date: "2026-09-23"};
+const sol = engine.priceModel(byId["openai/gpt-6-sol"], scenario);
+const luna = engine.priceModel(byId["openai/gpt-6-luna"], {...scenario, input_tokens: 1000, output_tokens: 100});
+const opus = engine.priceModel(byId["anthropic/claude-opus-5.5"], {...scenario, input_tokens: 1000, output_tokens: 100,
+  cache_refreshes_per_month: 1, cache_write_duration: "1h"});
+let prelaunchRejected = false;
+try { engine.priceModel(byId["openai/gpt-6-sol"], {...scenario, pricing_date: "2026-09-22"}); }
+catch (_error) { prelaunchRejected = true; }
+console.log(JSON.stringify({sol, luna, opus, prelaunchRejected,
+  prior: engine.selectCatalog([prior, catalog], "2026-09-22").catalog_version,
+  current: engine.selectCatalog([prior, catalog], "2026-09-23").catalog_version,
+  priorModelCount: prior.models.length}));
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "data" / "pricing-catalog-v0.5.js"),
+            str(ROOT / "docs" / "pricing-snapshots" / "pricing-catalog-2026-09-22.js"),
+            str(WEB / "pricing-engine.js"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert (payload["prior"], payload["current"], payload["priorModelCount"]) == (
+        "2026-09-22",
+        "2026-09-23",
+        14,
+    )
+    assert payload["prelaunchRejected"] is True
+    assert payload["sol"]["rates_per_1m_tokens"] == {
+        "input": 4,
+        "cached_input": 0.4,
+        "cache_write": 5,
+        "output": 15,
+    }
+    assert payload["luna"]["rates_per_1m_tokens"] == {
+        "input": 0.1,
+        "cached_input": 0.01,
+        "cache_write": 0.125,
+        "output": 0.5,
+    }
+    assert payload["opus"]["rates_per_1m_tokens"]["cached_input"] == 0.2
+    assert payload["opus"]["cache_write_rate_field"] == "cache_write_1h"
+    assert payload["opus"]["estimated_monthly_cost_breakdown_usd"]["cache_read"] == 0
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -486,8 +556,9 @@ def test_catalog_date_selection_long_context_rates_and_token_limits_fail_closed(
     script = r"""
 const catalog = require(process.argv[1]);
 const engine = require(process.argv[2]);
-const older = {...catalog, catalog_version: "2026-08-01", effective_at: "2026-08-01"};
-const selected = engine.selectCatalog([catalog, older], "2026-09-01");
+const older = require(process.argv[3]);
+const selected = engine.selectCatalog([catalog, older], "2026-09-22");
+const current = engine.selectCatalog([catalog, older], "2026-09-23");
 const model = catalog.models.find((item) => item.id === "openai/gpt-5.6-sol");
 const longContext = engine.priceModel(model, {
   input_tokens: 300000, output_tokens: 10000, calls_per_month: 1,
@@ -518,7 +589,7 @@ try {
 } catch (_error) { missingRejected = true; }
 try { engine.selectCatalog([catalog], "2026-02-31"); } catch (_error) { invalidDateRejected = true; }
 try { engine.requireCatalogDateCoverage(catalog, "2026-11-22"); } catch (_error) { expiredCatalogRejected = true; }
-console.log(JSON.stringify({selected: selected.catalog_version, longContext, contextRejected, outputRejected, missingRejected, invalidDateRejected, expiredCatalogRejected}));
+console.log(JSON.stringify({selected: selected.catalog_version, current: current.catalog_version, longContext, contextRejected, outputRejected, missingRejected, invalidDateRejected, expiredCatalogRejected}));
 """
     result = subprocess.run(
         [
@@ -527,6 +598,7 @@ console.log(JSON.stringify({selected: selected.catalog_version, longContext, con
             script,
             str(WEB / "data" / "pricing-catalog-v0.5.js"),
             str(WEB / "pricing-engine.js"),
+            str(ROOT / "docs" / "pricing-snapshots" / "pricing-catalog-2026-09-22.js"),
         ],
         check=False,
         capture_output=True,
@@ -534,7 +606,8 @@ console.log(JSON.stringify({selected: selected.catalog_version, longContext, con
     )
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
-    assert payload["selected"] == "2026-08-01"
+    assert payload["selected"] == "2026-09-22"
+    assert payload["current"] == "2026-09-23"
     assert payload["longContext"]["pricing_adjustment"] == "long_context"
     assert payload["longContext"]["rates_per_1m_tokens"] == {
         "input": 8,
