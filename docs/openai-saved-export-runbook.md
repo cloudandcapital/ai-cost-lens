@@ -12,7 +12,15 @@ From the OpenAI Usage dashboard, save two CSV reports for the same date range:
 
 The files are read locally. API credentials are not required.
 
-Native current dashboard CSV compatibility still needs a consenting user's unmodified export. Contract-shaped fixtures and a CSV transformed from OpenAI's published API notebook exercise the logic but cannot establish that current downloadable CSV headers match. If the importer rejects a file, keep it local and inspect the missing fields before adapting the contract.
+An [older public repository](https://github.com/sabah-naveed/njc-cost-analysis)
+contains paired, dashboard-shaped usage and cost CSVs.
+They exercise the importer without copying the repository's account identifiers
+into AI Cost Lens. The older usage file omits `input_cache_write_tokens`; the
+completions importer accepts the file and reports that measure as unavailable. These
+third-party files have no provider attestation or matching invoice, so current
+dashboard compatibility and invoice reconciliation still need a consenting
+user's unmodified exports. If the importer rejects a file, keep it local and
+inspect the missing fields before adapting the contract.
 
 ## What the review can establish
 

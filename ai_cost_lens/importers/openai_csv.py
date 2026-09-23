@@ -33,7 +33,6 @@ USAGE_COLUMNS = {
     "input_tokens",
     "output_tokens",
     "input_cached_tokens",
-    "input_cache_write_tokens",
     "input_uncached_tokens",
 }
 
@@ -147,11 +146,19 @@ def _usage_rows(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         cached = _optional_integer(
             row.get("input_cached_tokens"), f"{field}.input_cached_tokens"
         )
-        cache_write = _optional_integer(
-            row.get("input_cache_write_tokens"), f"{field}.input_cache_write_tokens"
+        cache_write = (
+            _optional_integer(
+                row.get("input_cache_write_tokens"), f"{field}.input_cache_write_tokens"
+            )
+            if "input_cache_write_tokens" in row
+            else None
         )
         uncached_raw = row.get("input_uncached_tokens")
         if uncached_raw is None or str(uncached_raw).strip() == "":
+            if cache_write is None:
+                raise OpenAICsvImportError(
+                    f"{field} has neither uncached nor cache-write token evidence"
+                )
             uncached = total_input - cached - cache_write
             if uncached < 0:
                 raise OpenAICsvImportError(
@@ -160,11 +167,16 @@ def _usage_rows(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
             breakdown_basis = "derived_from_total"
         else:
             uncached = _optional_integer(uncached_raw, f"{field}.input_uncached_tokens")
-            if uncached + cached + cache_write != total_input:
+            categorized = uncached + cached + (cache_write or 0)
+            if categorized > total_input or (
+                cache_write is not None and categorized != total_input
+            ):
                 raise OpenAICsvImportError(
                     f"{field} input token categories do not reconcile to input_tokens"
                 )
-            breakdown_basis = "provider_reported"
+            breakdown_basis = (
+                "provider_reported" if cache_write is not None else "partial_reported"
+            )
         parsed.append(
             {
                 "date": _day(row, field),
@@ -220,7 +232,7 @@ def _cost_rows(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     return parsed
 
 
-def _usage_totals(rows: list[dict[str, Any]]) -> dict[str, int]:
+def _usage_totals(rows: list[dict[str, Any]]) -> dict[str, int | None]:
     fields = (
         "requests",
         "input_tokens",
@@ -229,7 +241,14 @@ def _usage_totals(rows: list[dict[str, Any]]) -> dict[str, int]:
         "cache_write_input_tokens",
         "output_tokens",
     )
-    return {field: sum(int(row[field]) for row in rows) for field in fields}
+    return {
+        field: (
+            None
+            if any(row[field] is None for row in rows)
+            else sum(int(row[field]) for row in rows)
+        )
+        for field in fields
+    }
 
 
 def _group_usage(rows: list[dict[str, Any]], field: str) -> list[dict[str, Any]]:
