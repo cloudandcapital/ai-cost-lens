@@ -12,12 +12,14 @@ From the OpenAI Usage dashboard, save two CSV reports for the same date range:
 
 The files are read locally. API credentials are not required.
 
+Native current dashboard CSV compatibility still needs a consenting user's unmodified export. Contract-shaped fixtures and a CSV transformed from OpenAI's published API notebook exercise the logic but cannot establish that current downloadable CSV headers match. If the importer rejects a file, keep it local and inspect the missing fields before adapting the contract.
+
 ## What the review can establish
 
 - Provider-reported total cost and currency
 - Requests, input tokens, output tokens, and cache-token fields
 - Observed usage mix by model and project
-- Whether usage and cost reports cover the same daily buckets
+- Whether usage and cost reports cover the same UTC time buckets, including start and end boundaries
 - Which attribution fields are populated
 
 ## What remains unavailable unless the evidence supports it

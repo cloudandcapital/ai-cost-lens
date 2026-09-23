@@ -112,6 +112,23 @@ def _bucket_dates(rows: Iterable[dict[str, str]], label: str) -> list[str]:
     )
 
 
+def _bucket_ranges(rows: Iterable[dict[str, str]], label: str) -> list[tuple[int, int]]:
+    ranges = set()
+    for index, row in enumerate(rows, 2):
+        start = int(
+            _decimal(
+                row.get("start_time"), f"{label} row {index}.start_time", integer=True
+            )
+        )
+        end = int(
+            _decimal(row.get("end_time"), f"{label} row {index}.end_time", integer=True)
+        )
+        if end <= start or end > 253402300799:
+            raise OpenAICsvImportError(f"{label} row {index} has an invalid time range")
+        ranges.add((start, end))
+    return sorted(ranges)
+
+
 def _usage_rows(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     parsed: list[dict[str, Any]] = []
     for index, row in enumerate(rows, 2):
@@ -246,7 +263,9 @@ def build_openai_csv_bill_review(
     costs = _cost_rows(raw_costs)
     usage_dates = _bucket_dates(raw_usage, "usage")
     cost_dates = _bucket_dates(raw_costs, "cost")
-    aligned = usage_dates == cost_dates
+    aligned = usage_dates == cost_dates and _bucket_ranges(
+        raw_usage, "usage"
+    ) == _bucket_ranges(raw_costs, "cost")
     total = sum((Decimal(row["amount"]) for row in costs), Decimal("0"))
     cost_project = _coverage(costs, "project")
     cost_line_item = _coverage(costs, "line_item")
@@ -262,7 +281,7 @@ def build_openai_csv_bill_review(
         )
     if not aligned:
         limitations.insert(
-            0, "The usage and cost exports do not cover the same daily buckets."
+            0, "The usage and cost exports do not cover the same UTC time buckets."
         )
     return {
         "schema_version": SCHEMA_VERSION,

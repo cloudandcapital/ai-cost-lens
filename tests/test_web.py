@@ -471,7 +471,11 @@ eval(source);
     fs.readFileSync(process.argv[2], "utf8"),
     fs.readFileSync(process.argv[3], "utf8"),
   );
-  console.log(JSON.stringify(result));
+  const partial = await globalThis.__buildOpenAIBillReview(
+    fs.readFileSync(process.argv[2], "utf8").replaceAll("1788307200,1788393600", "1788310800,1788393600"),
+    fs.readFileSync(process.argv[3], "utf8"),
+  );
+  console.log(JSON.stringify({result, partial}));
 })();
 """
     result = subprocess.run(
@@ -488,12 +492,17 @@ eval(source);
         text=True,
     )
     assert result.returncode == 0, result.stderr
-    payload = __import__("json").loads(result.stdout)
+    output = __import__("json").loads(result.stdout)
+    payload = output["result"]
     assert payload["bill"]["total"] == 12.75
     assert payload["usage"]["totals"]["requests"] == 30
     assert payload["period"]["aligned"] is True
     assert payload["reconciliation"]["model_cost_allocation_supported"] is False
     assert payload["reconciliation"]["savings_claim_allowed"] is False
+    partial = output["partial"]
+    assert partial["period"]["usage_dates"] == partial["period"]["cost_dates"]
+    assert partial["period"]["aligned"] is False
+    assert partial["reconciliation"]["status"] == "period_mismatch"
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")

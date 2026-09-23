@@ -11897,7 +11897,9 @@ body{min-width:0}
     if (!costRows.length) throw new Error("The OpenAI cost export has no populated cost rows.");
     const currencies = new Set(costRows.map((row) => row.currency));
     if (currencies.size !== 1) throw new Error("One bill review cannot mix currencies.");
-    const aligned = JSON.stringify(usageDates) === JSON.stringify(costDates);
+    const bucketRanges = (rows) => [...new Set(rows.map((row) => `${Number(row.start_time)}:${Number(row.end_time)}`))].sort();
+    const aligned = JSON.stringify(usageDates) === JSON.stringify(costDates)
+      && JSON.stringify(bucketRanges(rawUsage)) === JSON.stringify(bucketRanges(rawCosts));
     const costProject = rowCoverage(costRows, "project");
     const projectJoin = costProject.row_coverage_pct === 100;
     const limitations = [
@@ -11905,7 +11907,7 @@ body{min-width:0}
       "The provider exports do not establish whether a result was usable, how much human correction it required, or what business outcome it produced.",
     ];
     if (!projectJoin) limitations.splice(1, 0, "The saved cost export does not fully attribute cost to projects, so project-level billed cost is unavailable.");
-    if (!aligned) limitations.unshift("The usage and cost exports do not cover the same daily buckets.");
+    if (!aligned) limitations.unshift("The usage and cost exports do not cover the same UTC time buckets.");
     const usageAggregate = openAIUsageTotals(usageRows);
     return {
       schema_version: "ai-cost-lens-openai-bill-review/0.1",

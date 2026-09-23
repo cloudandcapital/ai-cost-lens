@@ -41,3 +41,18 @@ def test_rejects_nonreconciling_input_token_categories(tmp_path: Path):
 
     with pytest.raises(OpenAICsvImportError, match="do not reconcile"):
         build_openai_csv_bill_review(bad, FIXTURES / "openai-dashboard-cost.csv")
+
+
+def test_same_calendar_days_do_not_hide_partial_usage_bucket(tmp_path: Path):
+    source = (FIXTURES / "openai-dashboard-usage.csv").read_text()
+    partial = tmp_path / "partial-usage.csv"
+    partial.write_text(source.replace("1788307200,1788393600", "1788310800,1788393600"))
+
+    review = build_openai_csv_bill_review(
+        partial, FIXTURES / "openai-dashboard-cost.csv"
+    )
+
+    assert review["period"]["usage_dates"] == review["period"]["cost_dates"]
+    assert review["period"]["aligned"] is False
+    assert review["reconciliation"]["status"] == "period_mismatch"
+    assert review["reconciliation"]["savings_claim_allowed"] is False
