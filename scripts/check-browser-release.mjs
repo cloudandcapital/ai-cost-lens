@@ -153,7 +153,8 @@ async function verifyRichDecisionFlow(page) {
     await page.locator("#hourly-rate").fill(String(config.hourlyRate));
     await page.locator("#baseline-policy-approved").setChecked(config.baselinePolicyApproved);
     await page.locator("#proposed-policy-approved").setChecked(config.proposedPolicyApproved);
-    await page.locator(".advanced-costs summary").click();
+    const advancedCosts = page.locator(".advanced-costs");
+    if (!(await advancedCosts.evaluate((details) => details.open))) await advancedCosts.locator("summary").click();
     await page.locator("#baseline-shared").fill(String(config.baselineShared));
     await page.locator("#proposed-shared").fill(String(config.proposedShared));
     await page.locator("#change-cost").fill(String(config.changeCost));
