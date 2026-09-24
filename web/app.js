@@ -4524,11 +4524,12 @@
     validateResult(state.data);
     const exampleSwitcher = document.getElementById("example-switcher");
     exampleSwitcher.hidden = state.data.mode !== "illustrative";
+    const isGrowthExample = state.data.mode === "illustrative" && state.data.workload?.name === "Growing support AI workload";
     exampleSwitcher.querySelectorAll("[data-example]").forEach((button) => {
-      button.setAttribute("aria-pressed", String(button.dataset.example === (state.data.workload.name === "Growing support AI workload" ? "growth" : "cost-trap")));
+      button.setAttribute("aria-pressed", String(button.dataset.example === (isGrowthExample ? "growth" : "cost-trap")));
     });
     const growthProjection = document.getElementById("growth-projection");
-    growthProjection.hidden = state.data.mode !== "illustrative" || state.data.workload.name !== "Growing support AI workload";
+    growthProjection.hidden = !isGrowthExample;
     if (!growthProjection.hidden) {
       const startingVolume = state.data.baseline.outcomes.completed_results;
       const fivefoldGap = Math.abs(state.data.comparison.normalized_cost_difference) * 5;
