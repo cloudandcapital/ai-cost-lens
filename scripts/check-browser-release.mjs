@@ -250,7 +250,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#invoice-currency").fill("USD");
   await page.locator("#build-review").click();
   assert(await page.locator("#bill-review-screen").isVisible(), `${engineName}: one-bill review did not render.`);
-  assert((await page.locator("#bill-metric-ledger").innerText()).includes("User-entered billed amount"), `${engineName}: manual amount was presented as provider-verified.`);
+  assert((await page.locator("#bill-metric-ledger .metric-cell:first-child span").textContent()).includes("User-entered billed amount"), `${engineName}: manual amount was presented as provider-verified.`);
   await page.locator("#review-usage").click();
   assert(await page.locator("#request-log-file").isVisible(), `${engineName}: one-bill to usage path opened a blank page.`);
   await page.locator("#back-to-bill").click();
