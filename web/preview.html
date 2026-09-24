@@ -5792,6 +5792,14 @@ body.story-mode .cockpit-grid {
   background: var(--surface);
 }
 
+.model-catalog-tier {
+  margin: 10px 0 5px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .model-catalog-rate {
   min-width: 0;
   padding: 9px;
@@ -15897,10 +15905,18 @@ body{min-width:0}
             ? ["Cache storage / hr", model.standard.cache_storage_per_1m_token_hour]
             : ["Cache extra", null];
       const rates = [["Input", model.standard.input], ["Cached input", model.standard.cached_input], cacheSupplement, ["Output", model.standard.output]];
+      const longContextRates = model.long_context && [
+        ["Input", model.standard.input * model.long_context.input_multiplier],
+        ["Cached input", model.standard.cached_input * model.long_context.cached_input_multiplier],
+        ["Cache write", model.standard.cache_write * (model.long_context.cache_write_multiplier || model.long_context.input_multiplier)],
+        ["Output", model.standard.output * model.long_context.output_multiplier],
+      ];
       const modes = pricingEngine.availableProcessingModes(model).map(modeLabel).join(" · ");
       return `<article class="model-catalog-card" role="listitem">
         <div class="model-catalog-card-head"><div><a href="${escapeHtml(model.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(model.label)}</a><span>${escapeHtml(model.provider)} · checked ${escapeHtml(model.verified_at)}${model.effective_at ? ` · catalog use from ${escapeHtml(model.effective_at)}` : ""}</span></div><button class="text-button catalog-add-model" type="button" data-model-id="${escapeHtml(model.id)}">Add</button></div>
+        <p class="model-catalog-tier">Standard mode · ${longContextRates ? `up to ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens per request` : "published text rates"}</p>
         <div class="model-catalog-rates" role="group" aria-label="Standard USD rates. Token rates are per 1 million tokens; cache storage is per 1 million token-hours.">${rates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${value === null ? "Not listed" : modelRate(value)}</strong></div>`).join("")}</div>
+        ${longContextRates ? `<p class="model-catalog-tier">Standard mode · over ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens per request; higher rates apply to the full request</p><div class="model-catalog-rates" role="group" aria-label="Standard long-context USD rates per 1 million tokens">${longContextRates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${modelRate(value)}</strong></div>`).join("")}</div>` : ""}
         <div class="model-catalog-card-foot"><div><span class="model-catalog-context">${compact(context)} token context · ${escapeHtml(modes)}</span><div class="model-workload-signals">${model.workload_tags.map((tag) => `<span>${escapeHtml(tagLabels[tag])}</span>`).join("")}</div></div><a class="model-catalog-provider-notes" href="${escapeHtml(model.capability_source_url)}" target="_blank" rel="noreferrer">Provider notes</a></div>
       </article>`;
     }).join("") || '<p class="model-catalog-empty">No model matches this filter.</p>';

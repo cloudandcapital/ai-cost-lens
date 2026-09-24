@@ -5770,6 +5770,14 @@ body.story-mode .cockpit-grid {
   background: var(--surface);
 }
 
+.model-catalog-tier {
+  margin: 10px 0 5px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .model-catalog-rate {
   min-width: 0;
   padding: 9px;

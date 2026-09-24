@@ -193,6 +193,17 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     const provenance = await card.locator(".model-catalog-card-head span").textContent();
     assert(provenance.includes("checked 2026-09-23"), `${engineName}: ${name} is missing its checked date: ${provenance}`);
   }
+  for (const [name, rates] of [
+    ["GPT-6 Sol", ["INPUT\n$4", "CACHED INPUT\n$0.40", "CACHE WRITE\n$5", "OUTPUT\n$15"]],
+    ["GPT-6 Luna", ["INPUT\n$0.20", "CACHED INPUT\n$0.02", "CACHE WRITE\n$0.25", "OUTPUT\n$0.75"]],
+  ]) {
+    const card = page.locator(".model-catalog-card").filter({ hasText: name });
+    const tier = card.locator('[aria-label="Standard long-context USD rates per 1 million tokens"]');
+    assert((await card.innerText()).includes("over 272,000 input tokens per request; higher rates apply to the full request"), `${engineName}: ${name} hides the long-context threshold.`);
+    for (const expected of rates) {
+      assert((await tier.innerText()).toUpperCase().includes(expected), `${engineName}: ${name} long-context rate is missing ${expected.replace("\n", " ")}.`);
+    }
+  }
 
   const estimate = await saveJsonDownload(page, "#download-price-estimate", `${engineName}-prompt-estimate.json`);
   assert(estimate.schema_version === "ai-cost-lens-prompt-price-estimate/0.6", `${engineName}: prompt estimate schema is wrong.`);

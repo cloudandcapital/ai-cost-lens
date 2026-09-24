@@ -111,10 +111,12 @@ const onlyBaseline = text => text.trim().split('\n').filter((line,i) => !i || li
 const invoice = spend.split('\n')[0] + '\nbaseline,2026-08-01,Unrelated subscription,,,,,,,,,20,provider_reported,USD\n';
 const catalogHtml = el('model-catalog-rows').innerHTML;
 assert.equal((catalogHtml.match(/class="model-catalog-card"/g) || []).length, pricingCatalog.models.length);
-assert.equal((catalogHtml.match(/class="model-catalog-rate"/g) || []).length, pricingCatalog.models.length * 4);
-assert.equal((catalogHtml.match(/<span>Input<\/span>/g) || []).length, pricingCatalog.models.length);
-assert.equal((catalogHtml.match(/<span>Cached input<\/span>/g) || []).length, pricingCatalog.models.length);
-assert.equal((catalogHtml.match(/<span>Output<\/span>/g) || []).length, pricingCatalog.models.length);
+const tieredCount = pricingCatalog.models.filter(model => model.long_context).length;
+assert.equal((catalogHtml.match(/class="model-catalog-rate"/g) || []).length, (pricingCatalog.models.length + tieredCount) * 4);
+assert.equal((catalogHtml.match(/<span>Input<\/span>/g) || []).length, pricingCatalog.models.length + tieredCount);
+assert.equal((catalogHtml.match(/<span>Cached input<\/span>/g) || []).length, pricingCatalog.models.length + tieredCount);
+assert.equal((catalogHtml.match(/<span>Output<\/span>/g) || []).length, pricingCatalog.models.length + tieredCount);
+assert.match(catalogHtml, /GPT-6 Sol[\s\S]*?over 272,000 input tokens per request[\s\S]*?<span>Input<\/span><strong>\$4<\/strong>[\s\S]*?<span>Output<\/span><strong>\$15<\/strong>/);
 assert.match(catalogHtml, /Claude Sonnet 5[\s\S]*?<span>Input<\/span><strong>\$2<\/strong>[\s\S]*?<span>Cached input<\/span><strong>\$0\.20<\/strong>[\s\S]*?<span>Output<\/span><strong>\$10<\/strong>/);
 api.state.data = JSON.parse(read('web/data/illustrative-review-result.json'));
 api.state.demoData = api.state.data;
