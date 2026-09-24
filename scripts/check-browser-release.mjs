@@ -335,6 +335,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert((await page.locator("#customer-revenue-result").innerText()).includes("Example customer A"), `${engineName}: customer example failed to join.`);
   assert((await page.locator("#customer-revenue-result").innerText()).includes("Illustrative inputs"), `${engineName}: customer example lost its evidence label.`);
   assert((await page.locator("#customer-revenue-result").innerText()).includes("lack customer IDs"), `${engineName}: unallocated cost is hidden.`);
+  await page.locator("#request-human-review-cost").evaluate((input) => { input.closest("details").open = true; });
   await page.locator("#request-human-review-cost").fill("0.12");
   await page.locator("#analyze-request-log").click();
   await page.locator("#request-analysis-results").waitFor({ state: "visible" });
