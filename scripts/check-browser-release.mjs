@@ -219,6 +219,12 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#growth-revenue").fill("3");
   assert(await page.locator("#growth-results tbody tr").count() === 4, `${engineName}: growth planner lacks volume scenarios.`);
   assert((await page.locator("#growth-results tbody tr").first().innerText()).includes("26.7%"), `${engineName}: modeled current gross margin is wrong.`);
+  await page.locator('.nav-item[data-view="evidence"]').click();
+  assert((await page.locator("#evidence-kit-list").innerText()).includes("Replace the example"), `${engineName}: evidence kit lost its concrete next step.`);
+  assert((await page.locator("#sample-size-result").innerText()).includes("385"), `${engineName}: sample planner returned an incorrect precision estimate.`);
+  const [kitDownload] = await Promise.all([page.waitForEvent("download"), page.locator("#download-evidence-kit").click()]);
+  assert(kitDownload.suggestedFilename().endsWith(".md"), `${engineName}: evidence action list did not download.`);
+  await page.locator('.nav-item[data-view="review"]').click();
   await page.locator("#start-review-inline").click();
   assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: inline review action did not open.`);
   assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 3, `${engineName}: start dialog still presents too many choices.`);
@@ -306,6 +312,12 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const usage = await saveJsonDownload(page, "#download-usage-review", `${engineName}-usage-review.json`);
   assert(usage.event_count === 7, `${engineName}: usage import did not retain all seven rows.`);
   assert(usage.evidence_gate.savings_claim_allowed === false, `${engineName}: usage review allowed a savings claim.`);
+  await page.locator("#try-illustrative-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  await page.locator("#try-customer-economics").click();
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("Example customer A"), `${engineName}: customer example failed to join.`);
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("Illustrative inputs"), `${engineName}: customer example lost its evidence label.`);
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("lack customer IDs"), `${engineName}: unallocated cost is hidden.`);
 
   const financeMemoPdf = engineName === "chromium" ? await verifyFinanceMemoPdf(page) : null;
   const savedReview = engineName === "chromium" ? await verifySavedReviewRoundTrip(page) : null;

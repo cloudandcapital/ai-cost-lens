@@ -114,6 +114,7 @@ const elements = {};
 const element = id => elements[id] ||= {textContent:'',innerHTML:'',value:'',hidden:false,style:{},dataset:{},classList:{add(){},remove(){},toggle(){}},setAttribute(){},replaceChildren(){},querySelectorAll(){return []}};
 global.document = {getElementById:element,querySelector:element,querySelectorAll:()=>[],body:element('body')};
 global.window = {scrollTo(){}};
+global.AICostLensEvidenceTools = require('./web/evidence-tools.js');
 let source = fs.readFileSync('web/app.js','utf8');
 source = source.replace('  function renderAll() {', '  globalThis.api = {validDate, finiteNumber, buildSampledReview: buildSimpleReview, validateResult, renderAll, updateBreakEvenExplorer, lumenResponse, setData(d){state.data=d}}; return;\n  function renderAll() {');
 eval(source);

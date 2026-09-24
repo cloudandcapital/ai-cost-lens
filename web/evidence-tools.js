@@ -6,6 +6,31 @@
   "use strict";
   const xml = (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]);
 
+  function sampleSize(marginPoints, expectedReadyRate = 0.5) {
+    const margin = Number(marginPoints) / 100;
+    const rate = Number(expectedReadyRate);
+    if (!(margin > 0 && margin < 1) || !(rate > 0 && rate < 1)) throw new Error("Choose a margin between 0 and 100 points and a ready rate between 0% and 100%.");
+    return Math.ceil(1.96 ** 2 * rate * (1 - rate) / margin ** 2);
+  }
+
+  function evidenceKit(review) {
+    if (!review?.baseline || !review?.proposed || !review?.comparison) throw new Error("A two-route review is required.");
+    const tasks = [];
+    const add = (key, action, why) => { if (!tasks.some((item) => item.key === key)) tasks.push({ key, action, why }); };
+    if (review.mode === "illustrative") add("own-records", "Replace the example with your own spend and outcome records for both routes.", "All example costs and outcomes are invented.");
+    for (const [route, label] of [[review.baseline, "Current route"], [review.proposed, "Candidate route"]]) {
+      if (route.evidence.cost_basis !== "observed") add(`${label}-cost`, `Obtain the ${label.toLowerCase()} provider cost for this workload and period.`, "Calculated or allocated cost is an estimate until checked against provider records.");
+      if (route.evidence.coverage_status !== "complete") add(`${label}-coverage`, `Complete the ${label.toLowerCase()} usage and outcome log for the same bounded period.`, `Current coverage: ${route.evidence.coverage_status || "unspecified"}.`);
+      if (route.outcomes.basis === "sampled") add(`${label}-sample`, `Score more ${label.toLowerCase()} outputs with the same ready-result rule, then log review time.`, "Sampled outcomes cannot establish a complete-period result.");
+      for (const [index, issue] of (route.evidence.reconciliation_issues || []).entries()) add(`${label}-issue-${index}`, `Resolve ${label.toLowerCase()} reconciliation: ${issue}`, "The supplied records do not yet reconcile.");
+      if (!route.policy.approved) add(`${label}-policy`, `Record an explicit policy decision for the ${label.toLowerCase()}.`, "Policy approval is required before recommending a route change.");
+    }
+    if (!review.comparison.same_cost_basis) add("basis", "Compare both routes using the same cost basis.", "Mixed cost bases make the dollar difference unreliable.");
+    if (!review.comparison.quality_holds) add("quality", "Test the candidate on the same cases and ready-result rule; meet the declared quality floor.", "A cheaper result that fails quality is not a saving.");
+    if (!tasks.length) add("actuals", "Check the changed route against a later provider bill and complete outcome log.", "A comparison is a decision input; realized savings require a post-change period.");
+    return tasks;
+  }
+
   function receiptFor(review, route) {
     const scenario = review?.[route];
     const count = scenario?.outcomes?.usable_results;
@@ -83,5 +108,5 @@
     return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="510" viewBox="0 0 800 510" role="img" aria-label="Cost per ready result on two routes"><style>text{font-family:Arial,Helvetica,sans-serif;fill:#171816}.title{font-family:Georgia,serif;font-size:29px}.route{font-size:19px;font-weight:bold}.stamp{font-size:12px;letter-spacing:1px;fill:#526b56}.item{font-size:15px}.total{font-size:17px;font-weight:bold}.note{font-size:13px;fill:#414740}</style><rect width="800" height="510" fill="#fcfaf6"/><text x="40" y="58" class="title">What one ready result cost</text><text x="40" y="85" class="note">${xml(review.workload?.name || "AI workload")} · ${xml(review.currency || "USD")}</text><path d="M 400 122 v 300" stroke="#d7d8d1"/>${rows}<text x="40" y="457" class="note">${xml(receipts[0].note)}</text><text x="40" y="481" class="note">Recurring costs only. One-time change cost excluded; lines add to each total.</text></svg>`;
   }
 
-  return Object.freeze({ receiptFor, receiptSvg, priceSenseCheck });
+  return Object.freeze({ receiptFor, receiptSvg, priceSenseCheck, evidenceKit, sampleSize });
 });

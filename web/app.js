@@ -38,6 +38,7 @@
   const actualsEngine = globalThis.AICostLensActuals;
   const growthEngine = globalThis.AICostLensGrowth;
   const evidenceTools = globalThis.AICostLensEvidenceTools;
+  const customerEconomics = globalThis.AICostLensCustomerEconomics;
 
   const money = (value, digits = 0) =>
     new Intl.NumberFormat("en-US", {
@@ -3474,6 +3475,9 @@
 
   function renderEvidence() {
     const { baseline, proposed, comparison } = state.data;
+    const tasks = evidenceTools.evidenceKit(state.data);
+    document.getElementById("evidence-kit-list").innerHTML = tasks.map((item) => `<li><strong>${escapeHtml(item.action)}</strong><span>${escapeHtml(item.why)}</span></li>`).join("");
+    renderSamplePlanner();
     document.getElementById("evidence-grid").innerHTML =
       evidenceCard(baseline) + evidenceCard(proposed);
     const boundaryTitle = document.getElementById("boundary-title");
@@ -3497,6 +3501,15 @@
       : comparison.outcome_evidence_basis === "sampled"
         ? `${providerCostsReported(baseline, proposed, comparison) ? "Provider spend is reported" : `${costBasisLabel(proposed.evidence.cost_basis)} is used`}. Ready result yield and human time are extrapolated from the reviewed outputs. Repeat the sample or add a detailed outcome log before treating the difference as booked savings.`
         : "At least one side has incomplete or mismatched evidence. The review can show the modeled difference, but it cannot turn that difference into a savings claim.";
+  }
+
+  function renderSamplePlanner() {
+    const target = document.getElementById("sample-margin");
+    const output = document.getElementById("sample-size-result");
+    try {
+      const n = evidenceTools.sampleSize(target.value, 0.5);
+      output.textContent = `About ${wholeNumber(n)} independent cases per route for a 95% normal-approximation margin of ±${target.value} points at a conservative 50% ready rate. Use the same cases on both routes; this precision guide does not establish quality or savings by itself.`;
+    } catch { output.textContent = "Choose a precision target between 1 and 20 percentage points."; }
   }
 
   function renderOpportunities() {
@@ -3764,6 +3777,8 @@
 
   function renderRequestAnalysis(review) {
     const result = document.getElementById("request-analysis-results");
+    document.getElementById("customer-revenue-result").hidden = true;
+    document.getElementById("customer-revenue-error").textContent = "";
     const summary = document.getElementById("request-analysis-summary");
     const list = document.getElementById("request-finding-list");
     document.getElementById("request-analysis-mode").textContent = state.usageReviewIllustrative
@@ -3923,6 +3938,45 @@
     state.usageReview = null;
     state.usageReviewIllustrative = false;
     state.usageReviewBill = null;
+  });
+
+  function showCustomerEconomics(rows, exampleRevenue = false) {
+    const error = document.getElementById("customer-revenue-error");
+    const output = document.getElementById("customer-revenue-result");
+    error.textContent = "";
+    error.classList.remove("visible");
+    output.hidden = true;
+    try {
+      if (!state.usageReview) throw new Error("Analyze the request log before joining revenue.");
+      requireColumns(rows, ["customer", "period_start", "period_end", "revenue", "currency"], "Customer revenue");
+      const analysis = customerEconomics.analyze(state.usageReview, rows);
+      const moneyFor = (value) => requestReviewMoney(value, analysis.currency);
+      output.innerHTML = `<p class="request-variance-note">${escapeHtml(analysis.period.start)} through ${escapeHtml(analysis.period.end)} · ${escapeHtml(analysis.currency)}. ${state.usageReviewIllustrative || exampleRevenue ? "Illustrative inputs: these figures are an example, not observed customer economics. " : ""}${escapeHtml(analysis.limitations)}</p>
+        <p class="request-variance-note"><strong>Outside the customer join:</strong> ${wholeNumber(analysis.unallocated_requests)} requests (${moneyFor(analysis.unallocated_cost)}) lack customer IDs; ${wholeNumber(analysis.unmatched_requests)} requests (${moneyFor(analysis.unmatched_cost)}) have no matching revenue row; ${wholeNumber(analysis.unpriced_requests)} requests have no selected cost. These amounts are excluded from customer ratios.</p>
+        <div class="request-variance-table-wrap" role="region" aria-label="Customer AI request cost versus revenue" tabindex="0"><table><thead><tr><th>Customer ID</th><th>Revenue supplied</th><th>AI request cost</th><th>Share of revenue</th><th>Revenue after AI requests</th><th>Coverage</th></tr></thead><tbody>${analysis.customers.map((item) => `<tr><th>${escapeHtml(item.customer)}</th><td>${moneyFor(item.revenue)}</td><td>${item.requests ? moneyFor(item.selected_cost) : "No matched requests"}</td><td>${item.ai_cost_share === null ? "Unavailable" : `${(item.ai_cost_share * 100).toFixed(1)}%`}</td><td>${item.revenue_after_ai_requests === null ? "Unavailable" : moneyFor(item.revenue_after_ai_requests)}</td><td>${wholeNumber(item.requests)} requests · ${wholeNumber(item.unpriced)} unpriced · ${escapeHtml(item.cost_basis.join(" / ") || "No cost basis")}</td></tr>`).join("")}</tbody></table></div>`;
+      output.hidden = false;
+    } catch (caught) { error.textContent = caught.message || "Revenue could not be compared."; error.classList.add("visible"); }
+  }
+  document.getElementById("analyze-customer-revenue").addEventListener("click", async () => {
+    try {
+      const file = document.getElementById("customer-revenue-file").files[0];
+      if (!file) throw new Error("Choose a customer revenue CSV to compare.");
+      showCustomerEconomics(parseCsv(await readLocalFile(file), "Customer revenue"));
+    } catch (caught) {
+      const error = document.getElementById("customer-revenue-error");
+      error.textContent = caught.message || "Revenue could not be compared.";
+      error.classList.add("visible");
+    }
+  });
+  document.getElementById("try-customer-economics").addEventListener("click", () => {
+    if (!state.usageReviewIllustrative) {
+      const error = document.getElementById("customer-revenue-error");
+      error.textContent = "Choose Try illustrative data above and analyze it first. Illustrative revenue cannot be attached to your own request log.";
+      error.classList.add("visible");
+      return;
+    }
+    const { start, end } = state.usageReview.spend.period;
+    showCustomerEconomics(["Example customer A", "Example customer B"].map((customer, index) => ({ customer, period_start: start, period_end: end, revenue: index ? "0.12" : "0.15", currency: "USD" })), true);
   });
 
   document.getElementById("analyze-request-log").addEventListener("click", async () => {
@@ -6350,6 +6404,19 @@
   });
   ["growth-revenue", "growth-fixed", "growth-discount", "growth-review"].forEach((id) => {
     document.getElementById(id).addEventListener("input", renderGrowthPlanner);
+  });
+  document.getElementById("sample-margin").addEventListener("input", renderSamplePlanner);
+  document.getElementById("download-evidence-kit").addEventListener("click", () => {
+    const tasks = evidenceTools.evidenceKit(state.data);
+    const content = ["# AI Cost Lens — evidence action list", "", `Workload: ${state.data.workload?.name || "Unknown"}`, `Review: ${state.data.mode === "illustrative" ? "invented example" : "user-supplied"}`, "", ...tasks.flatMap((item, index) => [`${index + 1}. ${item.action}`, `   Why: ${item.why}`]), "", "Use the work log template for outcomes and review time. Record the same tasks, ready-result rule, period, currency, and policy decision on both routes. A sample estimate is not a realized savings claim.", ""].join("\n");
+    const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "ai-cost-lens-evidence-actions.md";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   document.getElementById("download-receipt").addEventListener("click", () => {
     if (!state.data || state.data.experience === "simple") return;
