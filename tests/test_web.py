@@ -39,7 +39,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert (
         "universal spend and work templates for any provider, including OpenAI" in html
     )
-    assert "Start with the records you already have" in html
+    assert "Choose what you have. You can add more evidence later." in html
     assert "Start with the reports you already have" in html
     assert "Put both routes in one spend file" in html
     assert "Add what happened to the work" in html
@@ -52,13 +52,10 @@ def test_web_assets_and_brand_contract_are_present():
     assert "Price a prompt" in html
     assert "Review AI usage" in html
     assert 'data-builder-mode="single"' in html
-    assert "CRAWL" in html
-    assert "WALK" in html
-    assert "RUN" in html
-    assert "Understand the bill" in html
-    assert "Explain the usage" in html
-    assert "Connect cost to outcomes" in html
-    assert "Understand one bill" in html
+    assert "Start with a bill" in html
+    assert "Review AI usage" in html
+    assert "Compare two options" in html
+    assert '<details class="builder-more-paths">' in html
     assert "Human effort is optional" in html
     assert "No human review record? Leave it blank" in (WEB / "app.js").read_text()
     assert "Blended cost per request" in (WEB / "app.js").read_text()
@@ -106,7 +103,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert 'id="print-memo"' in html
     assert 'id="finance-memo"' in html
     assert "Print finance memo" in html
-    assert "What would help you today?" in html
+    assert "Choose what you have. You can add more evidence later." in html
     assert 'id="baseline-policy-approved"' in html
     assert 'id="proposed-policy-approved"' in html
     assert 'id="policy-approved"' not in html

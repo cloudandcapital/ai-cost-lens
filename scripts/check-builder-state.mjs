@@ -534,5 +534,6 @@ await el('actuals-form').emit('submit');
 assert.equal(api.state.actualsLedger.gates.source_record_is_real,false);
 assert.equal(api.state.actualsLedger.gates.realized_savings_claim_allowed,false);
 assert.equal(el('actuals-result').hidden,false);
-assert.match(el('actuals-conclusion').textContent,/evidence gates remain open/);
+assert.match(el('actuals-conclusion').textContent,/not a realized savings claim/);
+assert.match(el('actuals-open-gates').innerHTML,/illustrative or sampled/);
 console.log('PASS: prompt pricing, opportunity, scenario-to-verification and actuals event flows');

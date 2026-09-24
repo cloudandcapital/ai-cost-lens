@@ -54,6 +54,17 @@
     const sourceReal = input.source_mode === "real";
     const observed = implemented && sourceReal && Boolean(input.provider_reported) && Boolean(input.periods_comparable) && Boolean(input.outcomes_complete);
     const realized = verified && approved && observed && netDifference > 0;
+    const openGates = [
+      !sourceReal && "Use records from a real workload; this review is illustrative or sampled.",
+      !implemented && "Record the implementation date.",
+      !input.quality_verified && "Verify the post-change work against the same quality rule.",
+      actualUsableRate < input.quality_floor && "The post-change usable-result rate is below the required quality floor.",
+      !approved && "Record business and policy approval.",
+      !input.provider_reported && "Reconcile provider charges in both periods to provider-reported bills.",
+      !input.periods_comparable && "Confirm equivalent work and comparable period duration.",
+      !input.outcomes_complete && "Supply outcomes for the full declared scope.",
+      netDifference <= 0 && "The normalized difference does not recover the one-time implementation cost in this period.",
+    ].filter(Boolean);
     const stages = [
       { stage: "identified", complete: true },
       { stage: "proposed", complete: true },
@@ -68,7 +79,7 @@
       created_at: createdAt || new Date().toISOString(),
       currency,
       periods: { baseline: baselinePeriod, actual: actualPeriod },
-      implementation: { effective_at: implementedAt || null, cost: round(implementationCost) },
+      implementation: { effective_at: implementedAt || null, cost: round(implementationCost), treatment: "one_time_cost_deducted_in_this_period_only" },
       baseline: { cost: round(baselineCost), volume: baselineVolume, usable_rate: baselineUsableRate, ready_results: round(baselineReady), cost_per_ready_result: round(baselineUnitCost) },
       actual: { cost: round(actualCost), volume: actualVolume, usable_rate: actualUsableRate, ready_results: round(actualReady), cost_per_ready_result: round(actualUnitCost) },
       normalization: { method: "baseline_cost_per_ready_result_at_actual_ready_volume", normalized_baseline_cost: round(normalizedBaselineCost) },
@@ -89,8 +100,9 @@
         source_record_is_real: sourceReal,
         realized_savings_claim_allowed: realized,
       },
+      open_gates: openGates,
       stages,
-      status: realized ? "REALIZED" : observed ? "OBSERVED_NOT_REALIZED" : implemented ? "IMPLEMENTED_AWAITING_ACTUALS" : verified ? "VERIFIED_NOT_IMPLEMENTED" : "PROPOSED",
+      status: realized ? "REALIZED" : observed ? "OBSERVED_NOT_REALIZED" : !sourceReal ? "ILLUSTRATIVE_NOT_REALIZED" : implemented ? "IMPLEMENTED_AWAITING_ACTUALS" : verified ? "VERIFIED_NOT_IMPLEMENTED" : "PROPOSED",
     };
   }
 

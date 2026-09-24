@@ -232,6 +232,11 @@ console.log(JSON.stringify({realized, blocked, illustrative, eur, missingImpleme
     assert illustrative["waterfall"]["realized_net_difference"] == 17000
     assert illustrative["gates"]["source_record_is_real"] is False
     assert illustrative["gates"]["realized_savings_claim_allowed"] is False
+    assert illustrative["status"] == "ILLUSTRATIVE_NOT_REALIZED"
+    assert "illustrative" in illustrative["open_gates"][0]
+    assert blocked["open_gates"] == ["Verify the post-change work against the same quality rule."]
+    assert realized["open_gates"] == []
+    assert realized["implementation"]["treatment"] == "one_time_cost_deducted_in_this_period_only"
     assert result["eur"]["currency"] == "EUR"
 
     assert result["missingImplementation"]["gates"]["implementation_recorded"] is False
@@ -241,6 +246,30 @@ console.log(JSON.stringify({realized, blocked, illustrative, eur, missingImpleme
     }
     assert result["invalidDateRejected"] is True
     assert result["fractionalVolumeRejected"] is True
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_growth_margin_models_fixed_infrastructure_and_quality_adjusted_revenue():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const review = require(process.argv[2]);
+const rows = engine.growthMargins(review, {revenue_per_ready: 3, fixed_infrastructure_share: 1, model_discount: 0, review_effort_share: 1});
+const halfReview = engine.growthMargins(review, {revenue_per_ready: 3, fixed_infrastructure_share: 1, model_discount: 0, review_effort_share: 0.5});
+let rejected = false;
+try { engine.growthMargins(review, {revenue_per_ready: 3, fixed_infrastructure_share: 2, model_discount: 0, review_effort_share: 1}); } catch (_error) { rejected = true; }
+console.log(JSON.stringify({rows, halfReview, rejected}));
+""",
+        WEB / "growth-engine.js",
+        WEB / "data" / "startup-growth-review-result.json",
+    )
+    assert result["rejected"] is True
+    assert result["rows"][0]["baseline"]["ready"] == 18200
+    assert result["rows"][0]["baseline"]["revenue"] == 54600
+    assert result["rows"][0]["baseline"]["cost"] == 40000
+    assert result["rows"][0]["proposed"]["cost"] == 33000
+    assert result["rows"][2]["baseline"]["cost"] == 176000  # 5x variable cost plus $6k fixed infrastructure.
+    assert result["halfReview"][0]["baseline"]["cost"] == 34000
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")

@@ -36,6 +36,7 @@
   const verificationEngine = globalThis.AICostLensVerification;
   const scenarioEngine = globalThis.AICostLensScenarios;
   const actualsEngine = globalThis.AICostLensActuals;
+  const growthEngine = globalThis.AICostLensGrowth;
 
   const money = (value, digits = 0) =>
     new Intl.NumberFormat("en-US", {
@@ -4133,13 +4134,13 @@
     const { baseline, proposed, workload, period } = state.data;
     const values = {
       "actuals-baseline-period": period.start || "",
-      "actuals-post-period": period.end || "",
+      "actuals-post-period": "",
       "actuals-baseline-cost": baseline.costs.recurring_operating_cost,
-      "actuals-post-cost": proposed.costs.recurring_operating_cost,
+      "actuals-post-cost": "",
       "actuals-baseline-volume": baseline.outcomes.completed_results,
-      "actuals-post-volume": proposed.outcomes.completed_results,
+      "actuals-post-volume": "",
       "actuals-baseline-rate": round(baseline.measures.usable_result_rate * 100, 2),
-      "actuals-post-rate": round(proposed.measures.usable_result_rate * 100, 2),
+      "actuals-post-rate": "",
       "actuals-change-cost": proposed.costs.one_time_change_cost,
       "actuals-quality-floor": round(workload.accepted_quality_threshold * 100, 2),
     };
@@ -4149,6 +4150,7 @@
     }
     document.getElementById("actuals-implemented-at").value = "";
     document.getElementById("actuals-result").hidden = true;
+    document.getElementById("actuals-open-gates").textContent = "";
     document.getElementById("actuals-error").classList.remove("visible");
     state.actualsLedger = null;
   }
@@ -4537,6 +4539,34 @@
         : "Modeled difference · not booked savings";
   }
 
+  function renderGrowthPlanner() {
+    const message = document.getElementById("growth-planner-message");
+    const results = document.getElementById("growth-results");
+    const revenue = document.getElementById("growth-revenue").value.trim();
+    results.replaceChildren();
+    if (!revenue) {
+      message.textContent = "Enter revenue to see a modeled gross margin at 1×, 2×, 5×, and 10× volume.";
+      return;
+    }
+    try {
+      const percentages = ["growth-fixed", "growth-discount", "growth-review"].map((id) => {
+        const value = document.getElementById(id).value.trim();
+        if (value === "") throw new Error("Fill in each percentage to model growth.");
+        return Number(value) / 100;
+      });
+      const rows = growthEngine.growthMargins(state.data, {
+        revenue_per_ready: Number(revenue),
+        fixed_infrastructure_share: percentages[0],
+        model_discount: percentages[1],
+        review_effort_share: percentages[2],
+      });
+      message.textContent = "Modeled gross margin, using the invented example workload and your entered assumptions:";
+      results.innerHTML = `<table class="usage-table"><thead><tr><th>Monthly volume</th><th>Current gross margin</th><th>Proposed gross margin</th><th>Gross profit change</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${row.factor}× · ${wholeNumber(row.volume)} completed</td><td>${row.baseline.margin_pct === null ? "No revenue" : `${round(row.baseline.margin_pct, 1)}%`}</td><td>${row.proposed.margin_pct === null ? "No revenue" : `${round(row.proposed.margin_pct, 1)}%`}</td><td>${signedMoney(row.gross_profit_difference)}</td></tr>`).join("")}</tbody></table>`;
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  }
+
   function renderAll() {
     validateResult(state.data);
     const exampleSwitcher = document.getElementById("example-switcher");
@@ -4547,10 +4577,10 @@
     });
     const growthProjection = document.getElementById("growth-projection");
     growthProjection.hidden = !isGrowthExample;
+    document.getElementById("growth-planner").hidden = !isGrowthExample;
     if (!growthProjection.hidden) {
-      const startingVolume = state.data.baseline.outcomes.completed_results;
-      const fivefoldGap = Math.abs(state.data.comparison.normalized_cost_difference) * 5;
-      growthProjection.textContent = `At 5× volume (${wholeNumber(startingVolume * 5)} summaries), multiplying today's ${wholeNumber(startingVolume)}-summary unit-cost gap gives about ${money(fivefoldGap)} a month before implementation cost. This assumes the same ready rates and unit costs. It does not model revenue, discounts, fixed infrastructure, or changes in review effort, so it is a sensitivity check, not a margin forecast.`;
+      growthProjection.textContent = "The proposed route costs less per ready result in this invented example. Add a sale price below to test what that means for margin as the workload grows.";
+      renderGrowthPlanner();
     }
     document.body.classList.remove("bill-usage-mode");
     document.getElementById("back-to-bill").hidden = true;
@@ -5024,15 +5054,18 @@
       document.getElementById("savings-stages").innerHTML = ledger.stages.map((stage) => `<div class="savings-stage ${stage.complete ? "complete" : ""}">${escapeHtml(stage.stage)}</div>`).join("");
       const waterfall = [
         ["Normalized baseline", ledger.waterfall.normalized_baseline_cost],
-        ["Actual billed cost", -ledger.waterfall.less_actual_billed_cost],
-        ["Billed difference", ledger.waterfall.billed_difference],
-        ["Implementation cost", -ledger.waterfall.less_implementation_cost],
-        ["Net difference", ledger.waterfall.realized_net_difference],
+        ["Entered post-change cost", -ledger.waterfall.less_actual_billed_cost],
+        ["Recurring difference at post-change ready volume", ledger.waterfall.billed_difference],
+        ["One-time cost deducted this period", -ledger.waterfall.less_implementation_cost],
+        ["First-period net difference", ledger.waterfall.realized_net_difference],
       ];
       document.getElementById("savings-waterfall").innerHTML = waterfall.map(([label, amount]) => `<article><span>${escapeHtml(label)}</span><strong>${signedMoney(amount)}</strong></article>`).join("");
       document.getElementById("actuals-conclusion").textContent = ledger.gates.realized_savings_claim_allowed
-        ? `The post-change bill and outcome-adjusted economics support ${money(ledger.waterfall.realized_net_difference)} in realized net savings for the declared periods.`
-        : `The arithmetic shows ${signedMoney(ledger.waterfall.realized_net_difference)}, but one or more evidence gates remain open. Keep the result in ${ledger.status.replaceAll("_", " ").toLowerCase()} status.`;
+        ? `The post-change bill and outcomes support ${money(ledger.waterfall.billed_difference)} in recurring difference at this period's ready volume, and ${money(ledger.waterfall.realized_net_difference)} after the one-time implementation cost in this period.`
+        : `The first-period calculation is ${signedMoney(ledger.waterfall.realized_net_difference)} after the one-time cost. This is not a realized savings claim. ${ledger.open_gates.length} ${ledger.open_gates.length === 1 ? "condition remains" : "conditions remain"}:`;
+      document.getElementById("actuals-open-gates").innerHTML = ledger.open_gates.length
+        ? `<ul>${ledger.open_gates.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+        : "All stated conditions passed for the declared periods.";
       document.getElementById("actuals-result").hidden = false;
       document.getElementById("actuals-result").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (caught) {
@@ -6290,6 +6323,9 @@
   });
   document.querySelectorAll("[data-lumen-question]").forEach((button) => {
     button.addEventListener("click", () => askLumen(button.dataset.lumenQuestion, button.textContent.trim()));
+  });
+  ["growth-revenue", "growth-fixed", "growth-discount", "growth-review"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", renderGrowthPlanner);
   });
   /* AI_COST_LENS_DEMO_LOADER_START */
   async function loadDemo() {

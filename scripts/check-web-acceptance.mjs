@@ -36,6 +36,7 @@ const element = (id) => {
 navButtons.push(element('review-tab'), element('anatomy-tab'), element('evidence-tab'));
 const document = { getElementById: element, querySelector: element, querySelectorAll() { return []; }, body: element('body') };
 const context = { TextEncoder, crypto: webcrypto, document, window: { scrollTo() {} } };
+runInNewContext(read('web/growth-engine.js'), context);
 runInNewContext(source.slice(0, boundary) + 'globalThis.api = {parseCsv, validDate, validateResult, buildLocalReview, buildSampledReview, buildOpenAIBillReview, buildSingleBillReview, buildClaudeSpendReview, buildClaudeApiReview, parseFlatStructured, suggestStructuredMapping, buildMappedReview, extractPdfText, extractInvoiceCandidate, inspectUploadedFiles, summarizeSingleBill, failedSavingsGateText, lumenResponse, renderAll, state};})();', context);
 const api = context.api;
 for (const date of ['2026-02-31', '2026-02-29', '2026-04-31', '2026-13-01', 'not-a-date']) assert.throws(() => api.validDate(date, 'Date'));

@@ -170,6 +170,22 @@
             <button type="button" id="start-review-inline">Use my own numbers</button>
           </div>
           <p class="growth-projection" id="growth-projection" hidden></p>
+          <section class="growth-planner" id="growth-planner" hidden aria-labelledby="growth-planner-title">
+            <div>
+              <p class="kicker">STARTUP UNIT ECONOMICS</p>
+              <h2 id="growth-planner-title">Would the margin hold as usage grows?</h2>
+              <p>Try your own sale price per ready result. Both routes keep their example ready rates; infrastructure can stay fixed while model and review costs scale.</p>
+            </div>
+            <div class="growth-inputs">
+              <label>Revenue per ready result ($)<input id="growth-revenue" type="number" min="0" step="0.01" placeholder="Enter your price" /></label>
+              <label>Infrastructure fixed share (%)<input id="growth-fixed" type="number" min="0" max="100" step="1" value="100" /></label>
+              <label>Model rate discount (%)<input id="growth-discount" type="number" min="0" max="100" step="1" value="0" /></label>
+              <label>Human review effort retained (%)<input id="growth-review" type="number" min="0" max="100" step="1" value="100" /></label>
+            </div>
+            <p id="growth-planner-message" role="status">Enter revenue to see a modeled gross margin at 1×, 2×, 5×, and 10× volume.</p>
+            <div class="growth-results" id="growth-results" role="region" aria-label="Modeled margin at growth" tabindex="0"></div>
+            <p class="growth-assumptions">Illustrative scenario only. Revenue applies to ready results; the entered discount applies to both model bills; review effort uses the entered share at every volume. Quality, prices, fixed costs, demand, and capacity may change. One-time change cost is excluded from gross margin.</p>
+          </section>
 
           <section class="truth-section share-card" aria-labelledby="truth-title">
             <div class="truth-heading">
@@ -637,7 +653,7 @@
           <div class="section-page-title">
             <p class="kicker">ACTUALS</p>
             <h1 id="actuals-title">Did the savings appear after the change?</h1>
-            <p>Normalize for ready-result volume, subtract implementation cost, and keep the result out of “realized” until every evidence gate passes. Amounts stay in the review currency; no conversion is applied.</p>
+            <p>Enter the post-change period from your records. Compare recurring costs at the same ready-result volume, then show any one-time implementation cost separately. Amounts stay in the review currency.</p>
           </div>
           <form class="workbench-form actuals-form" id="actuals-form" novalidate>
             <div class="actuals-period-grid">
@@ -650,6 +666,7 @@
               </fieldset>
               <fieldset>
                 <legend>Post-change period</legend>
+                <p>Enter observed post-change figures here. A proposed route is not an actual result.</p>
                 <label><span>Period label</span><input id="actuals-post-period" type="text" placeholder="September 2026" /></label>
                 <label><span>Recurring cost</span><input id="actuals-post-cost" type="number" min="0" step="0.01" /></label>
                 <label><span>Completed results</span><input id="actuals-post-volume" type="number" min="1" step="1" /></label>
@@ -675,7 +692,9 @@
             <div class="actuals-result-head"><div><p class="kicker">SAVINGS LEDGER</p><h2 id="actuals-status"></h2></div><button class="text-button" id="download-actuals" type="button">Download ledger (JSON)</button></div>
             <div class="savings-stages" id="savings-stages" role="region" aria-label="Savings evidence stages" tabindex="0"></div>
             <div class="savings-waterfall" id="savings-waterfall"></div>
+            <p>One-time implementation cost is deducted in this period only. The recurring difference excludes it; subsequent periods need their own actuals.</p>
             <p class="actuals-conclusion" id="actuals-conclusion"></p>
+            <div id="actuals-open-gates" role="status"></div>
           </section>
         </section>
       </main>
@@ -765,32 +784,12 @@
           <p>Use non-negative costs after documented discounts. Reconcile credits and refunds first, and use the same gross or net basis on both sides.</p>
         </div>
 
-        <section class="maturity-ladder" aria-label="AI cost review depth">
-          <div>
-            <small>CRAWL</small>
-            <strong>Understand the bill</strong>
-            <span>Start with cost. Usage, retries, outcomes, and human effort can all be blank.</span>
-          </div>
-          <div>
-            <small>WALK</small>
-            <strong>Explain the usage</strong>
-            <span>Add requests, tokens, models, routes, or cache data when your source provides them.</span>
-          </div>
-          <div>
-            <small>RUN</small>
-            <strong>Connect cost to outcomes</strong>
-            <span>Add ready results when you need to test value. Human effort remains optional.</span>
-          </div>
-        </section>
-        <p class="maturity-note">These labels describe the depth of this review, not a formal FinOps maturity rating. Start with the records you already have.</p>
-
-        <p class="builder-choice-label">What would help you today?</p>
+        <p class="builder-choice-label">Choose what you have. You can add more evidence later.</p>
         <div class="builder-mode-choice" role="group" aria-label="Choose how to start">
-          <button class="builder-mode builder-mode-featured" data-builder-mode="price" type="button" aria-pressed="false">
-            <small>NO FILES · LOCAL CALCULATOR</small>
-            <strong>Price a prompt</strong>
-            <span>Compare direct API costs, cache, batch, retries, and cost per expected usable result.</span>
-            <em>FASTEST WAY TO ESTIMATE A WORKLOAD</em>
+          <button class="builder-mode builder-mode-featured" data-builder-mode="single" type="button" aria-pressed="false">
+            <small>BILL OR SUBSCRIPTION</small>
+            <strong>Start with a bill</strong>
+            <span>Enter a total and period. Add usage or outcomes when you have them.</span>
           </button>
           <button class="builder-mode builder-mode-featured" data-builder-mode="usage" type="button" aria-pressed="false">
             <small>CSV OR JSON · LOCAL ANALYSIS</small>
@@ -798,11 +797,14 @@
             <span>Find spend drivers, budget risk, operational patterns, variance, and credible optimization targets.</span>
             <em>BEST FOR REQUEST OR TRACE EXPORTS</em>
           </button>
-          <button class="builder-mode builder-mode-simple" data-builder-mode="simple" type="button" aria-pressed="false">
+          <button class="builder-mode builder-mode-featured" data-builder-mode="simple" type="button" aria-pressed="false">
             <small>SIMPLE · NO FILES NEEDED</small>
-            <strong>Compare two AI tools or plans</strong>
+            <strong>Compare two options</strong>
             <span>For subscriptions, solo work, and small teams. Enter two monthly costs and check a small sample of work.</span>
-            <em>START HERE FOR A QUICK COMPARISON</em>
+          </button>
+          <details class="builder-more-paths"><summary>Other ways to start <span>Prompt price, file upload, detailed comparison, and examples</span></summary><div class="builder-more-grid">
+          <button class="builder-mode" data-builder-mode="price" type="button" aria-pressed="false">
+            <small>NO FILES · LOCAL CALCULATOR</small><strong>Price a prompt</strong><span>Compare API prices, cache, batch, retries, and expected usable results.</span>
           </button>
           <button class="builder-mode builder-mode-featured" data-builder-mode="growth-example" type="button" aria-pressed="false">
             <small>ILLUSTRATIVE · NO FILES NEEDED</small>
@@ -815,11 +817,6 @@
             <strong>See a cheaper bill backfire</strong>
             <span>Follow a lower provider bill that turns into more expensive work.</span>
           </button>
-          <button class="builder-mode" data-builder-mode="single" type="button" aria-pressed="false">
-            <small>ANY PROVIDER · START WITH COST</small>
-            <strong>Understand one bill</strong>
-            <span>Get a cost baseline and practical next steps. Usage, outcomes, retries, and human effort are optional.</span>
-          </button>
           <button class="builder-mode" data-builder-mode="openai" type="button" aria-pressed="false">
             <small>OPENAI OR CLAUDE · START HERE</small>
             <strong>Upload what you have</strong>
@@ -830,6 +827,7 @@
             <strong>Compare cost per ready result</strong>
             <span>Use universal spend and work templates for any provider, including OpenAI.</span>
           </button>
+          </div></details>
         </div>
 
         <p class="builder-path-help" id="builder-path-help">Not sure? Start with one bill. The review becomes more detailed as you add the usage or outcome data you already have.</p>
@@ -1484,6 +1482,7 @@
     <script src="scenario-engine.js"></script>
     <script src="verification-engine.js"></script>
     <script src="actuals-engine.js"></script>
+    <script src="growth-engine.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

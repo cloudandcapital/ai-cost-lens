@@ -41,6 +41,7 @@ const usageEventEngine = await readFile(resolve(web, "usage-event-engine.js"), "
 const verificationEngine = await readFile(resolve(web, "verification-engine.js"), "utf8");
 const scenarioEngine = await readFile(resolve(web, "scenario-engine.js"), "utf8");
 const actualsEngine = await readFile(resolve(web, "actuals-engine.js"), "utf8");
+const growthEngine = await readFile(resolve(web, "growth-engine.js"), "utf8");
 
 const loaderPattern =
   /  \/\* AI_COST_LENS_DEMO_LOADER_START \*\/[\s\S]*?  \/\* AI_COST_LENS_DEMO_LOADER_END \*\//;
@@ -77,6 +78,7 @@ html = html
   .replace('<script src="verification-engine.js"></script>', () => `<script>${verificationEngine}</script>`)
   .replace('<script src="scenario-engine.js"></script>', () => `<script>${scenarioEngine}</script>`)
   .replace('<script src="actuals-engine.js"></script>', () => `<script>${actualsEngine}</script>`)
+  .replace('<script src="growth-engine.js"></script>', () => `<script>${growthEngine}</script>`)
   .replace('<script src="app.js"></script>', () => `<script>${app}</script>`);
 
 if (!html.includes(`<script>${app}</script>`)) {
