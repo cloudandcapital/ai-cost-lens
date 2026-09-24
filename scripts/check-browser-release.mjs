@@ -159,7 +159,7 @@ async function verifyRichDecisionFlow(page) {
     await page.locator("#proposed-shared").fill(String(config.proposedShared));
     await page.locator("#change-cost").fill(String(config.changeCost));
     await page.locator("#build-review").click();
-    await page.locator("#review-title").waitFor({ state: "visible" });
+    await page.waitForFunction(() => !document.querySelector("#review-dialog")?.open || document.querySelector("#builder-error")?.textContent?.trim(), null, { timeout: 20000 });
     assert(!(await page.locator("#review-dialog").evaluate((dialog) => dialog.open)), `${scenario.name}: detailed review did not close the builder: ${await page.locator("#builder-error").innerText()}`);
     const review = await saveJsonDownload(page, "#download-review", `${scenario.name}-browser-review.json`);
     assert(review.schema_version === "ai-cost-lens-review-result/1.0", `${scenario.name}: wrong review export.`);
