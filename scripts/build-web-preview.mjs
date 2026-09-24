@@ -14,6 +14,10 @@ const data = await readFile(
   resolve(web, "data", "illustrative-review-result.json"),
   "utf8",
 );
+const growthData = await readFile(
+  resolve(web, "data", "startup-growth-review-result.json"),
+  "utf8",
+);
 const spendTemplate = await readFile(
   resolve(web, "templates", "ai-cost-lens-spend-template.csv"),
 );
@@ -46,7 +50,7 @@ if (!loaderPattern.test(app)) {
 
 app = app.replace(
   loaderPattern,
-  `  state.data = ${data.trim()};\n  state.demoData = cloneData(state.data);\n  renderAll();`,
+  `  state.data = ${data.trim()};\n  state.demoData = cloneData(state.data);\n  state.growthDemoData = ${growthData.trim()};\n  renderAll();`,
 );
 html = html
   .replace('<link rel="stylesheet" href="styles.css" />', () => `<style>${css}</style>`)

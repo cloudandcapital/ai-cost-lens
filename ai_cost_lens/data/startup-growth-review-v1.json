@@ -1,0 +1,130 @@
+{
+  "schema_version": "ai-cost-lens-review/1.0",
+  "mode": "illustrative",
+  "currency": "USD",
+  "period": {
+    "start": "2026-08-01",
+    "end": "2026-08-31",
+    "timezone": "UTC"
+  },
+  "workload": {
+    "name": "Growing support AI workload",
+    "description": "A startup processes 20,000 customer support summaries a month and expects volume to grow. Compare the current route with a possible caching and model-routing change before scaling it. All figures are invented for this example.",
+    "outcome_unit": "ready result",
+    "accepted_quality_threshold": 0.9
+  },
+  "planning": {
+    "label": "Approved plan for the current route",
+    "plan": {
+      "provider_cost": 20000,
+      "shared_infrastructure_cost": 6000,
+      "human_review_cost": 11000,
+      "completed_results": 20000,
+      "ready_result_rate": 0.91
+    },
+    "expected_ready_results_per_month": 18200,
+    "decision_horizon_months": 12
+  },
+  "baseline": {
+    "id": "current-route",
+    "label": "Current route",
+    "model": {
+      "provider": "Model API",
+      "name": "Current production mix",
+      "route": "Current support route"
+    },
+    "costs": {
+      "model_cost": 22000,
+      "shared_infrastructure_cost": 6000,
+      "human_review_cost": 12000,
+      "one_time_change_cost": 0
+    },
+    "usage": {
+      "requests": 20000,
+      "retries": 2400,
+      "unique_input_tokens": null,
+      "processed_input_tokens": 150000000,
+      "cached_input_tokens": 15000000,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 14000000
+    },
+    "outcomes": {
+      "basis": "illustrative",
+      "completed_results": 20000,
+      "usable_results": 18200,
+      "status_counts": {
+        "ready_to_use": 18200,
+        "needs_correction": 1300,
+        "needs_escalation": 500
+      },
+      "human_review_minutes": 12000,
+      "verifier": "Independent quality review",
+      "acceptance_rule": "Accurate support summary, policy-compliant, and ready for an agent without material rewrite"
+    },
+    "policy": {
+      "approved": true,
+      "retention_mode": "Assumed approved for this illustrative workflow"
+    },
+    "evidence": {
+      "cost_basis": "observed",
+      "outcome_basis": "illustrative",
+      "source": "Invented provider costs and work outcomes for a startup growth example",
+      "observed_at": "2026-08-31",
+      "coverage": "Invented complete work log for the example",
+      "coverage_status": "illustrative",
+      "reconciliation_issues": [],
+      "cost_boundary": "provider cost + shared infrastructure + human review and correction"
+    }
+  },
+  "proposed": {
+    "id": "proposed-route",
+    "label": "Proposed route",
+    "model": {
+      "provider": "Model API",
+      "name": "Cached and routed mix",
+      "route": "Proposed support route"
+    },
+    "costs": {
+      "model_cost": 15000,
+      "shared_infrastructure_cost": 7000,
+      "human_review_cost": 11000,
+      "one_time_change_cost": 18000
+    },
+    "usage": {
+      "requests": 20000,
+      "retries": 1800,
+      "unique_input_tokens": null,
+      "processed_input_tokens": 150000000,
+      "cached_input_tokens": 60000000,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 13500000
+    },
+    "outcomes": {
+      "basis": "illustrative",
+      "completed_results": 20000,
+      "usable_results": 18600,
+      "status_counts": {
+        "ready_to_use": 18600,
+        "needs_correction": 1100,
+        "needs_escalation": 300
+      },
+      "human_review_minutes": 11000,
+      "verifier": "Independent quality review",
+      "acceptance_rule": "Accurate support summary, policy-compliant, and ready for an agent without material rewrite"
+    },
+    "policy": {
+      "approved": true,
+      "retention_mode": "Assumed approved for this illustrative workflow"
+    },
+    "evidence": {
+      "cost_basis": "observed",
+      "outcome_basis": "illustrative",
+      "source": "Invented provider costs and work outcomes for a startup growth example",
+      "observed_at": "2026-08-31",
+      "coverage": "Invented complete work log for the example",
+      "coverage_status": "illustrative",
+      "reconciliation_issues": [],
+      "cost_boundary": "provider cost + shared infrastructure + human review and correction"
+    }
+  }
+}

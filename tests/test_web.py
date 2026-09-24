@@ -16,6 +16,7 @@ def test_web_assets_and_brand_contract_are_present():
     css = (WEB / "styles.css").read_text()
     assert (WEB / "app.js").is_file()
     assert (WEB / "data" / "illustrative-review-result.json").is_file()
+    assert (WEB / "data" / "startup-growth-review-result.json").is_file()
     assert (WEB / "preview.html").is_file()
     assert (WEB / "templates" / "ai-cost-lens-spend-template.csv").is_file()
     assert (WEB / "templates" / "ai-cost-lens-work-log-template.csv").is_file()
@@ -27,11 +28,12 @@ def test_web_assets_and_brand_contract_are_present():
     assert "ILLUSTRATIVE DATA" not in html  # The current file supplies the label.
     assert "Calculations run locally. Source files are not uploaded." in html
     assert "What would you like to check?" in html
-    assert "See the worked example" in html
+    assert "See a growing AI startup" in html
+    assert "See a cheaper bill backfire" in html
     assert "Upload what you have" in html
     assert "CSV, JSON, or a text-based invoice PDF" in html
     assert "Compare cost per ready result" in html
-    assert "BEST PLACE TO START" in html
+    assert "SEE WHAT A COST REVIEW CAN DO" in html
     assert "OPENAI OR CLAUDE" in html
     assert "ANY PROVIDER OR AI TOOL" in html
     assert (
@@ -46,7 +48,7 @@ def test_web_assets_and_brand_contract_are_present():
         in html
     )
     assert "Set the decision rules" in html
-    assert html.count("data-builder-mode=") == 7
+    assert html.count("data-builder-mode=") == 8
     assert "Price a prompt" in html
     assert "Review AI usage" in html
     assert 'data-builder-mode="single"' in html
@@ -215,6 +217,7 @@ def test_single_file_preview_embeds_assets_and_data():
     assert 'schema_version: "ai-cost-lens-scenario/1.0"' in preview
     assert 'schema_version: "ai-cost-lens-realized-savings/1.0"' in preview
     assert 'fetch("data/illustrative-review-result.json")' not in preview
+    assert 'fetch("data/startup-growth-review-result.json")' not in preview
     assert 'href="templates/ai-cost-lens-spend-template.csv"' not in preview
     assert 'href="templates/ai-cost-lens-work-log-template.csv"' not in preview
     assert "data:text/csv;base64," in preview

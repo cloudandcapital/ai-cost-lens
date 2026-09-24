@@ -1,0 +1,225 @@
+{
+  "schema_version": "ai-cost-lens-review-result/1.0",
+  "mode": "illustrative",
+  "currency": "USD",
+  "period": {
+    "start": "2026-08-01",
+    "end": "2026-08-31",
+    "timezone": "UTC"
+  },
+  "workload": {
+    "name": "Growing support AI workload",
+    "description": "A startup processes 20,000 customer support summaries a month and expects volume to grow. Compare the current route with a possible caching and model-routing change before scaling it. All figures are invented for this example.",
+    "outcome_unit": "ready result",
+    "accepted_quality_threshold": 0.9
+  },
+  "baseline": {
+    "id": "current-route",
+    "label": "Current route",
+    "model": {
+      "provider": "Model API",
+      "name": "Current production mix",
+      "route": "Current support route"
+    },
+    "costs": {
+      "model_cost": 22000.0,
+      "shared_infrastructure_cost": 6000.0,
+      "human_review_cost": 12000.0,
+      "one_time_change_cost": 0.0,
+      "recurring_operating_cost": 40000.0,
+      "all_in_pilot_cost": 40000.0
+    },
+    "usage": {
+      "requests": 20000,
+      "retries": 2400,
+      "unique_input_tokens": null,
+      "processed_input_tokens": 150000000,
+      "cached_input_tokens": 15000000,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 14000000
+    },
+    "outcomes": {
+      "basis": "illustrative",
+      "completed_results": 20000,
+      "usable_results": 18200,
+      "status_counts": {
+        "ready_to_use": 18200,
+        "needs_correction": 1300,
+        "needs_escalation": 500
+      },
+      "human_review_minutes": 12000.0,
+      "review_minutes": 12000.0,
+      "correction_minutes": 0.0,
+      "verifier": "Independent quality review",
+      "acceptance_rule": "Accurate support summary, policy-compliant, and ready for an agent without material rewrite"
+    },
+    "policy": {
+      "approved": true,
+      "retention_mode": "Assumed approved for this illustrative workflow"
+    },
+    "evidence": {
+      "cost_basis": "observed",
+      "outcome_basis": "illustrative",
+      "source": "Invented provider costs and work outcomes for a startup growth example",
+      "observed_at": "2026-08-31",
+      "coverage": "Invented complete work log for the example",
+      "coverage_status": "illustrative",
+      "reconciliation_issues": [],
+      "cost_boundary": "provider cost + shared infrastructure + human review and correction",
+      "provider_usage_sha256": null,
+      "provider_cost_sha256": null,
+      "outcome_log_sha256": null
+    },
+    "measures": {
+      "cost_per_usable_result": 2.197802,
+      "all_in_cost_per_usable_result": 2.197802,
+      "usable_result_rate": 0.91,
+      "retry_rate": 0.12,
+      "cache_reuse_rate": 0.1,
+      "cache_write_rate": 0.0,
+      "context_reprocessing_ratio": null,
+      "human_review_minutes_per_usable_result": 0.659341
+    }
+  },
+  "proposed": {
+    "id": "proposed-route",
+    "label": "Proposed route",
+    "model": {
+      "provider": "Model API",
+      "name": "Cached and routed mix",
+      "route": "Proposed support route"
+    },
+    "costs": {
+      "model_cost": 15000.0,
+      "shared_infrastructure_cost": 7000.0,
+      "human_review_cost": 11000.0,
+      "one_time_change_cost": 18000.0,
+      "recurring_operating_cost": 33000.0,
+      "all_in_pilot_cost": 51000.0
+    },
+    "usage": {
+      "requests": 20000,
+      "retries": 1800,
+      "unique_input_tokens": null,
+      "processed_input_tokens": 150000000,
+      "cached_input_tokens": 60000000,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 13500000
+    },
+    "outcomes": {
+      "basis": "illustrative",
+      "completed_results": 20000,
+      "usable_results": 18600,
+      "status_counts": {
+        "ready_to_use": 18600,
+        "needs_correction": 1100,
+        "needs_escalation": 300
+      },
+      "human_review_minutes": 11000.0,
+      "review_minutes": 11000.0,
+      "correction_minutes": 0.0,
+      "verifier": "Independent quality review",
+      "acceptance_rule": "Accurate support summary, policy-compliant, and ready for an agent without material rewrite"
+    },
+    "policy": {
+      "approved": true,
+      "retention_mode": "Assumed approved for this illustrative workflow"
+    },
+    "evidence": {
+      "cost_basis": "observed",
+      "outcome_basis": "illustrative",
+      "source": "Invented provider costs and work outcomes for a startup growth example",
+      "observed_at": "2026-08-31",
+      "coverage": "Invented complete work log for the example",
+      "coverage_status": "illustrative",
+      "reconciliation_issues": [],
+      "cost_boundary": "provider cost + shared infrastructure + human review and correction",
+      "provider_usage_sha256": null,
+      "provider_cost_sha256": null,
+      "outcome_log_sha256": null
+    },
+    "measures": {
+      "cost_per_usable_result": 1.774194,
+      "all_in_cost_per_usable_result": 2.741935,
+      "usable_result_rate": 0.93,
+      "retry_rate": 0.09,
+      "cache_reuse_rate": 0.4,
+      "cache_write_rate": 0.0,
+      "context_reprocessing_ratio": null,
+      "human_review_minutes_per_usable_result": 0.591398
+    }
+  },
+  "comparison": {
+    "status": "modeled_improvement",
+    "finding": "On recurring cost, the proposed route comes out 19.3% lower for each ready result. The usable result rate moves from 91.0% to 93.0%.",
+    "limitation": "The conclusion applies only to these inputs; it is not a savings or performance claim for another workload.",
+    "recommendation": "Run one bounded pilot and verify the proposed bill. The $18,000 change cost would be earned back after about 42,492 usable results if the modeled operating difference holds.",
+    "savings_claim_allowed": false,
+    "same_cost_basis": true,
+    "provider_cost_reported": true,
+    "quality_holds": true,
+    "both_policy_approved": true,
+    "evidence_complete": false,
+    "recurring_cost_difference": -7000.0,
+    "cost_per_usable_result_difference": -0.423608,
+    "cost_per_usable_result_change_pct": -19.3,
+    "usable_result_rate_change_points": 2.0,
+    "normalized_proposed_cost_at_baseline_volume": 32290.3308,
+    "normalized_cost_difference": -7709.6692,
+    "payback_usable_results": 42492
+  },
+  "planning": {
+    "label": "Approved plan for the current route",
+    "plan": {
+      "provider_cost": 20000.0,
+      "shared_infrastructure_cost": 6000.0,
+      "human_review_cost": 11000.0,
+      "recurring_operating_cost": 37000.0,
+      "completed_results": 20000,
+      "ready_result_rate": 0.91,
+      "ready_results": 18200.0,
+      "cost_per_ready_result": 2.032967
+    },
+    "actual": {
+      "provider_cost": 22000.0,
+      "shared_infrastructure_cost": 6000.0,
+      "human_review_cost": 12000.0,
+      "recurring_operating_cost": 40000.0,
+      "completed_results": 20000,
+      "ready_result_rate": 0.91,
+      "ready_results": 18200.0,
+      "cost_per_ready_result": 2.197802
+    },
+    "variance": {
+      "provider_cost": 2000.0,
+      "shared_infrastructure_cost": 0.0,
+      "human_review_cost": 1000.0,
+      "recurring_operating_cost": 3000.0,
+      "ready_results": 0.0,
+      "ready_result_rate_points": 0.0,
+      "cost_per_ready_result": 0.164835,
+      "primary_cost_drivers": [
+        {
+          "label": "Provider cost",
+          "amount": 2000.0,
+          "direction": "unfavorable"
+        },
+        {
+          "label": "Human review and correction",
+          "amount": 1000.0,
+          "direction": "unfavorable"
+        }
+      ]
+    },
+    "payback": {
+      "expected_ready_results_per_month": 18200,
+      "decision_horizon_months": 12,
+      "monthly_operating_savings": 7709.6656,
+      "one_time_change_cost": 18000.0,
+      "payback_months": 2.334732,
+      "within_decision_horizon": true,
+      "horizon_net_savings": 74515.9872,
+      "status": "within_horizon"
+    }
+  }
+}
