@@ -133,6 +133,43 @@ async function verifySavedReviewRoundTrip(page) {
   return review.schema_version;
 }
 
+async function verifyRichDecisionFlow(page) {
+  const scenarios = [
+    { name: "false-economy", allowed: false, status: "no_improvement" },
+    { name: "true-savings", allowed: true, status: "observed_improvement" },
+  ];
+  const results = [];
+  for (const scenario of scenarios) {
+    const directory = join(root, "examples", "synthetic-cases");
+    const config = JSON.parse(await readFile(join(directory, `${scenario.name}-config.json`), "utf8"));
+    await page.locator("#start-review").click();
+    await page.locator('[data-builder-mode="workload"]').click();
+    await page.locator("#spend-file").setInputFiles(join(directory, `${scenario.name}-spend.csv`));
+    await page.locator('[data-outcome-mode="detailed"]').click();
+    await page.locator("#work-file").setInputFiles(join(directory, `${scenario.name}-outcomes.csv`));
+    await page.locator("#acceptance-rule").fill(config.acceptanceRule);
+    await page.locator("#verifier").fill(config.verifier);
+    await page.locator("#quality-floor").fill(String(config.qualityFloor * 100));
+    await page.locator("#hourly-rate").fill(String(config.hourlyRate));
+    await page.locator("#baseline-policy-approved").setChecked(config.baselinePolicyApproved);
+    await page.locator("#proposed-policy-approved").setChecked(config.proposedPolicyApproved);
+    await page.locator("#baseline-shared").fill(String(config.baselineShared));
+    await page.locator("#proposed-shared").fill(String(config.proposedShared));
+    await page.locator("#change-cost").fill(String(config.changeCost));
+    await page.locator("#build-review").click();
+    await page.locator("#review-title").waitFor({ state: "visible" });
+    assert(!(await page.locator("#review-dialog").evaluate((dialog) => dialog.open)), `${scenario.name}: detailed review did not close the builder: ${await page.locator("#builder-error").innerText()}`);
+    const review = await saveJsonDownload(page, "#download-review", `${scenario.name}-browser-review.json`);
+    assert(review.schema_version === "ai-cost-lens-review-result/1.0", `${scenario.name}: wrong review export.`);
+    assert(review.comparison.status === scenario.status, `${scenario.name}: decision status changed to ${review.comparison.status}.`);
+    assert(review.comparison.savings_claim_allowed === scenario.allowed, `${scenario.name}: savings gate is wrong.`);
+    assert(review.mode === "real" && review.comparison.evidence_complete === true, `${scenario.name}: complete work log lost its evidence status.`);
+    assert(review.baseline.costs.model_cost > review.proposed.costs.model_cost, `${scenario.name}: provider cost did not fall.`);
+    results.push({ scenario: scenario.name, status: review.comparison.status, savings_claim_allowed: scenario.allowed });
+  }
+  return results;
+}
+
 async function verifyOpenAIPartialBucket(page) {
   const fixtureDir = join(root, "tests", "fixtures");
   const usage = (await readFile(join(fixtureDir, "openai-dashboard-usage.csv"), "utf8"))
@@ -241,6 +278,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
 
   const financeMemoPdf = engineName === "chromium" ? await verifyFinanceMemoPdf(page) : null;
   const savedReview = engineName === "chromium" ? await verifySavedReviewRoundTrip(page) : null;
+  const rich_decisions = engineName === "chromium" ? await verifyRichDecisionFlow(page) : null;
   if (engineName === "chromium") await verifyOpenAIPartialBucket(page);
   await page.locator("#start-review").click();
   await page.locator('[data-builder-mode="single"]').click();
@@ -266,7 +304,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `${engineName}: browser errors: ${observed.errors.join(" | ")}`);
   await browser.close();
-  return { engine: engineName, prompt_routes: estimate.comparison.length, usage_rows: usage.event_count, finance_memo_pdf: financeMemoPdf, saved_review_reopened: savedReview, egress: 0 };
+  return { engine: engineName, prompt_routes: estimate.comparison.length, usage_rows: usage.event_count, finance_memo_pdf: financeMemoPdf, saved_review_reopened: savedReview, rich_decisions, egress: 0 };
 }
 
 async function mobileAndAccessibility(origin) {

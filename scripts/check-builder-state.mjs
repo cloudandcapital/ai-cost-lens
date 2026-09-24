@@ -188,6 +188,32 @@ async function assertFresh(nextMode) {
 await assertFresh('workload');
 await file('spend-file',spend); await file('work-file',work); await outcome('detailed');
 await submit(); assert.equal(api.state.data.schema_version,'ai-cost-lens-review-result/1.0');
+for (const [scenario, status, allowed] of [
+  ['false-economy','no_improvement',false],
+  ['true-savings','observed_improvement',true],
+]) {
+  const path = `examples/synthetic-cases/${scenario}`;
+  const config = JSON.parse(read(`${path}-config.json`));
+  await assertFresh('workload');
+  await file('spend-file',read(`${path}-spend.csv`));
+  await outcome('detailed');
+  await file('work-file',read(`${path}-outcomes.csv`));
+  for (const [id,value] of Object.entries({
+    'acceptance-rule': config.acceptanceRule,
+    verifier: config.verifier,
+    'quality-floor': config.qualityFloor * 100,
+    'hourly-rate': config.hourlyRate,
+    'baseline-shared': config.baselineShared,
+    'proposed-shared': config.proposedShared,
+    'change-cost': config.changeCost,
+  })) el(id).value = value;
+  el('baseline-policy-approved').checked = config.baselinePolicyApproved;
+  el('proposed-policy-approved').checked = config.proposedPolicyApproved;
+  await submit();
+  assert.equal(api.state.data.mode,'real',scenario);
+  assert.equal(api.state.data.comparison.status,status,scenario);
+  assert.equal(api.state.data.comparison.savings_claim_allowed,allowed,scenario);
+}
 await click('start-review'); await mode('openai');
 const openAIProvider = document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === 'openai');
 const claudeProvider = document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === 'claude');
