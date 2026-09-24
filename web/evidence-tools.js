@@ -49,9 +49,9 @@
     const stamp = review.mode === "illustrative"
       ? "ILLUSTRATIVE"
       : review.mode === "sampled" || scenario.outcomes.basis === "sampled"
-        ? "SAMPLED ESTIMATE"
-        : evidence.cost_basis === "observed" && evidence.coverage_status === "complete" && evidence.reconciliation_issues?.length === 0
-          ? "USER-SUPPLIED RECORDS"
+        ? evidence.cost_basis === "observed" ? "REPORTED COST · SAMPLED OUTCOMES" : "SAMPLED ESTIMATE"
+        : evidence.cost_basis === "observed"
+          ? evidence.coverage_status === "complete" && evidence.reconciliation_issues?.length === 0 ? "USER-SUPPLIED RECORDS" : "REPORTED COST · PARTIAL"
           : "CALCULATED / PARTIAL";
     return {
       label: scenario.label,

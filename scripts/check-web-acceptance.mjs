@@ -512,10 +512,10 @@ for (const [review, expected] of gateCases) {
   assert.match(api.lumenResponse('cfo'), expected);
 }
 api.state.data = gateCases[0][0];
-assert.equal(api.lumenResponse('evidence'), 'The files match, but policy approval still blocks a savings claim.');
+assert.equal(api.lumenResponse('evidence'), 'The files match, but these checks remain open: policy approval. A savings claim is blocked.');
 assert.match(api.lumenResponse('cfo'), /\. Policy approval still blocks a savings claim\.$/);
 api.state.data = gateCases[3][0];
-assert.equal(api.lumenResponse('evidence'), 'The files match, but the declared quality requirement and policy approval still block a savings claim.');
+assert.equal(api.lumenResponse('evidence'), 'The files match, but these checks remain open: the declared quality requirement and policy approval. A savings claim is blocked.');
 assert.match(api.lumenResponse('cfo'), /\. The declared quality requirement and policy approval still block a savings claim\.$/);
 for (const response of [api.lumenResponse('evidence'), api.lumenResponse('cfo')]) {
   assert.doesNotMatch(response, /(?:^|[.!?]\s+)[a-z]/);

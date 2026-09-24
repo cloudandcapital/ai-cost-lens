@@ -3904,6 +3904,12 @@ body.story-mode .cockpit-grid {
 .customer-economics .request-variance-table-wrap { overflow-x: auto; }
 .customer-economics table { min-width: 700px; width: 100%; border-collapse: collapse; }
 .customer-economics th, .customer-economics td { padding: 10px; text-align: left; border-bottom: 1px solid var(--ink); font-size: 12px; }
+.request-currency-slices { margin-top: 24px; }
+.request-currency-slices article { margin: 12px 0; padding: 16px; border: 1px solid var(--ink); }
+.request-currency-slices article > span { display: block; margin: 6px 0; color: var(--muted); font-size: 12px; }
+.request-currency-slices article > div { overflow-x: auto; }
+.request-currency-slices table { min-width: 420px; width: 100%; border-collapse: collapse; }
+.request-currency-slices th, .request-currency-slices td { padding: 7px; text-align: left; border-bottom: 1px solid var(--ink); font-size: 12px; }
 @media (max-width: 600px) { .evidence-kit, .customer-economics { padding: 16px; } }
 
 .request-review-panel .section-heading h2,

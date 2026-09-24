@@ -839,6 +839,24 @@
     });
   }
 
+  function currencySlices(events) {
+    const currencies = [...new Set(events.map((event) => event.currency).filter(Boolean))].sort();
+    return currencies.map((currency) => {
+      const rows = events.filter((event) => event.currency === currency);
+      const priced = rows.filter((event) => event.selected_cost !== null);
+      const total = priced.reduce((sum, event) => sum + event.selected_cost, 0);
+      return {
+        currency, rows: rows.length, priced_rows: priced.length, unpriced_rows: rows.length - priced.length,
+        selected_cost: priced.length ? round(total) : null,
+        breakdowns: {
+          customer: spendBreakdown(rows, "customer", true, total),
+          model: spendBreakdown(rows, "model", true, total),
+          feature: spendBreakdown(rows, "feature", true, total),
+        },
+      };
+    });
+  }
+
   function sourceHasField(rows, field) {
     const names = new Set(aliases[field]);
     return rows.some((row) => Object.keys(row).some((key) => names.has(normalizeKey(key))));
@@ -1248,6 +1266,7 @@
         environment: spendBreakdown(events, "environment", currencyComparable, selectedObservedCost),
         customer_product: spendBreakdown(events, "customer_product", currencyComparable, selectedObservedCost),
       },
+      currency_slices: currencySlices(events),
     };
   }
 

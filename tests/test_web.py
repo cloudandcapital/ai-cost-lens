@@ -682,6 +682,8 @@ eval(source);
       proposedShared: 0,
       changeCost: 0,
       sampleRandom: true,
+      // The tiny spend template is a parser fixture; this test explicitly models multiple results per call.
+      allowMultipleResultsPerRequest: true,
     },
   );
   console.log(JSON.stringify(result));

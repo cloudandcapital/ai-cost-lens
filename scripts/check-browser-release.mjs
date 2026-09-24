@@ -226,6 +226,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert(kitDownload.suggestedFilename().endsWith(".md"), `${engineName}: evidence action list did not download.`);
   await page.locator('.nav-item[data-view="review"]').click();
   await page.locator("#start-review-inline").click();
+  assert(await page.locator("#baseline-population").inputValue() === "" && await page.locator("#proposed-ready").inputValue() === "", `${engineName}: example outcomes leaked into a real review.`);
   assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: inline review action did not open.`);
   assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 3, `${engineName}: start dialog still presents too many choices.`);
   await page.locator("#close-review").click();
@@ -312,12 +313,33 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const usage = await saveJsonDownload(page, "#download-usage-review", `${engineName}-usage-review.json`);
   assert(usage.event_count === 7, `${engineName}: usage import did not retain all seven rows.`);
   assert(usage.evidence_gate.savings_claim_allowed === false, `${engineName}: usage review allowed a savings claim.`);
+  const mixedLog = [
+    "event_id,timestamp,provider,model,customer,input_tokens,output_tokens,cached_input_tokens,tool_charges,provider_reported_cost,currency",
+    "a,2026-09-01T10:00:00Z,OpenAI,gpt-5.6-sol,A,100,20,0,0,12,USD",
+    "b,2026-09-01T10:01:00Z,OpenAI,gpt-5.6-sol,A,100,20,,,,USD",
+    "c,2026-09-01T10:02:00Z,OpenAI,gpt-5.6-sol,B,100,20,0,0,5,EUR",
+  ].join("\n");
+  await page.locator("#request-log-file").setInputFiles({ name: "mixed.csv", mimeType: "text/csv", buffer: Buffer.from(mixedLog) });
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  assert((await page.locator("#request-analysis-summary").innerText()).includes("$12.00"), `${engineName}: a EUR row hid comparable USD cost.`);
+  assert((await page.locator("#request-currency-slices").innerText()).includes("EUR"), `${engineName}: currency coverage was hidden.`);
+  const revenueLog = "customer,period_start,period_end,revenue,currency\nA,2026-09-01,2026-09-01,100,USD\n";
+  await page.locator("#customer-revenue-file").setInputFiles({ name: "revenue.csv", mimeType: "text/csv", buffer: Buffer.from(revenueLog) });
+  await page.locator("#analyze-customer-revenue").click();
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("At least"), `${engineName}: unpriced customer cost lost its lower-bound label.`);
   await page.locator("#try-illustrative-request-log").click();
   await page.locator("#request-analysis-results").waitFor({ state: "visible" });
   await page.locator("#try-customer-economics").click();
   assert((await page.locator("#customer-revenue-result").innerText()).includes("Example customer A"), `${engineName}: customer example failed to join.`);
   assert((await page.locator("#customer-revenue-result").innerText()).includes("Illustrative inputs"), `${engineName}: customer example lost its evidence label.`);
   assert((await page.locator("#customer-revenue-result").innerText()).includes("lack customer IDs"), `${engineName}: unallocated cost is hidden.`);
+  await page.locator("#request-human-review-cost").fill("0.12");
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  await page.locator("#customer-allocation-method").selectOption("requests");
+  await page.locator("#try-customer-economics").click();
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("Allocated operating cost"), `${engineName}: entered human cost was not available for explicit allocation.`);
 
   const financeMemoPdf = engineName === "chromium" ? await verifyFinanceMemoPdf(page) : null;
   const savedReview = engineName === "chromium" ? await verifySavedReviewRoundTrip(page) : null;

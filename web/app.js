@@ -60,6 +60,9 @@
   const pct = (value, digits = 0) => `${(value * 100).toFixed(digits)}%`;
   const pctOrMissing = (value, digits = 0) =>
     value === null || value === undefined ? "Not available" : pct(value, digits);
+  const sampleIntervalAvailable = (scenario) => scenario.outcomes?.basis === "sampled"
+    && scenario.outcomes.sample_method === "declared random or systematic"
+    && Array.isArray(scenario.outcomes.ready_rate_interval_95);
   const cents = (value) => `${(value * 100).toFixed(1)}¢`;
   const unitMoney = (value) => (value < 1 && (!state.data?.currency || state.data.currency === "USD") ? cents(value) : money(value, 2));
   const signedMoney = (value) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${money(Math.abs(value), 2)}`;
@@ -1007,6 +1010,9 @@
     if (sampleSize > population) {
       throw new Error(`The ${period} sample cannot be larger than the declared results in the period.`);
     }
+    if (requests !== null && population > requests && !config.allowMultipleResultsPerRequest) {
+      throw new Error(`The ${period} has ${population} results but only ${requests} billed requests. Check the period and result-to-request mapping. If one request genuinely yields several results, explicitly confirm that in the sample form.`);
+    }
 
     const readyRate = ready / sampleSize;
     const estimatedReady = population * readyRate;
@@ -1086,7 +1092,7 @@
           outcome_basis: "sampled",
           source: `${costBasisLabel(basis)} from the universal spend template + sampled outcome counts`,
           observed_at: maxDate,
-          coverage: `${sampleSize} of ${population.toLocaleString()} results reviewed; outcome yield and human time extrapolated`,
+          coverage: `${sampleSize} of ${population.toLocaleString()} results reviewed; outcome yield and human time extrapolated${population > requests ? "; multiple results per request declared by reviewer" : ""}`,
           coverage_status: "sampled",
           reconciliation_issues: [],
           cost_boundary: "provider cost + declared shared infrastructure + sampled human review and correction",
@@ -1888,6 +1894,9 @@
     if (sampleSize > population) {
       throw new Error(`The ${period} sample cannot be larger than the declared results in the period.`);
     }
+    if (requests !== null && population > requests && !config.allowMultipleResultsPerRequest) {
+      throw new Error(`The ${period} has ${population} results but only ${requests} billed requests. Check the period and result-to-request mapping. If one request genuinely yields several results, explicitly confirm that in the sample form.`);
+    }
 
     const readyRate = ready / sampleSize;
     const estimatedReady = population * readyRate;
@@ -1967,8 +1976,8 @@
           source: `${costBasisLabel(basis)} from the universal spend template + sampled outcome counts`,
           observed_at: maxDate,
           coverage: humanTimeSupplied
-            ? `${sampleSize} of ${population.toLocaleString()} results reviewed; outcome yield and human time extrapolated`
-            : `${sampleSize} of ${population.toLocaleString()} results reviewed; outcome yield extrapolated; human time not supplied`,
+            ? `${sampleSize} of ${population.toLocaleString()} results reviewed; outcome yield and human time extrapolated${population > requests ? "; multiple results per request declared by reviewer" : ""}`
+            : `${sampleSize} of ${population.toLocaleString()} results reviewed; outcome yield extrapolated; human time not supplied${population > requests ? "; multiple results per request declared by reviewer" : ""}`,
           coverage_status: "sampled",
           reconciliation_issues: humanTimeSupplied ? [] : ["Human review and correction time was not supplied."],
           cost_boundary: humanTimeSupplied
@@ -2437,7 +2446,7 @@
       </div>
       ${renderYieldRoute(baseline)}
       ${renderYieldRoute(proposed)}
-      ${proposed.outcomes.basis === "sampled" ? `<p class="sample-range">Proposed ready-rate 95% sample range: ${escapeHtml(pct(proposed.outcomes.ready_rate_interval_95[0], 1))}–${escapeHtml(pct(proposed.outcomes.ready_rate_interval_95[1], 1))}. ${proposed.outcomes.ready_rate_interval_95[0] < state.data.workload.accepted_quality_threshold && proposed.outcomes.ready_rate_interval_95[1] >= state.data.workload.accepted_quality_threshold ? "This range crosses your quality minimum; the sample is inconclusive." : "This range describes sampling uncertainty, not a guarantee."}</p>` : ""}`;
+      ${sampleIntervalAvailable(proposed) ? `<p class="sample-range">Proposed ready-rate 95% sample range: ${escapeHtml(pct(proposed.outcomes.ready_rate_interval_95[0], 1))}–${escapeHtml(pct(proposed.outcomes.ready_rate_interval_95[1], 1))}. ${proposed.outcomes.ready_rate_interval_95[0] < state.data.workload.accepted_quality_threshold && proposed.outcomes.ready_rate_interval_95[1] >= state.data.workload.accepted_quality_threshold ? "This range crosses your quality minimum; the sample is inconclusive." : "This range describes sampling uncertainty, not a guarantee."}</p>` : proposed.outcomes.basis === "sampled" ? '<p class="sample-range">No statistical range: the sample was not declared random or systematic.</p>' : ""}`;
     configureBreakEvenExplorer();
     renderLumenPanel();
   }
@@ -2711,7 +2720,6 @@
     const providerTerm = providerCostTerm(baseline, proposed);
     const failedGateText = failedSavingsGateText(comparison, baseline, proposed);
     const failedGateSentence = sentenceCase(failedGateText);
-    const failedGateVerb = /,| and /.test(failedGateText) ? "block" : "blocks";
     const planning = state.data.planning;
     const planCostPosition = planning
       ? planning.variance.recurring_operating_cost > 0
@@ -2732,14 +2740,14 @@
       changed: `${decisionFor(state.data).reason} Provider cost: ${money(baseline.costs.model_cost)} → ${money(proposed.costs.model_cost)}. Human work: ${money(baseline.costs.human_review_cost)} → ${money(proposed.costs.human_review_cost)}.`,
       improve: facts.requiredRate === null
         ? "The review does not contain enough volume data to calculate a break-even yield."
-        : `At the current proposed cost, at least ${compact(facts.requiredReady)} of ${compact(proposed.outcomes.completed_results)} attempts must be ready to match the current ${unitMoney(baseline.measures.cost_per_usable_result)} unit cost. That is a ${facts.requiredRate.toFixed(1)}% ready result rate, compared with ${pct(proposed.measures.usable_result_rate)} now. The break-even explorer lets you test a different yield, provider bill, or human work cost.`,
+        : `At the modeled proposed cost, at least ${compact(facts.requiredReady)} of ${compact(proposed.outcomes.completed_results)} results must be ready to match the current ${unitMoney(baseline.measures.cost_per_usable_result)} unit cost. That is a ${facts.requiredRate.toFixed(1)}% ready result rate, versus ${pct(proposed.measures.usable_result_rate)} on the proposed route. The break-even explorer lets you test a different yield, provider bill, or human work cost.`,
       evidence: mode === "illustrative"
         ? `These costs and outcomes are invented. The example's arithmetic can guide a test, but it does not verify savings, a provider bill, a work log, or real policy approval. For your own decision, compare one workload's bill and reviewed results with the same definition of "ready" on both routes.${issueCount ? ` ${issueCount} file or math issue${issueCount === 1 ? " is" : "s are"} also open.` : ""}`
         : comparison.savings_claim_allowed
           ? "The bill, work volume, quality rule, policy approval, and included costs all match for this review. That supports this decision for this workload and period, not a claim about the model everywhere."
           : issueCount
-            ? `${failedGateSentence} still ${failedGateVerb} a savings claim. Open The evidence for the ${issueCount} reconciliation issue${issueCount === 1 ? "" : "s"}.`
-            : `The files match, but ${failedGateText} still ${failedGateVerb} a savings claim.`,
+            ? `Open checks: ${failedGateSentence}. A savings claim is blocked. Open Evidence for the ${issueCount} reconciliation issue${issueCount === 1 ? "" : "s"}.`
+            : `The files match, but these checks remain open: ${failedGateText}. A savings claim is blocked.`,
       cfo: decisionFor(state.data).reason,
       plan: planning
         ? `The current route finished ${money(Math.abs(planning.variance.recurring_operating_cost))} ${planCostPosition} its recurring cost plan. ${planning.variance.primary_cost_drivers.map((driver) => `${sentenceCase(driver.label)} was ${money(Math.abs(driver.amount))} ${driver.amount > 0 ? "over plan" : driver.amount < 0 ? "under plan" : "on plan"}`).join(". ")}. Ready result yield was ${Math.abs(planning.variance.ready_result_rate_points).toFixed(1)} points ${planYieldPosition} plan.`
@@ -3082,7 +3090,7 @@
     section.hidden = !checks.some((check) => check.available);
     if (section.hidden) return;
     document.getElementById("price-crosscheck-result").innerHTML = checks.map((check, index) => check.available
-      ? `<article><div><span class="price-check-label">${escapeHtml(state.data[index ? "proposed" : "baseline"].label)} · ${escapeHtml(check.basis)}</span><strong>${escapeHtml(check.flag)}</strong></div><p>${escapeHtml(check.label)} list-rate estimate ${money(check.estimated_cost, 2)}; supplied model cost ${money(check.supplied_cost, 2)}. Difference ${check.gap < 0 ? "−" : "+"}${money(Math.abs(check.gap), 2)}${check.gap_percent === null ? "" : ` (${round(check.gap_percent, 1)}%)`}.</p><small>Catalog effective ${escapeHtml(check.catalog_date)}. ${escapeHtml(check.limitation)}</small></article>`
+      ? `<article><div><span class="price-check-label">${escapeHtml(state.data[index ? "proposed" : "baseline"].label)} · ${escapeHtml(check.basis)}</span><strong>${escapeHtml(check.flag)}</strong></div><p>${escapeHtml(check.label)} list-rate estimate ${money(check.estimated_cost, 2)}; supplied model cost ${money(check.supplied_cost, 2)}. Difference ${check.gap < 0 ? "−" : "+"}${money(Math.abs(check.gap), 2)}${check.gap_percent === null ? "" : ` (${round(check.gap_percent, 1)}%)`}.</p><small>Catalog version ${escapeHtml(catalog.catalog_version)} · valid from ${escapeHtml(check.catalog_date)}. ${escapeHtml(check.limitation)}</small></article>`
       : `<article><div><span class="price-check-label">${escapeHtml(state.data[index ? "proposed" : "baseline"].label)}</span><strong>Not comparable</strong></div><p>${escapeHtml(check.reason)}</p></article>`).join("");
   }
 
@@ -3773,6 +3781,10 @@
         ${rows.length > visible.length ? `<p>Showing the top ${visible.length} of ${rows.length} values. Use the local filters below for row-level review.</p>` : ""}
       </article>`;
     }).join("");
+    const slices = spend.currency_slices || [];
+    document.getElementById("request-currency-slices").innerHTML = slices.length > 1 || review.currency === null
+      ? `<h4>Comparable cost within each currency</h4><p>All ${wholeNumber(review.event_count)} rows remain in the record. Currencies are never added together. These subtotals cover only priced rows and do not reconcile to a mixed-currency bill or support a savings claim.</p>${slices.map((slice) => `<article><strong>${escapeHtml(slice.currency)} ${requestReviewMoney(slice.selected_cost, slice.currency)}</strong><span>${wholeNumber(slice.priced_rows)} priced of ${wholeNumber(slice.rows)} ${escapeHtml(slice.currency)} rows; ${wholeNumber(slice.unpriced_rows)} unpriced</span><div role="region" aria-label="${escapeHtml(slice.currency)} customer costs" tabindex="0"><table><thead><tr><th>Customer</th><th>Requests</th><th>Selected request cost</th></tr></thead><tbody>${slice.breakdowns.customer.slice(0, 8).map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${wholeNumber(item.event_count)}</td><td>${requestReviewMoney(item.selected_cost, slice.currency)}</td></tr>`).join("")}</tbody></table></div></article>`).join("")}`
+      : "";
   }
 
   function renderRequestAnalysis(review) {
@@ -3826,9 +3838,12 @@
           copy: `Bill minus raw selected request cost: ${requestReviewMoney(bill.raw_selected_cost_difference, bill.supplied_currency)}. Bill minus the duplicate-excluded review reference: ${requestReviewMoney(bill.duplicate_excluded_reference_difference, bill.supplied_currency)}.`,
         }
       : billPresentation[bill.status] || { title: "Not comparable", copy: "The imported evidence cannot be reconciled to this bill." };
+    const primarySlice = currency === "MIXED" || currency === null
+      ? [...(review.spend.currency_slices || [])].sort((a, b) => b.rows - a.rows || b.priced_rows - a.priced_rows)[0]
+      : null;
     summary.innerHTML = `
       <article><span>Imported events</span><strong>${wholeNumber(review.event_count)}</strong><p>${wholeNumber(review.reconciliation.priced_rows)} priced; ${wholeNumber(review.reconciliation.unpriced_rows)} retained as unpriced.</p></article>
-      <article><span>Observed request cost</span><strong>${requestReviewMoney(review.reconciliation.selected_observed_cost, currency)}</strong><p>Provider-reported cost wins for the same row. Calculated cost fills only missing reported cost.</p></article>
+      <article><span>${primarySlice ? "Largest comparable currency subset" : "Selected request cost"}</span><strong>${primarySlice ? requestReviewMoney(primarySlice.selected_cost, primarySlice.currency) : requestReviewMoney(review.reconciliation.selected_observed_cost, currency)}</strong><p>${primarySlice ? `${wholeNumber(primarySlice.priced_rows)} priced of ${wholeNumber(primarySlice.rows)} ${escapeHtml(primarySlice.currency)} rows. ${wholeNumber(review.event_count - primarySlice.rows)} other or untagged rows excluded; see currency subtotals below. No cross-currency total.` : "Provider-reported cost wins for the same row. Calculated cost fills only missing reported cost."}</p></article>
       <article><span>Investigation cost boundary</span><strong>${requestReviewMoney(headline, currency)}</strong><p>Duplicate and failed-attempt cost, with overlapping events counted once. Successful retries are excluded. This is not savings.</p></article>
       <article><span>User-entered bill comparison</span><strong>${escapeHtml(billCard.title)}</strong><p>${escapeHtml(billCard.copy)} The entered total was not verified against an invoice.</p></article>`;
     document.getElementById("request-analysis-boundary").textContent = review.evidence_gate.reason;
@@ -3917,7 +3932,7 @@
 
   // A result belongs to the options used to calculate it, not subsequent edits.
   document.querySelectorAll(".request-review-panel input:not([type=file]), .request-review-panel select").forEach((input) => {
-    if (input.id.startsWith("request-filter-")) return;
+    if (input.id.startsWith("request-filter-") || input.id.startsWith("customer-")) return;
     input.addEventListener("input", () => {
       if (!state.usageReview) return;
       state.usageReview = null;
@@ -3925,6 +3940,12 @@
       state.usageReviewBill = null;
       document.getElementById("request-analysis-results").hidden = true;
       showToast("Review inputs changed. Choose Analyze locally to update the results.");
+    });
+  });
+  ["customer-allocation-method", "customer-share-warning"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", () => {
+      document.getElementById("customer-revenue-result").hidden = true;
+      document.getElementById("customer-revenue-error").textContent = "Choose Compare locally to update the customer figures for these settings.";
     });
   });
   document.getElementById("request-log-file").addEventListener("change", (event) => {
@@ -3949,11 +3970,15 @@
     try {
       if (!state.usageReview) throw new Error("Analyze the request log before joining revenue.");
       requireColumns(rows, ["customer", "period_start", "period_end", "revenue", "currency"], "Customer revenue");
-      const analysis = customerEconomics.analyze(state.usageReview, rows);
+      const allocationMethod = document.getElementById("customer-allocation-method").value;
+      const warningValue = document.getElementById("customer-share-warning").value.trim();
+      const warning = warningValue === "" ? null : finiteNumber(warningValue, "AI cost / revenue warning") / 100;
+      if (warning !== null && (warning <= 0 || warning > 10)) throw new Error("Choose a warning between 0.1% and 1000%.");
+      const analysis = customerEconomics.analyze(state.usageReview, rows, { allocation_method: allocationMethod });
       const moneyFor = (value) => requestReviewMoney(value, analysis.currency);
-      output.innerHTML = `<p class="request-variance-note">${escapeHtml(analysis.period.start)} through ${escapeHtml(analysis.period.end)} · ${escapeHtml(analysis.currency)}. ${state.usageReviewIllustrative || exampleRevenue ? "Illustrative inputs: these figures are an example, not observed customer economics. " : ""}${escapeHtml(analysis.limitations)}</p>
-        <p class="request-variance-note"><strong>Outside the customer join:</strong> ${wholeNumber(analysis.unallocated_requests)} requests (${moneyFor(analysis.unallocated_cost)}) lack customer IDs; ${wholeNumber(analysis.unmatched_requests)} requests (${moneyFor(analysis.unmatched_cost)}) have no matching revenue row; ${wholeNumber(analysis.unpriced_requests)} requests have no selected cost. These amounts are excluded from customer ratios.</p>
-        <div class="request-variance-table-wrap" role="region" aria-label="Customer AI request cost versus revenue" tabindex="0"><table><thead><tr><th>Customer ID</th><th>Revenue supplied</th><th>AI request cost</th><th>Share of revenue</th><th>Revenue after AI requests</th><th>Coverage</th></tr></thead><tbody>${analysis.customers.map((item) => `<tr><th>${escapeHtml(item.customer)}</th><td>${moneyFor(item.revenue)}</td><td>${item.requests ? moneyFor(item.selected_cost) : "No matched requests"}</td><td>${item.ai_cost_share === null ? "Unavailable" : `${(item.ai_cost_share * 100).toFixed(1)}%`}</td><td>${item.revenue_after_ai_requests === null ? "Unavailable" : moneyFor(item.revenue_after_ai_requests)}</td><td>${wholeNumber(item.requests)} requests · ${wholeNumber(item.unpriced)} unpriced · ${escapeHtml(item.cost_basis.join(" / ") || "No cost basis")}</td></tr>`).join("")}</tbody></table></div>`;
+      output.innerHTML = `<p class="request-variance-note">${escapeHtml(analysis.period.start)} through ${escapeHtml(analysis.period.end)} · ${escapeHtml(analysis.currency)} · ${wholeNumber(analysis.selected_currency_requests)} request rows. ${analysis.excluded_currency_requests ? `${wholeNumber(analysis.excluded_currency_requests)} other-currency or untagged rows excluded. ` : ""}${state.usageReview.spend.period.complete_period_confirmed ? "Complete period declared by the user. " : "Complete period not confirmed: ratios cover only the imported rows. "}${state.usageReviewIllustrative || exampleRevenue ? "Illustrative inputs: these figures are an example, not observed customer economics. " : ""}${escapeHtml(analysis.limitations)}</p>
+        <p class="request-variance-note"><strong>Outside the customer join:</strong> ${wholeNumber(analysis.unallocated_requests)} requests (${moneyFor(analysis.unallocated_cost)}) lack customer IDs; ${wholeNumber(analysis.unmatched_requests)} requests (${moneyFor(analysis.unmatched_cost)}) have no matching revenue row; ${wholeNumber(analysis.unpriced_requests)} requests have no selected cost. ${analysis.allocation_method !== "none" ? `${moneyFor(analysis.unassigned_adjacent_cost)} of the ${moneyFor(analysis.allocated_adjacent_total)} entered operating cost stays outside matched customers; ${wholeNumber(analysis.missing_categories.length)} categories are missing. ` : ""}These amounts are excluded from matched customer ratios.</p>
+        <div class="request-variance-table-wrap" role="region" aria-label="Customer AI request cost versus revenue" tabindex="0"><table><thead><tr><th>Customer ID</th><th>Revenue supplied</th><th>AI request cost</th><th>Share of revenue</th>${analysis.allocation_method === "none" ? "" : "<th>Allocated operating cost</th><th>Known AI cost / revenue</th>"}<th>Revenue after AI requests</th><th>Coverage</th></tr></thead><tbody>${analysis.customers.map((item) => `<tr><th>${escapeHtml(item.customer)}</th><td>${moneyFor(item.revenue)}</td><td>${item.requests ? moneyFor(item.selected_cost) : "No matched requests"}</td><td>${item.ai_cost_share !== null ? `${(item.ai_cost_share * 100).toFixed(1)}%` : item.known_ai_cost_share_lower_bound !== null ? `At least ${(item.known_ai_cost_share_lower_bound * 100).toFixed(1)}% · ${wholeNumber(item.unpriced)} unpriced` : "Unavailable"}</td>${analysis.allocation_method === "none" ? "" : `<td>${moneyFor(item.allocated_adjacent_cost)}</td><td>${item.known_ai_operating_share === null ? "Unavailable · incomplete cost or revenue" : `${(item.known_ai_operating_share * 100).toFixed(1)}%${warning !== null && item.known_ai_operating_share > warning ? " · Above your threshold" : ""}`}</td>`}<td>${item.revenue_after_ai_requests === null ? "Unavailable" : moneyFor(item.revenue_after_ai_requests)}</td><td>${wholeNumber(item.requests)} requests · ${wholeNumber(item.unpriced)} unpriced · ${escapeHtml(item.cost_basis.join(" / ") || "No cost basis")}</td></tr>`).join("")}</tbody></table></div>`;
       output.hidden = false;
     } catch (caught) { error.textContent = caught.message || "Revenue could not be compared."; error.classList.add("visible"); }
   }
@@ -4083,12 +4108,13 @@
         ? `${pricedCandidate.pricing_basis === "user_supplied" ? "User-supplied rate" : "Official list-price"} estimate · test first`
         : "Route in the current decision record";
     const interval = proposed.outcomes.ready_rate_interval_95;
-    const qualityStatus = !comparison.quality_holds ? "below floor" : proposed.outcomes.basis === "sampled" && interval?.[0] < workload.accepted_quality_threshold ? "sample crosses floor; inconclusive" : "floor met";
+    const qualityStatus = !comparison.quality_holds ? "below floor" : sampleIntervalAvailable(proposed) && interval[0] < workload.accepted_quality_threshold ? "sample crosses floor; inconclusive" : "floor met on the recorded route";
+    const newCandidate = candidateLabel !== proposed.label;
     status.innerHTML = `
       <article><span>Quality floor</span><strong>${pct(workload.accepted_quality_threshold, 1)}</strong></article>
-      <article><span>Current → proposed yield</span><strong>${pct(baseline.measures.usable_result_rate, 1)} → ${pct(proposed.measures.usable_result_rate, 1)}</strong></article>
-      <article><span>Verification status</span><strong>${escapeHtml(basis)} · ${qualityStatus}</strong></article>
-      <article><span>Candidate to test</span><strong>${escapeHtml(candidateLabel)}</strong><p>${escapeHtml(candidateBasis)}</p></article>`;
+      <article><span>Recorded routes: current → proposed yield</span><strong>${pct(baseline.measures.usable_result_rate, 1)} → ${pct(proposed.measures.usable_result_rate, 1)}</strong></article>
+      <article><span>Verification status</span><strong>${newCandidate ? "New candidate not tested" : `${escapeHtml(basis)} · ${qualityStatus}`}</strong></article>
+      <article><span>Candidate to test</span><strong>${escapeHtml(candidateLabel)}</strong><p>${escapeHtml(candidateBasis)}${newCandidate ? " · The recorded yields above do not measure this candidate." : ""}</p></article>`;
   }
 
   function verificationOutcomeLabel(value) {
@@ -4557,7 +4583,7 @@
     document.getElementById("memo-decision-title").textContent = comparison.recommendation;
     document.getElementById("memo-decision-limit").textContent = comparison.limitation;
     document.getElementById("memo-numbers-title").textContent = "Current route versus proposed route";
-    document.getElementById("memo-table-head").innerHTML = `<tr><th>Measure</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Difference</th></tr>`;
+    document.getElementById("memo-table-head").innerHTML = `<tr><th>Measure</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Difference (proposed − current)</th></tr>`;
     const routeRows = [
       [state.data.pricing_estimate ? "Estimated API cost" : "Provider cost", money(baseline.costs.model_cost), money(proposed.costs.model_cost), percentChange(baseline.costs.model_cost, proposed.costs.model_cost)],
       ["Shared infrastructure", state.data.pricing_estimate ? "Not supplied" : money(baseline.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Not supplied" : money(proposed.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Excluded" : signedMoney(proposed.costs.shared_infrastructure_cost - baseline.costs.shared_infrastructure_cost)],
@@ -4576,7 +4602,7 @@
       ["Quality floor", pct(workload.accepted_quality_threshold, 1)],
       ["Policy", mode === "illustrative" ? "Assumed approved for this invented comparison; no real reviewer approval" : `Current: ${baseline.policy.approved ? "approved by reviewer" : "approval not established"}; proposed: ${proposed.policy.approved ? "approved by reviewer" : "approval not established"}`],
       ["Cost boundary", baseline.evidence.cost_boundary],
-      ...(proposed.outcomes.basis === "sampled" ? [["Proposed ready-rate 95% sample range", `${pct(proposed.outcomes.ready_rate_interval_95[0], 1)}–${pct(proposed.outcomes.ready_rate_interval_95[1], 1)}; ${proposed.outcomes.ready_rate_interval_95[0] < workload.accepted_quality_threshold && proposed.outcomes.ready_rate_interval_95[1] >= workload.accepted_quality_threshold ? "crosses the quality minimum; inconclusive" : "sample estimate"}`]] : []),
+      ...(sampleIntervalAvailable(proposed) ? [["Proposed ready-rate 95% sample range", `${pct(proposed.outcomes.ready_rate_interval_95[0], 1)}–${pct(proposed.outcomes.ready_rate_interval_95[1], 1)}; ${proposed.outcomes.ready_rate_interval_95[0] < workload.accepted_quality_threshold && proposed.outcomes.ready_rate_interval_95[1] >= workload.accepted_quality_threshold ? "crosses the quality minimum; inconclusive" : "sample estimate"}`]] : proposed.outcomes.basis === "sampled" ? [["Statistical range", "Not shown: sample not declared random or systematic"]] : []),
     ]);
     document.getElementById("memo-evidence").innerHTML = memoList([
       ["Current route", `${baseline.evidence.coverage_status}: ${baseline.evidence.coverage}`],
@@ -4591,9 +4617,9 @@
         ? "No operating payback"
         : `${payback.payback_months.toFixed(1)} months`;
       document.getElementById("memo-plan-grid").innerHTML = [
-        ["Current cost vs plan", signedMoney(planning.variance.recurring_operating_cost)],
+        ["Current cost vs plan (actual − plan)", signedMoney(planning.variance.recurring_operating_cost)],
         ["Current ready results vs plan", `${planning.variance.ready_results >= 0 ? "+" : "−"}${compact(Math.abs(planning.variance.ready_results))}`],
-        ["Proposed monthly scenario", signedMoney(payback.monthly_operating_savings)],
+        ["Modeled monthly savings (current − proposed)", signedMoney(payback.monthly_operating_savings)],
         ["Proposed change payback", paybackLabel],
       ].map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
       document.getElementById("memo-plan-basis").textContent =
@@ -4727,7 +4753,7 @@
       code = "QUALITY BELOW MINIMUM";
       posture = "STOP CHANGE";
       reason = "The other option does not meet your minimum usable-result rate. A lower cost does not override that requirement.";
-    } else if (delta < 0 && comparison.human_cost_included !== false && proposed.outcomes?.basis === "sampled" && proposed.outcomes.ready_rate_interval_95?.[0] < data.workload.accepted_quality_threshold) {
+    } else if (delta < 0 && comparison.human_cost_included !== false && sampleIntervalAvailable(proposed) && proposed.outcomes.ready_rate_interval_95[0] < data.workload.accepted_quality_threshold) {
       code = "QUALITY INCONCLUSIVE";
       posture = "INSUFFICIENT EVIDENCE";
       reason = "The observed usable rate meets the minimum, but its 95% sample range crosses that minimum. Check more outputs before deciding to switch.";
@@ -6258,6 +6284,7 @@
         proposedShared: finiteNumber(document.getElementById("proposed-shared").value, "Proposed shared cost"),
         changeCost: finiteNumber(document.getElementById("change-cost").value, "One time change cost"),
         sampleRandom: document.getElementById("sample-random").checked,
+        allowMultipleResultsPerRequest: document.getElementById("sample-multi-output").checked,
         outcomeLogComplete: document.getElementById("outcome-log-complete").checked,
         planning,
       };

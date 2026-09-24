@@ -30,6 +30,7 @@ const requestLogTemplate = await readFile(
 const verificationTemplate = await readFile(
   resolve(web, "templates", "ai-cost-lens-verification-template.csv"),
 );
+const verificationExample = await readFile(resolve(web, "templates", "ai-cost-lens-verification-example.csv"));
 let app = await readFile(resolve(web, "app.js"), "utf8");
 const pricingCatalog = await readFile(
   resolve(web, "data", "pricing-catalog-v0.5.js"),
@@ -74,6 +75,7 @@ html = html
     'href="templates/ai-cost-lens-verification-template.csv"',
     `href="data:text/csv;base64,${verificationTemplate.toString("base64")}"`,
   )
+  .replaceAll('href="templates/ai-cost-lens-verification-example.csv"', `href="data:text/csv;base64,${verificationExample.toString("base64")}"`)
   .replaceAll('href="templates/ai-cost-lens-customer-revenue-template.csv"', `href="data:text/csv;base64,${customerRevenueTemplate.toString("base64")}"`)
   .replace('<script src="data/pricing-catalog-v0.5.js"></script>', () => `<script>${pricingCatalog}</script>`)
   .replace('<script src="pricing-engine.js"></script>', () => `<script>${pricingEngine}</script>`)

@@ -122,7 +122,7 @@ const config = {acceptanceRule:'First-pass usable',verifier:'Test reviewer',qual
 const header = 'period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,cost_basis,currency';
 async function build(a,b,minutesA=30,minutesB=200,readyB=16,overrides={}) {
  const csv = header+'\nbaseline,2026-09-01,Same tasks,A,A,Current,40,0,0,0,0,'+a+',calculated,USD\nproposed,2026-09-01,Same tasks,B,B,Other,40,0,0,0,0,'+b+',calculated,USD';
- const result = await api.buildSampledReview(csv,{baseline:{population:40,ready:19,correction:1,escalation:0,humanMinutes:minutesA},proposed:{population:40,ready:readyB,correction:20-readyB,escalation:0,humanMinutes:minutesB}},{...config,...overrides});
+ const result = await api.buildSampledReview(csv,{baseline:{population:overrides.samplePopulationOverride||40,ready:19,correction:1,escalation:0,humanMinutes:minutesA},proposed:{population:40,ready:readyB,correction:20-readyB,escalation:0,humanMinutes:minutesB}},{...config,...overrides});
  result.experience="simple"; return result;
 }
 function render(d,code) {
@@ -140,6 +140,7 @@ function render(d,code) {
  assert.equal(api.validDate('2024-02-29','Date'),'2024-02-29');
  assert.throws(()=>api.finiteNumber('9007199254740992','Count',{integer:true}), /number/);
  const d = await build(40,20);
+ await assert.rejects(build(40,20,30,200,16,{samplePopulationOverride:1000}), /results but only/);
  assert.equal(d.baseline.costs.recurring_operating_cost,70);
  assert.equal(d.proposed.costs.recurring_operating_cost,220);
  assert.equal(d.baseline.outcomes.usable_results,38);
@@ -159,7 +160,7 @@ function render(d,code) {
  assert.ok(elements['unit-cost-chart'].innerHTML.includes('Recurring cost per ready result'));
  assert.ok(!elements['unit-cost-chart'].innerHTML.includes('Recurring operating cost'));
 
- render(await build(40,20,0,0,16),'QUALITY INCONCLUSIVE');
+ render(await build(40,20,0,0,16),'TEST FIRST');
  render(await build(40,1,0,0,10),'QUALITY BELOW MINIMUM');
  render(await build(40,1,0,0,19,{proposedPolicyApproved:false}),'CHECK APPROVAL');
  render(await build(0,20,0,0,19),'KEEP CURRENT ROUTE');
@@ -167,7 +168,7 @@ function render(d,code) {
  render(await build(0,0,0,0,19),'NO COST ADVANTAGE');
  assert.equal(elements['break-even-verdict'].textContent,'NO COST ADVANTAGE');
  render(await build(40,40,0,0,19),'NO COST ADVANTAGE');
- render(await build(1000000,500000,0,0,19),'QUALITY INCONCLUSIVE');
+ render(await build(1000000,500000,0,0,19),'TEST FIRST');
  await assert.rejects(build(40,20,0,0,0), /zero usable outputs/);
  const tampered = JSON.parse(JSON.stringify(d)); tampered.proposed.measures.cost_per_usable_result = .001;
  assert.throws(()=>api.validateResult(tampered), /inconsistent|validation failed/);

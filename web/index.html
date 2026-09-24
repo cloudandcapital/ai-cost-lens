@@ -36,7 +36,7 @@
           <button class="text-button price-prompt-launch" id="price-prompt" type="button">Price a prompt</button>
           <button class="text-button" id="review-usage" type="button">Review AI usage</button>
           <button class="text-button" id="story-toggle" type="button">Presentation view</button>
-          <button class="text-button" id="download-review" type="button" title="Save the complete machine-readable review">Download decision record (JSON)</button>
+          <button class="text-button" id="download-review" type="button" title="Save this route or bill review; verification and actuals have separate downloads">Download decision record (JSON)</button>
           <button class="text-button" id="print-memo" type="button" title="Open the print dialog, where you can save the memo as a PDF">Print finance memo</button>
           <button class="file-button primary-action" id="start-review" type="button">Start a review</button>
           <button class="text-button" id="open-review" type="button">Open saved review</button>
@@ -311,7 +311,7 @@
                 </div>
                 <div class="planning-table-wrap" role="region" aria-label="Plan and actual comparison" tabindex="0">
                   <table class="planning-table">
-                    <thead><tr><th>Measure</th><th>Plan</th><th>Actual</th><th>Variance</th></tr></thead>
+                    <thead><tr><th>Measure</th><th>Plan</th><th>Actual</th><th>Variance (actual − plan)</th></tr></thead>
                     <tbody id="planning-rows"></tbody>
                   </table>
                 </div>
@@ -482,10 +482,12 @@
                   <div id="request-variance"></div>
                 </section>
                 <div class="request-spend-breakdowns" id="request-spend-breakdowns"></div>
+                <div id="request-currency-slices" class="request-currency-slices"></div>
               </section>
               <section class="customer-economics" aria-labelledby="customer-economics-title">
                 <div class="section-heading"><div><p class="kicker">COST TO SERVE</p><h3 id="customer-economics-title">Which customers carry the AI cost?</h3></div><span class="mode-tag">OPTIONAL · LOCAL CSV</span></div>
-                <p>Join customer IDs from this request log to revenue for the exact same dates and currency. See AI request cost as a share of revenue. Other costs of service are not allocated here.</p>
+                <p>Join customer IDs from this request log to revenue for the exact same dates and currency. See AI request cost as a share of revenue. Optionally spread the operating costs you entered, with the estimate and unattributed portion clearly shown.</p>
+                <div class="request-reconciliation-inputs"><label><span>Spread entered operating costs</span><select id="customer-allocation-method"><option value="none">Keep unallocated</option><option value="requests">By request count (estimate)</option><option value="cost">By request cost (estimate)</option></select><small>Uses only compute, data, network, tools, pipeline and human costs entered above. Missing categories remain missing.</small></label><label><span>Optional AI cost / revenue warning</span><div class="input-suffix"><input id="customer-share-warning" type="number" min="0.1" max="1000" step="0.1" placeholder="Your threshold" /><em>%</em></div></label></div>
                 <div class="request-import-row"><label><span>Customer revenue CSV</span><input id="customer-revenue-file" type="file" accept=".csv,text/csv" /><small>Columns: customer, period_start, period_end, revenue, currency. One row per customer; up to 5 MiB. Replace the template's example row with your own records.</small></label><div class="request-import-actions"><a class="text-button" href="templates/ai-cost-lens-customer-revenue-template.csv" download>Download template</a><button class="text-button" id="try-customer-economics" type="button">Try illustrative revenue</button><button class="build-button" id="analyze-customer-revenue" type="button">Compare locally</button></div></div>
                 <p id="customer-revenue-error" class="builder-error" role="alert"></p>
                 <div id="customer-revenue-result" aria-live="polite" hidden></div>
@@ -590,14 +592,14 @@
               </div>
               <span class="mode-tag">OUTPUTS ARE NOT SAVED</span>
             </div>
-            <p class="paired-verification-intro">Import one baseline row and one candidate row for every case. AI Cost Lens can check valid JSON, required or forbidden terms, required JSON fields, an exact label, and a maximum length. Human outcomes and review time remain separate evidence.</p>
+            <p class="paired-verification-intro">Import one baseline row and one candidate row for every case. AI Cost Lens can check valid JSON, required or forbidden terms, required JSON fields, an exact label, and a maximum length. Separate multiple terms or JSON fields with a semicolon (;), as shown in the separate illustrative example. Human outcomes and review time remain separate evidence.</p>
             <div class="verification-import-grid">
               <label class="field-wide">
                 <span>Paired verification CSV</span>
                 <input id="verification-file" type="file" accept=".csv,text/csv" />
                 <small id="verification-file-status">The file is read only in this browser. Raw output text is discarded from the saved verification record.</small>
               </label>
-              <div class="verification-template-action"><a class="text-button" href="templates/ai-cost-lens-verification-template.csv" download>Download blank template</a></div>
+              <div class="verification-template-action"><a class="text-button" href="templates/ai-cost-lens-verification-template.csv" download>Download blank template</a><a class="text-button" href="templates/ai-cost-lens-verification-example.csv" download>See illustrative example</a></div>
             </div>
             <div class="verification-control-grid">
               <label><span>Minimum deterministic pass rate</span><div class="input-suffix"><input id="verification-check-floor" type="number" min="0" max="100" step="0.1" value="100" /><em>%</em></div></label>
@@ -1099,21 +1101,21 @@
                 <fieldset class="sample-route-card">
                   <legend>Current route</legend>
                   <div class="sample-field-grid">
-                    <label><span>Results in period</span><input id="baseline-population" type="number" min="1" step="1" value="1000" /></label>
-                    <label><span>Ready in sample</span><input id="baseline-ready" type="number" min="1" step="1" value="22" /></label>
-                    <label><span>Still needs correction</span><input id="baseline-correction" type="number" min="0" step="1" value="6" /></label>
-                    <label><span>Needs escalation</span><input id="baseline-escalation" type="number" min="0" step="1" value="2" /></label>
-                    <label class="field-wide"><span>Total human minutes in sample</span><input id="baseline-human-minutes" type="number" min="0" step="0.1" value="120" /></label>
+                    <label><span>Results in period</span><input id="baseline-population" type="number" min="1" step="1" placeholder="Enter your count" /></label>
+                    <label><span>Ready in sample</span><input id="baseline-ready" type="number" min="1" step="1" placeholder="Enter your count" /></label>
+                    <label><span>Still needs correction</span><input id="baseline-correction" type="number" min="0" step="1" placeholder="Enter 0 if none" /></label>
+                    <label><span>Needs escalation</span><input id="baseline-escalation" type="number" min="0" step="1" placeholder="Enter 0 if none" /></label>
+                    <label class="field-wide"><span>Total human minutes in sample</span><input id="baseline-human-minutes" type="number" min="0" step="0.1" placeholder="Enter your minutes" /></label>
                   </div>
                 </fieldset>
                 <fieldset class="sample-route-card">
                   <legend>Proposed route</legend>
                   <div class="sample-field-grid">
-                    <label><span>Results in period</span><input id="proposed-population" type="number" min="1" step="1" value="1000" /></label>
-                    <label><span>Ready in sample</span><input id="proposed-ready" type="number" min="1" step="1" value="24" /></label>
-                    <label><span>Still needs correction</span><input id="proposed-correction" type="number" min="0" step="1" value="5" /></label>
-                    <label><span>Needs escalation</span><input id="proposed-escalation" type="number" min="0" step="1" value="1" /></label>
-                    <label class="field-wide"><span>Total human minutes in sample</span><input id="proposed-human-minutes" type="number" min="0" step="0.1" value="90" /></label>
+                    <label><span>Results in period</span><input id="proposed-population" type="number" min="1" step="1" placeholder="Enter your count" /></label>
+                    <label><span>Ready in sample</span><input id="proposed-ready" type="number" min="1" step="1" placeholder="Enter your count" /></label>
+                    <label><span>Still needs correction</span><input id="proposed-correction" type="number" min="0" step="1" placeholder="Enter 0 if none" /></label>
+                    <label><span>Needs escalation</span><input id="proposed-escalation" type="number" min="0" step="1" placeholder="Enter 0 if none" /></label>
+                    <label class="field-wide"><span>Total human minutes in sample</span><input id="proposed-human-minutes" type="number" min="0" step="0.1" placeholder="Enter your minutes" /></label>
                   </div>
                 </fieldset>
               </div>
@@ -1121,6 +1123,7 @@
                 <input id="sample-random" type="checkbox" />
                 <span>The outputs were selected randomly or by a repeatable sampling rule</span>
               </label>
+              <label class="check-field sample-method-check"><input id="sample-multi-output" type="checkbox" /><span>One billed request can produce multiple completed results in this workload; I checked how results map to requests</span></label>
               <p class="sample-caveat">AI Cost Lens will extrapolate the sampled outcome rate and human time across the declared period. A user-selected sample stays directional and will not show a statistical range. Every result remains labeled as sampled, not observed production truth.</p>
             </div>
 
@@ -1481,7 +1484,7 @@
         <p class="lumen-boundary">This is a deterministic record explainer, not a general AI chat. It uses only the calculated review in this browser and does not contact an AI API. Your file is not uploaded.</p>
         <div class="lumen-conversation" id="lumen-conversation" role="log" tabindex="0" aria-live="polite"></div>
         <div class="lumen-prompts" role="group" aria-label="Suggested questions">
-          <button type="button" data-lumen-question="why">Why isn't the cheaper route cheaper?</button>
+          <button type="button" data-lumen-question="why">How do these costs compare?</button>
           <button type="button" data-lumen-question="changed">What changed?</button>
           <button type="button" data-lumen-question="improve">What has to improve?</button>
           <button type="button" data-lumen-question="evidence">What evidence is missing?</button>

@@ -160,6 +160,29 @@
             "outcome_coverage_rows": { "type": "integer", "minimum": 0 }
           }
         },
+        "currency_slices": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["currency", "rows", "priced_rows", "unpriced_rows", "selected_cost", "breakdowns"],
+            "properties": {
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+              "rows": { "type": "integer", "minimum": 1 },
+              "priced_rows": { "type": "integer", "minimum": 0 },
+              "unpriced_rows": { "type": "integer", "minimum": 0 },
+              "selected_cost": { "type": ["number", "null"], "minimum": 0 },
+              "breakdowns": {
+                "type": "object", "additionalProperties": false,
+                "required": ["customer", "model", "feature"],
+                "properties": {
+                  "customer": { "$ref": "#/$defs/spendBreakdown" },
+                  "model": { "$ref": "#/$defs/spendBreakdown" },
+                  "feature": { "$ref": "#/$defs/spendBreakdown" }
+                }
+              }
+            }
+          }
+        },
         "breakdowns": {
           "type": "object",
           "additionalProperties": false,

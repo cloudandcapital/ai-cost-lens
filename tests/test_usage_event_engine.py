@@ -248,6 +248,10 @@ console.log(JSON.stringify(engine.buildReview(rows, {generated_at: "2026-09-21T0
     assert result["currency"] == "MIXED"
     assert result["reconciliation"]["selected_observed_cost"] is None
     assert result["spend"]["selected_cost"] is None
+    assert [
+        (item["currency"], item["selected_cost"], item["priced_rows"])
+        for item in result["spend"]["currency_slices"]
+    ] == [("EUR", 8, 1), ("USD", 10, 1)]
     assert result["spend"]["cost_per_priced_request"] is None
     assert result["spend"]["projected_30_day_cost"] is None
     assert all(

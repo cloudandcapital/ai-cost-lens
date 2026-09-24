@@ -22,11 +22,11 @@ def test_customer_cost_excludes_unmatched_and_partial_cost():
     result = node_json("""
       const engine=require('./web/customer-economics-engine');
       const review={currency:'USD',spend:{period:{start:'2026-09-01',end:'2026-09-30'}},events:[
-        {customer:'A',selected_cost:60,cost_basis:'provider_reported'},
-        {customer:'A',selected_cost:null,cost_basis:'unpriced'},
-        {customer:'B',selected_cost:130,cost_basis:'calculated'},
-        {customer:'C',selected_cost:10,cost_basis:'calculated'},
-        {customer:null,selected_cost:15,cost_basis:'calculated'}]};
+        {customer:'A',currency:'USD',selected_cost:60,cost_basis:'provider_reported'},
+        {customer:'A',currency:'USD',selected_cost:null,cost_basis:'unpriced'},
+        {customer:'B',currency:'USD',selected_cost:130,cost_basis:'calculated'},
+        {customer:'C',currency:'USD',selected_cost:10,cost_basis:'calculated'},
+        {customer:null,currency:'USD',selected_cost:15,cost_basis:'calculated'}]};
       const rows=['A','B'].map(customer=>({customer,period_start:'2026-09-01',period_end:'2026-09-30',revenue:'100',currency:'USD'}));
       console.log(JSON.stringify(engine.analyze(review,rows)));
     """)
@@ -71,3 +71,36 @@ def test_evidence_kit_and_precision_guide():
     } <= keys
     assert result["n"] == 385
     assert result["wide"] == 97
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node unavailable")
+def test_customer_join_keeps_known_cost_when_a_row_is_unpriced_or_other_currency():
+    result = node_json("""
+      const engine=require('./web/customer-economics-engine');
+      const review={currency:'MIXED',spend:{period:{start:'2026-09-01',end:'2026-09-30'}},events:[
+        {customer:'A',currency:'USD',selected_cost:40,cost_basis:'provider_reported'},
+        {customer:'A',currency:'USD',selected_cost:null,cost_basis:'unpriced'},
+        {customer:'A',currency:'EUR',selected_cost:10,cost_basis:'provider_reported'}]};
+      const rows=[{customer:'A',period_start:'2026-09-01',period_end:'2026-09-30',revenue:'100',currency:'USD'}];
+      console.log(JSON.stringify(engine.analyze(review,rows)));
+    """)
+    assert result["customers"][0]["ai_cost_share"] is None
+    assert result["customers"][0]["known_ai_cost_share_lower_bound"] == 0.4
+    assert result["excluded_currency_requests"] == 1
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node unavailable")
+def test_allocated_costs_conserve_entered_total_and_unmatched_share():
+    result = node_json("""
+      const engine=require('./web/customer-economics-engine');
+      const review={currency:'USD',spend:{period:{start:'2026-09-01',end:'2026-09-30'},cost_stack:{known_adjacent_cost:90,missing_categories:['pipeline']}},events:[
+        {customer:'A',currency:'USD',selected_cost:10,cost_basis:'provider_reported'},
+        {customer:'A',currency:'USD',selected_cost:10,cost_basis:'provider_reported'},
+        {customer:null,currency:'USD',selected_cost:5,cost_basis:'provider_reported'}]};
+      const rows=[{customer:'A',period_start:'2026-09-01',period_end:'2026-09-30',revenue:'100',currency:'USD'}];
+      console.log(JSON.stringify(engine.analyze(review,rows,{allocation_method:'requests'})));
+    """)
+    assert result["customers"][0]["allocated_adjacent_cost"] == 60
+    assert result["customers"][0]["known_ai_operating_share"] == 0.8
+    assert result["unassigned_adjacent_cost"] == 30
+    assert result["missing_categories"] == ["pipeline"]
