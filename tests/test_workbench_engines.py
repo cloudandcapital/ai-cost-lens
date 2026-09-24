@@ -234,9 +234,14 @@ console.log(JSON.stringify({realized, blocked, illustrative, eur, missingImpleme
     assert illustrative["gates"]["realized_savings_claim_allowed"] is False
     assert illustrative["status"] == "ILLUSTRATIVE_NOT_REALIZED"
     assert "illustrative" in illustrative["open_gates"][0]
-    assert blocked["open_gates"] == ["Verify the post-change work against the same quality rule."]
+    assert blocked["open_gates"] == [
+        "Verify the post-change work against the same quality rule."
+    ]
     assert realized["open_gates"] == []
-    assert realized["implementation"]["treatment"] == "one_time_cost_deducted_in_this_period_only"
+    assert (
+        realized["implementation"]["treatment"]
+        == "one_time_cost_deducted_in_this_period_only"
+    )
     assert result["eur"]["currency"] == "EUR"
 
     assert result["missingImplementation"]["gates"]["implementation_recorded"] is False
@@ -268,7 +273,9 @@ console.log(JSON.stringify({rows, halfReview, rejected}));
     assert result["rows"][0]["baseline"]["revenue"] == 54600
     assert result["rows"][0]["baseline"]["cost"] == 40000
     assert result["rows"][0]["proposed"]["cost"] == 33000
-    assert result["rows"][2]["baseline"]["cost"] == 176000  # 5x variable cost plus $6k fixed infrastructure.
+    assert (
+        result["rows"][2]["baseline"]["cost"] == 176000
+    )  # 5x variable cost plus $6k fixed infrastructure.
     assert result["halfReview"][0]["baseline"]["cost"] == 34000
 
 
