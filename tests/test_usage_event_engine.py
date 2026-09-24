@@ -303,6 +303,36 @@ console.log(JSON.stringify(engine.buildReview(rows, {catalog, generated_at: "202
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_long_expensive_session_is_investigated_without_imaginary_savings():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const catalog = require(process.argv[2]);
+const rows = Array.from({length: 30}, (_, index) => ({
+  event_id: `step-${index}`, session_id: "agent-run-1", workload: "Research",
+  timestamp: new Date(Date.UTC(2026, 8, 20, 0, index)).toISOString(),
+  provider: "OpenAI", model: "gpt-6-astra", input_tokens: 1000 + index * 100,
+  output_tokens: 100, cached_input_tokens: 0, cost_usd: 4, currency: "USD",
+  outcome_status: index === 29 ? "ready_to_use" : "",
+}));
+rows.push({event_id: "other", session_id: "other-session", workload: "Research", provider: "OpenAI", model: "gpt-6-astra", input_tokens: 2000, output_tokens: 100, cached_input_tokens: 0, cost_usd: 180, currency: "USD", outcome_status: "ready_to_use"});
+const review = engine.buildReview(rows, {catalog, generated_at: "2026-09-21T00:00:00Z"});
+console.log(JSON.stringify(review));
+""",
+        ENGINE,
+        CATALOG,
+    )
+    by_id = {finding["id"]: finding for finding in result["findings"]}
+    session = by_id["high-cost-multistep-session"]
+    assert "30 calls" in session["explanation"]
+    assert "40%" in session["explanation"]
+    assert "Input tokens rose" in session["explanation"]
+    assert session["estimated_avoidable_cost"] is None
+    assert session["headline_eligible"] is False
+    assert "spend-without-outcome-evidence" not in by_id
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_cost_spike_requires_unit_cost_change_and_never_becomes_savings():
     result = run_node(
         r"""

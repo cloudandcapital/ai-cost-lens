@@ -254,6 +254,21 @@
             </details>
           </section>
 
+          <section class="evidence-receipt" id="evidence-receipt" aria-labelledby="receipt-title">
+            <div class="section-heading">
+              <div><p class="kicker">THE RECEIPT</p><h2 id="receipt-title">What one ready result costs</h2></div>
+              <button class="text-button" id="download-receipt" type="button">Save receipt as image (SVG)</button>
+            </div>
+            <p>Model usage is one part of the cost. The evidence label travels with the numbers.</p>
+            <div class="receipt-grid" id="receipt-grid"></div>
+            <p class="receipt-footnote" id="receipt-note"></p>
+          </section>
+
+          <section class="price-crosscheck" id="price-crosscheck" aria-labelledby="price-crosscheck-title" hidden>
+            <div class="section-heading"><div><p class="kicker">TOKEN-TO-COST CHECK</p><h2 id="price-crosscheck-title">Do the tokens support this amount?</h2></div></div>
+            <div id="price-crosscheck-result"></div>
+          </section>
+
           <article class="finding" aria-labelledby="finding-title">
             <div class="finding-mark" aria-hidden="true">↘</div>
             <div>
@@ -1483,6 +1498,7 @@
     <script src="verification-engine.js"></script>
     <script src="actuals-engine.js"></script>
     <script src="growth-engine.js"></script>
+    <script src="evidence-tools.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

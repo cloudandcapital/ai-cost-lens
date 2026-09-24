@@ -528,6 +528,37 @@
       headline_eligible: true,
     }));
 
+    const sessions = new Map();
+    events.filter((event) => event.session_id && !duplicateCopies.has(event.record_id)).forEach((event) => {
+      if (!sessions.has(event.session_id)) sessions.set(event.session_id, []);
+      sessions.get(event.session_id).push(event);
+    });
+    const pricedTotalForSessions = currencyComparable ? pricedEvents.reduce((sum, event) => sum + event.selected_cost, 0) : null;
+    const costlySessions = [...sessions.entries()].map(([sessionId, members]) => ({
+      sessionId,
+      members,
+      cost: members.reduce((sum, event) => sum + (event.selected_cost || 0), 0),
+    })).filter(({ members, cost }) => members.length >= 20 && pricedTotalForSessions > 0 && cost / pricedTotalForSessions >= 0.2);
+    if (costlySessions.length) {
+      const affected = costlySessions.flatMap(({ members }) => members);
+      const largest = costlySessions.sort((a, b) => b.cost - a.cost)[0];
+      const sorted = [...largest.members].filter((event) => event.input_tokens !== null && event.timestamp).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      const growth = sorted.length >= 5 && sorted.slice(1).filter((event, index) => event.input_tokens >= sorted[index].input_tokens).length / (sorted.length - 1) >= 0.8;
+      findings.push(finding({
+        id: "high-cost-multistep-session", kind: "high_cost_multistep_session", category: "Agent sessions",
+        title: "One multi-step session deserves a closer look",
+        explanation: `${largest.members.length} calls in one supplied session account for ${round(largest.cost / pricedTotalForSessions * 100, 1)}% of priced request cost.${growth ? " Input tokens rose on most sequential calls; check whether context was repeatedly carried forward." : " Check whether its steps were needed to produce the final result."}`,
+        affected_scope: `${costlySessions.length} session${costlySessions.length === 1 ? "" : "s"} with 20+ calls and at least 20% of comparable request cost`,
+        current_cost: round(affected.reduce((sum, event) => sum + (event.selected_cost || 0), 0)),
+        calculation: "Selected cost of the flagged session requests; no avoidable cost calculated.",
+        evidence_basis: "observed", confidence: "directional", confidence_in_dollar_estimate: "not_quantified", overlap_group: "session-investigation",
+        affected_event_ids: affected.map((event) => event.record_id),
+        verification_requirement: "Inspect the session trace and terminal outcome before setting a step limit, shortening context, or changing tools.",
+        suggested_next_step: "Inspect the expensive session trace", action: "investigate",
+        limitations: "A long session may be necessary and valuable. Session IDs do not show tool identity, actual task difficulty, or avoidable savings.", headline_eligible: false,
+      }));
+    }
+
     const prefixGroups = new Map();
     events.filter((event) => event.prefix_fingerprint && event.input_tokens !== null).forEach((event) => {
       const key = `${analysisWorkload(event)}\u0000${event.prefix_fingerprint}`;
@@ -668,7 +699,8 @@
       action: "verify", limitations: "Shared workload labels do not establish equal task difficulty, capabilities, output length, or usable-result yield.", headline_eligible: false,
     }));
 
-    const noOutcome = pricedEvents.filter((event) => !event.outcome_status);
+    const sessionsWithOutcome = new Set(events.filter((event) => event.session_id && event.outcome_status).map((event) => event.session_id));
+    const noOutcome = pricedEvents.filter((event) => !event.outcome_status && !(event.session_id && sessionsWithOutcome.has(event.session_id)));
     const noOutcomeHasCost = noOutcome.some((event) => event.selected_cost > 0);
     const pricedTotal = currencyComparable ? pricedEvents.reduce((sum, event) => sum + event.selected_cost, 0) : null;
     const noOutcomeCost = currencyComparable ? noOutcome.reduce((sum, event) => sum + event.selected_cost, 0) : null;

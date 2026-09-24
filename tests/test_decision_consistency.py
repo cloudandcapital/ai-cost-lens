@@ -191,7 +191,8 @@ const element = id => elements[id] ||= {textContent:'',innerHTML:'',value:'',sty
 global.document = {getElementById:element,querySelector:element,querySelectorAll:()=>[],body:element('body'),createElement:()=>element('anchor')};
 let printed = false, blob;
 global.window = {scrollTo(){},setTimeout(){},addEventListener(){},print(){printed=true;assert.ok(classes.has('printing-memo'));assert.equal(elements['memo-decision-code'].textContent,'QUALITY BELOW MINIMUM')}};
-global.URL = {createObjectURL(b){blob=b;return 'blob:test'},revokeObjectURL(){}};
+    global.URL = {createObjectURL(b){blob=b;return 'blob:test'},revokeObjectURL(){}};
+    global.AICostLensEvidenceTools = require('./web/evidence-tools.js');
 let source = fs.readFileSync('web/app.js','utf8');
 source = source.replace('  function renderAll() {','  globalThis.useRecord = d => {state.data=d;renderAll()};\n  function renderAll() {');
 source = source.replace('  loadDemo().catch((error) => showToast(error.message));','');

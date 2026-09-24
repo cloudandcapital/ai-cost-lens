@@ -280,6 +280,46 @@ console.log(JSON.stringify({rows, halfReview, rejected}));
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_evidence_receipt_balances_cents_and_bill_check_never_implies_reconciliation():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const review = require(process.argv[2]);
+const catalog = require(process.argv[3]);
+const current = engine.receiptFor(review, "baseline");
+const proposed = engine.receiptFor(review, "proposed");
+const check = engine.priceSenseCheck(review, catalog);
+const changed = structuredClone(review);
+changed.baseline.costs.model_cost = 220000;
+const mismatch = engine.priceSenseCheck(changed, catalog);
+changed.baseline.usage.cached_input_tokens = null;
+const unavailable = engine.priceSenseCheck(changed, catalog);
+const svg = engine.receiptSvg({...review, workload: {name: "<Client & Co>"}}, [current, proposed]);
+console.log(JSON.stringify({current, proposed, check, mismatch, unavailable, svg}));
+""",
+        WEB / "evidence-tools.js",
+        WEB / "data" / "startup-growth-review-result.json",
+        WEB / "data" / "pricing-catalog-v0.5.js",
+    )
+    for route in ["current", "proposed"]:
+        receipt = result[route]
+        assert sum(line["cents"] for line in receipt["lines"]) == receipt["total_cents"]
+        assert receipt["stamp"] == "ILLUSTRATIVE"
+    assert result["proposed"]["total_cents"] == 177
+    assert result["proposed"]["lines"] == [
+        {"label": "Model usage", "cents": 81},
+        {"label": "Shared infrastructure", "cents": 37},
+        {"label": "Human review", "cents": 59},
+    ]
+    assert result["check"]["estimated_cost"] == 22000
+    assert result["check"]["basis"] == "INVENTED EXAMPLE"
+    assert result["check"]["flag"] == "WITHIN 10% OF LIST RATE"
+    assert result["mismatch"]["flag"] == "INVESTIGATE GAP"
+    assert result["unavailable"]["available"] is False
+    assert "&lt;Client &amp; Co&gt;" in result["svg"]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 @pytest.mark.parametrize(
     "asset",
     [

@@ -37,6 +37,7 @@
   const scenarioEngine = globalThis.AICostLensScenarios;
   const actualsEngine = globalThis.AICostLensActuals;
   const growthEngine = globalThis.AICostLensGrowth;
+  const evidenceTools = globalThis.AICostLensEvidenceTools;
 
   const money = (value, digits = 0) =>
     new Intl.NumberFormat("en-US", {
@@ -3064,7 +3065,29 @@
         : "Payback not established from the supplied evidence";
   }
 
+  function renderReceiptAndPriceCheck() {
+    const receipts = ["baseline", "proposed"].map((route) => evidenceTools.receiptFor(state.data, route));
+    const lineMoney = (cents) => money(cents / 100, 2);
+    document.getElementById("receipt-grid").innerHTML = receipts.map((receipt) => `
+      <article class="receipt-card">
+        <div class="receipt-head"><strong>${escapeHtml(receipt.label)}</strong><span>${escapeHtml(receipt.stamp)}</span></div>
+        <dl>${receipt.lines.map((line) => `<div><dt>${escapeHtml(line.label)}</dt><dd>${lineMoney(line.cents)}</dd></div>`).join("")}
+          <div class="receipt-total"><dt>One ready result</dt><dd>${lineMoney(receipt.total_cents)}</dd></div></dl>
+      </article>`).join("");
+    document.getElementById("receipt-note").textContent = `${receipts[0].note} Each line includes the cost of attempts that did not produce a ready result. One-time change costs are excluded.`;
+    const catalog = globalThis.AI_COST_LENS_PRICING_CATALOG;
+    const checks = ["baseline", "proposed"].map((route) => evidenceTools.priceSenseCheck(state.data, catalog, route));
+    const section = document.getElementById("price-crosscheck");
+    section.hidden = !checks.some((check) => check.available);
+    if (section.hidden) return;
+    document.getElementById("price-crosscheck-result").innerHTML = checks.map((check, index) => check.available
+      ? `<article><div><span class="price-check-label">${escapeHtml(state.data[index ? "proposed" : "baseline"].label)} · ${escapeHtml(check.basis)}</span><strong>${escapeHtml(check.flag)}</strong></div><p>${escapeHtml(check.label)} list-rate estimate ${money(check.estimated_cost, 2)}; supplied model cost ${money(check.supplied_cost, 2)}. Difference ${check.gap < 0 ? "−" : "+"}${money(Math.abs(check.gap), 2)}${check.gap_percent === null ? "" : ` (${round(check.gap_percent, 1)}%)`}.</p><small>Catalog effective ${escapeHtml(check.catalog_date)}. ${escapeHtml(check.limitation)}</small></article>`
+      : `<article><div><span class="price-check-label">${escapeHtml(state.data[index ? "proposed" : "baseline"].label)}</span><strong>Not comparable</strong></div><p>${escapeHtml(check.reason)}</p></article>`).join("");
+  }
+
   function renderReview() {
+    document.getElementById("evidence-receipt").hidden = state.data.experience === "simple";
+    document.getElementById("price-crosscheck").hidden = true;
     if (state.data.experience === "simple") return renderSimpleReview();
     document.getElementById("review-kicker").textContent = "FINANCE FIRST AI SPEND REVIEW";
     document.getElementById("review-title").textContent = state.data.mode === "illustrative"
@@ -3121,6 +3144,7 @@
           ? "TEST FIRST"
           : "KEEP CURRENT ROUTE";
     renderTruthSection();
+    renderReceiptAndPriceCheck();
     renderPlanning();
 
     const bars = [
@@ -6326,6 +6350,19 @@
   });
   ["growth-revenue", "growth-fixed", "growth-discount", "growth-review"].forEach((id) => {
     document.getElementById(id).addEventListener("input", renderGrowthPlanner);
+  });
+  document.getElementById("download-receipt").addEventListener("click", () => {
+    if (!state.data || state.data.experience === "simple") return;
+    const receipts = ["baseline", "proposed"].map((route) => evidenceTools.receiptFor(state.data, route));
+    const blob = new Blob([evidenceTools.receiptSvg(state.data, receipts)], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "ai-cost-lens-cost-per-ready-result.svg";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   /* AI_COST_LENS_DEMO_LOADER_START */
   async function loadDemo() {

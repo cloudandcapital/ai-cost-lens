@@ -211,6 +211,11 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert((await page.locator("#decision-title").innerText()) === "Test the lower-cost route", `${engineName}: startup example overclaims the route change.`);
   assert((await page.locator("#opportunity-ledger").innerText()).includes("One time change cost"), `${engineName}: growth example omitted migration cost.`);
   assert((await page.locator("#review-title").innerText()).includes("Cost per ready result down 19%"), `${engineName}: startup example hides its result.`);
+  assert((await page.locator("#receipt-grid").innerText()).includes("ILLUSTRATIVE"), `${engineName}: receipt lost its evidence label.`);
+  assert((await page.locator("#receipt-grid").innerText()).includes("$1.77"), `${engineName}: receipt lines do not support the proposed unit cost.`);
+  assert((await page.locator("#price-crosscheck-result").innerText()).includes("$22,000.00"), `${engineName}: token-to-cost check did not reprice the example.`);
+  const [receiptDownload] = await Promise.all([page.waitForEvent("download"), page.locator("#download-receipt").click()]);
+  assert(receiptDownload.suggestedFilename().endsWith(".svg"), `${engineName}: receipt did not export as an image.`);
   await page.locator("#growth-revenue").fill("3");
   assert(await page.locator("#growth-results tbody tr").count() === 4, `${engineName}: growth planner lacks volume scenarios.`);
   assert((await page.locator("#growth-results tbody tr").first().innerText()).includes("26.7%"), `${engineName}: modeled current gross margin is wrong.`);
@@ -351,6 +356,7 @@ async function mobileAndAccessibility(origin) {
   assert(horizontalOverflow <= 1, `mobile: page overflows horizontally by ${horizontalOverflow}px.`);
   await page.locator('[data-example="growth"]').click();
   await page.locator("#growth-revenue").fill("3");
+  assert((await page.locator("#receipt-grid").innerText()).includes("$1.77"), "mobile: receipt failed to render.");
   assert(await page.locator("#growth-results").evaluate((element) => element.scrollWidth > element.clientWidth), "mobile: growth results should scroll inside their own region.");
   assert(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 1, "mobile: growth planner causes page overflow.");
   await page.locator('[data-example="cost-trap"]').click();

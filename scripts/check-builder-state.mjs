@@ -13,6 +13,7 @@ const usageEventEngine = require('../web/usage-event-engine.js');
 const scenarioEngine = require('../web/scenario-engine.js');
 const verificationEngine = require('../web/verification-engine.js');
 const actualsEngine = require('../web/actuals-engine.js');
+const evidenceTools = require('../web/evidence-tools.js');
 
 // Minimal DOM adapter: actual HTML defaults and actual app event handlers.
 // This checks state transitions, not browser layout or native file dialogs.
@@ -94,6 +95,7 @@ const context = {
   AICostLensScenarios:scenarioEngine,
   AICostLensVerification:verificationEngine,
   AICostLensActuals:actualsEngine,
+  AICostLensEvidenceTools:evidenceTools,
 };
 runInNewContext(source, context);
 const {api} = context;
