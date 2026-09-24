@@ -1033,6 +1033,25 @@ console.log(JSON.stringify({finding,headline:review.headline}));
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_duplicate_retry_row_does_not_create_a_retry_chain():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const rows = [
+  {event_id:"parent",status:"failed",cost:1,currency:"USD"},
+  {event_id:"retry",retry_parent_event_id:"parent",status:"retried",cost:1,currency:"USD"},
+  {event_id:"retry",retry_parent_event_id:"parent",status:"retried",cost:1,currency:"USD"},
+];
+const review = engine.buildReview(rows);
+console.log(JSON.stringify(review.findings.map(item => item.id)));
+""",
+        ENGINE,
+    )
+    assert "duplicate-billed-event" in result
+    assert "repeated-error-loop" not in result
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_findings_do_not_invent_cache_evidence_or_convert_catalog_currency():
     result = run_node(
         r"""

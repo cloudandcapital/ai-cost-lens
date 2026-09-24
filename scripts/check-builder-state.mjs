@@ -377,7 +377,7 @@ await submit();
 assert.equal(api.state.data,prior);
 assert.match(el('builder-error').textContent,/zero usable outputs/);
 await click('start-review'); await mode('example');
-assert.equal(el('review-title').textContent,'What did one ready result really cost?');
+assert.equal(el('review-title').textContent,'Provider cost down 65%. Cost per ready result up 5%.');
 await click('start-review'); await mode('openai');
 assert.equal(el('simple-current-cost').disabled,true);
 assert.equal(el('openai-usage-file').disabled,false);

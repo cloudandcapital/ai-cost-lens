@@ -136,7 +136,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert "NO READY RESULTS" in app
     assert 'input.step = "any"' in app
     assert "safeMax / 200" not in app
-    assert "The numbers match. The conclusion remains bounded to these inputs." in app
+    assert "These numbers are invented. They show how the decision works." in app
     assert "if (proposed.costs.one_time_change_cost > 0)" in app
     assert ".status-illustrative" in css
     assert (

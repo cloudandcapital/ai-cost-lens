@@ -345,6 +345,13 @@
     const monthly = uncachedInputCost + cacheReadCost + cacheWriteCost + cacheStorageCost + outputCost;
     const perCall = billedCalls ? monthly / billedCalls : 0;
     const expectedUsable = scenario.usable_rate === null ? null : scenario.calls_per_month * scenario.usable_rate;
+    const rateBoundary = model.promotional_rate_guaranteed_through ||
+      (model.scheduled_rate_change?.effective_at
+        ? new Date(Date.parse(`${model.scheduled_rate_change.effective_at}T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
+        : null);
+    const annualStart = scenario.pricing_date || model.effective_at;
+    const annualEnd = annualStart ? new Date(Date.parse(`${annualStart}T00:00:00Z`) + 365 * 86400000).toISOString().slice(0, 10) : null;
+    const annualRateKnown = !rateBoundary || (annualEnd !== null && annualEnd <= rateBoundary);
     return {
       model_id: model.id,
       provider: model.provider,
@@ -365,6 +372,8 @@
       pricing_verified_at: model.verified_at || null,
       pricing_effective_at: model.effective_at || null,
       pricing_date: scenario.pricing_date || model.effective_at || null,
+      promotional_rate_guaranteed_through: rateBoundary,
+      annual_rate_known: annualRateKnown,
       estimated_monthly_cost_breakdown_usd: {
         uncached_input: round(uncachedInputCost),
         cache_read: round(cacheReadCost),
@@ -375,7 +384,7 @@
       estimated_cost_per_call_usd: round(perCall),
       estimated_cost_per_1000_calls_usd: round(perCall * 1000),
       estimated_monthly_cost_usd: round(monthly),
-      estimated_annual_cost_usd: round(monthly * 12),
+      estimated_annual_cost_usd: annualRateKnown ? round(monthly * 12) : null,
       estimated_cost_per_usable_result_usd: expectedUsable === null || expectedUsable === 0 ? null : round(monthly / expectedUsable),
       billed_calls_per_month: round(billedCalls, 4),
       note: model.note,
@@ -415,7 +424,8 @@
       ...result,
       role: index === 0 ? "current" : "alternative",
       monthly_difference_from_current_usd: round(result.estimated_monthly_cost_usd - current.estimated_monthly_cost_usd),
-      annual_difference_from_current_usd: round(result.estimated_annual_cost_usd - current.estimated_annual_cost_usd),
+      annual_difference_from_current_usd: result.estimated_annual_cost_usd === null || current.estimated_annual_cost_usd === null
+        ? null : round(result.estimated_annual_cost_usd - current.estimated_annual_cost_usd),
     }));
   }
 

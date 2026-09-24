@@ -9,7 +9,7 @@
   },
   "workload": {
     "name": "Growing support AI workload",
-    "description": "A startup processes 20,000 customer support summaries a month and expects volume to grow. Compare the current route with a possible caching and model-routing change before scaling it. All figures are invented for this example.",
+    "description": "A fictional startup handles 20,000 support summaries a month. Compare the current setup with a proposed caching and routing change before scaling. Both routes are invented alternatives for the same monthly workload; neither is a real provider bill.",
     "outcome_unit": "ready result",
     "accepted_quality_threshold": 0.9
   },
@@ -17,9 +17,9 @@
     "id": "current-route",
     "label": "Current route",
     "model": {
-      "provider": "Model API",
-      "name": "Current production mix",
-      "route": "Current support route"
+      "provider": "OpenAI",
+      "name": "GPT-6 Astra",
+      "route": "Current support route (standard API list rate)"
     },
     "costs": {
       "model_cost": 22000.0,
@@ -33,7 +33,7 @@
       "requests": 20000,
       "retries": 2400,
       "unique_input_tokens": null,
-      "processed_input_tokens": 150000000,
+      "processed_input_tokens": 2143500000,
       "cached_input_tokens": 15000000,
       "cache_write_input_tokens": 0,
       "output_tokens": 14000000
@@ -55,14 +55,14 @@
     },
     "policy": {
       "approved": true,
-      "retention_mode": "Assumed approved for this illustrative workflow"
+      "retention_mode": "Approval assumed only for this invented comparison; no reviewer approved a real route"
     },
     "evidence": {
-      "cost_basis": "observed",
+      "cost_basis": "calculated",
       "outcome_basis": "illustrative",
-      "source": "Invented provider costs and work outcomes for a startup growth example",
+      "source": "Invented token volumes priced at GPT-6 Astra standard API list rates; no provider bill",
       "observed_at": "2026-08-31",
-      "coverage": "Invented complete work log for the example",
+      "coverage": "Invented complete work log; 2.1435B input tokens including 15M cache reads and 14M output tokens model $22,000 at standard list rates without long-context surcharges",
       "coverage_status": "illustrative",
       "reconciliation_issues": [],
       "cost_boundary": "provider cost + shared infrastructure + human review and correction",
@@ -75,7 +75,7 @@
       "all_in_cost_per_usable_result": 2.197802,
       "usable_result_rate": 0.91,
       "retry_rate": 0.12,
-      "cache_reuse_rate": 0.1,
+      "cache_reuse_rate": 0.006998,
       "cache_write_rate": 0.0,
       "context_reprocessing_ratio": null,
       "human_review_minutes_per_usable_result": 0.659341
@@ -101,7 +101,7 @@
       "requests": 20000,
       "retries": 1800,
       "unique_input_tokens": null,
-      "processed_input_tokens": 150000000,
+      "processed_input_tokens": 2143500000,
       "cached_input_tokens": 60000000,
       "cache_write_input_tokens": 0,
       "output_tokens": 13500000
@@ -123,14 +123,14 @@
     },
     "policy": {
       "approved": true,
-      "retention_mode": "Assumed approved for this illustrative workflow"
+      "retention_mode": "Approval assumed only for this invented comparison; no reviewer approved a real route"
     },
     "evidence": {
-      "cost_basis": "observed",
+      "cost_basis": "calculated",
       "outcome_basis": "illustrative",
-      "source": "Invented provider costs and work outcomes for a startup growth example",
+      "source": "Invented $15,000 blended routing estimate; no provider bill or negotiated price verified",
       "observed_at": "2026-08-31",
-      "coverage": "Invented complete work log for the example",
+      "coverage": "Invented complete work log; $15,000 assumes a routed model mix and more cache reuse on the same 2.1435B processed input tokens",
       "coverage_status": "illustrative",
       "reconciliation_issues": [],
       "cost_boundary": "provider cost + shared infrastructure + human review and correction",
@@ -143,7 +143,7 @@
       "all_in_cost_per_usable_result": 2.741935,
       "usable_result_rate": 0.93,
       "retry_rate": 0.09,
-      "cache_reuse_rate": 0.4,
+      "cache_reuse_rate": 0.027992,
       "cache_write_rate": 0.0,
       "context_reprocessing_ratio": null,
       "human_review_minutes_per_usable_result": 0.591398
@@ -156,7 +156,7 @@
     "recommendation": "Run one bounded pilot and verify the proposed bill. The $18,000 change cost would be earned back after about 42,492 usable results if the modeled operating difference holds.",
     "savings_claim_allowed": false,
     "same_cost_basis": true,
-    "provider_cost_reported": true,
+    "provider_cost_reported": false,
     "quality_holds": true,
     "both_policy_approved": true,
     "evidence_complete": false,
