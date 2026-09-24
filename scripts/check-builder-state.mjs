@@ -116,11 +116,12 @@ assert.equal((catalogHtml.match(/class="model-catalog-rate"/g) || []).length, (p
 assert.equal((catalogHtml.match(/<span>Input<\/span>/g) || []).length, pricingCatalog.models.length + tieredCount);
 assert.equal((catalogHtml.match(/<span>Cached input<\/span>/g) || []).length, pricingCatalog.models.length + tieredCount);
 assert.equal((catalogHtml.match(/<span>Output<\/span>/g) || []).length, pricingCatalog.models.length + tieredCount);
-assert.match(catalogHtml, /GPT-6 Sol[\s\S]*?over 272,000 input tokens per request[\s\S]*?<span>Input<\/span><strong>\$4<\/strong>[\s\S]*?<span>Output<\/span><strong>\$15<\/strong>/);
-assert.match(catalogHtml, /Claude Sonnet 5[\s\S]*?<span>Input<\/span><strong>\$2<\/strong>[\s\S]*?<span>Cached input<\/span><strong>\$0\.20<\/strong>[\s\S]*?<span>Output<\/span><strong>\$10<\/strong>/);
+assert.match(catalogHtml, /GPT-6 Sol[\s\S]*?over 272,000 input tokens per request[\s\S]*?<span>Input<\/span><strong>\$4\.00<\/strong>[\s\S]*?<span>Output<\/span><strong>\$15\.00<\/strong>/);
+assert.match(catalogHtml, /Claude Sonnet 5[\s\S]*?<span>Input<\/span><strong>\$2\.00<\/strong>[\s\S]*?<span>Cached input<\/span><strong>\$0\.20<\/strong>[\s\S]*?<span>Output<\/span><strong>\$10\.00<\/strong>/);
 api.state.data = JSON.parse(read('web/data/illustrative-review-result.json'));
 api.state.demoData = api.state.data;
 api.renderAll();
+assert.match(el('memo-title').textContent,/ILLUSTRATIVE/,'The example PDF must declare its evidence status in the header.');
 await click('start-review'); await mode('single');
 await file('single-spend-file', onlyBaseline(spend)); await file('single-work-file', onlyBaseline(work));
 el('single-ready-rule').value = 'Customer accepted'; el('single-verifier').value = 'Reviewer';
@@ -295,6 +296,13 @@ assert.equal(el('builder-error').classList.contains('visible'),true);
 await file('single-spend-file',invoice); await submit();
 assert.equal(api.state.data.source.spend[0].workload,'Unrelated subscription');
 assert.equal(el('builder-error').classList.contains('visible'),false);
+await click('review-usage');
+assert.equal(document.body.classList.contains('bill-usage-mode'),true);
+assert.equal(el('view-opportunities').classList.contains('active'),true);
+assert.equal(el('bill-review-screen').classList.contains('active'),false);
+await click('back-to-bill');
+assert.equal(el('bill-review-screen').classList.contains('active'),true);
+assert.equal(api.state.data.source.spend[0].workload,'Unrelated subscription');
 
 await click('print-memo');
 while (timers.length) timers.shift()();
@@ -312,10 +320,12 @@ console.log('PASS: seven-path entry, builder transition/correction sequences and
 
 // Integrated no-file comparison: real HTML defaults and registered submit handler.
 await click('start-review'); await mode('simple');
+assert.equal(el('simple-approved').checked,false,'Policy must require an explicit reviewer action.');
 assert.equal(el('simple-current-cost').disabled,false);
 assert.equal(el('spend-file').disabled,true);
 el('simple-current-name').value = 'Diana current';
 el('simple-other-name').value = '<Diana other>';
+el('simple-approved').checked = true;
 await submit();
 assert.equal(api.state.data.experience,'simple');
 assert.equal(api.state.data.baseline.costs.recurring_operating_cost,70);
@@ -329,6 +339,7 @@ const simpleRecord = JSON.stringify(api.state.data);
 await file('review-file',simpleRecord,'comparison.json');
 assert.equal(api.state.data.experience,'simple');
 await click('start-review'); await mode('simple');
+el('simple-approved').checked = true;
 el('simple-current-cost').value = '0'; el('simple-other-cost').value = '0';
 el('simple-hourly-rate').value = '0';
 await submit();

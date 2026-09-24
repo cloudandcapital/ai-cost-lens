@@ -5882,6 +5882,12 @@ body.story-mode .cockpit-grid {
   border-bottom: 1px solid var(--ink);
 }
 
+.price-scroll-hint { color: var(--muted); font-size: 13px; margin: 12px 0; }
+.sample-range { margin: 16px 0 0; color: var(--muted); line-height: 1.5; }
+.price-review-choice { display: grid; gap: 6px; font-size: 12px; }
+.price-review-choice select { max-width: 100%; }
+body.bill-usage-mode #view-opportunities > :not(.request-review-panel) { display: none; }
+
 .price-table {
   width: 100%;
   min-width: 900px;
@@ -6069,7 +6075,16 @@ body.story-mode .cockpit-grid {
   }
 }
 
-@media(max-width:620px){.simple-change-path{width:max-content;margin-top:8px}}
+@media (max-width: 620px) {
+  .price-table-wrap { overflow: visible; }
+  .price-table, .price-table tbody { display: block; min-width: 0; width: 100%; }
+  .price-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .price-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+  .price-table td, .price-table td:first-child, .price-table td:last-child { display: block; min-width: 0; text-align: left; padding: 10px 8px; border: 0; overflow-wrap: anywhere; }
+  .price-table td:first-child { grid-column: 1 / -1; border-bottom: 1px solid var(--line); }
+  .price-table td[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .simple-change-path { width: max-content; margin-top: 8px; }
+}
 body{min-width:0}
 .decision-table th,.bar-label,.evidence-card h2,.anatomy-card h2,.finance-memo th{overflow-wrap:anywhere}
 </style>
@@ -6143,7 +6158,7 @@ body{min-width:0}
           <div class="title-grid bill-title-grid">
             <div>
               <p class="kicker" id="bill-review-kicker">OPENAI BILL REVIEW</p>
-              <h1 id="bill-review-title">What can this bill actually prove?</h1>
+              <h1 id="bill-review-title" tabindex="-1">What can this bill actually prove?</h1>
             </div>
             <div class="workload-intro">
               <strong id="bill-source-title">Saved dashboard exports</strong>
@@ -6412,6 +6427,7 @@ body{min-width:0}
           <div class="workbench-summary" id="opportunity-summary"></div>
           <div class="opportunity-workbench-list" id="opportunity-workbench-list"></div>
           <section class="request-review-panel" aria-labelledby="request-review-title">
+            <button class="text-button" id="back-to-bill" type="button" hidden>Back to bill review</button>
             <div class="section-heading">
               <div>
                 <p class="kicker">REQUEST-LEVEL REVIEW</p>
@@ -6988,7 +7004,7 @@ body{min-width:0}
               <div class="field-grid compact-fields">
                 <label><span>What is an hour of your time worth?</span><div class="input-prefix"><em>$</em><input id="simple-hourly-rate" type="number" min="0" step="0.01" value="30" /></div></label>
                 <label><span>Minimum usable rate you would accept</span><div class="input-suffix"><input id="simple-quality-floor" type="number" min="1" max="100" step="0.1" value="80" /><em>%</em></div></label>
-                <label class="check-field field-wide"><input id="simple-approved" type="checkbox" checked /><span>Both tools are okay to use for this work</span></label>
+                <label class="check-field field-wide"><input id="simple-approved" type="checkbox" /><span>I have confirmed both tools are okay to use for this work</span></label>
               </div>
               <p class="sample-caveat">The prefilled numbers are a small-business example. Replace them with your own before comparing.</p>
             </div>
@@ -7457,6 +7473,7 @@ body{min-width:0}
             </div>
             <strong id="price-token-summary"></strong>
           </div>
+          <p class="price-scroll-hint">Compare costs for each route below.</p>
           <div class="price-table-wrap" role="region" aria-label="Prompt price comparison" tabindex="0">
             <table class="price-table">
               <thead><tr><th>Route</th><th>Per call</th><th>Per 1,000 calls</th><th>Per month</th><th>Per year</th><th>Vs. current / month</th><th>Per usable result</th></tr></thead>
@@ -7470,6 +7487,7 @@ body{min-width:0}
             </div>
             <div class="price-result-actions">
               <button class="text-button" id="download-price-estimate" type="button">Download estimate JSON</button>
+              <label class="price-review-choice"><span>Route to review</span><select id="price-review-alternative"></select></label>
               <button class="build-button" id="send-price-to-review" type="button">Send estimate to Review</button>
             </div>
           </div>
@@ -12932,7 +12950,7 @@ body{min-width:0}
       ? costBasisLabel(proposed.evidence.cost_basis).toUpperCase()
       : "MIXED COST BASIS";
     const evidenceLabel = simple
-      ? `SAMPLED n=${baseline.outcomes.sample_size} / ${proposed.outcomes.sample_size} · USER-ENTERED COST AND TIME`
+      ? `SAMPLED n=${baseline.outcomes.sample_size} / ${proposed.outcomes.sample_size} · ${state.data.pricing_estimate ? "LIST-PRICE ESTIMATE" : "USER-ENTERED COST"} AND USER-ENTERED TIME`
       : sampled
       ? `SAMPLED n=${baseline.outcomes.sample_size} / ${proposed.outcomes.sample_size} · ${baseline.outcomes.sample_method === "declared random or systematic" && proposed.outcomes.sample_method === "declared random or systematic" ? "RANDOM / SYSTEMATIC" : "USER-SELECTED"} · ${costBasisEvidence}`
       : state.data.mode === "illustrative"
@@ -12946,7 +12964,7 @@ body{min-width:0}
         change: baseline.costs.model_cost
           ? `${proposed.costs.model_cost <= baseline.costs.model_cost ? "↓" : "↑"} ${Math.abs(((proposed.costs.model_cost - baseline.costs.model_cost) / baseline.costs.model_cost) * 100).toFixed(1)}%`
           : "Not comparable",
-        meaning: simple ? "The subscription or plan cost you entered" : providerCostsReported(baseline, proposed, comparison)
+        meaning: simple ? state.data.pricing_estimate ? "Estimated API charges at the selected rates; no provider bill was supplied" : "The monthly tool or plan cost you entered" : providerCostsReported(baseline, proposed, comparison)
           ? "Provider-reported model and API charges"
           : "Model and API cost using the declared basis",
       },
@@ -13017,7 +13035,8 @@ body{min-width:0}
         <span>QUALITY FLOOR ${pct(state.data.workload.accepted_quality_threshold)}</span>
       </div>
       ${renderYieldRoute(baseline)}
-      ${renderYieldRoute(proposed)}`;
+      ${renderYieldRoute(proposed)}
+      ${proposed.outcomes.basis === "sampled" ? `<p class="sample-range">Proposed ready-rate 95% sample range: ${escapeHtml(pct(proposed.outcomes.ready_rate_interval_95[0], 1))}–${escapeHtml(pct(proposed.outcomes.ready_rate_interval_95[1], 1))}. ${proposed.outcomes.ready_rate_interval_95[0] < state.data.workload.accepted_quality_threshold && proposed.outcomes.ready_rate_interval_95[1] >= state.data.workload.accepted_quality_threshold ? "This range crosses your quality minimum; the sample is inconclusive." : "This range describes sampling uncertainty, not a guarantee."}</p>` : ""}`;
     configureBreakEvenExplorer();
     renderLumenPanel();
   }
@@ -14569,10 +14588,12 @@ body{min-width:0}
       : pricedCandidate
         ? `${pricedCandidate.pricing_basis === "user_supplied" ? "User-supplied rate" : "Official list-price"} estimate · test first`
         : "Route in the current decision record";
+    const interval = proposed.outcomes.ready_rate_interval_95;
+    const qualityStatus = !comparison.quality_holds ? "below floor" : proposed.outcomes.basis === "sampled" && interval?.[0] < workload.accepted_quality_threshold ? "sample crosses floor; inconclusive" : "floor met";
     status.innerHTML = `
       <article><span>Quality floor</span><strong>${pct(workload.accepted_quality_threshold, 1)}</strong></article>
       <article><span>Current → proposed yield</span><strong>${pct(baseline.measures.usable_result_rate, 1)} → ${pct(proposed.measures.usable_result_rate, 1)}</strong></article>
-      <article><span>Verification status</span><strong>${escapeHtml(basis)} · ${comparison.quality_holds ? "floor met" : "below floor"}</strong></article>
+      <article><span>Verification status</span><strong>${escapeHtml(basis)} · ${qualityStatus}</strong></article>
       <article><span>Candidate to test</span><strong>${escapeHtml(candidateLabel)}</strong><p>${escapeHtml(candidateBasis)}</p></article>`;
   }
 
@@ -14719,6 +14740,8 @@ body{min-width:0}
 
   function renderSingleBill() {
     const review = summarizeSingleBill(state.data);
+    const manualBill = ["invoice_form", "invoice_pdf"].includes(state.data.config.reviewSource);
+    const basisLabel = manualBill ? "User-entered billed amount (unverified)" : costBasisLabel(review.basis);
     const { totals, period } = review;
     const stage = singleBillStage(review);
     const guidance = singleBillGuidance(review);
@@ -14737,14 +14760,14 @@ body{min-width:0}
         : `${cost(totals.providerCost)} produced ${count(review.ready)} ready result${review.ready === 1 ? "" : "s"} at ${cost(review.providerUnit)} each.`;
     const metrics = stage.key === "bill"
       ? [
-          [costBasisLabel(review.basis), cost(totals.providerCost), "The declared starting point for this review"],
+          [basisLabel, cost(totals.providerCost), "Supplied by you; no provider record was verified"],
           ["Review depth", "Bill only", "Useful for a cost baseline; usage and outcomes are optional next layers"],
           ["Usage detail", "Not supplied", "Add requests or tokens only when the source supports them"],
           ["Human effort", "Optional", "Leave blank when nobody reviews or corrects the output"],
         ]
       : stage.key === "usage"
         ? [
-            [costBasisLabel(review.basis), cost(totals.providerCost), "The declared cost for this workload and period"],
+            [basisLabel, cost(totals.providerCost), "The declared cost for this workload and period"],
             ["Requests", reported("requests"), coverageNote("requests", "Includes additional attempts when reported")],
             ["Blended cost per request", cost(costPerRequest), "Provider cost divided by supplied requests; not a model price"],
             ["Input tokens", reported("processedInput"), coverageNote("processedInput", `Cache read: ${reported("cachedInput")} · Cache write: ${reported("cacheWriteInput")}`)],
@@ -14754,7 +14777,7 @@ body{min-width:0}
             ["Human effort", "Optional", "Add only when people actively review or correct the output"],
           ]
         : [
-            [costBasisLabel(review.basis), cost(totals.providerCost), "The declared cost for this workload and period"],
+            [basisLabel, cost(totals.providerCost), "The declared cost for this workload and period"],
             ["Requests", reported("requests"), coverageNote("requests", "Includes additional attempts when reported")],
             ["Ready results", count(review.ready), `${review.completed} outcome rows under the declared ready rule`],
             ["Provider cost per ready result", cost(review.providerUnit), "Excludes shared infrastructure and human effort"],
@@ -14766,7 +14789,8 @@ body{min-width:0}
     document.getElementById("bill-review-kicker").textContent = stage.kicker;
     document.getElementById("bill-review-title").textContent = stage.title;
     const sourceTitles = {
-      invoice_form: "Your invoice details",
+      invoice_form: "Amount you entered",
+      invoice_pdf: "Invoice amount you confirmed",
       claude_spend_report: "Your Claude Team or Enterprise spend report",
       claude_admin_api: "Your saved Claude Admin API reports",
     };
@@ -14787,9 +14811,9 @@ body{min-width:0}
           : "The bill, completed work, and supplied operating costs are connected. One bill still establishes a baseline, not savings.";
     document.getElementById("bill-metric-ledger").innerHTML = metrics.map(([label, value, note]) => `<div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`).join("");
     document.getElementById("model-mix-title").textContent = "Declared bill drivers and available usage";
-    document.getElementById("bill-mix-note").textContent = `Amounts use ${costBasisLabel(review.basis).toLowerCase()}. This is the supplied attribution, not an inferred allocation or savings estimate. Cache values are token counts.`;
+    document.getElementById("bill-mix-note").textContent = `Amounts use ${basisLabel.toLowerCase()}. This is the supplied attribution, not an inferred allocation or savings estimate. Cache values are token counts.`;
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Provider / model / route</th><th>Requests</th><th>Input / output</th><th>Cache read / write</th><th>Cost basis</th><th>Declared cost</th></tr>";
-    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${escapeHtml(reportedCoverageValue(row, "requests"))}</td><td>${escapeHtml(reportedCoverageValue(row, "processedInput"))} / ${escapeHtml(reportedCoverageValue(row, "outputTokens"))}</td><td>${escapeHtml(reportedCoverageValue(row, "cachedInput"))} / ${escapeHtml(reportedCoverageValue(row, "cacheWriteInput"))}</td><td>${escapeHtml(costBasisLabel(review.basis))}</td><td>${cost(row.providerCost)}</td></tr>`).join("");
+    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${escapeHtml(reportedCoverageValue(row, "requests"))}</td><td>${escapeHtml(reportedCoverageValue(row, "processedInput"))} / ${escapeHtml(reportedCoverageValue(row, "outputTokens"))}</td><td>${escapeHtml(reportedCoverageValue(row, "cachedInput"))} / ${escapeHtml(reportedCoverageValue(row, "cacheWriteInput"))}</td><td>${escapeHtml(basisLabel)}</td><td>${cost(row.providerCost)}</td></tr>`).join("");
     document.getElementById("bill-opportunity-ledger").innerHTML = guidance.map(([kind, label, title, value, note]) => `<article class="opportunity-row state-${kind}"><span class="opportunity-state">${escapeHtml(label)}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(note)}</p></div><em>${escapeHtml(value)}</em></article>`).join("");
     document.getElementById("bill-next-step").textContent = stage.key === "bill"
       ? "Keep this baseline. Add the next piece of data only when it answers a real decision."
@@ -14809,7 +14833,7 @@ body{min-width:0}
     document.getElementById("memo-numbers-title").textContent = "What the supplied evidence supports";
     document.getElementById("memo-table-head").innerHTML = "<tr><th>Measure</th><th>Value</th><th>Boundary</th></tr>";
     document.getElementById("memo-table-body").innerHTML = metrics.map((cells) => `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("");
-    document.getElementById("memo-rules").innerHTML = memoList([["Ready means", state.data.config.acceptanceRule || "Not supplied"], ["Verified by", state.data.config.verifier || "Not supplied"], ["Cost basis", costBasisLabel(review.basis)]]);
+    document.getElementById("memo-rules").innerHTML = memoList([["Ready means", state.data.config.acceptanceRule || "Not supplied"], ["Verified by", state.data.config.verifier || "Not supplied"], ["Cost basis", basisLabel]]);
     document.getElementById("memo-evidence").innerHTML = memoList([["Review depth", stage.title], ["Evidence level", review.level], ["Coverage", "Service period and completeness are user declarations, not independently verified"], ["Savings", "Not supported by one bill"]]);
     document.getElementById("memo-planning").hidden = true;
     document.getElementById("memo-next-step").textContent = document.getElementById("bill-next-step").textContent;
@@ -15027,7 +15051,7 @@ body{min-width:0}
       : proposedIsLower
         ? "TEST FIRST"
         : "KEEP CURRENT ROUTE";
-    document.getElementById("memo-title").textContent = "AI spend decision memo";
+    document.getElementById("memo-title").textContent = mode === "illustrative" ? "ILLUSTRATIVE · AI spend decision memo" : "AI spend decision memo";
     document.getElementById("memo-meta").textContent = `${workload.name}\n${period.start} to ${period.end} · ${period.timezone}`;
     document.getElementById("memo-decision-code").textContent = decisionCode;
     document.getElementById("memo-decision-title").textContent = comparison.recommendation;
@@ -15050,13 +15074,14 @@ body{min-width:0}
       ["Ready means", baseline.outcomes.acceptance_rule],
       ["Checked by", baseline.outcomes.verifier],
       ["Quality floor", pct(workload.accepted_quality_threshold, 1)],
-      ["Policy", `Current: ${baseline.policy.approved ? "approved" : "not approved"}; proposed: ${proposed.policy.approved ? "approved" : "not approved"}`],
+      ["Policy", `Current: ${baseline.policy.approved ? "approved by reviewer" : "approval not established"}; proposed: ${proposed.policy.approved ? "approved by reviewer" : "approval not established"}`],
       ["Cost boundary", baseline.evidence.cost_boundary],
+      ...(proposed.outcomes.basis === "sampled" ? [["Proposed ready-rate 95% sample range", `${pct(proposed.outcomes.ready_rate_interval_95[0], 1)}–${pct(proposed.outcomes.ready_rate_interval_95[1], 1)}; ${proposed.outcomes.ready_rate_interval_95[0] < workload.accepted_quality_threshold && proposed.outcomes.ready_rate_interval_95[1] >= workload.accepted_quality_threshold ? "crosses the quality minimum; inconclusive" : "sample estimate"}`]] : []),
     ]);
     document.getElementById("memo-evidence").innerHTML = memoList([
       ["Current route", `${baseline.evidence.coverage_status}: ${baseline.evidence.coverage}`],
       ["Proposed route", `${proposed.evidence.coverage_status}: ${proposed.evidence.coverage}`],
-      ["Cost basis", comparison.same_cost_basis ? costBasisLabel(proposed.evidence.cost_basis) : "Mixed cost basis"],
+      ["Cost basis", state.data.pricing_estimate ? "AI Cost Lens list-price estimate; no provider bill" : state.data.experience === "simple" ? "User-entered monthly cost; no provider bill" : comparison.same_cost_basis ? costBasisLabel(proposed.evidence.cost_basis) : "Mixed cost basis"],
       ["Savings claim", comparison.savings_claim_allowed ? "Supported for this workload and period" : "Not supported"],
     ]);
     if (planning) {
@@ -15094,6 +15119,8 @@ body{min-width:0}
 
   function renderAll() {
     validateResult(state.data);
+    document.body.classList.remove("bill-usage-mode");
+    document.getElementById("back-to-bill").hidden = true;
     document.getElementById("lumen-conversation").replaceChildren();
     const isSingle = state.data.schema_version === singleBillSchema;
     const isBill = isSingle || state.data.schema_version === "ai-cost-lens-openai-bill-review/0.1";
@@ -15159,6 +15186,10 @@ body{min-width:0}
       code = "QUALITY BELOW MINIMUM";
       posture = "STOP CHANGE";
       reason = "The other option does not meet your minimum usable-result rate. A lower cost does not override that requirement.";
+    } else if (delta < 0 && comparison.human_cost_included !== false && proposed.outcomes?.basis === "sampled" && proposed.outcomes.ready_rate_interval_95?.[0] < data.workload.accepted_quality_threshold) {
+      code = "QUALITY INCONCLUSIVE";
+      posture = "INSUFFICIENT EVIDENCE";
+      reason = "The observed usable rate meets the minimum, but its 95% sample range crosses that minimum. Check more outputs before deciding to switch.";
     } else if (comparison.human_cost_included === false) {
       code = "ADD MISSING TIME";
       posture = "INSUFFICIENT EVIDENCE";
@@ -15657,6 +15688,17 @@ body{min-width:0}
     }
     if (mode === "usage") {
       state.builderMode = null;
+      const fromBill = [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version);
+      if (fromBill) {
+        document.body.classList.add("bill-usage-mode");
+        document.getElementById("back-to-bill").hidden = false;
+        document.getElementById("bill-review-screen").classList.remove("active");
+        document.getElementById("view-opportunities").classList.add("active");
+        reviewDialog.close();
+        document.querySelector(".request-review-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById("request-log-file").focus();
+        return;
+      }
       state.view = "opportunities";
       state.story = false;
       document.body.classList.remove("story-mode");
@@ -15711,6 +15753,13 @@ body{min-width:0}
   document.getElementById("open-review").addEventListener("click", () => document.getElementById("review-file").click());
 
   document.getElementById("review-usage").addEventListener("click", () => activateBuilderMode("usage"));
+  document.getElementById("back-to-bill").addEventListener("click", () => {
+    document.body.classList.remove("bill-usage-mode");
+    document.getElementById("view-opportunities").classList.remove("active");
+    document.getElementById("bill-review-screen").classList.add("active");
+    document.getElementById("back-to-bill").hidden = true;
+    document.getElementById("bill-review-title").focus();
+  });
 
   document.getElementById("start-review").addEventListener("click", () => {
     document.getElementById("builder-error").classList.remove("visible");
@@ -15881,7 +15930,11 @@ body{min-width:0}
   }
 
   function modelRate(value) {
-    return `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: value < 1 ? 2 : 0, maximumFractionDigits: 5 })}`;
+    return `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 5 })}`;
+  }
+
+  function contextTokens(value) {
+    return `${wholeNumber(value)}-token`;
   }
 
   function renderModelCatalog() {
@@ -15900,7 +15953,7 @@ body{min-width:0}
       const cacheSupplement = model.standard.cache_write !== undefined
         ? ["Cache write", model.standard.cache_write]
         : model.standard.cache_write_5m !== undefined
-          ? ["Cache write · 5m", model.standard.cache_write_5m]
+            ? ["Cache write · 5 min", model.standard.cache_write_5m]
           : model.standard.cache_storage_per_1m_token_hour !== undefined
             ? ["Cache storage / hr", model.standard.cache_storage_per_1m_token_hour]
             : ["Cache extra", null];
@@ -15917,7 +15970,9 @@ body{min-width:0}
         <p class="model-catalog-tier">Standard mode · ${longContextRates ? `up to ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens per request` : "published text rates"}</p>
         <div class="model-catalog-rates" role="group" aria-label="Standard USD rates. Token rates are per 1 million tokens; cache storage is per 1 million token-hours.">${rates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${value === null ? "Not listed" : modelRate(value)}</strong></div>`).join("")}</div>
         ${longContextRates ? `<p class="model-catalog-tier">Standard mode · over ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens per request; higher rates apply to the full request</p><div class="model-catalog-rates" role="group" aria-label="Standard long-context USD rates per 1 million tokens">${longContextRates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${modelRate(value)}</strong></div>`).join("")}</div>` : ""}
-        <div class="model-catalog-card-foot"><div><span class="model-catalog-context">${compact(context)} token context · ${escapeHtml(modes)}</span><div class="model-workload-signals">${model.workload_tags.map((tag) => `<span>${escapeHtml(tagLabels[tag])}</span>`).join("")}</div></div><a class="model-catalog-provider-notes" href="${escapeHtml(model.capability_source_url)}" target="_blank" rel="noreferrer">Provider notes</a></div>
+        ${model.standard.cache_write_1h !== undefined ? `<p class="model-catalog-tier">1-hour cache write: ${modelRate(model.standard.cache_write_1h)} / 1M tokens</p>` : ""}
+        ${model.provider === "Anthropic" && context >= 1000000 ? '<p class="model-catalog-tier">Published rates apply across the full 1,000,000-token context.</p>' : ""}
+        <div class="model-catalog-card-foot"><div><span class="model-catalog-context">${contextTokens(context)} context · ${escapeHtml(modes)}</span><div class="model-workload-signals">${model.workload_tags.map((tag) => `<span>${escapeHtml(tagLabels[tag])}</span>`).join("")}</div></div><a class="model-catalog-provider-notes" href="${escapeHtml(model.capability_source_url)}" target="_blank" rel="noreferrer">Provider notes</a></div>
       </article>`;
     }).join("") || '<p class="model-catalog-empty">No model matches this filter.</p>';
     document.getElementById("model-catalog-count").textContent = `${models.length} of ${pricingCatalog.models.length} models · token rates per 1M tokens; storage per 1M token-hours · provider-described workload signals are reference only`;
@@ -15951,7 +16006,8 @@ body{min-width:0}
     document.getElementById("prompt-alt-1").value = "anthropic/claude-sonnet-5";
     document.getElementById("prompt-alt-2").value = "google/gemini-3.8-flash";
     document.getElementById("prompt-alt-3").value = "";
-    const today = new Date().toISOString().slice(0, 10);
+    const localNow = new Date();
+    const today = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, "0")}-${String(localNow.getDate()).padStart(2, "0")}`;
     document.getElementById("prompt-custom-effective").value = today;
     const pricingDateInput = document.getElementById("prompt-pricing-date");
     pricingDateInput.min = pricingCatalog.effective_at;
@@ -15965,7 +16021,7 @@ body{min-width:0}
       });
     });
     const sources = pricingCatalog.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.provider)} (checked ${escapeHtml(source.checked_at)})</a>`).join(", ");
-    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Direct API list-price sources: ${sources}. Model-specific start dates are shown below; review again by ${escapeHtml(pricingCatalog.review_by)}. Earlier pricing snapshots remain in the repository. Processing mode, cache-write treatment, and geography are recorded per route.`;
+    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Direct API list-price sources: ${sources}. Model-specific start dates are shown below; review again by ${escapeHtml(pricingCatalog.review_by)}. Earlier pricing snapshots remain in the repository. Processing mode, cache-write treatment, and geography are recorded per route.${today > pricingCatalog.review_by ? " Catalog review is overdue. The selected date is historical; refresh rates before using this for a current decision." : ""}`;
     const providers = [...new Set(pricingCatalog.models.map((model) => model.provider))];
     document.getElementById("model-catalog-provider").innerHTML = '<option value="">All providers</option>' + providers.map((provider) => `<option value="${escapeHtml(provider)}">${escapeHtml(provider)}</option>`).join("");
     document.getElementById("model-catalog-search").addEventListener("input", renderModelCatalog);
@@ -16022,14 +16078,18 @@ body{min-width:0}
       const priceBasis = result.pricing_basis === "user_supplied" ? `user-supplied · effective ${result.pricing_effective_at}` : `official list · checked ${result.pricing_verified_at}`;
       return `<tr>
         <td class="price-route-name"><strong>${escapeHtml(result.label)}</strong><span>${escapeHtml(result.provider)} · ${escapeHtml(modeLabel(result.processing_mode))} · ${escapeHtml(geographyLabel(result.geography, result.geography_multiplier))}${result.pricing_adjustment === "long_context" ? " · long-context rates" : ""}${result.role === "current" ? " · current" : ""}</span><small>${wholeNumber(result.input_tokens)} input · ${result.input_token_method === "openai_o200k_base_exact_raw_text" ? "exact raw-text count" : result.input_token_method === "manual" ? "entered count" : "estimated count"} · ${escapeHtml(priceBasis)}</small></td>
-        <td>${promptPriceMoney(result.estimated_cost_per_call_usd)}</td>
-        <td>${promptPriceMoney(result.estimated_cost_per_1000_calls_usd)}</td>
-        <td>${promptPriceMoney(result.estimated_monthly_cost_usd)}</td>
-        <td>${promptPriceMoney(result.estimated_annual_cost_usd)}</td>
-        <td class="${differenceClass}">${result.role === "current" ? "Reference" : `${difference < 0 ? "−" : difference > 0 ? "+" : ""}${promptPriceMoney(Math.abs(difference))}`}</td>
-        <td>${usable}</td>
+        <td data-label="Per call">${promptPriceMoney(result.estimated_cost_per_call_usd)}</td>
+        <td data-label="Per 1,000 calls">${promptPriceMoney(result.estimated_cost_per_1000_calls_usd)}</td>
+        <td data-label="Per month">${promptPriceMoney(result.estimated_monthly_cost_usd)}</td>
+        <td data-label="Per year">${promptPriceMoney(result.estimated_annual_cost_usd)}</td>
+        <td data-label="Vs. current / month" class="${differenceClass}">${result.role === "current" ? "Reference" : `${difference < 0 ? "−" : difference > 0 ? "+" : ""}${promptPriceMoney(Math.abs(difference))}`}</td>
+        <td data-label="Per usable result">${usable}</td>
       </tr>`;
     }).join("");
+    const choice = document.getElementById("price-review-alternative");
+    choice.innerHTML = alternatives.map((route, index) => `<option value="${index}">${escapeHtml(route.label)}</option>`).join("");
+    choice.value = alternatives.length ? "0" : "";
+    choice.disabled = !alternatives.length;
     const basis = record.estimate_basis;
     const tokenMethods = new Set(basis.model_token_estimates.map((item) => item.input_token_method));
     const tokenMethod = tokenMethods.size === 1 && tokenMethods.has("manual")
@@ -16099,6 +16159,10 @@ body{min-width:0}
     event.preventDefault();
     const error = document.getElementById("price-prompt-error");
     const button = document.getElementById("calculate-prompt-price");
+    pendingPriceRecord = null;
+    document.getElementById("price-results").hidden = true;
+    document.getElementById("download-price-estimate").disabled = true;
+    document.getElementById("send-price-to-review").disabled = true;
     error.classList.remove("visible");
     button.disabled = true;
     button.textContent = "Calculating…";
@@ -16133,6 +16197,8 @@ body{min-width:0}
       const comparison = pricingEngine.compareModels(pricingCatalog, routes, scenario, modelTokenEstimates, customModels);
       pendingPriceRecord = pricingEngine.buildEstimateRecord(pricingCatalog, comparison, scenario, tokenEstimate);
       renderPromptPrice(pendingPriceRecord);
+      document.getElementById("download-price-estimate").disabled = false;
+      document.getElementById("send-price-to-review").disabled = false;
     } catch (caught) {
       error.textContent = caught.message || "The prompt scenario could not be calculated.";
       error.classList.add("visible");
@@ -16158,7 +16224,7 @@ body{min-width:0}
   document.getElementById("send-price-to-review").addEventListener("click", () => {
     if (!pendingPriceRecord) return;
     const current = pendingPriceRecord.comparison[0];
-    const alternative = [...pendingPriceRecord.comparison.slice(1)].sort((a, b) => a.estimated_monthly_cost_usd - b.estimated_monthly_cost_usd)[0];
+    const alternative = pendingPriceRecord.comparison.slice(1)[Number(document.getElementById("price-review-alternative").value)];
     if (!alternative) {
       const error = document.getElementById("price-prompt-error");
       error.textContent = "Choose at least one alternative before sending the estimate to Review.";
@@ -16183,7 +16249,7 @@ body{min-width:0}
     document.getElementById("builder-action-note").textContent = pendingPriceRecord.estimate_basis.rate_source_scope === "official_list_only"
       ? "Official list-price estimates are loaded. Review the same task sample on both routes before making a decision."
       : "Rate estimates are loaded, including a user-supplied rate that AI Cost Lens did not verify. Review the same task sample on both routes before making a decision.";
-    showToast("Estimate loaded. Add comparable output evidence before judging the route.");
+    showToast(`${alternative.label} selected. Add comparable output evidence before judging the route.`);
   });
 
   initializePromptPricing();
@@ -16432,6 +16498,10 @@ body{min-width:0}
             ? ""
             : " One or more rates were supplied by the user and were not independently verified.";
           state.data.comparison.limitation += ` The provider charges came from an AI Cost Lens rate estimate.${customRateCopy} Estimated calculator data cannot support a savings claim.`;
+          for (const scenario of [state.data.baseline, state.data.proposed]) {
+            scenario.evidence.source = "AI Cost Lens list-price estimate; no provider bill supplied";
+            scenario.evidence.cost_boundary = "Estimated API list price plus user-entered value of review and fixing time; not billed spend";
+          }
         }
         state.data.comparison.recommendation = decisionFor(state.data).reason;
         validateResult(state.data);

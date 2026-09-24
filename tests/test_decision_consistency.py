@@ -157,7 +157,7 @@ function render(d,code) {
  assert.ok(elements['unit-cost-chart'].innerHTML.includes('Recurring cost per ready result'));
  assert.ok(!elements['unit-cost-chart'].innerHTML.includes('Recurring operating cost'));
 
- render(await build(40,20,0,0,16),'TEST FIRST');
+ render(await build(40,20,0,0,16),'QUALITY INCONCLUSIVE');
  render(await build(40,1,0,0,10),'QUALITY BELOW MINIMUM');
  render(await build(40,1,0,0,19,{proposedPolicyApproved:false}),'CHECK APPROVAL');
  render(await build(0,20,0,0,19),'KEEP CURRENT ROUTE');
@@ -165,7 +165,7 @@ function render(d,code) {
  render(await build(0,0,0,0,19),'NO COST ADVANTAGE');
  assert.equal(elements['break-even-verdict'].textContent,'NO COST ADVANTAGE');
  render(await build(40,40,0,0,19),'NO COST ADVANTAGE');
- render(await build(1000000,500000,0,0,19),'TEST FIRST');
+ render(await build(1000000,500000,0,0,19),'QUALITY INCONCLUSIVE');
  await assert.rejects(build(40,20,0,0,0), /zero usable outputs/);
  const tampered = JSON.parse(JSON.stringify(d)); tampered.proposed.measures.cost_per_usable_result = .001;
  assert.throws(()=>api.validateResult(tampered), /inconsistent|validation failed/);
