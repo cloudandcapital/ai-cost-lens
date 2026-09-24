@@ -3025,7 +3025,7 @@
             : "No one time or policy cost was entered for this row.",
       },
     ];
-    document.getElementById("opportunity-ledger").innerHTML = opportunityRows
+    document.getElementById("opportunity-ledger").innerHTML = visibleOpportunityRows(opportunityRows, comparison, lowerUnitCost, illustrative, evidenceIssues)
       .map(
         (row) => `
           <article class="opportunity-row state-${row.state}">
@@ -3254,7 +3254,7 @@
             : "No one time or policy cost was entered for this row.",
       },
     ];
-    document.getElementById("opportunity-ledger").innerHTML = opportunityRows
+    document.getElementById("opportunity-ledger").innerHTML = visibleOpportunityRows(opportunityRows, comparison, lowerUnitCost, illustrative, evidenceIssues)
       .map(
         (row) => `
           <article class="opportunity-row state-${row.state}">
@@ -4616,13 +4616,54 @@
     return { code, posture, reason, delta, percent: a > 0 ? delta / a * 100 : null };
   }
 
+  function visibleOpportunityRows(rows, comparison, lowerUnitCost, illustrative, evidenceIssues) {
+    const save = rows.find((row) => row.state === "save");
+    const test = rows.find((row) => row.state === "test");
+    const fix = rows.find((row) => row.state === "fix");
+    const leave = rows.find((row) => row.state === "leave");
+    if (illustrative) {
+      fix.label = "TRY IT WITH YOUR DATA";
+      fix.title = "Check this against a real bill and work log";
+      fix.note = "This example shows the method. Match your own bill to the same period of work before making a cost claim.";
+      if (!lowerUnitCost) {
+        leave.title = "A cheaper bill, a costlier result";
+        leave.note = `The provider bill falls, but each ready result costs ${Math.abs(comparison.cost_per_usable_result_change_pct).toFixed(1)}% more once the supplied costs and outcomes are counted.`;
+      }
+    }
+    return [
+      comparison.savings_claim_allowed && save,
+      lowerUnitCost && !comparison.savings_claim_allowed && test,
+      !lowerUnitCost && leave,
+      (illustrative || evidenceIssues.length || fix.title === "Sample assumptions need confirmation") && fix,
+      lowerUnitCost && leave.value !== "—" && leave,
+    ].filter(Boolean);
+  }
+
+  function decisionHeadline(code) {
+    return {
+      "QUALITY BELOW MINIMUM": "Keep the current route",
+      "KEEP CURRENT ROUTE": "Keep the current route",
+      "NO COST ADVANTAGE": "No cost advantage to switching",
+      "CHECK APPROVAL": "Confirm policy approval first",
+      "QUALITY INCONCLUSIVE": "Check more results before switching",
+      "ADD MISSING TIME": "Add the missing review time",
+      "SAVE NOW": "The lower cost is supported",
+      "TEST FIRST": "Test the lower-cost route",
+    }[code] || sentenceCase(code.toLowerCase());
+  }
+
   function renderDecisionConsistency() {
     if ([singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version)) return;
     const decision = decisionFor(state.data);
     state.data.comparison.finance_posture = decision.posture;
     for (const id of ["decision-code", "memo-decision-code"]) document.getElementById(id).textContent = decision.code;
     document.getElementById("finance-posture").textContent = `Finance recommendation: ${decision.posture}`;
-    for (const id of ["decision-title", "memo-decision-title", "memo-next-step", "lumen-panel-copy"]) document.getElementById(id).textContent = decision.reason;
+    for (const id of ["decision-title", "memo-decision-title"]) document.getElementById(id).textContent = decisionHeadline(decision.code);
+    for (const id of ["decision-explanation", "memo-next-step", "lumen-panel-copy"]) document.getElementById(id).textContent = decision.reason;
+    if (state.data.mode === "illustrative" && decision.code === "QUALITY BELOW MINIMUM" && decision.delta > 0) {
+      document.getElementById("decision-explanation").textContent =
+        `The proposed route costs ${Math.abs(decision.percent).toFixed(1)}% more per ready result and falls below the quality floor. This example needs real bill and work records before anyone acts on it.`;
+    }
     document.getElementById("lumen-panel-title").textContent = sentenceCase(decision.code.toLowerCase());
     const decisionHeading = document.querySelector(".decision-table-heading strong");
     if (decisionHeading) decisionHeading.textContent = sentenceCase(decision.code.toLowerCase());

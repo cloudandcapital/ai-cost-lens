@@ -129,7 +129,8 @@ function render(d,code) {
  assert.equal(elements['decision-code'].textContent,code);
  assert.equal(elements['memo-decision-code'].textContent,code);
  assert.match(elements['finance-posture'].textContent,/Finance recommendation: (FUND CHANGE|FIX EVIDENCE|STOP CHANGE|INSUFFICIENT EVIDENCE)/);
- assert.equal(elements['decision-title'].textContent,elements['memo-next-step'].textContent);
+ assert.equal(elements['decision-title'].textContent,elements['memo-decision-title'].textContent);
+ assert.equal(elements['decision-explanation'].textContent,elements['memo-next-step'].textContent);
  for (const kind of ['why','changed','cfo']) assert.ok(api.lumenResponse(kind).includes(d.comparison.recommendation));
  for (const [id,e] of Object.entries(elements)) assert.ok(!/NaN|Infinity|>undefined</.test(e.textContent+' '+e.innerHTML), id+': '+e.textContent+' '+e.innerHTML);
 }

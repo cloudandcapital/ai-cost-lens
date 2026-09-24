@@ -43,6 +43,14 @@ for (const date of ['2024-02-29', '2026-02-28', '2026-12-31']) assert.equal(api.
 const demo = JSON.parse(read('web/data/illustrative-review-result.json'));
 api.validateResult(demo);
 api.validateResult(JSON.parse(JSON.stringify(demo)));
+api.state.data = demo;
+api.renderAll();
+assert.match(element('opportunity-ledger').innerHTML, /A cheaper bill, a costlier result/);
+assert.match(element('opportunity-ledger').innerHTML, /Check this against a real bill and work log/);
+assert.doesNotMatch(element('opportunity-ledger').innerHTML, /No proven savings yet|No open route test/);
+assert.equal(element('decision-title').textContent, 'Keep the current route');
+assert.match(element('decision-explanation').textContent, /costs 4\.8% more per ready result/);
+assert.equal(element('memo-decision-title').textContent, 'Keep the current route');
 let rejectedMutations = 0;
 const requiredLeaves = (obj, prefix = []) => Object.entries(obj).flatMap(([key, value]) => {
   if (['planning'].includes(key) && !prefix.length) return [];
@@ -471,8 +479,9 @@ for (const [review, expected] of gateCases) {
   api.state.data = review;
   api.renderAll();
   assert.match(element('finding-title').textContent, expected);
-  assert.match(element('decision-title').textContent, expected);
-  assert.match(element('memo-decision-title').textContent, expected);
+  assert.match(element('decision-explanation').textContent, expected);
+  assert.match(element('memo-next-step').textContent, expected);
+  assert.equal(element('decision-title').textContent, element('memo-decision-title').textContent);
   assert.match(element('opportunity-ledger').innerHTML, expected);
   assert.match(api.lumenResponse('evidence'), expected);
   assert.match(api.lumenResponse('cfo'), expected);
