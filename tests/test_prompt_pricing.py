@@ -96,6 +96,10 @@ console.log(JSON.stringify({catalog, comparison, record}));
     assert current["estimated_cost_per_usable_result_usd"] == 0.0180125
     assert alternative["estimated_monthly_cost_usd"] == 7.205
     assert alternative["monthly_difference_from_current_usd"] == -7.205
+    assert current["promotional_rate_guaranteed_through"] == "2026-11-21"
+    assert current["estimated_annual_cost_usd"] is None
+    assert current["annual_rate_known"] is False
+    assert alternative["annual_difference_from_current_usd"] is None
 
     record = payload["record"]
     assert record["application_version"] == "1.0.0"

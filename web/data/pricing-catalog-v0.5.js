@@ -84,6 +84,7 @@
         provider: "OpenAI",
         label: "GPT-5.6 Sol",
         model: "gpt-5.6-sol",
+        promotional_rate_guaranteed_through: "2026-11-21",
         context_window_tokens: 1050000,
         max_output_tokens: 128000,
         source_url: "https://developers.openai.com/api/docs/pricing",

@@ -298,6 +298,22 @@ button,
   color: var(--surface);
 }
 
+.example-switcher #start-review-inline {
+  margin-left: auto;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 700;
+}
+
+@media (max-width: 680px) {
+  .example-switcher #start-review-inline {
+    width: 100%;
+    margin-left: 0;
+    min-height: 44px;
+  }
+}
+
 .example-switcher button:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;

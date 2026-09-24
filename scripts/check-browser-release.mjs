@@ -202,6 +202,10 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert((await page.locator("#mode-tag").innerText()) === "ILLUSTRATIVE DATA", `${engineName}: invented example lacks its evidence label.`);
   assert((await page.locator("#decision-title").innerText()) === "Test the lower-cost route", `${engineName}: startup example overclaims the route change.`);
   assert((await page.locator("#opportunity-ledger").innerText()).includes("One time change cost"), `${engineName}: growth example omitted migration cost.`);
+  assert((await page.locator("#review-title").innerText()).includes("Cost per ready result down 19%"), `${engineName}: startup example hides its result.`);
+  await page.locator("#start-review-inline").click();
+  assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: inline review action did not open.`);
+  await page.locator("#close-review").click();
   await page.locator('[data-example="cost-trap"]').click();
   assert((await page.locator("#workload-name").innerText()) === "Contract risk summaries", `${engineName}: could not return to the original example.`);
 

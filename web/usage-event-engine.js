@@ -471,6 +471,9 @@
       }));
     }
 
+    // Repeated source rows can carry the same retry parent without representing new attempts.
+    const duplicateCopies = new Set([...duplicateGroups.values()].flatMap((members) => members.slice(1).map((event) => event.record_id)));
+
     const failedOrRetried = events.filter((event) => ["failed", "cancelled", "retried"].includes(event.request_status) || event.retry_parent_event_id);
     const failedAttemptCost = (event) => ["failed", "cancelled", "retried"].includes(event.request_status) ? event.selected_cost : null;
     if (failedOrRetried.length) {
@@ -498,7 +501,7 @@
     }
 
     const loopRoots = new Map();
-    events.filter((event) => event.retry_parent_event_id).forEach((event) => {
+    events.filter((event) => event.retry_parent_event_id && !duplicateCopies.has(event.record_id)).forEach((event) => {
       if (!loopRoots.has(event.retry_parent_event_id)) loopRoots.set(event.retry_parent_event_id, []);
       loopRoots.get(event.retry_parent_event_id).push(event);
     });
@@ -533,11 +536,6 @@
     });
     const cacheCandidates = [...prefixGroups.values()].filter((members) => members.length >= 3).flatMap((members) => members.filter((event) => event.cached_input_tokens === 0));
     if (cacheCandidates.length) {
-      const amounts = eventAmountMap(cacheCandidates, (event) => {
-        const input = rateForEvent(event, catalog, "input");
-        const cached = rateForEvent(event, catalog, "cached_input");
-        return input === null || cached === null ? null : event.input_tokens * Math.max(0, input - cached) / 1_000_000;
-      });
       findings.push(finding({
         id: "low-cache-use-with-repeated-prefix",
         kind: "low_cache_use_with_repeated_prefix",
@@ -546,17 +544,17 @@
         explanation: "A supplied prefix fingerprint repeats at least three times, while the affected rows report no cached input.",
         affected_scope: scope(cacheCandidates),
         current_cost: round(cacheCandidates.reduce((sum, event) => sum + (event.selected_cost || 0), 0)),
-        event_avoidable_costs: amounts,
-        calculation: Object.keys(amounts).length ? "Upper-bound difference between published uncached-input and cached-input rates for affected tokens." : "No amount because an exact catalog model or token count was unavailable.",
+        event_avoidable_costs: {},
+        calculation: "No savings amount: a prefix fingerprint does not reveal how many input tokens qualify for caching, write premiums, or storage charges.",
         evidence_basis: "inferred",
         confidence: "medium",
-        confidence_in_dollar_estimate: Object.keys(amounts).length ? "estimated" : "not_quantified",
+        confidence_in_dollar_estimate: "not_quantified",
         overlap_group: "input-efficiency",
         affected_event_ids: cacheCandidates.map((event) => event.record_id),
         verification_requirement: "Confirm provider cache eligibility, prefix stability, minimum token thresholds, writes, TTL, and storage charges.",
         suggested_next_step: "Test one stable cacheable prefix",
         action: "verify",
-        limitations: "The amount is an upper bound. A fingerprint does not prove every token qualifies for cache pricing.",
+        limitations: "A fingerprint does not prove how many tokens qualify for cache pricing. Measure the reusable prefix, cache writes, TTL, and storage before estimating savings.",
         headline_eligible: false,
       }));
     }

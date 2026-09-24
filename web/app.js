@@ -534,6 +534,11 @@
   }
 
   function failedSavingsGateText(comparison, baseline, proposed) {
+    if ([baseline, proposed].some((route) => route.evidence.coverage_status === "illustrative")) {
+      return comparison.quality_holds
+        ? "the invented example inputs"
+        : "the declared quality requirement and invented example inputs";
+    }
     const failures = [
       !comparison.quality_holds && "the declared quality requirement",
       !comparison.both_policy_approved && "policy approval",
@@ -2304,7 +2309,11 @@
     const shares = [counts.ready, counts.correction, counts.escalation].map(
       (value) => (counts.completed ? (value / counts.completed) * 100 : 0),
     );
-    const perHundred = shares.map((value) => Math.round(value));
+    const perHundred = shares.map((value) => Math.floor(value));
+    const remainder = counts.completed ? Math.max(0, 100 - perHundred.reduce((sum, value) => sum + value, 0)) : 0;
+    const byFraction = shares.map((value, index) => ({ index, fraction: value - perHundred[index] }))
+      .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+    for (let index = 0; index < remainder; index += 1) perHundred[byFraction[index % byFraction.length].index] += 1;
     return `
       <div class="yield-route">
         <div class="yield-route-head">
@@ -2574,19 +2583,23 @@
       ? unitMoney(modeledUnit)
       : "Unavailable";
     const hasReadyResults = readyResults > 0;
+    const meetsQuality = yieldRate >= state.data.workload.accepted_quality_threshold &&
+      yieldRate >= baseline.measures.usable_result_rate;
     document.getElementById("break-even-verdict").textContent = !hasReadyResults
       ? "NO READY RESULTS"
+      : !meetsQuality
+        ? "BELOW QUALITY REQUIREMENT"
       : Math.abs(modeledUnit - currentUnit) < 0.000001
         ? "NO COST ADVANTAGE"
         : modeledUnit < currentUnit ? "LOWER MODELED COST" : "CURRENT ROUTE STILL WINS";
-    document.getElementById("break-even-verdict").classList.toggle("wins", hasReadyResults && modeledUnit < currentUnit);
+    document.getElementById("break-even-verdict").classList.toggle("wins", hasReadyResults && meetsQuality && modeledUnit < currentUnit);
     document.getElementById("break-even-copy").textContent = currentUnit === 0
       ? "The current option has zero cost on the supplied inputs. A percentage saving is undefined; the other option can only match zero or cost more. Quality and approval requirements still apply."
       : !hasReadyResults
       ? `At 0% ready, the proposed route produces no usable result, so a unit cost cannot be calculated. At these costs it needs ${breakEvenYield.toFixed(1)}% of attempts to be ready to match ${unitMoney(currentUnit)}.`
-      : breakEvenYield <= 100
-        ? `At these costs, the proposed route needs ${breakEvenYield.toFixed(1)}% of attempts to be ready to match ${unitMoney(currentUnit)}. The slider currently models ${readyResults.toFixed(0)} ready results and a ${Math.abs(delta).toFixed(1)}% ${delta <= 0 ? "advantage" : "premium"}.`
-        : `Even a 100% ready result rate would not match ${unitMoney(currentUnit)} at these costs. Reduce the provider or human work line first.`;
+      : `${breakEvenYield <= 100
+        ? `At these costs, the proposed route needs ${breakEvenYield.toFixed(1)}% of attempts to be ready to match ${unitMoney(currentUnit)}. The slider models ${readyResults.toFixed(0)} ready results and a ${Math.abs(delta).toFixed(1)}% ${delta <= 0 ? "cost advantage" : "cost premium"}.`
+        : `Even a 100% ready result rate would not match ${unitMoney(currentUnit)} at these costs. Reduce the provider or human work line first.`} ${meetsQuality ? "" : `The selected ready rate does not meet the ${pct(state.data.workload.accepted_quality_threshold)} floor and the current route's ${pct(baseline.measures.usable_result_rate)} rate.`} Human cost stays fixed in this slider; adjust it separately if review effort changes with yield.`;
   }
 
   function lumenFacts() {
@@ -2718,7 +2731,7 @@
         ? "The review does not contain enough volume data to calculate a break-even yield."
         : `At the current proposed cost, at least ${compact(facts.requiredReady)} of ${compact(proposed.outcomes.completed_results)} attempts must be ready to match the current ${unitMoney(baseline.measures.cost_per_usable_result)} unit cost. That is a ${facts.requiredRate.toFixed(1)}% ready result rate, compared with ${pct(proposed.measures.usable_result_rate)} now. The break-even explorer lets you test a different yield, provider bill, or human work cost.`,
       evidence: mode === "illustrative"
-        ? `The math is complete for these inputs. Before finance relies on it, use the provider bill and outcome log for one specific workload. Apply the same definition of "ready" to both routes, measure the human correction time, and enter the cost of making the change. ${issueCount ? `${issueCount} file or math issue${issueCount === 1 ? " is" : "s are"} also open.` : "The records reconcile."}`
+        ? `These costs and outcomes are invented. The example's arithmetic can guide a test, but it does not verify savings, a provider bill, a work log, or real policy approval. For your own decision, compare one workload's bill and reviewed results with the same definition of "ready" on both routes.${issueCount ? ` ${issueCount} file or math issue${issueCount === 1 ? " is" : "s are"} also open.` : ""}`
         : comparison.savings_claim_allowed
           ? "The bill, work volume, quality rule, policy approval, and included costs all match for this review. That supports this decision for this workload and period, not a claim about the model everywhere."
           : issueCount
@@ -2803,7 +2816,7 @@
     const horizonValue = payback.horizon_net_savings;
     document.getElementById("payback-metrics").innerHTML = `
       <div><dt>Expected ready results</dt><dd>${compact(payback.expected_ready_results_per_month)} / month</dd></div>
-      <div><dt>Monthly savings or shortfall</dt><dd>${signedMoney(payback.monthly_operating_savings)}</dd></div>
+      <div><dt>Monthly unit-cost gap at ${compact(payback.expected_ready_results_per_month)} ready results</dt><dd>${signedMoney(payback.monthly_operating_savings)}</dd></div>
       <div><dt>One time change cost</dt><dd>${money(payback.one_time_change_cost)}</dd></div>
       <div><dt>${payback.decision_horizon_months}-month net</dt><dd class="${horizonValue >= 0 ? "positive" : "negative"}">${signedMoney(horizonValue)}</dd></div>`;
   }
@@ -2919,7 +2932,7 @@
       {
         label: humanIncluded ? "Recurring cost" : "Measured recurring cost",
         value: `${money(baseline.costs.recurring_operating_cost)} → ${money(proposed.costs.recurring_operating_cost)}`,
-        note: `${money(Math.abs(comparison.recurring_cost_difference))} ${comparison.recurring_cost_difference <= 0 ? "lower" : "higher"} in the compared period`,
+        note: `${money(Math.abs(comparison.recurring_cost_difference))} ${comparison.recurring_cost_difference <= 0 ? "lower" : "higher"} in recurring totals at each route's own ready-result yield`,
       },
       {
         label: "Ready result rate",
@@ -2987,7 +3000,7 @@
         label: "TEST FIRST",
         title: lowerUnitCost && !comparison.savings_claim_allowed ? "Proposed model route" : "No open route test",
         value: lowerUnitCost && !comparison.savings_claim_allowed
-          ? `${money(Math.abs(comparison.normalized_cost_difference))} difference`
+          ? `${money(Math.abs(comparison.normalized_cost_difference))} modeled difference at ${compact(baseline.outcomes.usable_results)} baseline ready results`
           : "—",
         note: lowerUnitCost && !comparison.savings_claim_allowed
           ? `The unit cost is ${Math.abs(comparison.cost_per_usable_result_change_pct).toFixed(1)}% lower at equivalent accepted volume, but ${gateFailureText} still blocks a savings claim.`
@@ -3053,7 +3066,11 @@
   function renderReview() {
     if (state.data.experience === "simple") return renderSimpleReview();
     document.getElementById("review-kicker").textContent = "FINANCE FIRST AI SPEND REVIEW";
-    document.getElementById("review-title").textContent = "What did one ready result really cost?";
+    document.getElementById("review-title").textContent = state.data.mode === "illustrative"
+      ? state.data.workload.name === "Growing support AI workload"
+        ? "Provider cost down 32%. Cost per ready result down 19%."
+        : "Provider cost down 65%. Cost per ready result up 5%."
+      : "What did one ready result really cost?";
     document.getElementById("truth-kicker").textContent = "THE NUMBER FINANCE NEEDS";
     document.getElementById("truth-title").textContent = "The cost of one ready result";
     const { baseline, proposed, comparison, workload, period, mode } = state.data;
@@ -3157,7 +3174,7 @@
       {
         label: "Recurring cost",
         value: `${money(baseline.costs.recurring_operating_cost)} → ${money(proposed.costs.recurring_operating_cost)}`,
-        note: `${money(Math.abs(comparison.recurring_cost_difference))} ${comparison.recurring_cost_difference <= 0 ? "lower" : "higher"} in the compared period`,
+        note: `${money(Math.abs(comparison.recurring_cost_difference))} ${comparison.recurring_cost_difference <= 0 ? "lower" : "higher"} in recurring totals at each route's own ready-result yield`,
       },
       {
         label: "Ready result rate",
@@ -3216,7 +3233,7 @@
         label: "TEST FIRST",
         title: lowerUnitCost && !comparison.savings_claim_allowed ? "Proposed model route" : "No open route test",
         value: lowerUnitCost && !comparison.savings_claim_allowed
-          ? `${money(Math.abs(comparison.normalized_cost_difference))} difference`
+          ? `${money(Math.abs(comparison.normalized_cost_difference))} modeled difference at ${compact(baseline.outcomes.usable_results)} baseline ready results`
           : "—",
         note: lowerUnitCost && !comparison.savings_claim_allowed
           ? `The unit cost is ${Math.abs(comparison.cost_per_usable_result_change_pct).toFixed(1)}% lower at equivalent accepted volume, but ${gateFailureText} still blocks a savings claim.`
@@ -3393,7 +3410,7 @@
       ? `<div><dt>Outcome evidence</dt><dd>${escapeHtml(scenario.outcomes.sample_method)} sample · ${scenario.outcomes.sample_size} reviewed of ${compact(scenario.outcomes.completed_results)} period results</dd></div>
          <div><dt>${randomSample ? "Ready-rate range" : "Statistical range"}</dt><dd>${randomSample ? `${pct(scenario.outcomes.ready_rate_interval_95[0])} to ${pct(scenario.outcomes.ready_rate_interval_95[1])} · assumes the declared sampling method` : "Not shown · the sample was not declared random or systematic"}</dd></div>`
       : scenario.outcomes.basis === "illustrative"
-        ? `<div><dt>Outcome evidence</dt><dd>Complete outcome log</dd></div>`
+        ? `<div><dt>Outcome evidence</dt><dd>Invented complete outcome counts</dd></div>`
         : `<div><dt>Outcome evidence</dt><dd>One row per completed result</dd></div>`;
     return `
       <article class="evidence-card">
@@ -3401,7 +3418,7 @@
           <h2>${escapeHtml(scenario.label)}</h2>
           <div class="evidence-chips">
             <span class="basis-chip">${escapeHtml(costBasisText)}</span>
-            <span class="evidence-status status-${escapeHtml(status)}">${escapeHtml(status === "illustrative" ? "complete record" : `${status} coverage`)}</span>
+            <span class="evidence-status status-${escapeHtml(status)}">${escapeHtml(status === "illustrative" ? "invented example" : `${status} coverage`)}</span>
           </div>
         </header>
         <dl>
@@ -3413,7 +3430,7 @@
           <div><dt>Latest evidence date</dt><dd>${escapeHtml(scenario.evidence.observed_at)}</dd></div>
           <div><dt>Verifier</dt><dd>${escapeHtml(scenario.outcomes.verifier)}</dd></div>
           <div><dt>Accepted when</dt><dd>${escapeHtml(scenario.outcomes.acceptance_rule)}</dd></div>
-          <div><dt>Policy</dt><dd>${scenario.policy.approved ? "Approved" : "Not approved"} · ${escapeHtml(scenario.policy.retention_mode)}</dd></div>
+          <div><dt>Policy</dt><dd>${status === "illustrative" ? "Assumed for example" : scenario.policy.approved ? "Approved" : "Not approved"} · ${escapeHtml(scenario.policy.retention_mode)}</dd></div>
         </dl>
         <div class="issue-list ${issues.length ? "has-issues" : "is-clear"}">
           <p class="kicker">${issues.length ? "STILL TO RESOLVE" : status === "illustrative" ? "INTERNAL CHECK" : "RECONCILIATION"}</p>
@@ -3421,7 +3438,7 @@
             issues.length
               ? `<ul>${issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul>`
               : status === "illustrative"
-                ? "<p>The spend, cost, and outcome rows reconcile.</p>"
+                ? "<p>The invented totals agree internally. No provider bill or work log was verified.</p>"
                 : status === "sampled"
                 ? "<p>The entered numbers reconcile. Outcome yield and human time remain sampled estimates.</p>"
                 : "<p>Usage, provider cost, and the outcome log reconcile for the declared scope.</p>"
@@ -3438,14 +3455,14 @@
     const boundaryCopy = document.getElementById("boundary-copy");
     const illustrative = state.data.mode === "illustrative";
     boundaryTitle.textContent = illustrative
-      ? "The numbers match. The conclusion remains bounded to these inputs."
+      ? "These numbers are invented. They show how the decision works."
       : comparison.evidence_complete
       ? "The evidence reconciles for this comparison."
       : comparison.outcome_evidence_basis === "sampled"
         ? "The sample is useful. It is not the whole population."
       : "The missing proof stays visible.";
     boundaryCopy.textContent = illustrative
-      ? "Use one bounded workload, a matching provider bill, and the same ready-result rule before relying on the conclusion."
+      ? "The example totals agree internally, but no provider bill, work log, or policy approval was verified. Use your own records and the same ready-result rule before relying on the conclusion."
       : comparison.evidence_complete
       ? comparison.same_cost_basis
         ? providerCostsReported(baseline, proposed, comparison)
@@ -4477,14 +4494,14 @@
       ["Ready means", baseline.outcomes.acceptance_rule],
       ["Checked by", baseline.outcomes.verifier],
       ["Quality floor", pct(workload.accepted_quality_threshold, 1)],
-      ["Policy", `Current: ${baseline.policy.approved ? "approved by reviewer" : "approval not established"}; proposed: ${proposed.policy.approved ? "approved by reviewer" : "approval not established"}`],
+      ["Policy", mode === "illustrative" ? "Assumed approved for this invented comparison; no real reviewer approval" : `Current: ${baseline.policy.approved ? "approved by reviewer" : "approval not established"}; proposed: ${proposed.policy.approved ? "approved by reviewer" : "approval not established"}`],
       ["Cost boundary", baseline.evidence.cost_boundary],
       ...(proposed.outcomes.basis === "sampled" ? [["Proposed ready-rate 95% sample range", `${pct(proposed.outcomes.ready_rate_interval_95[0], 1)}–${pct(proposed.outcomes.ready_rate_interval_95[1], 1)}; ${proposed.outcomes.ready_rate_interval_95[0] < workload.accepted_quality_threshold && proposed.outcomes.ready_rate_interval_95[1] >= workload.accepted_quality_threshold ? "crosses the quality minimum; inconclusive" : "sample estimate"}`]] : []),
     ]);
     document.getElementById("memo-evidence").innerHTML = memoList([
       ["Current route", `${baseline.evidence.coverage_status}: ${baseline.evidence.coverage}`],
       ["Proposed route", `${proposed.evidence.coverage_status}: ${proposed.evidence.coverage}`],
-      ["Cost basis", state.data.pricing_estimate ? "AI Cost Lens list-price estimate; no provider bill" : state.data.experience === "simple" ? "User-entered monthly cost; no provider bill" : comparison.same_cost_basis ? costBasisLabel(proposed.evidence.cost_basis) : "Mixed cost basis"],
+      ["Cost basis", mode === "illustrative" ? "Invented model costs; no provider bill" : state.data.pricing_estimate ? "AI Cost Lens list-price estimate; no provider bill" : state.data.experience === "simple" ? "User-entered monthly cost; no provider bill" : comparison.same_cost_basis ? costBasisLabel(proposed.evidence.cost_basis) : "Mixed cost basis"],
       ["Savings claim", comparison.savings_claim_allowed ? "Supported for this workload and period" : "Not supported"],
     ]);
     if (planning) {
@@ -4533,7 +4550,7 @@
     if (!growthProjection.hidden) {
       const startingVolume = state.data.baseline.outcomes.completed_results;
       const fivefoldGap = Math.abs(state.data.comparison.normalized_cost_difference) * 5;
-      growthProjection.textContent = `Growth test: if volume rose from ${wholeNumber(startingVolume)} to ${wholeNumber(startingVolume * 5)} summaries a month and unit costs and ready rates held, the modeled cost gap would be about ${money(fivefoldGap)} a month before implementation costs. This is a sensitivity check, not a forecast.`;
+      growthProjection.textContent = `At 5× volume (${wholeNumber(startingVolume * 5)} summaries), multiplying today's ${wholeNumber(startingVolume)}-summary unit-cost gap gives about ${money(fivefoldGap)} a month before implementation cost. This assumes the same ready rates and unit costs. It does not model revenue, discounts, fixed infrastructure, or changes in review effort, so it is a sensitivity check, not a margin forecast.`;
     }
     document.body.classList.remove("bill-usage-mode");
     document.getElementById("back-to-bill").hidden = true;
@@ -5080,6 +5097,7 @@
   document.querySelectorAll("[data-example]").forEach((button) => {
     button.addEventListener("click", () => openIllustrativeExample(button.dataset.example));
   });
+  document.getElementById("start-review-inline").addEventListener("click", () => document.getElementById("start-review").click());
   const builderForm = document.getElementById("review-builder");
   const filenameDefaults = new Map(
     ["spend-file-name", "work-file-name", "openai-usage-file-name", "openai-cost-file-name", "claude-spend-file-name", "claude-usage-file-name", "claude-cost-file-name"]
@@ -5564,13 +5582,13 @@
       const difference = result.monthly_difference_from_current_usd;
       const differenceClass = difference < 0 ? "price-difference-lower" : difference > 0 ? "price-difference-higher" : "";
       const usable = result.estimated_cost_per_usable_result_usd === null ? "Not modeled" : promptPriceMoney(result.estimated_cost_per_usable_result_usd);
-      const priceBasis = result.pricing_basis === "user_supplied" ? `user-supplied · effective ${result.pricing_effective_at}` : `official list · checked ${result.pricing_verified_at}`;
+      const priceBasis = result.pricing_basis === "user_supplied" ? `user-supplied · effective ${result.pricing_effective_at}` : `official list · checked ${result.pricing_verified_at}${result.promotional_rate_guaranteed_through ? ` · ${result.model_id === "openai/gpt-5.6-sol" ? "promotional rate guaranteed at least through" : "rate changes after"} ${result.promotional_rate_guaranteed_through}` : ""}`;
       return `<tr>
         <td class="price-route-name"><strong>${escapeHtml(result.label)}</strong><span>${escapeHtml(result.provider)} · ${escapeHtml(modeLabel(result.processing_mode))} · ${escapeHtml(geographyLabel(result.geography, result.geography_multiplier))}${result.pricing_adjustment === "long_context" ? " · long-context rates" : ""}${result.role === "current" ? " · current" : ""}</span><small>${wholeNumber(result.input_tokens)} input · ${result.input_token_method === "openai_o200k_base_exact_raw_text" ? "exact raw-text count" : result.input_token_method === "manual" ? "entered count" : "estimated count"} · ${escapeHtml(priceBasis)}</small></td>
         <td data-label="Per call">${promptPriceMoney(result.estimated_cost_per_call_usd)}</td>
         <td data-label="Per 1,000 calls">${promptPriceMoney(result.estimated_cost_per_1000_calls_usd)}</td>
         <td data-label="Per month">${promptPriceMoney(result.estimated_monthly_cost_usd)}</td>
-        <td data-label="Per year">${promptPriceMoney(result.estimated_annual_cost_usd)}</td>
+        <td data-label="Per year">${result.estimated_annual_cost_usd === null ? `Rate changes or unconfirmed after ${escapeHtml(result.promotional_rate_guaranteed_through)}` : promptPriceMoney(result.estimated_annual_cost_usd)}</td>
         <td data-label="Vs. current / month" class="${differenceClass}">${result.role === "current" ? "Reference" : `${difference < 0 ? "−" : difference > 0 ? "+" : ""}${promptPriceMoney(Math.abs(difference))}`}</td>
         <td data-label="Per usable result">${usable}</td>
       </tr>`;
