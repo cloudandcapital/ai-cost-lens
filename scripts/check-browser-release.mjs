@@ -327,7 +327,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const revenueLog = "customer,period_start,period_end,revenue,currency\nA,2026-09-01,2026-09-01,100,USD\n";
   await page.locator("#customer-revenue-file").setInputFiles({ name: "revenue.csv", mimeType: "text/csv", buffer: Buffer.from(revenueLog) });
   await page.locator("#analyze-customer-revenue").click();
-  assert((await page.locator("#customer-revenue-result").innerText()).includes("At least"), `${engineName}: unpriced customer cost lost its lower-bound label.`);
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("At least"), `${engineName}: unpriced customer cost lost its lower-bound label. Error: ${await page.locator("#customer-revenue-error").innerText()}; result: ${await page.locator("#customer-revenue-result").innerText()}`);
   await page.locator("#try-illustrative-request-log").click();
   await page.locator("#request-analysis-results").waitFor({ state: "visible" });
   await page.locator("#try-customer-economics").click();
