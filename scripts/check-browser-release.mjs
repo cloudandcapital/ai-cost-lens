@@ -89,8 +89,14 @@ async function saveJsonDownload(page, selector, filename) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
+async function openAdvancedChoices(page) {
+  const choices = page.locator(".builder-more-paths");
+  if (!(await choices.evaluate((element) => element.open))) await choices.locator("summary").click();
+}
+
 async function verifyFinanceMemoPdf(page) {
   await page.locator("#start-review").click();
+  await openAdvancedChoices(page);
   await page.locator('[data-builder-mode="example"]').click();
   await page.waitForFunction(() => document.querySelector("#memo-decision-code")?.textContent?.trim());
   await page.evaluate(() => { window.print = () => {}; });
@@ -143,6 +149,7 @@ async function verifyRichDecisionFlow(page) {
     const directory = join(root, "examples", "synthetic-cases");
     const config = JSON.parse(await readFile(join(directory, `${scenario.name}-config.json`), "utf8"));
     await page.locator("#start-review").click();
+    await openAdvancedChoices(page);
     await page.locator('[data-builder-mode="workload"]').click();
     await page.locator("#spend-file").setInputFiles(join(directory, `${scenario.name}-spend.csv`));
     await page.locator('[data-outcome-mode="detailed"]').click();
@@ -177,6 +184,7 @@ async function verifyOpenAIPartialBucket(page) {
   const usage = (await readFile(join(fixtureDir, "openai-dashboard-usage.csv"), "utf8"))
     .replaceAll("1788307200,1788393600", "1788310800,1788393600");
   await page.locator("#start-review").click();
+  await openAdvancedChoices(page);
   await page.locator('[data-builder-mode="openai"]').click();
   await page.locator("#openai-usage-file").setInputFiles({ name: "partial-usage.csv", mimeType: "text/csv", buffer: Buffer.from(usage) });
   await page.locator("#openai-cost-file").setInputFiles(join(fixtureDir, "openai-dashboard-cost.csv"));
@@ -203,8 +211,12 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert((await page.locator("#decision-title").innerText()) === "Test the lower-cost route", `${engineName}: startup example overclaims the route change.`);
   assert((await page.locator("#opportunity-ledger").innerText()).includes("One time change cost"), `${engineName}: growth example omitted migration cost.`);
   assert((await page.locator("#review-title").innerText()).includes("Cost per ready result down 19%"), `${engineName}: startup example hides its result.`);
+  await page.locator("#growth-revenue").fill("3");
+  assert(await page.locator("#growth-results tbody tr").count() === 4, `${engineName}: growth planner lacks volume scenarios.`);
+  assert((await page.locator("#growth-results tbody tr").first().innerText()).includes("26.7%"), `${engineName}: modeled current gross margin is wrong.`);
   await page.locator("#start-review-inline").click();
   assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: inline review action did not open.`);
+  assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 3, `${engineName}: start dialog still presents too many choices.`);
   await page.locator("#close-review").click();
   await page.locator('[data-example="cost-trap"]').click();
   assert((await page.locator("#workload-name").innerText()) === "Contract risk summaries", `${engineName}: could not return to the original example.`);
@@ -337,6 +349,11 @@ async function mobileAndAccessibility(origin) {
   assert(titleBox && titleBox.y < 560, `mobile: primary content begins too low (${titleBox?.y ?? "missing"}px).`);
   const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert(horizontalOverflow <= 1, `mobile: page overflows horizontally by ${horizontalOverflow}px.`);
+  await page.locator('[data-example="growth"]').click();
+  await page.locator("#growth-revenue").fill("3");
+  assert(await page.locator("#growth-results").evaluate((element) => element.scrollWidth > element.clientWidth), "mobile: growth results should scroll inside their own region.");
+  assert(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 1, "mobile: growth planner causes page overflow.");
+  await page.locator('[data-example="cost-trap"]').click();
 
   await page.locator("#header-menu-toggle").click();
   assert(await page.locator("#header-actions").isVisible(), "mobile: action menu did not open.");
