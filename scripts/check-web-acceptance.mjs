@@ -51,6 +51,18 @@ assert.doesNotMatch(element('opportunity-ledger').innerHTML, /No proven savings 
 assert.equal(element('decision-title').textContent, 'Keep the current route');
 assert.match(element('decision-explanation').textContent, /costs 4\.8% more per ready result/);
 assert.equal(element('memo-decision-title').textContent, 'Keep the current route');
+const growthDemo = JSON.parse(read('web/data/startup-growth-review-result.json'));
+api.validateResult(growthDemo);
+assert.equal(growthDemo.mode, 'illustrative');
+assert.equal(growthDemo.comparison.status, 'modeled_improvement');
+assert.equal(growthDemo.comparison.savings_claim_allowed, false);
+assert.equal(growthDemo.comparison.quality_holds, true);
+api.state.data = growthDemo;
+api.renderAll();
+assert.equal(element('decision-title').textContent, 'Test the lower-cost route');
+assert.match(element('opportunity-ledger').innerHTML, /TEST FIRST/);
+assert.match(element('opportunity-ledger').innerHTML, /One time change cost/);
+assert.doesNotMatch(element('opportunity-ledger').innerHTML, /Proven savings|No proven savings yet/);
 let rejectedMutations = 0;
 const requiredLeaves = (obj, prefix = []) => Object.entries(obj).flatMap(([key, value]) => {
   if (['planning'].includes(key) && !prefix.length) return [];
@@ -586,7 +598,7 @@ assert.match(source, /This invoice uses \$\. Confirm whether it is USD, CAD, AUD
 assert.match(source, /We don’t recognize this file automatically yet\. Match the columns you know below\. Your file stays in this browser\./);
 assert.doesNotMatch(source, /This schema is not a supported direct export|exact header aliases/);
 assert.doesNotMatch(source, /XMLHttpRequest|sendBeacon|WebSocket/);
-assert.deepEqual([...source.matchAll(/fetch\(([^)]*)\)/g)].map((m) => m[1]), ['"data/illustrative-review-result.json"']);
+assert.deepEqual([...source.matchAll(/fetch\(([^)]*)\)/g)].map((m) => m[1]), ['"data/illustrative-review-result.json"', '"data/startup-growth-review-result.json"']);
 const png = readFileSync(new URL('web/social-preview.png', root));
 assert.equal(png.readUInt32BE(16), 2190);
 assert.equal(png.readUInt32BE(20), 964);

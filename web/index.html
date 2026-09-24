@@ -163,6 +163,13 @@
             </div>
           </div>
 
+          <div class="example-switcher" id="example-switcher" role="group" aria-label="Illustrative decisions">
+            <span>EXPLORE TWO EXAMPLES</span>
+            <button type="button" data-example="growth" aria-pressed="false">Growing AI startup</button>
+            <button type="button" data-example="cost-trap" aria-pressed="true">When a cheaper bill backfires</button>
+          </div>
+          <p class="growth-projection" id="growth-projection" hidden></p>
+
           <section class="truth-section share-card" aria-labelledby="truth-title">
             <div class="truth-heading">
               <div>
@@ -796,11 +803,16 @@
             <span>For subscriptions, solo work, and small teams. Enter two monthly costs and check a small sample of work.</span>
             <em>START HERE FOR A QUICK COMPARISON</em>
           </button>
-          <button class="builder-mode builder-mode-featured" data-builder-mode="example" type="button" aria-pressed="false">
-            <small>NO FILES NEEDED</small>
-            <strong>See the worked example</strong>
-            <span>Follow a cheaper AI bill that turns into more expensive work.</span>
-            <em>BEST PLACE TO START</em>
+          <button class="builder-mode builder-mode-featured" data-builder-mode="growth-example" type="button" aria-pressed="false">
+            <small>ILLUSTRATIVE · NO FILES NEEDED</small>
+            <strong>See a growing AI startup</strong>
+            <span>Find a promising route change, check quality and payback, and see what still needs a pilot.</span>
+            <em>SEE WHAT A COST REVIEW CAN DO</em>
+          </button>
+          <button class="builder-mode" data-builder-mode="example" type="button" aria-pressed="false">
+            <small>ILLUSTRATIVE · NO FILES NEEDED</small>
+            <strong>See a cheaper bill backfire</strong>
+            <span>Follow a lower provider bill that turns into more expensive work.</span>
           </button>
           <button class="builder-mode" data-builder-mode="single" type="button" aria-pressed="false">
             <small>ANY PROVIDER · START WITH COST</small>

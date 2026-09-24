@@ -58,10 +58,13 @@ def test_request_analysis_has_no_network_or_credential_path():
     assert "unknown source fields were not copied" in app
 
 
-def test_browser_app_only_fetches_its_checked_in_example():
+def test_browser_app_only_fetches_its_checked_in_examples():
     app = (WEB / "app.js").read_text()
     calls = re.findall(r"fetch\(([^\n]+)", app)
-    assert calls == ['"data/illustrative-review-result.json");']
+    assert calls == [
+        '"data/illustrative-review-result.json");',
+        '"data/startup-growth-review-result.json");',
+    ]
     assert "illustrative-request-log-data" in (WEB / "index.html").read_text()
     assert 'fetch("data/illustrative-request-log' not in app
 

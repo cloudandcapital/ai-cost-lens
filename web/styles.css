@@ -262,6 +262,61 @@ button,
   letter-spacing: 0.1em;
 }
 
+.example-switcher {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 28px;
+}
+
+.example-switcher[hidden] {
+  display: none;
+}
+
+.example-switcher span {
+  margin-right: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.example-switcher button {
+  padding: 9px 13px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.example-switcher button[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--sage);
+  color: var(--surface);
+}
+
+.example-switcher button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.growth-projection {
+  margin: -10px 0 28px;
+  padding: 14px 18px;
+  border-left: 3px solid var(--sage);
+  background: var(--paper-light);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.growth-projection[hidden] {
+  display: none;
+}
+
 .title-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);

@@ -4,6 +4,7 @@
   const state = {
     data: null,
     demoData: null,
+    growthDemoData: null,
     view: "review",
     story: false,
     builderMode: null,
@@ -4521,6 +4522,19 @@
 
   function renderAll() {
     validateResult(state.data);
+    const exampleSwitcher = document.getElementById("example-switcher");
+    exampleSwitcher.hidden = state.data.mode !== "illustrative";
+    const isGrowthExample = state.data.mode === "illustrative" && state.data.workload?.name === "Growing support AI workload";
+    exampleSwitcher.querySelectorAll("[data-example]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.example === (isGrowthExample ? "growth" : "cost-trap")));
+    });
+    const growthProjection = document.getElementById("growth-projection");
+    growthProjection.hidden = !isGrowthExample;
+    if (!growthProjection.hidden) {
+      const startingVolume = state.data.baseline.outcomes.completed_results;
+      const fivefoldGap = Math.abs(state.data.comparison.normalized_cost_difference) * 5;
+      growthProjection.textContent = `Growth test: if volume rose from ${wholeNumber(startingVolume)} to ${wholeNumber(startingVolume * 5)} summaries a month and unit costs and ready rates held, the modeled cost gap would be about ${money(fivefoldGap)} a month before implementation costs. This is a sensitivity check, not a forecast.`;
+    }
     document.body.classList.remove("bill-usage-mode");
     document.getElementById("back-to-bill").hidden = true;
     document.getElementById("lumen-conversation").replaceChildren();
@@ -5048,6 +5062,24 @@
   });
 
   const reviewDialog = document.getElementById("review-dialog");
+
+  function openIllustrativeExample(kind) {
+    const data = kind === "growth" ? state.growthDemoData : state.demoData;
+    if (!data) { showToast("That example is still loading. Try again in a moment."); return; }
+    state.data = cloneData(data);
+    state.view = "review";
+    state.story = false;
+    document.body.classList.remove("story-mode");
+    document.getElementById("story-toggle").textContent = "Presentation view";
+    renderAll();
+    setView("review");
+    if (reviewDialog.open) reviewDialog.close();
+    showToast(`${kind === "growth" ? "Startup growth" : "Cheaper bill"} example open. All numbers are illustrative.`);
+  }
+
+  document.querySelectorAll("[data-example]").forEach((button) => {
+    button.addEventListener("click", () => openIllustrativeExample(button.dataset.example));
+  });
   const builderForm = document.getElementById("review-builder");
   const filenameDefaults = new Map(
     ["spend-file-name", "work-file-name", "openai-usage-file-name", "openai-cost-file-name", "claude-spend-file-name", "claude-usage-file-name", "claude-cost-file-name"]
@@ -5177,14 +5209,9 @@
       showToast("Usage review ready. Your file will stay in this browser.");
       return;
     }
-    if (mode === "example") {
-      if (!state.demoData) { showToast("The worked example is still loading. Try again in a moment."); return; }
-      state.data = cloneData(state.demoData);
-      state.view = "review";
-      state.story = false;
-      document.body.classList.remove("story-mode");
-      document.getElementById("story-toggle").textContent = "Presentation view";
-      renderAll(); setView("review"); reviewDialog.close(); showToast("Worked example open. No files needed."); return;
+    if (mode === "example" || mode === "growth-example") {
+      openIllustrativeExample(mode === "example" ? "cost-trap" : "growth");
+      return;
     }
     document.querySelectorAll(".builder-mode").forEach((item) => {
       const active = button ? item === button : item.dataset.builderMode === mode;
@@ -6257,6 +6284,15 @@
     renderAll();
   }
 
+  async function loadGrowthDemo() {
+    const response = await fetch("data/startup-growth-review-result.json");
+    if (!response.ok) throw new Error("The startup example could not be loaded.");
+    const data = await response.json();
+    validateResult(data);
+    state.growthDemoData = data;
+  }
+
   loadDemo().catch((error) => showToast(error.message));
+  loadGrowthDemo().catch((error) => showToast(error.message));
   /* AI_COST_LENS_DEMO_LOADER_END */
 })();

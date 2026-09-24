@@ -197,6 +197,14 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.goto(origin, { waitUntil: "networkidle" });
   await page.locator("#review-title").waitFor({ state: "visible" });
 
+  await page.locator('[data-example="growth"]').click();
+  assert((await page.locator("#workload-name").innerText()) === "Growing support AI workload", `${engineName}: startup example did not open.`);
+  assert((await page.locator("#mode-tag").innerText()) === "ILLUSTRATIVE DATA", `${engineName}: invented example lacks its evidence label.`);
+  assert((await page.locator("#decision-title").innerText()) === "Test the lower-cost route", `${engineName}: startup example overclaims the route change.`);
+  assert((await page.locator("#opportunity-ledger").innerText()).includes("One time change cost"), `${engineName}: growth example omitted migration cost.`);
+  await page.locator('[data-example="cost-trap"]').click();
+  assert((await page.locator("#workload-name").innerText()) === "Contract risk summaries", `${engineName}: could not return to the original example.`);
+
   assert(await page.locator("#header-menu-toggle").isHidden(), `${engineName}: desktop menu toggle should be hidden.`);
   assert(await page.locator("#price-prompt").isVisible(), `${engineName}: Price a prompt is not visible.`);
   await page.locator("#price-prompt").click();
