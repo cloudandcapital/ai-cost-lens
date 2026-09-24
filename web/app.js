@@ -16,6 +16,9 @@
     priceEstimate: null,
     usageReview: null,
     usageReviewIllustrative: false,
+    requestSourceIllustrative: false,
+    usageReviewBill: null,
+    carriedBillIntoUsage: false,
     verificationRecord: null,
     verificationSession: null,
     verificationScores: [],
@@ -513,6 +516,7 @@
   }
 
   function providerCostTerm(baseline, proposed) {
+    if (state.data?.pricing_estimate) return "estimated API cost";
     const bases = new Set([baseline.evidence.cost_basis, proposed.evidence.cost_basis]);
     if (bases.size !== 1) return "provider cost";
     const [basis] = bases;
@@ -1396,7 +1400,8 @@
 
   function safeImportedLabel(value, label) {
     const text = String(value || "").trim();
-    if (!text || /^[=+@-]/.test(text) || /<\/?[a-z][^>]*>/i.test(text)) throw new Error(`${label} contains unsupported formula or markup text.`);
+    if (!text) throw new Error(`${label} is required.`);
+    if (/^[=+@-]/.test(text) || /<\/?[a-z][^>]*>/i.test(text)) throw new Error(`${label} contains unsupported formula or markup text.`);
     return text;
   }
 
@@ -2336,17 +2341,18 @@
       : sampled
       ? `SAMPLED n=${baseline.outcomes.sample_size} / ${proposed.outcomes.sample_size} · ${baseline.outcomes.sample_method === "declared random or systematic" && proposed.outcomes.sample_method === "declared random or systematic" ? "RANDOM / SYSTEMATIC" : "USER-SELECTED"} · ${costBasisEvidence}`
       : state.data.mode === "illustrative"
-        ? costBasisEvidence
+        ? `ILLUSTRATIVE DATA · ${costBasisEvidence} ASSUMED`
         : `OBSERVED OUTCOMES · ${costBasisEvidence}`;
     const metricRows = [
       {
-        label: simple ? "Monthly tool cost" : sentenceCase(providerTerm),
+        label: simple ? state.data.pricing_estimate ? "Estimated monthly API cost" : "Monthly tool cost" : sentenceCase(providerTerm),
         current: money(baseline.costs.model_cost),
         proposed: money(proposed.costs.model_cost),
         change: baseline.costs.model_cost
           ? `${proposed.costs.model_cost <= baseline.costs.model_cost ? "↓" : "↑"} ${Math.abs(((proposed.costs.model_cost - baseline.costs.model_cost) / baseline.costs.model_cost) * 100).toFixed(1)}%`
           : "Not comparable",
-        meaning: simple ? state.data.pricing_estimate ? "Estimated API charges at the selected rates; no provider bill was supplied" : "The monthly tool or plan cost you entered" : providerCostsReported(baseline, proposed, comparison)
+        meaning: simple ? state.data.pricing_estimate ? "Estimated API charges at the selected rates; no provider bill was supplied" : "The monthly tool or plan cost you entered" : state.data.mode === "illustrative"
+          ? "Illustrative provider charges; no real provider record was supplied" : providerCostsReported(baseline, proposed, comparison)
           ? "Provider-reported model and API charges"
           : "Model and API cost using the declared basis",
       },
@@ -2438,7 +2444,7 @@
     const evidenceLabel = sampled
       ? `SAMPLED n=${baseline.outcomes.sample_size} / ${proposed.outcomes.sample_size} · ${baseline.outcomes.sample_method === "declared random or systematic" && proposed.outcomes.sample_method === "declared random or systematic" ? "RANDOM / SYSTEMATIC" : "USER-SELECTED"} · ${costBasisEvidence}`
       : state.data.mode === "illustrative"
-        ? costBasisEvidence
+        ? `ILLUSTRATIVE DATA · ${costBasisEvidence} ASSUMED`
         : `OBSERVED OUTCOMES · ${costBasisEvidence}`;
     const metricRows = [
       {
@@ -2448,7 +2454,7 @@
         change: baseline.costs.model_cost
           ? `${proposed.costs.model_cost <= baseline.costs.model_cost ? "↓" : "↑"} ${Math.abs(((proposed.costs.model_cost - baseline.costs.model_cost) / baseline.costs.model_cost) * 100).toFixed(1)}%`
           : "Not comparable",
-        meaning: providerCostsReported(baseline, proposed, comparison)
+        meaning: state.data.mode === "illustrative" ? "Illustrative provider charges; no real provider record was supplied" : providerCostsReported(baseline, proposed, comparison)
           ? "Provider-reported model and API charges"
           : "Model and API cost using the declared basis",
       },
@@ -2997,10 +3003,10 @@
         value: evidenceIssues.length
           ? `${evidenceIssues.length} issue${evidenceIssues.length === 1 ? "" : "s"}`
           : illustrative
-            ? "Records match"
+            ? "Example only"
             : mode === "sampled" ? "Estimate" : "Files match",
         note: evidenceIssues[0] || (illustrative
-          ? "The supplied inputs reconcile. They do not predict another workload or vendor."
+          ? "The example arithmetic is internally consistent. No real bill or work log was verified."
           : mode === "sampled" ? "Sample arithmetic is consistent. This does not verify an invoice or a complete work log." : "The bill and work log match for this review. Quality, policy, and approval checks still apply."),
       },
       {
@@ -3226,10 +3232,10 @@
         value: evidenceIssues.length
           ? `${evidenceIssues.length} issue${evidenceIssues.length === 1 ? "" : "s"}`
           : illustrative
-            ? "Records match"
+            ? "Example only"
             : "Files match",
         note: evidenceIssues[0] || (illustrative
-          ? "The supplied inputs reconcile. They do not predict another workload or vendor."
+          ? "The example arithmetic is internally consistent. No real bill or work log was verified."
           : "The bill and work log match for this review. Quality, policy, and approval checks still apply."),
       },
       {
@@ -3606,11 +3612,11 @@
       <article><span>30-day run rate</span><strong>${requestReviewMoney(spend.projected_30_day_cost, spend.currency)}</strong><p>${escapeHtml(runRateCopy)}</p></article>`;
     const evidence = review.evidence_layers;
     document.getElementById("request-evidence-layers").innerHTML = `
-      <div class="request-explorer-head"><div><p class="kicker">EVIDENCE LAYERS</p><h4>Fast signals and finance proof stay separate</h4></div><p>Telemetry diagnoses · billing confirms</p></div>
+      <div class="request-explorer-head"><div><p class="kicker">EVIDENCE LAYERS</p><h4>Usage, request cost, and entered bill stay separate</h4></div><p>Telemetry diagnoses · invoice still needs verification</p></div>
       <div class="request-spend-context">
         <article><span>Usage telemetry</span><strong>${escapeHtml(evidence.usage_telemetry.status.replaceAll("_", " "))}</strong><p>${wholeNumber(evidence.usage_telemetry.rows_with_usage_signals)} of ${wholeNumber(evidence.usage_telemetry.total_rows)} rows carry usage or operating signals. This is not an invoice.</p></article>
         <article><span>Request cost</span><strong>${escapeHtml(evidence.request_cost.status.replaceAll("_", " "))}</strong><p>${wholeNumber(evidence.request_cost.provider_reported_rows)} provider-reported, ${wholeNumber(evidence.request_cost.calculated_rows)} calculated, ${wholeNumber(evidence.request_cost.unpriced_rows)} unpriced.</p></article>
-        <article><span>Billing evidence</span><strong>${escapeHtml(evidence.billing_evidence.status.replaceAll("_", " "))}</strong><p>${escapeHtml(evidence.billing_evidence.purpose)}</p></article>
+        <article><span>User-entered bill</span><strong>${escapeHtml(evidence.billing_evidence.status.replaceAll("_", " "))}</strong><p>${escapeHtml(evidence.billing_evidence.purpose)}</p></article>
       </div>
       <p class="request-variance-note">${escapeHtml(evidence.precedence_rule)}</p>`;
     const costStack = spend.cost_stack;
@@ -3765,8 +3771,8 @@
     summary.innerHTML = `
       <article><span>Imported events</span><strong>${wholeNumber(review.event_count)}</strong><p>${wholeNumber(review.reconciliation.priced_rows)} priced; ${wholeNumber(review.reconciliation.unpriced_rows)} retained as unpriced.</p></article>
       <article><span>Observed request cost</span><strong>${requestReviewMoney(review.reconciliation.selected_observed_cost, currency)}</strong><p>Provider-reported cost wins for the same row. Calculated cost fills only missing reported cost.</p></article>
-      <article><span>High-confidence boundary</span><strong>${requestReviewMoney(headline, currency)}</strong><p>Duplicate, failed, retry, and error-loop event cost, with overlapping events counted once. This is not savings.</p></article>
-      <article><span>Bill reconciliation</span><strong>${escapeHtml(billCard.title)}</strong><p>${escapeHtml(billCard.copy)}</p></article>`;
+      <article><span>Investigation cost boundary</span><strong>${requestReviewMoney(headline, currency)}</strong><p>Duplicate and failed-attempt cost, with overlapping events counted once. Successful retries are excluded. This is not savings.</p></article>
+      <article><span>User-entered bill comparison</span><strong>${escapeHtml(billCard.title)}</strong><p>${escapeHtml(billCard.copy)} The entered total was not verified against an invoice.</p></article>`;
     document.getElementById("request-analysis-boundary").textContent = review.evidence_gate.reason;
     renderRequestSpendOverview(review);
     populateRequestExplorer(review);
@@ -3832,6 +3838,7 @@
       });
       state.usageReview = review;
       state.usageReviewIllustrative = illustrative;
+      state.usageReviewBill = document.body.classList.contains("bill-usage-mode") && !illustrative ? state.data : null;
       renderRequestAnalysis(review);
       document.getElementById("request-analysis-results").scrollIntoView({ behavior: "smooth", block: "start" });
       showToast(illustrative
@@ -3840,6 +3847,7 @@
     } catch (caught) {
       state.usageReview = null;
       state.usageReviewIllustrative = false;
+      state.usageReviewBill = null;
       document.getElementById("request-analysis-results").hidden = true;
       error.textContent = caught instanceof TypeError || caught instanceof RangeError ? "The request log could not be analyzed. Check the flat file structure and numeric fields." : caught.message || "The request log could not be analyzed.";
       error.classList.add("visible");
@@ -3856,12 +3864,14 @@
       if (!state.usageReview) return;
       state.usageReview = null;
       state.usageReviewIllustrative = false;
+      state.usageReviewBill = null;
       document.getElementById("request-analysis-results").hidden = true;
       showToast("Review inputs changed. Choose Analyze locally to update the results.");
     });
   });
   document.getElementById("request-log-file").addEventListener("change", (event) => {
     const [file] = event.target.files;
+    state.requestSourceIllustrative = false;
     document.getElementById("request-log-file-status").textContent = file
       ? `${file.name} selected. It will be read only when you choose Analyze locally.`
       : "Up to 20,000 flat rows or 5 MiB. Unknown fields, including prompt text, are not copied into the normalized record.";
@@ -3869,12 +3879,16 @@
     document.getElementById("request-log-error").classList.remove("visible");
     state.usageReview = null;
     state.usageReviewIllustrative = false;
+    state.usageReviewBill = null;
   });
 
   document.getElementById("analyze-request-log").addEventListener("click", async () => {
     const button = document.getElementById("analyze-request-log");
     await runRequestLogAnalysis(button, "Analyze locally", async () => {
       const [file] = document.getElementById("request-log-file").files;
+      if (!file && state.requestSourceIllustrative) {
+        return { text: document.getElementById("illustrative-request-log-data").content.textContent.trim(), filename: "illustrative-request-log.json", illustrative: true };
+      }
       if (!file) throw new Error("Choose a request-log CSV or JSON file first.");
       const text = await readLocalFile(file);
       return { text, filename: file.name, illustrative: false };
@@ -3887,6 +3901,7 @@
       const template = document.getElementById("illustrative-request-log-data");
       const text = template.content.textContent.trim();
       document.getElementById("request-log-file").value = "";
+      state.requestSourceIllustrative = true;
       document.getElementById("request-log-file-status").textContent = "Using the bundled illustrative request log. Choose a local file at any time to replace it.";
       return { text, filename: "illustrative-request-log.json", illustrative: true };
     });
@@ -4122,6 +4137,7 @@
 
   function renderSingleBill() {
     const review = summarizeSingleBill(state.data);
+    const linkedUsage = state.usageReviewBill === state.data ? state.usageReview : null;
     const manualBill = ["invoice_form", "invoice_pdf"].includes(state.data.config.reviewSource);
     const basisLabel = manualBill ? "User-entered billed amount (unverified)" : costBasisLabel(review.basis);
     const { totals, period } = review;
@@ -4144,7 +4160,11 @@
       ? [
           [basisLabel, cost(totals.providerCost), "Supplied by you; no provider record was verified"],
           ["Review depth", "Bill only", "Useful for a cost baseline; usage and outcomes are optional next layers"],
-          ["Usage detail", "Not supplied", "Add requests or tokens only when the source supports them"],
+          ["Usage detail", linkedUsage ? `${wholeNumber(linkedUsage.event_count)} imported requests` : "Not supplied", linkedUsage
+            ? linkedUsage.reconciliation.bill.status === "COMPARABLE"
+              ? `User-entered bill minus request cost: ${requestReviewMoney(linkedUsage.reconciliation.bill.raw_selected_cost_difference, linkedUsage.currency)}. This is an arithmetic comparison, not invoice verification.`
+              : `Request review saved locally. Bill comparison: ${linkedUsage.reconciliation.bill.status.replaceAll("_", " ").toLowerCase()}. Check matching scope, currency, and priced rows.`
+            : "Add requests or tokens only when the source supports them"],
           ["Human effort", "Optional", "Leave blank when nobody reviews or corrects the output"],
         ]
       : stage.key === "usage"
@@ -4195,7 +4215,7 @@
     document.getElementById("model-mix-title").textContent = "Declared bill drivers and available usage";
     document.getElementById("bill-mix-note").textContent = `Amounts use ${basisLabel.toLowerCase()}. This is the supplied attribution, not an inferred allocation or savings estimate. Cache values are token counts.`;
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Provider / model / route</th><th>Requests</th><th>Input / output</th><th>Cache read / write</th><th>Cost basis</th><th>Declared cost</th></tr>";
-    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${escapeHtml(reportedCoverageValue(row, "requests"))}</td><td>${escapeHtml(reportedCoverageValue(row, "processedInput"))} / ${escapeHtml(reportedCoverageValue(row, "outputTokens"))}</td><td>${escapeHtml(reportedCoverageValue(row, "cachedInput"))} / ${escapeHtml(reportedCoverageValue(row, "cacheWriteInput"))}</td><td>${escapeHtml(basisLabel)}</td><td>${cost(row.providerCost)}</td></tr>`).join("");
+    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td data-label="Provider / model / route">${escapeHtml(row.label)}</td><td data-label="Requests">${escapeHtml(reportedCoverageValue(row, "requests"))}</td><td data-label="Input / output">${escapeHtml(reportedCoverageValue(row, "processedInput"))} / ${escapeHtml(reportedCoverageValue(row, "outputTokens"))}</td><td data-label="Cache read / write">${escapeHtml(reportedCoverageValue(row, "cachedInput"))} / ${escapeHtml(reportedCoverageValue(row, "cacheWriteInput"))}</td><td data-label="Cost basis">${escapeHtml(basisLabel)}</td><td data-label="Declared cost">${cost(row.providerCost)}</td></tr>`).join("");
     document.getElementById("bill-opportunity-ledger").innerHTML = guidance.map(([kind, label, title, value, note]) => `<article class="opportunity-row state-${kind}"><span class="opportunity-state">${escapeHtml(label)}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(note)}</p></div><em>${escapeHtml(value)}</em></article>`).join("");
     document.getElementById("bill-next-step").textContent = stage.key === "bill"
       ? "Keep this baseline. Add the next piece of data only when it answers a real decision."
@@ -4441,8 +4461,8 @@
     document.getElementById("memo-numbers-title").textContent = "Current route versus proposed route";
     document.getElementById("memo-table-head").innerHTML = `<tr><th>Measure</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Difference</th></tr>`;
     const routeRows = [
-      ["Provider cost", money(baseline.costs.model_cost), money(proposed.costs.model_cost), percentChange(baseline.costs.model_cost, proposed.costs.model_cost)],
-      ["Shared infrastructure", money(baseline.costs.shared_infrastructure_cost), money(proposed.costs.shared_infrastructure_cost), signedMoney(proposed.costs.shared_infrastructure_cost - baseline.costs.shared_infrastructure_cost)],
+      [state.data.pricing_estimate ? "Estimated API cost" : "Provider cost", money(baseline.costs.model_cost), money(proposed.costs.model_cost), percentChange(baseline.costs.model_cost, proposed.costs.model_cost)],
+      ["Shared infrastructure", state.data.pricing_estimate ? "Not supplied" : money(baseline.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Not supplied" : money(proposed.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Excluded" : signedMoney(proposed.costs.shared_infrastructure_cost - baseline.costs.shared_infrastructure_cost)],
       ["Human review and correction", money(baseline.costs.human_review_cost), money(proposed.costs.human_review_cost), percentChange(baseline.costs.human_review_cost, proposed.costs.human_review_cost)],
       ["Total recurring cost", money(baseline.costs.recurring_operating_cost), money(proposed.costs.recurring_operating_cost), percentChange(baseline.costs.recurring_operating_cost, proposed.costs.recurring_operating_cost)],
       ["Ready result rate", pct(baseline.measures.usable_result_rate, 1), pct(proposed.measures.usable_result_rate, 1), `${comparison.usable_result_rate_change_points >= 0 ? "+" : "−"}${Math.abs(comparison.usable_result_rate_change_points).toFixed(1)} points`],
@@ -4726,7 +4746,7 @@
     for (const id of ["simple-current-checked", "simple-current-usable", "simple-current-minutes", "simple-other-checked", "simple-other-usable", "simple-other-minutes"]) {
       document.getElementById(id).value = "";
     }
-    document.getElementById("simple-hourly-rate").value = "0";
+    document.getElementById("simple-hourly-rate").value = "";
     document.getElementById("review-dialog-title").textContent = "Verify the same tasks on both routes";
     document.getElementById("builder-action-note").textContent = "Use the same task type and acceptance rule. A small sample remains test evidence, not realized savings.";
   });
@@ -5072,6 +5092,18 @@
       state.builderMode = null;
       const fromBill = [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version);
       if (fromBill) {
+        if (state.data.schema_version === singleBillSchema) {
+          const bill = summarizeSingleBill(state.data);
+          document.getElementById("request-billed-total").value = bill.totals.providerCost;
+          document.getElementById("request-billed-currency").value = bill.currency;
+          document.getElementById("request-bill-scope-confirmed").checked = false;
+          state.carriedBillIntoUsage = true;
+          if (state.usageReviewBill !== state.data) {
+            state.usageReview = null;
+            state.usageReviewBill = null;
+            document.getElementById("request-analysis-results").hidden = true;
+          }
+        }
         document.body.classList.add("bill-usage-mode");
         document.getElementById("back-to-bill").hidden = false;
         document.getElementById("bill-review-screen").classList.remove("active");
@@ -5080,6 +5112,12 @@
         document.querySelector(".request-review-panel").scrollIntoView({ behavior: "smooth", block: "start" });
         document.getElementById("request-log-file").focus();
         return;
+      }
+      if (state.carriedBillIntoUsage) {
+        document.getElementById("request-billed-total").value = "";
+        document.getElementById("request-billed-currency").value = "";
+        document.getElementById("request-bill-scope-confirmed").checked = false;
+        state.carriedBillIntoUsage = false;
       }
       state.view = "opportunities";
       state.story = false;
@@ -5139,6 +5177,7 @@
     document.body.classList.remove("bill-usage-mode");
     document.getElementById("view-opportunities").classList.remove("active");
     document.getElementById("bill-review-screen").classList.add("active");
+    if (state.data?.schema_version === singleBillSchema) renderSingleBill();
     document.getElementById("back-to-bill").hidden = true;
     document.getElementById("bill-review-title").focus();
   });
@@ -5626,7 +5665,7 @@
     for (const id of ["simple-current-checked", "simple-current-usable", "simple-current-minutes", "simple-other-checked", "simple-other-usable", "simple-other-minutes"]) {
       document.getElementById(id).value = "";
     }
-    document.getElementById("simple-hourly-rate").value = "0";
+    document.getElementById("simple-hourly-rate").value = "";
     document.getElementById("review-dialog-title").textContent = "Add quality evidence to the price estimate";
     document.getElementById("builder-action-note").textContent = pendingPriceRecord.estimate_basis.rate_source_scope === "official_list_only"
       ? "Official list-price estimates are loaded. Review the same task sample on both routes before making a decision."
@@ -5868,6 +5907,7 @@
           scenario.evidence.cost_boundary = "Entered tool cost plus estimated value of review and fixing time; time value is not necessarily a cash expense";
           scenario.evidence.provider_usage_sha256 = null;
           scenario.evidence.provider_cost_sha256 = null;
+          scenario.evidence.outcome_log_sha256 = null;
           for (const key of Object.keys(scenario.usage)) scenario.usage[key] = null;
           scenario.measures.cache_reuse_rate = null;
           scenario.measures.cache_write_rate = null;
@@ -5882,7 +5922,7 @@
           state.data.comparison.limitation += ` The provider charges came from an AI Cost Lens rate estimate.${customRateCopy} Estimated calculator data cannot support a savings claim.`;
           for (const scenario of [state.data.baseline, state.data.proposed]) {
             scenario.evidence.source = "AI Cost Lens list-price estimate; no provider bill supplied";
-            scenario.evidence.cost_boundary = "Estimated API list price plus user-entered value of review and fixing time; not billed spend";
+            scenario.evidence.cost_boundary = "Estimated API list price plus user-entered value of review and fixing time; not billed spend. Shared infrastructure was not supplied and is excluded, not verified as zero.";
           }
         }
         state.data.comparison.recommendation = decisionFor(state.data).reason;

@@ -43,6 +43,7 @@
           "required": ["status", "supplied_total", "supplied_currency", "same_scope_confirmed", "raw_selected_cost_difference", "duplicate_excluded_reference_difference", "method"],
           "properties": {
             "status": { "enum": ["NOT_SUPPLIED", "SCOPE_NOT_CONFIRMED", "REQUEST_COST_MISSING", "MIXED_CURRENCY", "REQUEST_CURRENCY_MISSING", "BILL_CURRENCY_MISSING", "CURRENCY_MISMATCH", "COMPARABLE"] },
+            "source": { "enum": ["user_entered_unverified"] },
             "supplied_total": { "type": ["number", "null"], "minimum": 0 },
             "supplied_currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "type": "null" }] },
             "same_scope_confirmed": { "type": "boolean" },
@@ -351,7 +352,8 @@
           "additionalProperties": false,
           "required": ["status", "source_status", "supplied_total", "raw_request_cost_difference", "purpose"],
           "properties": {
-            "status": { "enum": ["NOT_SUPPLIED", "NOT_COMPARABLE", "RECONCILED", "VARIANCE"] },
+            "status": { "enum": ["NOT_SUPPLIED", "NOT_COMPARABLE", "RECONCILED", "VARIANCE", "USER_ENTERED_NOT_COMPARABLE", "USER_ENTERED_MATCH", "USER_ENTERED_VARIANCE"] },
+            "source": { "enum": ["user_entered_unverified"] },
             "source_status": { "type": "string", "minLength": 1 },
             "supplied_total": { "type": ["number", "null"], "minimum": 0 },
             "raw_request_cost_difference": { "type": ["number", "null"] },

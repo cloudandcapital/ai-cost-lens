@@ -383,7 +383,7 @@
             </div>
             <p class="request-format-note">Use one row per AI request or trace observation. The CLI canonical CSV is a separate period-level billing format and is not interchangeable with this request log.</p>
             <div class="request-reconciliation-inputs">
-              <label><span>Optional billed total</span><input id="request-billed-total" type="number" min="0" step="any" placeholder="Not supplied" /></label>
+              <label><span>User-entered billed total (unverified)</span><input id="request-billed-total" type="number" min="0" step="any" placeholder="Not supplied" /><small>Compare with request cost only after checking the same scope. This field does not verify an invoice.</small></label>
               <label><span>Bill currency</span><input id="request-billed-currency" type="text" maxlength="3" placeholder="USD" /></label>
               <label><span>Request currency fallback</span><input id="request-default-currency" type="text" maxlength="3" placeholder="Only if the file omits it" /></label>
               <label><span>Optional monthly budget</span><input id="request-monthly-budget" type="number" min="0.01" step="any" placeholder="Not supplied" /></label>

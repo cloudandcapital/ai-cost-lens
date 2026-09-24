@@ -223,6 +223,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: Review handoff did not open.`);
   assert(await page.locator("#simple-other-name").inputValue() === estimate.comparison[2].label, `${engineName}: Review ignored the selected route.`);
   assert(await page.locator("#simple-approved").isChecked() === false, `${engineName}: policy approval was preselected.`);
+  assert(await page.locator("#simple-hourly-rate").inputValue() === "", `${engineName}: the handoff silently valued human time at zero.`);
   for (const selector of ["#simple-current-checked", "#simple-current-usable", "#simple-other-checked", "#simple-other-usable"]) {
     assert(await page.locator(selector).inputValue() === "", `${engineName}: estimated pricing prefilled quality evidence.`);
   }
@@ -253,8 +254,15 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert((await page.locator("#bill-metric-ledger .metric-cell:first-child span").textContent()).includes("User-entered billed amount"), `${engineName}: manual amount was presented as provider-verified.`);
   await page.locator("#review-usage").click();
   assert(await page.locator("#request-log-file").isVisible(), `${engineName}: one-bill to usage path opened a blank page.`);
+  assert(await page.locator("#request-billed-total").inputValue() === "90", `${engineName}: the bill amount did not reach usage review.`);
+  assert(await page.locator("#request-billed-currency").inputValue() === "USD", `${engineName}: the bill currency did not reach usage review.`);
+  assert(await page.locator("#request-bill-scope-confirmed").isChecked() === false, `${engineName}: bill scope was assumed to match.`);
+  await page.locator("#request-log-file").setInputFiles(fixture);
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
   await page.locator("#back-to-bill").click();
   assert(await page.locator("#bill-review-screen").isVisible(), `${engineName}: could not return to the bill.`);
+  assert((await page.locator("#bill-metric-ledger").innerText()).includes("7 imported requests"), `${engineName}: analyzed usage did not appear on the bill review.`);
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `${engineName}: browser errors: ${observed.errors.join(" | ")}`);
   await browser.close();
