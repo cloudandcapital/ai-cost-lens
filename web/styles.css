@@ -5770,6 +5770,14 @@ body.story-mode .cockpit-grid {
   background: var(--surface);
 }
 
+.model-catalog-tier {
+  margin: 10px 0 5px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .model-catalog-rate {
   min-width: 0;
   padding: 9px;
@@ -5851,6 +5859,12 @@ body.story-mode .cockpit-grid {
   border-top: 1px solid var(--ink);
   border-bottom: 1px solid var(--ink);
 }
+
+.price-scroll-hint { color: var(--muted); font-size: 13px; margin: 12px 0; }
+.sample-range { margin: 16px 0 0; color: var(--muted); line-height: 1.5; }
+.price-review-choice { display: grid; gap: 6px; font-size: 12px; }
+.price-review-choice select { max-width: 100%; }
+body.bill-usage-mode #view-opportunities > :not(.request-review-panel) { display: none; }
 
 .price-table {
   width: 100%;
@@ -6039,6 +6053,23 @@ body.story-mode .cockpit-grid {
   }
 }
 
-@media(max-width:620px){.simple-change-path{width:max-content;margin-top:8px}}
+@media (max-width: 620px) {
+  #bill-review-screen .usage-table-wrap { overflow: visible; }
+  #bill-review-screen .usage-table, #bill-review-screen .usage-table tbody { display: block; min-width: 0; width: 100%; }
+  #bill-review-screen .usage-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  #bill-review-screen .usage-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+  #bill-review-screen .usage-table td, #bill-review-screen .usage-table td:first-child, #bill-review-screen .usage-table td:last-child { display: block; min-width: 0; text-align: left; padding: 10px 8px; border: 0; overflow-wrap: anywhere; }
+  #bill-review-screen .usage-table td:first-child { grid-column: 1 / -1; font-size: 17px; }
+  #bill-review-screen .usage-table td:last-child { grid-column: 1 / -1; font-weight: 700; font-size: 16px; }
+  #bill-review-screen .usage-table td[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font: 700 10px/1.4 var(--sans); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .price-table-wrap { overflow: visible; }
+  .price-table, .price-table tbody { display: block; min-width: 0; width: 100%; }
+  .price-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .price-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+  .price-table td, .price-table td:first-child, .price-table td:last-child { display: block; min-width: 0; text-align: left; padding: 10px 8px; border: 0; overflow-wrap: anywhere; }
+  .price-table td:first-child { grid-column: 1 / -1; border-bottom: 1px solid var(--line); }
+  .price-table td[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .simple-change-path { width: max-content; margin-top: 8px; }
+}
 body{min-width:0}
 .decision-table th,.bar-label,.evidence-card h2,.anatomy-card h2,.finance-memo th{overflow-wrap:anywhere}

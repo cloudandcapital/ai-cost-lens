@@ -618,9 +618,10 @@ console.log(JSON.stringify({full, partial, confirmedZero, unpriced, billVariance
     layers = review["evidence_layers"]
     assert layers["usage_telemetry"]["status"] == "AVAILABLE"
     assert layers["request_cost"]["status"] == "PROVIDER_REPORTED"
-    assert layers["billing_evidence"]["status"] == "RECONCILED"
+    assert layers["billing_evidence"]["status"] == "USER_ENTERED_MATCH"
+    assert layers["billing_evidence"]["source"] == "user_entered_unverified"
     assert "telemetry" in layers["precedence_rule"].lower()
-    assert "billing" in layers["precedence_rule"].lower()
+    assert "billed" in layers["precedence_rule"].lower()
 
     partial = result["partial"]["spend"]
     assert partial["cost_stack"]["status"] == "PARTIAL"
@@ -641,7 +642,7 @@ console.log(JSON.stringify({full, partial, confirmedZero, unpriced, billVariance
     )
     assert (
         result["billVariance"]["evidence_layers"]["billing_evidence"]["status"]
-        == "VARIANCE"
+        == "USER_ENTERED_VARIANCE"
     )
     assert result["thresholdRejected"] is True
 
@@ -696,12 +697,13 @@ console.log(JSON.stringify({comparable, unconfirmed, billCurrencyMissing, reques
     )
     assert comparable["reconciliation"]["bill"] == {
         "status": "COMPARABLE",
+        "source": "user_entered_unverified",
         "supplied_total": 15,
         "supplied_currency": "USD",
         "same_scope_confirmed": True,
         "raw_selected_cost_difference": -10,
         "duplicate_excluded_reference_difference": 0,
-        "method": "Billed total minus selected request cost. The duplicate-excluded difference retains the first source row in each repeated-ID group as a review reference only; no row is deleted or presumed invalid.",
+        "method": "Unverified user-entered total minus selected request cost after scope confirmation. The duplicate-excluded difference retains the first source row in each repeated-ID group as a review reference only; no row is deleted or presumed invalid.",
     }
     unconfirmed = result["unconfirmed"]["reconciliation"]["bill"]
     assert unconfirmed["status"] == "SCOPE_NOT_CONFIRMED"
@@ -979,12 +981,15 @@ console.log(JSON.stringify({partial:engine.buildReview(rows,options),
     assert partial["spend"]["cost_stack"]["known_operating_cost"] == 10
     assert partial["spend"]["cost_stack"]["fully_loaded_cost"] is None
     assert partial["spend"]["cost_stack"]["status"] == "PARTIAL"
-    assert partial["evidence_layers"]["billing_evidence"]["status"] == "NOT_COMPARABLE"
+    assert (
+        partial["evidence_layers"]["billing_evidence"]["status"]
+        == "USER_ENTERED_NOT_COMPARABLE"
+    )
     assert partial["reconciliation"]["bill"]["raw_selected_cost_difference"] is None
     assert result["complete"]["spend"]["cost_stack"]["fully_loaded_cost"] == 10
     assert (
         result["complete"]["evidence_layers"]["billing_evidence"]["status"]
-        == "RECONCILED"
+        == "USER_ENTERED_MATCH"
     )
 
 
@@ -1004,6 +1009,27 @@ console.log(JSON.stringify({
     assert result["absent"]["retry_coverage_rows"] == 0
     assert result["partial"]["retry_coverage_rows"] == 2
     assert result["partial"]["retry_linked_rate"] == 0.5
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_successful_retry_is_excluded_from_candidate_avoidable_cost():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const rows = [
+ {event_id:"first",status:"failed",cost:1.5,currency:"USD"},
+ {event_id:"second",retry_parent_event_id:"first",status:"success",cost:1.5,currency:"USD"},
+];
+const review = engine.buildReview(rows);
+const finding = review.findings.find(item => item.id === "failed-or-retried-request-cost");
+console.log(JSON.stringify({finding,headline:review.headline}));
+""",
+        ENGINE,
+    )
+    assert result["finding"]["current_cost"] == 3
+    assert result["finding"]["estimated_avoidable_cost"] == 1.5
+    assert result["headline"]["conservative_non_additive_opportunity"] == 1.5
+    assert result["finding"]["affected_event_ids"] == ["row-000001", "row-000002"]
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")

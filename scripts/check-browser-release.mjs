@@ -133,6 +133,45 @@ async function verifySavedReviewRoundTrip(page) {
   return review.schema_version;
 }
 
+async function verifyRichDecisionFlow(page) {
+  const scenarios = [
+    { name: "false-economy", allowed: false, status: "no_improvement" },
+    { name: "true-savings", allowed: true, status: "observed_improvement" },
+  ];
+  const results = [];
+  for (const scenario of scenarios) {
+    const directory = join(root, "examples", "synthetic-cases");
+    const config = JSON.parse(await readFile(join(directory, `${scenario.name}-config.json`), "utf8"));
+    await page.locator("#start-review").click();
+    await page.locator('[data-builder-mode="workload"]').click();
+    await page.locator("#spend-file").setInputFiles(join(directory, `${scenario.name}-spend.csv`));
+    await page.locator('[data-outcome-mode="detailed"]').click();
+    await page.locator("#work-file").setInputFiles(join(directory, `${scenario.name}-outcomes.csv`));
+    await page.locator("#acceptance-rule").fill(config.acceptanceRule);
+    await page.locator("#verifier").fill(config.verifier);
+    await page.locator("#quality-floor").fill(String(config.qualityFloor * 100));
+    await page.locator("#hourly-rate").fill(String(config.hourlyRate));
+    await page.locator("#baseline-policy-approved").setChecked(config.baselinePolicyApproved);
+    await page.locator("#proposed-policy-approved").setChecked(config.proposedPolicyApproved);
+    const advancedCosts = page.locator(".advanced-costs");
+    if (!(await advancedCosts.evaluate((details) => details.open))) await advancedCosts.locator("summary").click();
+    await page.locator("#baseline-shared").fill(String(config.baselineShared));
+    await page.locator("#proposed-shared").fill(String(config.proposedShared));
+    await page.locator("#change-cost").fill(String(config.changeCost));
+    await page.locator("#build-review").click();
+    await page.waitForFunction(() => !document.querySelector("#review-dialog")?.open || document.querySelector("#builder-error")?.textContent?.trim(), null, { timeout: 20000 });
+    assert(!(await page.locator("#review-dialog").evaluate((dialog) => dialog.open)), `${scenario.name}: detailed review did not close the builder: ${await page.locator("#builder-error").innerText()}`);
+    const review = await saveJsonDownload(page, "#download-review", `${scenario.name}-browser-review.json`);
+    assert(review.schema_version === "ai-cost-lens-review-result/1.0", `${scenario.name}: wrong review export.`);
+    assert(review.comparison.status === scenario.status, `${scenario.name}: decision status changed to ${review.comparison.status}.`);
+    assert(review.comparison.savings_claim_allowed === scenario.allowed, `${scenario.name}: savings gate is wrong.`);
+    assert(review.mode === "real" && review.comparison.evidence_complete === true, `${scenario.name}: complete work log lost its evidence status.`);
+    assert(review.baseline.costs.model_cost > review.proposed.costs.model_cost, `${scenario.name}: provider cost did not fall.`);
+    results.push({ scenario: scenario.name, status: review.comparison.status, savings_claim_allowed: scenario.allowed });
+  }
+  return results;
+}
+
 async function verifyOpenAIPartialBucket(page) {
   const fixtureDir = join(root, "tests", "fixtures");
   const usage = (await readFile(join(fixtureDir, "openai-dashboard-usage.csv"), "utf8"))
@@ -176,13 +215,13 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator(".model-catalog-browser").evaluate((details) => { details.open = true; });
   const sonnet = page.locator(".model-catalog-card").filter({ hasText: "Claude Sonnet 5" });
   const sonnetText = await sonnet.innerText();
-  for (const expected of ["INPUT\n$2", "CACHED INPUT\n$0.20", "CACHE WRITE · 5M\n$2.5", "OUTPUT\n$10"]) {
+  for (const expected of ["INPUT\n$2.00", "CACHED INPUT\n$0.20", "CACHE WRITE · 5 MIN\n$2.50", "OUTPUT\n$10.00"]) {
     assert(sonnetText.toUpperCase().includes(expected), `${engineName}: Claude Sonnet 5 card is missing ${expected.replace("\n", " ")}.`);
   }
   const currentRates = [
-    ["GPT-6 Sol", ["INPUT\n$2", "CACHED INPUT\n$0.20", "CACHE WRITE\n$2.5", "OUTPUT\n$10"]],
+    ["GPT-6 Sol", ["INPUT\n$2.00", "CACHED INPUT\n$0.20", "CACHE WRITE\n$2.50", "OUTPUT\n$10.00"]],
     ["GPT-6 Luna", ["INPUT\n$0.10", "CACHED INPUT\n$0.01", "CACHE WRITE\n$0.125", "OUTPUT\n$0.50"]],
-    ["Claude Opus 5.5", ["INPUT\n$4", "CACHED INPUT\n$0.20", "CACHE WRITE · 5M\n$5", "OUTPUT\n$20"]],
+    ["Claude Opus 5.5", ["INPUT\n$4.00", "CACHED INPUT\n$0.20", "CACHE WRITE · 5 MIN\n$5.00", "OUTPUT\n$20.00"]],
   ];
   for (const [name, expectedRates] of currentRates) {
     const card = page.locator(".model-catalog-card").filter({ hasText: name });
@@ -193,14 +232,37 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     const provenance = await card.locator(".model-catalog-card-head span").textContent();
     assert(provenance.includes("checked 2026-09-23"), `${engineName}: ${name} is missing its checked date: ${provenance}`);
   }
+  for (const [name, rates] of [
+    ["GPT-6 Sol", ["INPUT\n$4.00", "CACHED INPUT\n$0.40", "CACHE WRITE\n$5.00", "OUTPUT\n$15.00"]],
+    ["GPT-6 Luna", ["INPUT\n$0.20", "CACHED INPUT\n$0.02", "CACHE WRITE\n$0.25", "OUTPUT\n$0.75"]],
+  ]) {
+    const card = page.locator(".model-catalog-card").filter({ hasText: name });
+    const tier = card.locator('[aria-label="Standard long-context USD rates per 1 million tokens"]');
+    assert((await card.innerText()).includes("over 272,000 input tokens per request; higher rates apply to the full request"), `${engineName}: ${name} hides the long-context threshold.`);
+    for (const expected of rates) {
+      assert((await tier.innerText()).toUpperCase().includes(expected), `${engineName}: ${name} long-context rate is missing ${expected.replace("\n", " ")}.`);
+    }
+  }
 
   const estimate = await saveJsonDownload(page, "#download-price-estimate", `${engineName}-prompt-estimate.json`);
   assert(estimate.schema_version === "ai-cost-lens-prompt-price-estimate/0.6", `${engineName}: prompt estimate schema is wrong.`);
   assert(estimate.evidence_gate.savings_claim_allowed === false, `${engineName}: prompt estimate allowed a savings claim.`);
   assert(estimate.comparison.length === 3, `${engineName}: prompt estimate lost a route.`);
 
+  await page.locator("#prompt-input-tokens").fill("1200000");
+  await page.locator("#calculate-prompt-price").click();
+  assert(await page.locator("#price-results").isHidden(), `${engineName}: stale pricing results survived a calculation error.`);
+  assert(await page.locator("#download-price-estimate").isDisabled(), `${engineName}: stale estimate is still downloadable.`);
+  await page.locator("#prompt-input-tokens").fill("1000");
+  await page.locator("#calculate-prompt-price").click();
+  await page.locator("#price-results").waitFor({ state: "visible" });
+  await page.locator("#price-review-alternative").selectOption("1");
+
   await page.locator("#send-price-to-review").click();
   assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: Review handoff did not open.`);
+  assert(await page.locator("#simple-other-name").inputValue() === estimate.comparison[2].label, `${engineName}: Review ignored the selected route.`);
+  assert(await page.locator("#simple-approved").isChecked() === false, `${engineName}: policy approval was preselected.`);
+  assert(await page.locator("#simple-hourly-rate").inputValue() === "", `${engineName}: the handoff silently valued human time at zero.`);
   for (const selector of ["#simple-current-checked", "#simple-current-usable", "#simple-other-checked", "#simple-other-usable"]) {
     assert(await page.locator(selector).inputValue() === "", `${engineName}: estimated pricing prefilled quality evidence.`);
   }
@@ -218,11 +280,33 @@ async function priceAndUsageFlow(engineName, engine, origin) {
 
   const financeMemoPdf = engineName === "chromium" ? await verifyFinanceMemoPdf(page) : null;
   const savedReview = engineName === "chromium" ? await verifySavedReviewRoundTrip(page) : null;
+  const rich_decisions = engineName === "chromium" ? await verifyRichDecisionFlow(page) : null;
   if (engineName === "chromium") await verifyOpenAIPartialBucket(page);
+  await page.locator("#start-review").click();
+  await page.locator('[data-builder-mode="single"]').click();
+  await page.locator("#invoice-provider").fill("OpenAI");
+  await page.locator("#invoice-workload").fill("Personal plan");
+  await page.locator("#invoice-date").fill("2026-09-23");
+  await page.locator("#invoice-amount").fill("90");
+  await page.locator("#invoice-currency").fill("USD");
+  await page.locator("#build-review").click();
+  assert(await page.locator("#bill-review-screen").isVisible(), `${engineName}: one-bill review did not render.`);
+  assert((await page.locator("#bill-metric-ledger .metric-cell:first-child span").textContent()).includes("User-entered billed amount"), `${engineName}: manual amount was presented as provider-verified.`);
+  await page.locator("#review-usage").click();
+  assert(await page.locator("#request-log-file").isVisible(), `${engineName}: one-bill to usage path opened a blank page.`);
+  assert(await page.locator("#request-billed-total").inputValue() === "90", `${engineName}: the bill amount did not reach usage review.`);
+  assert(await page.locator("#request-billed-currency").inputValue() === "USD", `${engineName}: the bill currency did not reach usage review.`);
+  assert(await page.locator("#request-bill-scope-confirmed").isChecked() === false, `${engineName}: bill scope was assumed to match.`);
+  await page.locator("#request-log-file").setInputFiles(fixture);
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  await page.locator("#back-to-bill").click();
+  assert(await page.locator("#bill-review-screen").isVisible(), `${engineName}: could not return to the bill.`);
+  assert((await page.locator("#bill-metric-ledger").innerText()).includes("7 imported requests"), `${engineName}: analyzed usage did not appear on the bill review.`);
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `${engineName}: browser errors: ${observed.errors.join(" | ")}`);
   await browser.close();
-  return { engine: engineName, prompt_routes: estimate.comparison.length, usage_rows: usage.event_count, finance_memo_pdf: financeMemoPdf, saved_review_reopened: savedReview, egress: 0 };
+  return { engine: engineName, prompt_routes: estimate.comparison.length, usage_rows: usage.event_count, finance_memo_pdf: financeMemoPdf, saved_review_reopened: savedReview, rich_decisions, egress: 0 };
 }
 
 async function mobileAndAccessibility(origin) {
@@ -255,6 +339,10 @@ async function mobileAndAccessibility(origin) {
 
   await page.locator("#header-menu-toggle").click();
   await page.locator("#price-prompt").click();
+  await page.locator("#prompt-input-tokens").fill("1000");
+  await page.locator("#calculate-prompt-price").click();
+  await page.locator("#price-results").waitFor({ state: "visible" });
+  assert(await page.locator(".price-table-wrap").evaluate((element) => element.scrollWidth <= element.clientWidth + 1), "mobile: prompt costs are still hidden sideways.");
   const priceA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   assert(priceA11y.violations.length === 0, `mobile pricing accessibility violations: ${axeSummary(priceA11y)}`);
 

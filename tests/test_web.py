@@ -343,7 +343,7 @@ console.log(JSON.stringify(Object.fromEntries([...elements.entries()].map(([id, 
     )
     assert result.returncode == 0, result.stderr
     memo = __import__("json").loads(result.stdout)
-    assert memo["memo-title"]["textContent"] == "AI spend decision memo"
+    assert memo["memo-title"]["textContent"] == "ILLUSTRATIVE · AI spend decision memo"
     assert "Contract risk summaries" in memo["memo-meta"]["textContent"]
     assert memo["memo-decision-code"]["textContent"] == "KEEP CURRENT ROUTE"
     assert "$143.55" in memo["memo-table-body"]["innerHTML"]

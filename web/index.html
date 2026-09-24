@@ -91,7 +91,7 @@
           <div class="title-grid bill-title-grid">
             <div>
               <p class="kicker" id="bill-review-kicker">OPENAI BILL REVIEW</p>
-              <h1 id="bill-review-title">What can this bill actually prove?</h1>
+              <h1 id="bill-review-title" tabindex="-1">What can this bill actually prove?</h1>
             </div>
             <div class="workload-intro">
               <strong id="bill-source-title">Saved dashboard exports</strong>
@@ -360,6 +360,7 @@
           <div class="workbench-summary" id="opportunity-summary"></div>
           <div class="opportunity-workbench-list" id="opportunity-workbench-list"></div>
           <section class="request-review-panel" aria-labelledby="request-review-title">
+            <button class="text-button" id="back-to-bill" type="button" hidden>Back to bill review</button>
             <div class="section-heading">
               <div>
                 <p class="kicker">REQUEST-LEVEL REVIEW</p>
@@ -382,7 +383,7 @@
             </div>
             <p class="request-format-note">Use one row per AI request or trace observation. The CLI canonical CSV is a separate period-level billing format and is not interchangeable with this request log.</p>
             <div class="request-reconciliation-inputs">
-              <label><span>Optional billed total</span><input id="request-billed-total" type="number" min="0" step="any" placeholder="Not supplied" /></label>
+              <label><span>User-entered billed total (unverified)</span><input id="request-billed-total" type="number" min="0" step="any" placeholder="Not supplied" /><small>Compare with request cost only after checking the same scope. This field does not verify an invoice.</small></label>
               <label><span>Bill currency</span><input id="request-billed-currency" type="text" maxlength="3" placeholder="USD" /></label>
               <label><span>Request currency fallback</span><input id="request-default-currency" type="text" maxlength="3" placeholder="Only if the file omits it" /></label>
               <label><span>Optional monthly budget</span><input id="request-monthly-budget" type="number" min="0.01" step="any" placeholder="Not supplied" /></label>
@@ -936,7 +937,7 @@
               <div class="field-grid compact-fields">
                 <label><span>What is an hour of your time worth?</span><div class="input-prefix"><em>$</em><input id="simple-hourly-rate" type="number" min="0" step="0.01" value="30" /></div></label>
                 <label><span>Minimum usable rate you would accept</span><div class="input-suffix"><input id="simple-quality-floor" type="number" min="1" max="100" step="0.1" value="80" /><em>%</em></div></label>
-                <label class="check-field field-wide"><input id="simple-approved" type="checkbox" checked /><span>Both tools are okay to use for this work</span></label>
+                <label class="check-field field-wide"><input id="simple-approved" type="checkbox" /><span>I have confirmed both tools are okay to use for this work</span></label>
               </div>
               <p class="sample-caveat">The prefilled numbers are a small-business example. Replace them with your own before comparing.</p>
             </div>
@@ -1405,6 +1406,7 @@
             </div>
             <strong id="price-token-summary"></strong>
           </div>
+          <p class="price-scroll-hint">Compare costs for each route below.</p>
           <div class="price-table-wrap" role="region" aria-label="Prompt price comparison" tabindex="0">
             <table class="price-table">
               <thead><tr><th>Route</th><th>Per call</th><th>Per 1,000 calls</th><th>Per month</th><th>Per year</th><th>Vs. current / month</th><th>Per usable result</th></tr></thead>
@@ -1418,6 +1420,7 @@
             </div>
             <div class="price-result-actions">
               <button class="text-button" id="download-price-estimate" type="button">Download estimate JSON</button>
+              <label class="price-review-choice"><span>Route to review</span><select id="price-review-alternative"></select></label>
               <button class="build-button" id="send-price-to-review" type="button">Send estimate to Review</button>
             </div>
           </div>

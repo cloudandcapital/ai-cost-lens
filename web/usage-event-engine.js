@@ -472,17 +472,18 @@
     }
 
     const failedOrRetried = events.filter((event) => ["failed", "cancelled", "retried"].includes(event.request_status) || event.retry_parent_event_id);
+    const failedAttemptCost = (event) => ["failed", "cancelled", "retried"].includes(event.request_status) ? event.selected_cost : null;
     if (failedOrRetried.length) {
       findings.push(finding({
         id: "failed-or-retried-request-cost",
         kind: "failed_or_retried_request_cost",
         category: "Reliability",
         title: "Failed and retried calls consumed priced usage",
-        explanation: "These calls are linked to a failure, cancellation, or retry. The amount is a review boundary, not proof that every retry was avoidable.",
+        explanation: "These calls are linked to a failure, cancellation, or retry. The candidate amount counts failed attempts only; successful retries still produced a result.",
         affected_scope: scope(failedOrRetried),
         current_cost: round(failedOrRetried.reduce((sum, event) => sum + (event.selected_cost || 0), 0)),
-        event_avoidable_costs: eventAmountMap(failedOrRetried),
-        calculation: "Sum of selected event cost, using provider-reported cost before calculated token cost.",
+        event_avoidable_costs: eventAmountMap(failedOrRetried, failedAttemptCost),
+        calculation: "Selected cost of failed, cancelled, or retried-status attempts; successful retry cost is excluded from the candidate amount.",
         evidence_basis: "observed",
         confidence: "high",
         confidence_in_dollar_estimate: failedOrRetried.every((event) => event.selected_cost !== null) ? "high" : "partial",
@@ -491,7 +492,7 @@
         verification_requirement: "Separate necessary resilience retries from loops caused by configuration, validation, or provider errors.",
         suggested_next_step: "Classify retry causes",
         action: "investigate",
-        limitations: "Retries can preserve reliability. The full affected cost is not automatically recoverable.",
+        limitations: "A failed attempt may be necessary for resilience. Its cost is a candidate for investigation, not automatically recoverable savings.",
         headline_eligible: true,
       }));
     }
@@ -510,8 +511,8 @@
       explanation: "At least two retries point to the same parent event. Fixing the cause may be safer than increasing retry limits.",
       affected_scope: scope(loopEvents),
       current_cost: round(loopEvents.reduce((sum, event) => sum + (event.selected_cost || 0), 0)),
-      event_avoidable_costs: eventAmountMap(loopEvents),
-      calculation: "Cost of retry rows in parent-event groups containing at least two retries.",
+      event_avoidable_costs: eventAmountMap(loopEvents, failedAttemptCost),
+      calculation: "Failed-attempt cost among parent-event groups containing at least two retries; successful retry cost is excluded.",
       evidence_basis: "observed",
       confidence: "high",
       confidence_in_dollar_estimate: loopEvents.every((event) => event.selected_cost !== null) ? "high" : "partial",
@@ -1125,9 +1126,9 @@
         : calculatedRows
           ? "CALCULATED"
           : "UNPRICED";
-    let billingStatus = bill.status === "NOT_SUPPLIED" ? "NOT_SUPPLIED" : "NOT_COMPARABLE";
+    let billingStatus = bill.status === "NOT_SUPPLIED" ? "NOT_SUPPLIED" : "USER_ENTERED_NOT_COMPARABLE";
     if (bill.status === "COMPARABLE") {
-      billingStatus = bill.raw_selected_cost_difference === 0 ? "RECONCILED" : "VARIANCE";
+      billingStatus = bill.raw_selected_cost_difference === 0 ? "USER_ENTERED_MATCH" : "USER_ENTERED_VARIANCE";
     }
     return {
       usage_telemetry: {
@@ -1145,12 +1146,13 @@
       },
       billing_evidence: {
         status: billingStatus,
+        source: "user_entered_unverified",
         source_status: bill.status,
         supplied_total: bill.supplied_total,
         raw_request_cost_difference: bill.raw_selected_cost_difference,
-        purpose: "Billing evidence confirms finance actuals for a matching provider, account, currency, and period. A reconciled bill still does not prove business value or savings.",
+        purpose: "The billed total was typed in by the user and was not verified against an invoice. A matching scope permits an arithmetic comparison, not confirmation of finance actuals or savings.",
       },
-      precedence_rule: "Use telemetry to investigate quickly, then use comparable billing evidence to confirm the financial boundary. Keep calculated cost, request cost, and billed cost visibly separate.",
+      precedence_rule: "Use telemetry to investigate quickly. A user-entered billed total permits a scoped arithmetic comparison but does not confirm invoice actuals. Keep calculated cost, request cost, and billed cost visibly separate.",
     };
   }
 
@@ -1293,12 +1295,13 @@
     }
     const bill = {
       status: billStatus,
+      source: "user_entered_unverified",
       supplied_total: billTotal,
       supplied_currency: billCurrency,
       same_scope_confirmed: billScopeConfirmed,
       raw_selected_cost_difference: billDifference,
       duplicate_excluded_reference_difference: billDuplicateExcludedDifference,
-      method: "Billed total minus selected request cost. The duplicate-excluded difference retains the first source row in each repeated-ID group as a review reference only; no row is deleted or presumed invalid.",
+      method: "Unverified user-entered total minus selected request cost after scope confirmation. The duplicate-excluded difference retains the first source row in each repeated-ID group as a review reference only; no row is deleted or presumed invalid.",
     };
     const spend = spendSummary(events, reviewOptions, reviewCurrency, selectedObservedCost, !currencyNotComparable);
     return {

@@ -111,14 +111,17 @@ const onlyBaseline = text => text.trim().split('\n').filter((line,i) => !i || li
 const invoice = spend.split('\n')[0] + '\nbaseline,2026-08-01,Unrelated subscription,,,,,,,,,20,provider_reported,USD\n';
 const catalogHtml = el('model-catalog-rows').innerHTML;
 assert.equal((catalogHtml.match(/class="model-catalog-card"/g) || []).length, pricingCatalog.models.length);
-assert.equal((catalogHtml.match(/class="model-catalog-rate"/g) || []).length, pricingCatalog.models.length * 4);
-assert.equal((catalogHtml.match(/<span>Input<\/span>/g) || []).length, pricingCatalog.models.length);
-assert.equal((catalogHtml.match(/<span>Cached input<\/span>/g) || []).length, pricingCatalog.models.length);
-assert.equal((catalogHtml.match(/<span>Output<\/span>/g) || []).length, pricingCatalog.models.length);
-assert.match(catalogHtml, /Claude Sonnet 5[\s\S]*?<span>Input<\/span><strong>\$2<\/strong>[\s\S]*?<span>Cached input<\/span><strong>\$0\.20<\/strong>[\s\S]*?<span>Output<\/span><strong>\$10<\/strong>/);
+const tieredCount = pricingCatalog.models.filter(model => model.long_context).length;
+assert.equal((catalogHtml.match(/class="model-catalog-rate"/g) || []).length, (pricingCatalog.models.length + tieredCount) * 4);
+assert.equal((catalogHtml.match(/<span>Input<\/span>/g) || []).length, pricingCatalog.models.length + tieredCount);
+assert.equal((catalogHtml.match(/<span>Cached input<\/span>/g) || []).length, pricingCatalog.models.length + tieredCount);
+assert.equal((catalogHtml.match(/<span>Output<\/span>/g) || []).length, pricingCatalog.models.length + tieredCount);
+assert.match(catalogHtml, /GPT-6 Sol[\s\S]*?over 272,000 input tokens per request[\s\S]*?<span>Input<\/span><strong>\$4\.00<\/strong>[\s\S]*?<span>Output<\/span><strong>\$15\.00<\/strong>/);
+assert.match(catalogHtml, /Claude Sonnet 5[\s\S]*?<span>Input<\/span><strong>\$2\.00<\/strong>[\s\S]*?<span>Cached input<\/span><strong>\$0\.20<\/strong>[\s\S]*?<span>Output<\/span><strong>\$10\.00<\/strong>/);
 api.state.data = JSON.parse(read('web/data/illustrative-review-result.json'));
 api.state.demoData = api.state.data;
 api.renderAll();
+assert.match(el('memo-title').textContent,/ILLUSTRATIVE/,'The example PDF must declare its evidence status in the header.');
 await click('start-review'); await mode('single');
 await file('single-spend-file', onlyBaseline(spend)); await file('single-work-file', onlyBaseline(work));
 el('single-ready-rule').value = 'Customer accepted'; el('single-verifier').value = 'Reviewer';
@@ -185,6 +188,32 @@ async function assertFresh(nextMode) {
 await assertFresh('workload');
 await file('spend-file',spend); await file('work-file',work); await outcome('detailed');
 await submit(); assert.equal(api.state.data.schema_version,'ai-cost-lens-review-result/1.0');
+for (const [scenario, status, allowed] of [
+  ['false-economy','no_improvement',false],
+  ['true-savings','observed_improvement',true],
+]) {
+  const path = `examples/synthetic-cases/${scenario}`;
+  const config = JSON.parse(read(`${path}-config.json`));
+  await assertFresh('workload');
+  await file('spend-file',read(`${path}-spend.csv`));
+  await outcome('detailed');
+  await file('work-file',read(`${path}-outcomes.csv`));
+  for (const [id,value] of Object.entries({
+    'acceptance-rule': config.acceptanceRule,
+    verifier: config.verifier,
+    'quality-floor': config.qualityFloor * 100,
+    'hourly-rate': config.hourlyRate,
+    'baseline-shared': config.baselineShared,
+    'proposed-shared': config.proposedShared,
+    'change-cost': config.changeCost,
+  })) el(id).value = value;
+  el('baseline-policy-approved').checked = config.baselinePolicyApproved;
+  el('proposed-policy-approved').checked = config.proposedPolicyApproved;
+  await submit();
+  assert.equal(api.state.data.mode,'real',scenario);
+  assert.equal(api.state.data.comparison.status,status,scenario);
+  assert.equal(api.state.data.comparison.savings_claim_allowed,allowed,scenario);
+}
 await click('start-review'); await mode('openai');
 const openAIProvider = document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === 'openai');
 const claudeProvider = document.querySelectorAll('.import-provider').find(n => n.dataset.importProvider === 'claude');
@@ -293,6 +322,13 @@ assert.equal(el('builder-error').classList.contains('visible'),true);
 await file('single-spend-file',invoice); await submit();
 assert.equal(api.state.data.source.spend[0].workload,'Unrelated subscription');
 assert.equal(el('builder-error').classList.contains('visible'),false);
+await click('review-usage');
+assert.equal(document.body.classList.contains('bill-usage-mode'),true);
+assert.equal(el('view-opportunities').classList.contains('active'),true);
+assert.equal(el('bill-review-screen').classList.contains('active'),false);
+await click('back-to-bill');
+assert.equal(el('bill-review-screen').classList.contains('active'),true);
+assert.equal(api.state.data.source.spend[0].workload,'Unrelated subscription');
 
 await click('print-memo');
 while (timers.length) timers.shift()();
@@ -310,10 +346,12 @@ console.log('PASS: seven-path entry, builder transition/correction sequences and
 
 // Integrated no-file comparison: real HTML defaults and registered submit handler.
 await click('start-review'); await mode('simple');
+assert.equal(el('simple-approved').checked,false,'Policy must require an explicit reviewer action.');
 assert.equal(el('simple-current-cost').disabled,false);
 assert.equal(el('spend-file').disabled,true);
 el('simple-current-name').value = 'Diana current';
 el('simple-other-name').value = '<Diana other>';
+el('simple-approved').checked = true;
 await submit();
 assert.equal(api.state.data.experience,'simple');
 assert.equal(api.state.data.baseline.costs.recurring_operating_cost,70);
@@ -327,6 +365,7 @@ const simpleRecord = JSON.stringify(api.state.data);
 await file('review-file',simpleRecord,'comparison.json');
 assert.equal(api.state.data.experience,'simple');
 await click('start-review'); await mode('simple');
+el('simple-approved').checked = true;
 el('simple-current-cost').value = '0'; el('simple-other-cost').value = '0';
 el('simple-hourly-rate').value = '0';
 await submit();
@@ -358,6 +397,9 @@ assert.equal(api.state.usageReview.evidence_gate.savings_claim_allowed,false);
 assert.match(api.state.usageReview.source.name,/Illustrative request log/);
 assert.equal(el('request-analysis-mode').textContent,'ILLUSTRATIVE DATA');
 assert.equal(el('request-analysis-title').textContent,'What the example calls show');
+assert.equal(el('request-analysis-results').hidden,false);
+await click('analyze-request-log');
+assert.equal(api.state.usageReview.event_count,7,'Analyze locally should rerun the selected illustrative data');
 assert.equal(el('request-analysis-results').hidden,false);
 await click('start-review'); await mode('price');
 assert.equal(el('price-prompt-dialog').open,true);
@@ -415,6 +457,7 @@ assert.equal(el('price-results').hidden,false);
 assert.match(el('price-result-read').textContent,/worth testing, not a proven switch/);
 await click('send-price-to-review');
 assert.equal(el('review-dialog').open,true);
+assert.equal(el('simple-hourly-rate').value,'','Pricing handoff must require a deliberate time value');
 assert.equal(el('simple-current-name').value,'GPT-5.6 Sol');
 assert.equal(el('simple-other-name').value,'GPT-5.6 Luna');
 el('simple-current-checked').value = '100';
@@ -423,6 +466,7 @@ el('simple-current-minutes').value = '0';
 el('simple-other-checked').value = '100';
 el('simple-other-usable').value = '92';
 el('simple-other-minutes').value = '0';
+el('simple-hourly-rate').value = '30';
 await submit();
 assert.equal(api.state.data.pricing_estimate.evidence_gate.savings_claim_allowed,false);
 assert.equal(api.state.data.comparison.savings_claim_allowed,false);
