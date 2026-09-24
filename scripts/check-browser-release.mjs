@@ -341,7 +341,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#request-analysis-results").waitFor({ state: "visible" });
   await page.locator("#customer-allocation-method").selectOption("requests");
   await page.locator("#try-customer-economics").click();
-  assert((await page.locator("#customer-revenue-result").innerText()).includes("Allocated operating cost"), `${engineName}: entered human cost was not available for explicit allocation.`);
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("Allocated operating cost"), `${engineName}: entered human cost was not available for explicit allocation. Error: ${await page.locator("#customer-revenue-error").innerText()}; result: ${await page.locator("#customer-revenue-result").innerText()}`);
 
   const financeMemoPdf = engineName === "chromium" ? await verifyFinanceMemoPdf(page) : null;
   const savedReview = engineName === "chromium" ? await verifySavedReviewRoundTrip(page) : null;
