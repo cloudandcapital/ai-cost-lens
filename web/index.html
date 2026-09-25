@@ -422,18 +422,24 @@
                 <button class="build-button" id="analyze-request-log" type="button">Analyze locally</button>
               </div>
             </div>
+            <p class="request-format-note">Rows with invalid values or the wrong number of CSV fields are excluded from a scoped review. Download the issue list, correct the source, and analyze again for a whole-log comparison.</p>
             <p class="request-format-note">Use one row per AI request or trace observation. The CLI canonical CSV is a separate period-level billing format and is not interchangeable with this request log.</p>
             <div class="request-reconciliation-inputs">
               <label><span>User-entered billed total (unverified)</span><input id="request-billed-total" type="number" min="0" step="any" placeholder="Not supplied" /><small>Compare with request cost only after checking the same scope. This field does not verify an invoice.</small></label>
               <label><span>Bill currency</span><input id="request-billed-currency" type="text" maxlength="3" placeholder="e.g. USD" /></label>
               <label><span>Request currency fallback</span><input id="request-default-currency" type="text" maxlength="3" placeholder="Only if the file omits it" /></label>
-              <label><span>Optional monthly budget</span><input id="request-monthly-budget" type="number" min="0.01" step="any" placeholder="Not supplied" /></label>
-              <label><span>Budget warning threshold</span><div class="input-suffix"><input id="request-budget-warning" type="number" min="0.1" max="100" step="0.1" value="80" /><em>%</em></div></label>
-              <label><span>Decision allocation field</span><select id="request-allocation-basis"><option value="workload">Workload</option><option value="project">Project</option><option value="team_owner">Team or owner</option><option value="feature">Feature</option><option value="customer">Customer</option><option value="product">Product</option><option value="workflow">Workflow</option><option value="session_id">Session</option><option value="environment">Environment</option></select></label>
-              <label><span>Maximum unallocated cost</span><div class="input-suffix"><input id="request-allocation-warning" type="number" min="0" max="100" step="0.1" value="10" /><em>%</em></div><small>Cost missing the selected ownership field. This threshold is your review policy, not an industry standard.</small></label>
               <label class="check-field"><input id="request-bill-scope-confirmed" type="checkbox" /><span>The bill and request log cover the same provider, account, currency, and period</span></label>
               <label class="check-field"><input id="request-period-complete" type="checkbox" /><span>The log covers one complete, continuous period from its first through last UTC date</span></label>
             </div>
+            <details class="request-data-details request-advanced-settings">
+              <summary>Budget and allocation settings (optional)</summary>
+              <div class="request-reconciliation-inputs">
+                <label><span>Optional monthly budget</span><input id="request-monthly-budget" type="number" min="0.01" step="any" placeholder="Not supplied" /></label>
+                <label><span>Budget warning threshold</span><div class="input-suffix"><input id="request-budget-warning" type="number" min="0.1" max="100" step="0.1" value="80" /><em>%</em></div></label>
+                <label><span>Decision allocation field</span><select id="request-allocation-basis"><option value="workload">Workload</option><option value="project">Project</option><option value="team_owner">Team or owner</option><option value="feature">Feature</option><option value="customer">Customer</option><option value="product">Product</option><option value="workflow">Workflow</option><option value="session_id">Session</option><option value="environment">Environment</option></select></label>
+                <label><span>Maximum unallocated cost</span><div class="input-suffix"><input id="request-allocation-warning" type="number" min="0" max="100" step="0.1" value="10" /><em>%</em></div><small>Cost missing the selected ownership field. This threshold is your review policy, not an industry standard.</small></label>
+              </div>
+            </details>
             <details class="request-data-details request-cost-boundary-inputs">
               <summary>Add compute, data, network, tooling, pipeline, and human costs</summary>
               <p>Use totals for the same period and currency as the request log. Enter only costs not already included in provider request cost or another category. Blank means unknown. Enter zero only when you confirmed there was no cost. AI Cost Lens shows a fully loaded total only when every request is priced and every category is supplied.</p>
@@ -447,6 +453,11 @@
               </div>
             </details>
             <div class="builder-error" id="request-log-error" role="alert"></div>
+            <div class="request-import-issues" id="request-import-issues" hidden role="status">
+                <strong id="request-import-issues-title"></strong>
+                <p id="request-import-issues-copy">Costs and findings cover valid rows only. Bill comparison, run rate, and whole-log claims are unavailable until you correct and reimport the excluded rows.</p>
+                <button class="text-button" id="download-request-issues" type="button">Download issues CSV</button>
+            </div>
             <div id="request-analysis-results" hidden>
               <div class="request-analysis-head">
                 <div><p class="kicker" id="request-analysis-mode">OBSERVED REQUEST REVIEW</p><h3 id="request-analysis-title">What the imported calls support</h3></div>
@@ -458,6 +469,8 @@
               <div class="workbench-summary" id="request-analysis-summary"></div>
               <p class="request-analysis-boundary" id="request-analysis-boundary"></p>
               <div class="opportunity-workbench-list" id="request-finding-list"></div>
+              <details class="request-deep-dive" open>
+                <summary>Spend context and operating signals</summary>
               <section class="request-spend-overview" aria-labelledby="request-spend-overview-title">
                 <div class="request-explorer-head">
                   <div><p class="kicker">SPEND CONTEXT</p><h3 id="request-spend-overview-title">What shaped the imported cost?</h3></div>
@@ -485,6 +498,9 @@
                 <div class="request-spend-breakdowns" id="request-spend-breakdowns"></div>
                 <div id="request-currency-slices" class="request-currency-slices"></div>
               </section>
+              </details>
+              <details class="request-deep-dive" open>
+                <summary>Customer cost to serve</summary>
               <section class="customer-economics" aria-labelledby="customer-economics-title">
                 <div class="section-heading"><div><p class="kicker">COST TO SERVE</p><h3 id="customer-economics-title">Which customers carry the AI cost?</h3></div><span class="mode-tag">OPTIONAL · LOCAL CSV</span></div>
                 <p>Join customer IDs from this request log to revenue covering the log dates in the same currency. Extra days in the revenue period make the cost share a lower bound. Optionally spread entered operating costs, with missing and unattributed amounts shown.</p>
@@ -493,6 +509,9 @@
                 <p id="customer-revenue-error" class="builder-error" role="alert"></p>
                 <div id="customer-revenue-result" aria-live="polite" hidden></div>
               </section>
+              </details>
+              <details class="request-deep-dive" open>
+                <summary>Request rows and filters</summary>
               <section class="request-event-explorer" aria-labelledby="request-event-explorer-title">
                 <div class="request-explorer-head">
                   <div><p class="kicker">LOCAL SPEND EXPLORER</p><h3 id="request-event-explorer-title">Trace the finding back to its rows</h3></div>
@@ -516,6 +535,7 @@
                 </div>
                 <p class="request-row-limit" id="request-row-limit"></p>
               </section>
+              </details>
               <details class="request-data-details">
                 <summary>Import coverage and limitations</summary>
                 <div id="request-import-coverage"></div>

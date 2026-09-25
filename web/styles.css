@@ -3985,6 +3985,27 @@ body.story-mode .cockpit-grid {
   line-height: 1.55;
 }
 
+.request-import-issues {
+  margin: 18px 0;
+  padding: 16px 18px;
+  border-left: 3px solid var(--clay);
+  background: var(--surface-soft);
+}
+
+.request-import-issues p {
+  max-width: 75ch;
+  margin: 7px 0 12px;
+  line-height: 1.5;
+}
+
+.request-import-issues[hidden] {
+  display: none;
+}
+
+.request-deep-dive > summary {
+  display: none;
+}
+
 .request-reconciliation-inputs {
   display: grid;
   grid-template-columns: repeat(4, minmax(140px, 1fr));
@@ -6165,6 +6186,24 @@ body.bill-usage-mode #view-opportunities > :not(.request-review-panel) { display
 }
 
 @media (max-width: 620px) {
+  .request-deep-dive {
+    margin-top: 12px;
+    border: 1px solid var(--line-strong);
+    background: var(--paper-light);
+  }
+
+  .request-deep-dive > summary {
+    display: list-item;
+    cursor: pointer;
+    padding: 15px;
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  .request-deep-dive > section {
+    padding: 0 12px 12px;
+  }
+
   .price-prompt-workspace {
     padding: 22px;
   }

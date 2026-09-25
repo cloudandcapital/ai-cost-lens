@@ -313,6 +313,35 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const usage = await saveJsonDownload(page, "#download-usage-review", `${engineName}-usage-review.json`);
   assert(usage.event_count === 7, `${engineName}: usage import did not retain all seven rows.`);
   assert(usage.evidence_gate.savings_claim_allowed === false, `${engineName}: usage review allowed a savings claim.`);
+  await page.locator("#request-billed-total").fill("70");
+  await page.locator("#request-billed-currency").fill("USD");
+  await page.locator("#request-bill-scope-confirmed").check();
+  await page.locator("#request-period-complete").check();
+  const malformedLog = [
+    "event_id,timestamp,provider,model,provider_reported_cost,currency",
+    "good,2026-09-01T12:00:00Z,OpenAI,gpt-5.6-sol,10,USD",
+    "bad,2026-09-02T12:00:00Z,OpenAI,gpt-5.6-sol,oops,USD",
+    "wrong-fields,2026-09-03T12:00:00Z,OpenAI,gpt-5.6-sol,10",
+  ].join("\n");
+  await page.locator("#request-log-file").setInputFiles({ name: "malformed.csv", mimeType: "text/csv", buffer: Buffer.from(malformedLog) });
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  const partial = await saveJsonDownload(page, "#download-usage-review", `${engineName}-partial-usage-review.json`);
+  assert(partial.event_count === 1 && partial.import_coverage.excluded_rows === 2, `${engineName}: partial import lost coverage.`);
+  assert(partial.reconciliation.bill.status === "ROWS_EXCLUDED" && partial.spend.run_rate_status === "NOT_SUPPORTED", `${engineName}: excluded rows allowed a whole-log financial claim.`);
+  const issuesDownload = page.waitForEvent("download");
+  await page.locator("#download-request-issues").click();
+  const issues = await readFile(await (await issuesDownload).path(), "utf8");
+  assert(issues.includes("2,") && issues.includes("4,"), `${engineName}: issue export lost source record numbers.`);
+  assert((await page.locator("#request-analysis-boundary").innerText()).includes("valid rows only"), `${engineName}: scoped warning missing.`);
+  const allBadLog = "event_id,provider_reported_cost,currency\nbad,oops,USD\n";
+  await page.locator("#request-log-file").setInputFiles({ name: "all-bad.csv", mimeType: "text/csv", buffer: Buffer.from(allBadLog) });
+  await page.locator("#analyze-request-log").click();
+  assert((await page.locator("#request-log-error").innerText()).includes("No valid request rows"), `${engineName}: wholly invalid import was not stopped.`);
+  assert(await page.locator("#download-request-issues").isVisible(), `${engineName}: wholly invalid import lost the issue download.`);
+  await page.locator("#request-billed-total").fill("");
+  await page.locator("#request-bill-scope-confirmed").uncheck();
+  await page.locator("#request-period-complete").uncheck();
   const mixedLog = [
     "event_id,timestamp,provider,model,customer,input_tokens,output_tokens,cached_input_tokens,tool_charges,provider_reported_cost,currency",
     "a,2026-09-01T10:00:00Z,OpenAI,gpt-5.6-sol,A,100,20,0,0,12,USD",
@@ -413,6 +442,13 @@ async function mobileAndAccessibility(origin) {
   await page.locator("#mobile-section-nav").selectOption("review");
   const overviewA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   assert(overviewA11y.violations.length === 0, `mobile overview accessibility violations: ${axeSummary(overviewA11y)}`);
+  await page.locator("#mobile-section-nav").selectOption("opportunities");
+  await page.locator("#try-illustrative-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  assert(await page.locator(".request-deep-dive").first().evaluate((element) => !element.open), "mobile: detailed request analysis should start collapsed.");
+  await page.locator(".request-deep-dive").first().locator("summary").click();
+  assert(await page.locator("#request-spend-overview-title").isVisible(), "mobile: spend context could not be opened.");
+  assert(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 1, "mobile: request analysis causes page overflow.");
 
   await page.locator("#header-menu-toggle").click();
   await page.locator("#price-prompt").click();

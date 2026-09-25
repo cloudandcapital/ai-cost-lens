@@ -87,7 +87,7 @@
   const round = (value, digits = 6) => Number(Number(value).toFixed(digits));
   const cloneData = (value) => JSON.parse(JSON.stringify(value));
 
-  function parseCsv(text, label, { preserveColumns = [] } = {}) {
+  function parseCsv(text, label, { preserveColumns = [], quarantineInvalidRows = false } = {}) {
     if (new TextEncoder().encode(text).length > 5 * 1024 * 1024) {
       throw new Error(`${label} exceeds the 5 MiB local file limit. Split it into smaller, matching review periods.`);
     }
@@ -129,11 +129,17 @@
     const headers = rows[0].map((value) => value.trim());
     const preserveKey = (value) => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
     const preserved = new Set(preserveColumns.map(preserveKey));
-    const normalizedRows = rows.slice(1).map((values, rowIndex) => {
+    const importIssues = [];
+    const normalizedRows = rows.slice(1).flatMap((values, rowIndex) => {
       if (values.length !== headers.length) {
-        throw new Error(`${label} row ${rowIndex + 2} has ${values.length} fields; expected ${headers.length}.`);
+        const reason = `has ${values.length} fields; expected ${headers.length}.`;
+        if (!quarantineInvalidRows) throw new Error(`${label} row ${rowIndex + 2} ${reason}`);
+        importIssues.push({ row: rowIndex + 2, reason });
+        return [];
       }
-      return values.map((value, index) => preserved.has(preserveKey(headers[index])) ? value : value.trim());
+      const normalizedValues = values.map((value, index) => preserved.has(preserveKey(headers[index])) ? value : value.trim());
+      Object.defineProperty(normalizedValues, "__source_row", { value: rowIndex + 2 });
+      return [normalizedValues];
     });
     if (/spend|cost export|usage export/i.test(label)) {
       const seen = new Set();
@@ -144,7 +150,16 @@
       });
     }
     if (new Set(headers).size !== headers.length) throw new Error(`${label} has a duplicate column name.`);
-    return normalizedRows.map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index]])));
+    const parsed = normalizedRows.map((values) => {
+      const entry = Object.fromEntries(headers.map((header, index) => [header, values[index]]));
+      Object.defineProperties(entry, {
+        __source_row: { value: values.__source_row },
+        __source_index: { value: values.__source_row - 2 },
+      });
+      return entry;
+    });
+    if (quarantineInvalidRows) Object.defineProperty(parsed, "__import_issues", { value: importIssues });
+    return parsed;
   }
 
   function requireColumns(rows, columns, label) {
@@ -3576,13 +3591,13 @@
       if (!rows?.length) throw new Error("The request-log JSON needs a top-level array or a data array with at least one flat object.");
       if (rows.length > 20000) throw new Error("The request log exceeds 20,000 data rows.");
       rows.forEach((row, index) => {
-        if (!row || typeof row !== "object" || Array.isArray(row) || Object.values(row).some((value) => value !== null && typeof value === "object")) {
-          throw new Error(`Request-log JSON row ${index + 1} must be one flat object.`);
+        if (row && typeof row === "object" && !Array.isArray(row)) {
+          Object.defineProperties(row, { __source_row: { value: index + 1 }, __source_index: { value: index } });
         }
       });
       return rows;
     }
-    return parseCsv(text, "Request log");
+    return parseCsv(text, "Request log", { quarantineInvalidRows: true });
   }
 
   function requestReviewMoney(value, currency) {
@@ -3850,6 +3865,10 @@
         title: "Currency mismatch",
         copy: "The bill currency must match the single currency represented by the priced request rows.",
       },
+      ROWS_EXCLUDED: {
+        title: "Rows excluded",
+        copy: "Some source rows could not be analyzed. Correct and reimport them before comparing a bill with the whole request log.",
+      },
     };
     const billCard = bill.status === "COMPARABLE"
       ? {
@@ -3862,11 +3881,15 @@
       : null;
     const duplicateReference = review.reconciliation.selected_cost_excluding_later_duplicate_rows;
     summary.innerHTML = `
-      <article><span>Imported events</span><strong>${wholeNumber(review.event_count)}</strong><p>${wholeNumber(review.reconciliation.priced_rows)} priced; ${wholeNumber(review.reconciliation.unpriced_rows)} retained as unpriced.</p></article>
+      <article><span>Analyzed events</span><strong>${wholeNumber(review.event_count)}</strong><p>${wholeNumber(review.reconciliation.priced_rows)} priced; ${wholeNumber(review.reconciliation.unpriced_rows)} retained as unpriced. ${review.import_coverage.excluded_rows ? `${wholeNumber(review.import_coverage.excluded_rows)} excluded from ${wholeNumber(review.import_coverage.source_rows)} source rows.` : ""}</p></article>
       <article><span>${primarySlice ? "Largest comparable currency subset" : "Selected request cost · all rows"}</span><strong>${primarySlice ? requestReviewMoney(primarySlice.selected_cost, primarySlice.currency) : requestReviewMoney(review.reconciliation.selected_observed_cost, currency)}</strong><p>${primarySlice ? `${wholeNumber(primarySlice.priced_rows)} priced of ${wholeNumber(primarySlice.rows)} ${escapeHtml(primarySlice.currency)} rows. ${wholeNumber(review.event_count - primarySlice.rows)} other or untagged rows excluded; see currency subtotals below. No cross-currency total.` : `Provider-reported cost wins for the same row. Calculated cost fills only missing reported cost.${review.findings.some((item) => item.id === "duplicate-billed-event") && duplicateReference !== null ? ` Excluding later repeated-ID rows as an investigation reference: ${requestReviewMoney(duplicateReference, currency)}; confirm actual duplicates before removing charges.` : ""}`}</p></article>
       <article><span>${comparable ? `Investigation cost · ${escapeHtml(comparable.currency)} subset` : "Investigation cost boundary"}</span><strong>${requestReviewMoney(headline, comparable?.currency || currency)}</strong><p>Duplicate and failed-attempt cost, with overlapping events counted once. Successful retries are excluded.${comparable ? ` Covers only ${wholeNumber(comparable.rows)} of ${wholeNumber(review.event_count)} imported rows; other currencies and untagged rows are excluded.` : ""} This is not savings.</p></article>
       <article><span>User-entered bill comparison</span><strong>${escapeHtml(billCard.title)}</strong><p>${escapeHtml(billCard.copy)} The entered total was not verified against an invoice.</p></article>`;
     document.getElementById("request-analysis-boundary").textContent = review.evidence_gate.reason;
+    const issuesPanel = document.getElementById("request-import-issues");
+    issuesPanel.hidden = !review.import_coverage.excluded_rows;
+    document.getElementById("request-import-issues-title").textContent = `${wholeNumber(review.import_coverage.excluded_rows)} of ${wholeNumber(review.import_coverage.source_rows)} source rows need correction`;
+    document.getElementById("request-import-issues-copy").textContent = "Costs and findings cover valid rows only. Bill comparison, run rate, and whole-log claims are unavailable until you correct and reimport the excluded rows.";
     renderRequestSpendOverview(review);
     populateRequestExplorer(review);
     renderRequestEventExplorer();
@@ -3897,9 +3920,14 @@
   }
 
   function initializeRequestLogAnalysis() {
+  if (window.matchMedia?.("(max-width: 620px)").matches) {
+    document.querySelectorAll(".request-deep-dive").forEach((section) => { section.open = false; });
+  }
   async function runRequestLogAnalysis(button, idleText, loadInput) {
     const error = document.getElementById("request-log-error");
     error.classList.remove("visible");
+    document.getElementById("request-import-issues").hidden = true;
+    state.requestImportIssues = null;
     try {
       if (!usageEventEngine) throw new Error("Request-level analysis is unavailable in this build.");
       button.disabled = true;
@@ -3907,6 +3935,7 @@
       const { text, filename, illustrative } = await loadInput();
       const rows = parseRequestLog(text, filename);
       const review = usageEventEngine.buildReview(rows, {
+        quarantine_invalid_rows: true,
         catalog: globalThis.AI_COST_LENS_PRICING_CATALOG,
         source_name: illustrative ? "Illustrative request log bundled with AI Cost Lens" : filename,
         source_file_hash: await sha256(text),
@@ -3943,6 +3972,12 @@
       state.usageReviewIllustrative = false;
       state.usageReviewBill = null;
       document.getElementById("request-analysis-results").hidden = true;
+      if (caught.import_issues?.length) {
+        state.requestImportIssues = caught.import_issues;
+        document.getElementById("request-import-issues").hidden = false;
+        document.getElementById("request-import-issues-title").textContent = `${wholeNumber(caught.import_issues.length)} of ${wholeNumber(caught.source_rows)} source rows need correction`;
+        document.getElementById("request-import-issues-copy").textContent = "No analysis was produced. Download the issues, correct the source file, and import it again.";
+      }
       error.textContent = caught instanceof TypeError || caught instanceof RangeError ? "The request log could not be analyzed. Check the flat file structure and numeric fields." : caught.message || "The request log could not be analyzed.";
       error.classList.add("visible");
     } finally {
@@ -3960,6 +3995,8 @@
       state.usageReviewIllustrative = false;
       state.usageReviewBill = null;
       document.getElementById("request-analysis-results").hidden = true;
+      document.getElementById("request-import-issues").hidden = true;
+      state.requestImportIssues = null;
       showToast("Review inputs changed. Choose Analyze locally to update the results.");
     });
   });
@@ -3978,6 +4015,8 @@
       ? `${file.name} selected. It will be read only when you choose Analyze locally.`
       : "Up to 20,000 flat rows or 5 MiB. Unknown fields, including prompt text, are not copied into the normalized record.";
     document.getElementById("request-analysis-results").hidden = true;
+    document.getElementById("request-import-issues").hidden = true;
+    state.requestImportIssues = null;
     document.getElementById("request-log-error").classList.remove("visible");
     state.usageReview = null;
     state.usageReviewIllustrative = false;
@@ -3992,6 +4031,7 @@
     output.hidden = true;
     try {
       if (!state.usageReview) throw new Error("Analyze the request log before joining revenue.");
+      if (state.usageReview.import_coverage?.excluded_rows) throw new Error("Correct the excluded request rows before comparing customer revenue. The customer totals could omit unknown costs.");
       requireColumns(rows, ["customer", "period_start", "period_end", "revenue", "currency"], "Customer revenue");
       const allocationMethod = document.getElementById("customer-allocation-method").value;
       const warningValue = document.getElementById("customer-share-warning").value.trim();
@@ -4061,6 +4101,19 @@
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = "ai-cost-lens-normalized-usage.csv";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  document.getElementById("download-request-issues").addEventListener("click", () => {
+    const issues = state.usageReview?.import_coverage?.issues || state.requestImportIssues;
+    if (!issues?.length || !usageEventEngine) return;
+    const blob = new Blob([usageEventEngine.issuesCsv({ import_coverage: { issues } })], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "ai-cost-lens-request-import-issues.csv";
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();

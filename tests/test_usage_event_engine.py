@@ -67,6 +67,42 @@ console.log(JSON.stringify(review));
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_invalid_request_rows_remain_scoped_and_block_whole_log_finance():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const rows = Array.from({length: 7}, (_, index) => ({
+  event_id: `valid-${index}`, timestamp: `2026-09-0${index + 1}T12:00:00Z`,
+  provider: "OpenAI", model: "gpt-5.6-sol", provider_reported_cost: 10, currency: "USD",
+}));
+rows.splice(3, 0, {event_id:"bad", timestamp:"2026-09-04T12:00:00Z", provider_reported_cost:"oops", currency:"USD"});
+const review = engine.buildReview(rows, {
+  quarantine_invalid_rows:true, period_complete_confirmed:true, bill_scope_confirmed:true,
+  billed_total:70, billed_currency:"USD", compute_cost:2,
+});
+let allInvalid;
+try {
+  engine.buildReview([{event_id:"bad", provider_reported_cost:"oops"}], {quarantine_invalid_rows:true});
+} catch (error) {
+  allInvalid = {reason:error.message, issues:error.import_issues};
+}
+console.log(JSON.stringify({review, issues:engine.issuesCsv(review), allInvalid}));
+""",
+        ENGINE,
+    )
+    review = result["review"]
+    assert review["import_coverage"]["source_rows"] == 8
+    assert review["import_coverage"]["analyzed_rows"] == 7
+    assert review["import_coverage"]["issues"][0]["row"] == 4
+    assert "provider-reported cost" in result["issues"]
+    assert review["reconciliation"]["bill"]["status"] == "ROWS_EXCLUDED"
+    assert review["reconciliation"]["bill"]["raw_selected_cost_difference"] is None
+    assert review["spend"]["run_rate_status"] == "NOT_SUPPORTED"
+    assert review["spend"]["cost_stack"]["status"] != "COMPLETE"
+    assert result["allInvalid"]["issues"][0]["row"] == 1
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_catalog_cost_requires_explicit_pricing_inputs_and_matching_currency_date():
     result = run_node(
         r"""
@@ -908,6 +944,7 @@ def test_usage_event_and_review_schemas_are_versioned_and_fail_closed():
     assert reconciliation["additionalProperties"] is False
     assert reconciliation["properties"]["bill"]["properties"]["status"]["enum"] == [
         "NOT_SUPPLIED",
+        "ROWS_EXCLUDED",
         "SCOPE_NOT_CONFIRMED",
         "PROVIDER_SCOPE_UNCLEAR",
         "REQUEST_COST_MISSING",

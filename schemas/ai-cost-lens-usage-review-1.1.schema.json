@@ -23,6 +23,21 @@
     },
     "currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "const": "MIXED" }, { "type": "null" }] },
     "event_count": { "type": "integer", "minimum": 1, "maximum": 20000 },
+    "import_coverage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_rows", "analyzed_rows", "excluded_rows", "issues"],
+      "properties": {
+        "source_rows": { "type": "integer", "minimum": 1, "maximum": 20000 },
+        "analyzed_rows": { "type": "integer", "minimum": 1, "maximum": 20000 },
+        "excluded_rows": { "type": "integer", "minimum": 0, "maximum": 20000 },
+        "issues": {
+          "type": "array", "maxItems": 20000,
+          "items": { "type": "object", "additionalProperties": false, "required": ["row", "reason"],
+            "properties": { "row": { "type": "integer", "minimum": 1 }, "reason": { "type": "string" } }
+          }
+        }
+      }
+    },
     "events": { "type": "array", "minItems": 1, "maxItems": 20000, "items": { "$ref": "ai-cost-lens-usage-event-1.0.schema.json" } },
     "reconciliation": {
       "type": "object",
@@ -42,7 +57,7 @@
           "additionalProperties": false,
           "required": ["status", "supplied_total", "supplied_currency", "same_scope_confirmed", "raw_selected_cost_difference", "duplicate_excluded_reference_difference", "method"],
           "properties": {
-            "status": { "enum": ["NOT_SUPPLIED", "SCOPE_NOT_CONFIRMED", "PROVIDER_SCOPE_UNCLEAR", "REQUEST_COST_MISSING", "MIXED_CURRENCY", "REQUEST_CURRENCY_MISSING", "BILL_CURRENCY_MISSING", "CURRENCY_MISMATCH", "COMPARABLE"] },
+            "status": { "enum": ["NOT_SUPPLIED", "ROWS_EXCLUDED", "SCOPE_NOT_CONFIRMED", "PROVIDER_SCOPE_UNCLEAR", "REQUEST_COST_MISSING", "MIXED_CURRENCY", "REQUEST_CURRENCY_MISSING", "BILL_CURRENCY_MISSING", "CURRENCY_MISMATCH", "COMPARABLE"] },
             "source": { "enum": ["user_entered_unverified"] },
             "supplied_total": { "type": ["number", "null"], "minimum": 0 },
             "supplied_currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "type": "null" }] },

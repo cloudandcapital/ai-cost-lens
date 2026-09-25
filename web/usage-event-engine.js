@@ -334,7 +334,7 @@
       defaultCurrency,
     };
     if (options.defaultCurrency && !/^[A-Z]{3}$/.test(options.defaultCurrency)) throw new Error("Default currency must be a three-letter code.");
-    const events = rows.map((row, index) => normalizeRow(row, index, options));
+    const events = rows.map((row, index) => normalizeRow(row, row?.__source_index ?? index, options));
     markDuplicates(events);
     return events;
   }
@@ -1279,8 +1279,33 @@
   }
 
   function buildReview(rows, rawOptions = {}) {
-    const events = normalizeRows(rows, rawOptions);
-    const reviewOptions = { ...rawOptions, source_rows: rows };
+    if (!Array.isArray(rows) || rows.length + (rows.__import_issues || []).length > MAX_ROWS) throw new Error("Supply 1 to 20,000 request rows.");
+    const issues = [...(rows.__import_issues || [])];
+    const validRows = [];
+    if (rawOptions.quarantine_invalid_rows) {
+      rows.forEach((row, index) => {
+        try {
+          normalizeRows([row], rawOptions);
+          validRows.push(row);
+        } catch (error) {
+          issues.push({ row: row?.__source_row ?? index + 1, reason: error.message });
+        }
+      });
+    } else {
+      if (issues.length) throw new Error(`Request log record ${issues[0].row}: ${issues[0].reason}`);
+      validRows.push(...rows);
+    }
+    if (!validRows.length) {
+      const error = new Error("No valid request rows remain. Download the issue list and correct the source file.");
+      error.import_issues = issues;
+      error.source_rows = rows.length + (rows.__import_issues || []).length;
+      throw error;
+    }
+    const events = normalizeRows(validRows, rawOptions);
+    const reviewOptions = { ...rawOptions, source_rows: validRows, period_complete_confirmed: issues.length ? false : rawOptions.period_complete_confirmed };
+    if (issues.length) {
+      for (const [field] of OPERATING_COST_CATEGORIES) reviewOptions[field] = null;
+    }
     const priced = events.filter((event) => event.selected_cost !== null);
     const pricedCurrencies = [...new Set(priced.map((event) => event.currency).filter(Boolean))];
     const pricedCurrencyMissing = priced.some((event) => !event.currency);
@@ -1323,7 +1348,8 @@
     let billDifference = null;
     let billDuplicateExcludedDifference = null;
     if (billTotal !== null) {
-      if (!billScopeConfirmed) billStatus = "SCOPE_NOT_CONFIRMED";
+      if (issues.length) billStatus = "ROWS_EXCLUDED";
+      else if (!billScopeConfirmed) billStatus = "SCOPE_NOT_CONFIRMED";
       else if (providerScopeUnclear) billStatus = "PROVIDER_SCOPE_UNCLEAR";
       else if (priced.length !== events.length) billStatus = "REQUEST_COST_MISSING";
       else if (mixedCurrency) billStatus = "MIXED_CURRENCY";
@@ -1375,9 +1401,10 @@
       generated_at: rawOptions.generated_at || new Date().toISOString(),
       application_version: "1.0.0",
       pricing_catalog_version: rawOptions.catalog?.catalog_version || null,
-      source: { name: rawOptions.source_name || "Local request-log import", adapter: detectAdapter(rows), sha256: rawOptions.source_file_hash || null, uploaded: false },
+      source: { name: rawOptions.source_name || "Local request-log import", adapter: detectAdapter(validRows), sha256: rawOptions.source_file_hash || null, uploaded: false },
       currency: reviewCurrency,
       event_count: events.length,
+      import_coverage: { source_rows: rows.length + (rows.__import_issues || []).length, analyzed_rows: events.length, excluded_rows: issues.length, issues },
       events,
       reconciliation: {
         provider_reported_cost: currencyNotComparable || reportedCost === null ? null : round(reportedCost),
@@ -1398,7 +1425,7 @@
       evidence_gate: {
         status: "OBSERVED_REQUEST_REVIEW",
         savings_claim_allowed: false,
-        reason: "Request-level findings identify investigation and verification targets. They do not prove realized savings.",
+        reason: `${issues.length ? `${issues.length} source row(s) were excluded. All findings and costs cover valid rows only; bill reconciliation, run rate, and whole-log conclusions are blocked. ` : ""}Request-level findings identify investigation and verification targets. They do not prove realized savings.`,
       },
       privacy: { parsed_locally: true, prompt_text_required: false, prompt_text_stored: false, source_file_uploaded: false },
     };
@@ -1417,5 +1444,10 @@
     return `${fields.join(",")}\n${review.events.map((event) => fields.map((field) => csvCell(event[field])).join(",")).join("\n")}\n`;
   }
 
-  return Object.freeze({ SCHEMA, REVIEW_SCHEMA, aliases, normalizeRows, analyzeEvents, buildReview, normalizedCsv, detectAdapter, spendSummary, operationalSummary, periodVariance, budgetSummary, operatingCostStack, allocationSummary, evidenceLayers });
+  function issuesCsv(review) {
+    if (!review?.import_coverage) throw new Error("A usage review is required.");
+    return `source_row,reason\n${review.import_coverage.issues.map((issue) => [issue.row, issue.reason].map(csvCell).join(",")).join("\n")}\n`;
+  }
+
+  return Object.freeze({ SCHEMA, REVIEW_SCHEMA, aliases, normalizeRows, analyzeEvents, buildReview, normalizedCsv, issuesCsv, detectAdapter, spendSummary, operationalSummary, periodVariance, budgetSummary, operatingCostStack, allocationSummary, evidenceLayers });
 });
