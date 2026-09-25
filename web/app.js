@@ -567,8 +567,8 @@
     const qualityGate = qualityStatus === "inconclusive" ? "the quality sample crossing the minimum" : qualityStatus === "below" ? "the declared quality requirement" : null;
     if ([baseline, proposed].some((route) => route.evidence.coverage_status === "illustrative")) {
       return !qualityGate
-        ? "the invented example inputs"
-        : `${qualityGate} and invented example inputs`;
+        ? "this illustrative example"
+        : `${qualityGate} in this illustrative example`;
     }
     const failures = [
       qualityGate,
@@ -1291,6 +1291,18 @@
       .sort((a, b) => (b.reported_subtotals.requests || 0) - (a.reported_subtotals.requests || 0) || String(a[field]).localeCompare(String(b[field])));
   }
 
+  function groupOpenAICost(rows) {
+    const groups = new Map();
+    rows.forEach((row) => {
+      const current = groups.get(row.project) || { project: row.project, amount: 0, rows: 0 };
+      current.amount += row.amount;
+      current.rows += 1;
+      groups.set(row.project, current);
+    });
+    return [...groups.values()]
+      .sort((a, b) => b.amount - a.amount || a.project.localeCompare(b.project));
+  }
+
   const openAIUsageColumns = [
     "start_time", "end_time", "project_id", "num_model_requests", "model", "service_tier",
     "input_tokens", "output_tokens", "input_cached_tokens", "input_uncached_tokens",
@@ -1334,7 +1346,7 @@
       return [{
         date: openAIBucketDay(row, label),
         model: row.model || "unattributed",
-        project: row.project_id || "unattributed",
+        project: row.project_id.trim() || "unattributed",
         api_key: row.api_key_id || "unattributed",
         service_tier: row.service_tier || "unattributed",
         requests: optionalUsageNumber(row.num_model_requests, "num_model_requests"),
@@ -1355,7 +1367,7 @@
         date: openAIBucketDay(row, label),
         amount: costNumber(row.amount_value, `${label} amount_value`),
         currency,
-        project: row.project_id || "unattributed",
+        project: row.project_id.trim() || "unattributed",
         api_key: row.api_key_id || "unattributed",
         line_item: row.line_item || "unattributed",
       }];
@@ -1393,6 +1405,7 @@
         total: round(costRows.reduce((total, row) => total + row.amount, 0)),
         populated_rows: costRows.length,
         days_with_cost: new Set(costRows.map((row) => row.date)).size,
+        by_project: groupOpenAICost(costRows),
       },
       usage: {
         basis: "provider_reported",
@@ -2229,6 +2242,12 @@
         source: { usage_export: "string", cost_export: "string", usage_sha256: "string?", cost_sha256: "string?" },
       });
       currency(data.bill.currency);
+      if (data.bill.by_project !== undefined) {
+        shape(data.bill.by_project, [{ project: "string", amount: "number", rows: "number" }], "bill.by_project");
+        if (!data.bill.by_project.length || data.bill.by_project.some((row) => row.amount < 0 || !Number.isInteger(row.rows) || row.rows < 1)
+          || data.bill.by_project.reduce((sum, row) => sum + row.rows, 0) !== data.bill.populated_rows) fail("bill.by_project");
+        close(data.bill.by_project.reduce((sum, row) => sum + row.amount, 0), data.bill.total, "bill.by_project");
+      }
       const validateUsageCoverage = (totals, reportedSubtotals, coverage, path) => {
         if (coverage === undefined) return;
         usageFieldNames.forEach((field) => {
@@ -2582,6 +2601,7 @@
 
   function configureBreakEvenExplorer() {
     const { proposed } = state.data;
+    document.getElementById("provider-slider-label").textContent = state.data.experience === "simple" ? "Subscription or provider cost" : "Provider bill";
     const yieldInput = document.getElementById("yield-slider");
     yieldInput.value = String(proposed.measures.usable_result_rate * 100);
     yieldInput.dataset.original = yieldInput.value;
@@ -2734,7 +2754,7 @@
       const decision = decisionFor(state.data);
       if (["evidence", "challenge"].includes(kind)) return `${decision.reason} ${comparison.limitation}`;
       if (kind === "plan" || kind === "payback") return "No budget plan or switching cost was supplied. A monthly scenario alone does not establish payback or realized savings.";
-      return `${decision.reason} Current cost per qualifying result: ${unitMoney(baseline.measures.cost_per_usable_result)}. Other option: ${unitMoney(proposed.measures.cost_per_usable_result)}. Tool charges and estimated time value are included; qualifying means usable without a significant fix.`;
+      return `${decision.reason} Current cost per usable result: ${unitMoney(baseline.measures.cost_per_usable_result)}. Other option: ${unitMoney(proposed.measures.cost_per_usable_result)}. Tool charges and estimated time value are included; usable means accepted without a significant fix.`;
     }
 
 
@@ -2826,6 +2846,7 @@
         <td>${escapeHtml(actual)}</td>
         <td class="variance-${className}">${escapeHtml(variance)}</td>
       </tr>`).join("");
+    document.getElementById("planning-rounding-note").textContent = "Unit-cost variances use the unrounded values. The plan and actual shown above are rounded to cents.";
 
     const drivers = planning.variance.primary_cost_drivers || [];
     const qualityVariance = planning.variance.ready_result_rate_points;
@@ -2855,6 +2876,7 @@
       <div><dt>Monthly unit-cost gap at ${compact(payback.expected_ready_results_per_month)} ready results</dt><dd>${signedMoney(payback.monthly_operating_savings)}</dd></div>
       <div><dt>One time change cost</dt><dd>${money(payback.one_time_change_cost)}</dd></div>
       <div><dt>${payback.decision_horizon_months}-month net</dt><dd class="${horizonValue >= 0 ? "positive" : "negative"}">${signedMoney(horizonValue)}</dd></div>`;
+    document.getElementById("payback-basis-note").textContent = `This scenario holds output at ${compact(payback.expected_ready_results_per_month)} ready results per month on both routes. The recurring-total difference above compares each route at its own observed yield; the figures answer different questions.`;
   }
 
   function renderSimpleReview() {
@@ -3108,7 +3130,7 @@
         <dl>${receipt.lines.map((line) => `<div><dt>${escapeHtml(line.label)}</dt><dd>${lineMoney(line.cents)}</dd></div>`).join("")}
           <div class="receipt-total"><dt>One ready result</dt><dd>${lineMoney(receipt.total_cents)}</dd></div></dl>
       </article>`).join("");
-    document.getElementById("receipt-note").textContent = `${receipts[0].note} Each line includes the cost of attempts that did not produce a ready result. One-time change costs are excluded.`;
+    document.getElementById("receipt-note").textContent = `${receipts[0].note} Each line includes the cost of attempts that did not produce a ready result. Per-result lines are apportioned in cents so they add to the rounded total; an individual line may differ by one cent from rounding it alone. One-time change costs are excluded.`;
     const catalog = globalThis.AI_COST_LENS_PRICING_CATALOG;
     const checks = ["baseline", "proposed"].map((route) => evidenceTools.priceSenseCheck(state.data, catalog, route));
     const section = document.getElementById("price-crosscheck");
@@ -4338,6 +4360,7 @@
   }
 
   function renderSingleBill() {
+    document.getElementById("bill-project-cost").hidden = true;
     const review = summarizeSingleBill(state.data);
     const linkedUsage = state.usageReviewBill === state.data ? state.usageReview : null;
     const manualBill = ["invoice_form", "invoice_pdf"].includes(state.data.config.reviewSource);
@@ -4489,6 +4512,9 @@
     const averageOutput = requests && outputTokens !== null ? outputTokens / requests : null;
     const topModel = usage.by_model[0];
     const topRequestShare = topModel && requests ? topModel.requests / requests : null;
+    const projectCostAvailable = period.aligned && reconciliation.project_cost_join_supported && Array.isArray(bill.by_project) && bill.by_project.length > 0;
+    const topProject = projectCostAvailable && bill.total > 0 ? bill.by_project[0] : null;
+    const topProjectShare = topProject ? topProject.amount / bill.total : null;
     const costPerRequestLabel = costPerRequest === null ? "Unavailable" : money(costPerRequest, costPerRequest < 1 ? 4 : 2);
     const topRequestShareLabel = topRequestShare === null ? "Unavailable" : pct(topRequestShare, 1);
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
@@ -4533,10 +4559,16 @@
         <td class="unavailable">Unavailable</td>
       </tr>`;
     }).join("");
+    document.getElementById("bill-project-cost").hidden = !projectCostAvailable;
+    document.getElementById("bill-project-cost-rows").innerHTML = projectCostAvailable
+      ? bill.by_project.map((row) => `<tr><td>${escapeHtml(row.project)}</td><td>${money(row.amount, 2)}</td><td>${bill.total > 0 ? pct(row.amount / bill.total, 1) : "Unavailable"}</td></tr>`).join("")
+      : "";
     const requestCoverage = openAIFieldCoverage(usage, "requests");
-    const requestStart = requestCoverage.status === "complete" && requests
-      ? ["save", "START HERE", `Most requests went to ${topModel.model}`, topRequestShareLabel, `${topModel.model} handled ${compact(topModel.requests)} of ${compact(requests)} requests. Start with the busiest visible route before smaller ones.`]
-      : ["test", "CHECK FIRST", "Complete the request count", openAIReportedValue(usage, "requests"), openAICoverageNote(usage, "requests", "No requests were recorded for this period; request-based metrics remain unavailable.")];
+    const requestStart = topProject
+      ? ["save", "START HERE", `Review billed cost for ${topProject.project}`, pct(topProjectShare, 1), `${topProject.project} accounts for ${money(topProject.amount, 2)} of ${money(bill.total, 2)} in the cost export. Investigate this project first; do not assign its billed cost to a model.`]
+      : requestCoverage.status === "complete" && requests
+        ? ["test", "USAGE ONLY", `Most requests went to ${topModel.model}`, topRequestShareLabel, `${topModel.model} handled ${compact(topModel.requests)} of ${compact(requests)} requests. Billed project cost is unavailable here; request volume alone cannot rank spend.`]
+        : ["test", "CHECK FIRST", "Complete the request and project coverage", openAIReportedValue(usage, "requests"), "Without attributed project cost or complete request counts, there is no defensible cost driver to rank."];
     const ledger = period.aligned ? [
       requestStart,
       ["test", "UNIT COST", costPerRequest === null ? "Request unit cost is unavailable" : "Use the blended request cost as a baseline", costPerRequestLabel, costPerRequest === null ? "The export has no nonzero request volume. Keep the unit cost unavailable rather than dividing by zero." : "This is the full exported cost divided by observed requests. Track it over time, but do not treat it as a billed model rate."],
@@ -4555,9 +4587,9 @@
       </article>
     `).join("");
     document.getElementById("bill-next-step").textContent = period.aligned
-      ? topRequestShare === null
-        ? requestCoverage.status === "complete" ? `Start with ${topModel.model}, the busiest visible route in this export.` : "Complete the request coverage before using request volume to prioritize a route."
-        : `Start with ${topModel.model}, the route handling ${topRequestShareLabel} of requests.`
+      ? topProject
+        ? `Review ${topProject.project}: ${money(topProject.amount, 2)}, or ${pct(topProjectShare, 1)} of the billed cost.`
+        : "Project billed cost is unavailable. Use the model request mix as a usage lead, not a spend ranking."
       : "Export matching UTC usage and cost time buckets before investigating optimization.";
     document.getElementById("bill-boundary-copy").textContent = period.aligned
       ? `${usage.by_model.length} model route${usage.by_model.length === 1 ? "" : "s"}, ${usage.by_project.length} project record${usage.by_project.length === 1 ? "" : "s"}, and ${serviceTiers.length} processing tier${serviceTiers.length === 1 ? "" : "s"} are visible. Check prompt size, output length, caching, tier mix, and whether a smaller model meets quality on one repeatable job. Human review is optional; add outcomes only when you need to test value or savings.`
@@ -4594,8 +4626,7 @@
       const averageInput = requests && inputTokens !== null ? inputTokens / requests : null;
       const averageOutput = requests && outputTokens !== null ? outputTokens / requests : null;
       const cacheShare = inputTokens && cachedInput !== null ? cachedInput / inputTokens : null;
-      const topModel = usage.by_model[0];
-      const topRequestShare = topModel && requests ? topModel.requests / requests : null;
+      const topProject = period.aligned && reconciliation.project_cost_join_supported && total > 0 && bill.by_project?.length ? bill.by_project[0] : null;
       document.getElementById("memo-title").textContent = "OpenAI bill review";
       document.getElementById("memo-meta").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
       document.getElementById("memo-decision-code").textContent = period.aligned ? "COST AND USAGE" : "PERIOD MISMATCH";
@@ -4610,6 +4641,7 @@
       document.getElementById("memo-table-head").innerHTML = "<tr><th>Measure</th><th>Observed</th><th>What it proves</th></tr>";
       const billRows = [
         ["Provider reported cost", money(total, total < 1 ? 4 : 2), "The organization total for the exported period"],
+        ...(topProject ? [[`Largest billed project: ${topProject.project}`, money(topProject.amount, 2), `${pct(topProject.amount / total, 1)} of reported cost; not billed model cost`]] : []),
         ["Requests", openAIReportedValue(usage, "requests"), openAICoverageNote(usage, "requests", "Observed request volume")],
         ["Blended cost per request", costPerRequestLabel, costPerRequest === null ? "Unavailable until request coverage is complete and greater than zero" : "Full exported cost divided by observed requests; not a billed model rate"],
         ["Input tokens", openAIReportedValue(usage, "input_tokens"), openAICoverageNote(usage, "input_tokens", "Observed input usage, including cached input")],
@@ -4635,11 +4667,9 @@
       ]);
       memoPlanning.hidden = true;
       document.getElementById("memo-next-step").textContent = period.aligned
-        ? topModel
-          ? topRequestShare === null
-            ? openAIFieldCoverage(usage, "requests").status === "complete" ? `Start with ${topModel.model}, the busiest visible route, and test one bounded change.` : "Complete request coverage before using request volume to prioritize a route."
-            : `Start with ${topModel.model}, which handled ${pct(topRequestShare, 1)} of requests, and test one bounded change.`
-          : "Choose one repeatable workload and establish its request and token baseline."
+        ? topProject
+          ? `Investigate ${topProject.project}, the largest billed project at ${money(topProject.amount, 2)}. Model billed cost remains unavailable.`
+          : "Project billed cost is unavailable. Request count alone cannot rank spend."
         : "Export matching usage and cost periods before investigating optimization.";
       document.getElementById("memo-footer-status").textContent =
         state.data.mode === "illustrative" ? "Illustrative export" : "Provider reported cost and usage · calculated locally · no AI API";
@@ -4820,6 +4850,7 @@
 
   function decisionFor(data) {
     const { baseline, proposed, comparison } = data;
+    const resultTerm = data.experience === "simple" ? "usable result" : "ready result";
     const a = baseline.measures.cost_per_usable_result;
     const b = proposed.measures.cost_per_usable_result;
     const delta = b - a;
@@ -4844,15 +4875,15 @@
     } else if (Math.abs(delta) < 0.000001) {
       code = "NO COST ADVANTAGE";
       posture = "STOP CHANGE";
-      reason = "The options have the same cost per qualifying result at the precision shown. This comparison establishes no cost advantage.";
+      reason = `The options have the same cost per ${resultTerm} at the precision shown. This comparison establishes no cost advantage.`;
     } else if (delta > 0) {
       code = "KEEP CURRENT ROUTE";
       posture = "STOP CHANGE";
-      reason = "The other option costs more per qualifying result on the inputs supplied. This comparison does not support switching to save money.";
+      reason = `The other option costs more per ${resultTerm} on the inputs supplied. This comparison does not support switching to save money.`;
     } else {
       code = comparison.savings_claim_allowed ? "SAVE NOW" : "TEST FIRST";
       posture = comparison.savings_claim_allowed ? "FUND CHANGE" : "FIX EVIDENCE";
-      reason = comparison.savings_claim_allowed ? "The supplied evidence supports a lower cost per qualifying result for this workload and period." : "The other option costs less per qualifying result in this estimate. Repeat the comparison before treating the difference as savings.";
+      reason = comparison.savings_claim_allowed ? `The supplied evidence supports a lower cost per ${resultTerm} for this workload and period.` : `The other option costs less per ${resultTerm} in this estimate. Repeat the comparison before treating the difference as savings.`;
     }
     if (data.experience !== "simple" && !comparison.savings_claim_allowed) {
       const gates = failedSavingsGateText(comparison, baseline, proposed, sampleQualityStatus(proposed, data.workload?.accepted_quality_threshold ?? 0));
@@ -4923,7 +4954,7 @@
       document.getElementById("memo-meta").textContent = "Monthly scenario · billing dates not supplied";
       document.getElementById("finding-title").textContent = decision.reason;
       document.getElementById("finding-limit").textContent = state.data.comparison.limitation;
-      document.getElementById("lumen-signals").innerHTML = `<div><span>Current cost per qualifying result</span><strong>${escapeHtml(unitMoney(state.data.baseline.measures.cost_per_usable_result))}</strong></div><div><span>Other option</span><strong>${escapeHtml(unitMoney(state.data.proposed.measures.cost_per_usable_result))}</strong></div>`;
+      document.getElementById("lumen-signals").innerHTML = `<div><span>Current cost per usable result</span><strong>${escapeHtml(unitMoney(state.data.baseline.measures.cost_per_usable_result))}</strong></div><div><span>Other option</span><strong>${escapeHtml(unitMoney(state.data.proposed.measures.cost_per_usable_result))}</strong></div>`;
     }
   }
 
@@ -5799,7 +5830,7 @@
       const difference = result.monthly_difference_from_current_usd;
       const differenceClass = difference < 0 ? "price-difference-lower" : difference > 0 ? "price-difference-higher" : "";
       const usable = result.estimated_cost_per_usable_result_usd === null ? "Not modeled" : promptPriceMoney(result.estimated_cost_per_usable_result_usd);
-      const priceBasis = result.pricing_basis === "user_supplied" ? `user-supplied · effective ${result.pricing_effective_at}` : `official list · checked ${result.pricing_verified_at}${result.promotional_rate_guaranteed_through ? ` · ${result.model_id === "openai/gpt-5.6-sol" ? "promotional rate guaranteed at least through" : "rate changes after"} ${result.promotional_rate_guaranteed_through}` : ""}`;
+      const priceBasis = result.pricing_basis === "user_supplied" ? `user-supplied · effective ${result.pricing_effective_at}` : `official list · checked ${result.pricing_verified_at}${result.promotional_rate_guaranteed_through ? ` · ${result.model_id === "openai/gpt-5.6-sol" ? "promotional rate available at least through" : "rate changes after"} ${result.promotional_rate_guaranteed_through}` : ""}`;
       return `<tr>
         <td class="price-route-name"><strong>${escapeHtml(result.label)}</strong><span>${escapeHtml(result.provider)} · ${escapeHtml(modeLabel(result.processing_mode))} · ${escapeHtml(geographyLabel(result.geography, result.geography_multiplier))}${result.pricing_adjustment === "long_context" ? " · long-context rates" : ""}${result.role === "current" ? " · current" : ""}</span><small>${wholeNumber(result.input_tokens)} input · ${result.input_token_method === "openai_o200k_base_exact_raw_text" ? "exact raw-text count" : result.input_token_method === "manual" ? "entered count" : "estimated count"} · ${escapeHtml(priceBasis)}</small></td>
         <td data-label="Per call">${promptPriceMoney(result.estimated_cost_per_call_usd)}</td>

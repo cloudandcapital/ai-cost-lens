@@ -124,6 +124,16 @@
                 <tbody id="bill-model-rows"></tbody>
               </table>
             </div>
+            <div id="bill-project-cost" hidden>
+              <h3>Billed cost by project</h3>
+              <p>Cost export attribution. A project total is not a billed model total, even if the usage file shows one model for that project.</p>
+              <div class="usage-table-wrap" role="region" aria-label="Provider billed cost by project" tabindex="0">
+                <table class="usage-table">
+                  <thead><tr><th>Project</th><th>Billed cost</th><th>Share of bill</th></tr></thead>
+                  <tbody id="bill-project-cost-rows"></tbody>
+                </table>
+              </div>
+            </div>
           </section>
 
           <section class="opportunity-section" aria-labelledby="bill-ledger-title">
@@ -214,7 +224,7 @@
                         <input id="yield-slider" type="range" min="0" max="100" step="0.1" />
                       </label>
                       <label>
-                        <span>Provider bill <strong id="provider-slider-value"></strong></span>
+                        <span><span id="provider-slider-label">Provider bill</span> <strong id="provider-slider-value"></strong></span>
                         <input id="provider-slider" type="range" min="0" max="1" step="1" />
                       </label>
                       <label>
@@ -315,6 +325,7 @@
                     <tbody id="planning-rows"></tbody>
                   </table>
                 </div>
+                <p class="calculation-note" id="planning-rounding-note"></p>
                 <div class="variance-notes" id="variance-notes"></div>
               </div>
               <aside class="payback-card" aria-labelledby="payback-title">
@@ -323,6 +334,7 @@
                 <strong id="payback-verdict"></strong>
                 <p id="payback-copy"></p>
                 <dl id="payback-metrics"></dl>
+                <p class="calculation-note" id="payback-basis-note"></p>
               </aside>
             </div>
           </section>
@@ -751,7 +763,7 @@
       </main>
 
       <footer>
-        <p>AI Cost Lens is free, open source, and local first.</p>
+        <p>AI Cost Lens is free, <a href="https://github.com/cloudandcapital/ai-cost-lens" target="_blank" rel="noopener noreferrer">open source</a>, and local first.</p>
         <p>Calculations run locally. Source files are not uploaded.</p>
       </footer>
     </div>
@@ -853,7 +865,12 @@
             <strong>Compare two options</strong>
             <span>For subscriptions, solo work, and small teams. Enter two monthly costs and check a small sample of work.</span>
           </button>
-          <details class="builder-more-paths"><summary>Other ways to start <span>Prompt price, file upload, detailed comparison, and examples</span></summary><div class="builder-more-grid">
+          <button class="builder-mode builder-mode-featured" data-builder-mode="openai" type="button" aria-pressed="false">
+            <small>OPENAI OR CLAUDE · FILES</small>
+            <strong>Upload what you have</strong>
+            <span>Choose CSV, JSON, or a text-based invoice PDF. The browser checks it locally.</span>
+          </button>
+          <details class="builder-more-paths"><summary>Other ways to start <span>Prompt price, detailed comparison, and examples</span></summary><div class="builder-more-grid">
           <button class="builder-mode" data-builder-mode="price" type="button" aria-pressed="false">
             <small>NO FILES · LOCAL CALCULATOR</small><strong>Price a prompt</strong><span>Compare API prices, cache, batch, retries, and expected usable results.</span>
           </button>
@@ -867,11 +884,6 @@
             <small>ILLUSTRATIVE · NO FILES NEEDED</small>
             <strong>See a cheaper bill backfire</strong>
             <span>Follow a lower provider bill that turns into more expensive work.</span>
-          </button>
-          <button class="builder-mode" data-builder-mode="openai" type="button" aria-pressed="false">
-            <small>OPENAI OR CLAUDE · START HERE</small>
-            <strong>Upload what you have</strong>
-            <span>Choose CSV, JSON, or a text-based invoice PDF. The browser checks it locally.</span>
           </button>
           <button class="builder-mode" data-builder-mode="workload" type="button" aria-pressed="false">
             <small>ANY PROVIDER OR AI TOOL</small>

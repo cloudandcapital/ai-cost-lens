@@ -197,6 +197,21 @@ async function verifyOpenAIPartialBucket(page) {
   assert((await page.locator("#bill-boundary-copy").innerText()).includes("even if their calendar dates match"), "Mismatch guidance blames dates that already match.");
 }
 
+async function verifyFictionalProjectCost(page) {
+  const fixtureDir = join(root, "tests", "fixtures");
+  await page.locator("#start-review").click();
+  assert(await page.locator('.builder-mode-choice [data-builder-mode="openai"]').isVisible(), "Provider upload is hidden in the first choice screen.");
+  await page.locator('.builder-mode-choice [data-builder-mode="openai"]').click();
+  await page.locator("#openai-usage-file").setInputFiles(join(fixtureDir, "fictional-asterdesk-openai-activity.csv"));
+  await page.locator("#openai-cost-file").setInputFiles(join(fixtureDir, "fictional-asterdesk-openai-cost.csv"));
+  await page.locator("#build-review").click();
+  await page.locator("#bill-project-cost").waitFor({ state: "visible" });
+  assert((await page.locator("#bill-project-cost").innerText()).includes("$487.20"), "Billed Support cost is missing.");
+  assert((await page.locator("#bill-next-step").innerText()).includes("proj_aster_support"), "The review prioritized the busy low-cost model instead of the billed project.");
+  assert((await page.locator("#bill-model-rows").innerText()).includes("Unavailable"), "Project billed cost was assigned to a model.");
+  assert((await page.locator("#memo-next-step").textContent()).includes("proj_aster_support"), "The memo contradicts the project-cost priority.");
+}
+
 async function priceAndUsageFlow(engineName, engine, origin) {
   const browser = await engine.launch({ headless: true });
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
@@ -228,7 +243,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#start-review-inline").click();
   assert(await page.locator("#baseline-population").inputValue() === "" && await page.locator("#proposed-ready").inputValue() === "", `${engineName}: example outcomes leaked into a real review.`);
   assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: inline review action did not open.`);
-  assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 3, `${engineName}: start dialog still presents too many choices.`);
+  assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 4, `${engineName}: start dialog lost a primary path.`);
   await page.locator("#close-review").click();
   await page.locator('[data-example="cost-trap"]').click();
   assert((await page.locator("#workload-name").innerText()) === "Contract risk summaries", `${engineName}: could not return to the original example.`);
@@ -383,6 +398,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const savedReview = engineName === "chromium" ? await verifySavedReviewRoundTrip(page) : null;
   const rich_decisions = engineName === "chromium" ? await verifyRichDecisionFlow(page) : null;
   if (engineName === "chromium") await verifyOpenAIPartialBucket(page);
+  if (engineName === "chromium") await verifyFictionalProjectCost(page);
   await page.locator("#start-review").click();
   await page.locator('[data-builder-mode="single"]').click();
   await page.locator("#invoice-provider").fill("OpenAI");
