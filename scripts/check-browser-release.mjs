@@ -115,7 +115,7 @@ async function verifyFinanceMemoPdf(page) {
     pages.push(content.items.map((item) => item.str).join(" "));
   }
   const text = pages.join(" ").toLowerCase();
-  for (const expected of ["ai spend decision memo", "the other option does not meet", "provider cost", "cost per ready result", "what finance can rely on", "current cost vs plan", "monthly scenario compares route unit costs", "not booked savings", "not supported"]) {
+  for (const expected of ["ai spend decision memo", "the other option does not meet", "provider cost", "cost per ready result", "what finance can rely on", "current cost vs plan", "monthly scenario compares route unit costs", "one time change cost", "month net after change cost", "not booked savings", "not supported"]) {
     assert(text.includes(expected), `finance memo PDF is missing ${expected}.`);
   }
   await loadingTask.destroy();
@@ -324,6 +324,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#request-analysis-results").waitFor({ state: "visible" });
   assert((await page.locator("#request-analysis-summary").innerText()).includes("$12.00"), `${engineName}: a EUR row hid comparable USD cost.`);
   assert((await page.locator("#request-currency-slices").innerText()).includes("EUR"), `${engineName}: currency coverage was hidden.`);
+  assert((await page.locator("#request-spend-breakdowns").innerText()).includes("Breakdowns below use USD only"), `${engineName}: mixed currency breakdowns lack an explicit scope.`);
   const revenueLog = "customer,period_start,period_end,revenue,currency\nA,2026-09-01,2026-09-01,100,USD\n";
   await page.locator("#customer-revenue-file").setInputFiles({ name: "revenue.csv", mimeType: "text/csv", buffer: Buffer.from(revenueLog) });
   await page.locator("#analyze-customer-revenue").click();
@@ -342,6 +343,11 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#customer-allocation-method").selectOption("requests");
   await page.locator("#try-customer-economics").click();
   assert((await page.locator("#customer-revenue-result").innerText()).toLowerCase().includes("allocated operating cost"), `${engineName}: entered human cost was not available for explicit allocation. Error: ${await page.locator("#customer-revenue-error").innerText()}`);
+  if (engineName === "chromium") {
+    await page.locator('[data-view="evidence"]').click();
+    const workspace = await saveJsonDownload(page, "#download-workspace", "workspace-archive.json");
+    assert(workspace.schema_version === "ai-cost-lens-workspace/1.0" && workspace.request_review?.event_count === 7 && workspace.customer_cost_to_serve?.analysis?.customers?.length, "Workspace archive lost imported request or customer analysis.");
+  }
 
   const financeMemoPdf = engineName === "chromium" ? await verifyFinanceMemoPdf(page) : null;
   const savedReview = engineName === "chromium" ? await verifySavedReviewRoundTrip(page) : null;

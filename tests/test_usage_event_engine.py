@@ -254,11 +254,23 @@ console.log(JSON.stringify(engine.buildReview(rows, {generated_at: "2026-09-21T0
     ] == [("EUR", 8, 1), ("USD", 10, 1)]
     assert result["spend"]["cost_per_priced_request"] is None
     assert result["spend"]["projected_30_day_cost"] is None
-    assert all(
-        item["selected_cost"] is None
-        for rows in result["spend"]["breakdowns"].values()
-        for item in rows
+    assert result["comparable_currency_review"]["currency"] == "EUR"
+    assert (
+        result["comparable_currency_review"]["headline"][
+            "conservative_non_additive_opportunity"
+        ]
+        == 8
     )
+    assert result["spend"]["breakdowns"]["workload"] == [
+        {
+            "label": "Route B",
+            "event_count": 1,
+            "priced_rows": 1,
+            "selected_cost": 8,
+            "average_selected_cost_per_priced_row": 8,
+            "share_of_selected_cost": 1,
+        }
+    ]
     assert result["headline"]["conservative_non_additive_opportunity"] is None
     assert "No cross-currency amount" in result["headline"]["method"]
     assert all(
@@ -897,6 +909,7 @@ def test_usage_event_and_review_schemas_are_versioned_and_fail_closed():
     assert reconciliation["properties"]["bill"]["properties"]["status"]["enum"] == [
         "NOT_SUPPLIED",
         "SCOPE_NOT_CONFIRMED",
+        "PROVIDER_SCOPE_UNCLEAR",
         "REQUEST_COST_MISSING",
         "MIXED_CURRENCY",
         "REQUEST_CURRENCY_MISSING",
@@ -1128,3 +1141,19 @@ console.log(JSON.stringify(engine.buildReview(rows,{catalog}).events.map(event =
     )
     assert result[0]["basis"] == "unpriced"
     assert result[1]["basis"] == "calculated"
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_multi_provider_bill_cannot_be_comparable_by_checkbox_alone():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const rows = [
+  {event_id:'a',provider:'OpenAI',provider_reported_cost:5,currency:'USD'},
+  {event_id:'b',provider:'Anthropic',provider_reported_cost:7,currency:'USD'}];
+console.log(JSON.stringify(engine.buildReview(rows,{billed_total:12,billed_currency:'USD',bill_scope_confirmed:true})));
+""",
+        ENGINE,
+    )
+    assert result["reconciliation"]["bill"]["status"] == "PROVIDER_SCOPE_UNCLEAR"
+    assert result["reconciliation"]["bill"]["raw_selected_cost_difference"] is None

@@ -55,6 +55,32 @@ def test_revenue_period_and_duplicate_customers_are_rejected():
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node unavailable")
+def test_covering_revenue_period_and_opt_in_customer_matching_keep_cost_bounds():
+    result = node_json("""
+      const engine=require('./web/customer-economics-engine');
+      const review={currency:'USD',spend:{period:{start:'2026-08-01',end:'2026-08-30'}},events:[
+        {customer:'acme',currency:'USD',selected_cost:10,cost_basis:'provider_reported'},
+        {customer:'pilot',currency:'USD',selected_cost:2,cost_basis:'provider_reported'}]};
+      const rows=[
+        {customer:'ACME ',period_start:'2026-08-01',period_end:'2026-08-31',currency:'USD',revenue:'1,200.50'},
+        {customer:'pilot',period_start:'2026-08-01',period_end:'2026-08-31',currency:'USD',revenue:'0'}];
+      console.log(JSON.stringify({exact:engine.analyze(review,rows),matched:engine.analyze(review,rows,{normalize_customer_ids:true})}));
+    """)
+    assert result["exact"]["unmatched_requests"] == 1
+    matched = result["matched"]
+    assert matched["period_coverage_exact"] is False
+    assert matched["normalized_customer_ids"] is True
+    assert matched["unmatched_requests"] == 0
+    assert matched["customers"][0]["revenue"] == 1200.50
+    assert matched["customers"][0]["ai_cost_share"] is None
+    assert matched["customers"][0]["known_ai_cost_share_lower_bound"] == pytest.approx(
+        10 / 1200.50
+    )
+    assert matched["customers"][1]["revenue"] == 0
+    assert matched["customers"][1]["selected_cost"] == 2
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node unavailable")
 def test_evidence_kit_and_precision_guide():
     result = node_json("""
       const e=require('./web/evidence-tools');

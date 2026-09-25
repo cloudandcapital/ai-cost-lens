@@ -42,7 +42,7 @@
           "additionalProperties": false,
           "required": ["status", "supplied_total", "supplied_currency", "same_scope_confirmed", "raw_selected_cost_difference", "duplicate_excluded_reference_difference", "method"],
           "properties": {
-            "status": { "enum": ["NOT_SUPPLIED", "SCOPE_NOT_CONFIRMED", "REQUEST_COST_MISSING", "MIXED_CURRENCY", "REQUEST_CURRENCY_MISSING", "BILL_CURRENCY_MISSING", "CURRENCY_MISMATCH", "COMPARABLE"] },
+            "status": { "enum": ["NOT_SUPPLIED", "SCOPE_NOT_CONFIRMED", "PROVIDER_SCOPE_UNCLEAR", "REQUEST_COST_MISSING", "MIXED_CURRENCY", "REQUEST_CURRENCY_MISSING", "BILL_CURRENCY_MISSING", "CURRENCY_MISMATCH", "COMPARABLE"] },
             "source": { "enum": ["user_entered_unverified"] },
             "supplied_total": { "type": ["number", "null"], "minimum": 0 },
             "supplied_currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "type": "null" }] },
@@ -209,6 +209,21 @@
     "evidence_layers": { "$ref": "#/$defs/evidenceLayers" },
     "findings": { "type": "array" },
     "headline": { "type": "object" },
+    "comparable_currency_review": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "object", "additionalProperties": false,
+          "required": ["currency", "rows", "priced_rows", "findings", "headline"],
+          "properties": {
+            "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+            "rows": { "type": "integer", "minimum": 1 },
+            "priced_rows": { "type": "integer", "minimum": 0 },
+            "findings": { "type": "array" },
+            "headline": { "type": "object" }
+          }
+        }
+      ]
+    },
     "evidence_gate": {
       "type": "object",
       "additionalProperties": false,

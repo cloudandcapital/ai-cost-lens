@@ -208,7 +208,7 @@ def test_review_fails_closed(path, value, message):
 
 def test_review_rejects_reversed_period():
     payload = copy.deepcopy(DATA)
-    payload["period"]["end"] = "2026-07-30"
+    payload["period"]["end"] = "2026-06-30"
     with pytest.raises(ReviewError, match="cannot be before"):
         build_review(payload)
 

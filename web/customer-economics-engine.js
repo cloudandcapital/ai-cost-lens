@@ -5,6 +5,12 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function buildCustomerEconomics() {
   "use strict";
 
+  const customerKey = (value, normalize) => normalize ? String(value ?? "").trim().toLocaleLowerCase("en-US") : String(value ?? "").trim();
+  const moneyInput = (value) => {
+    const raw = String(value ?? "").trim();
+    return /^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$/.test(raw) ? Number(raw.replaceAll(",", "")) : NaN;
+  };
+
   function analyze(review, rows, options = {}) {
     if (!review?.events?.length || !review.spend?.period) throw new Error("Analyze a request log first.");
     if (!Array.isArray(rows) || !rows.length) throw new Error("Add at least one customer revenue row.");
@@ -12,9 +18,11 @@
     const rowCurrencies = [...new Set(rows.map((row) => String(row.currency ?? "").trim().toUpperCase()))];
     if (rowCurrencies.length !== 1 || !/^[A-Z]{3}$/.test(rowCurrencies[0])) throw new Error("Customer revenue needs one three-letter currency per comparison.");
     const currency = rowCurrencies[0];
+    const normalizeCustomers = options.normalize_customer_ids === true;
     if (!period.start || !period.end) throw new Error("The request log needs dated rows before customer revenue can be compared.");
     if (review.currency && review.currency !== "MIXED" && review.currency !== currency) throw new Error(`Revenue currency must match the request log: ${review.currency}.`);
     const customers = new Map();
+    let coveringPeriod = false;
     for (const [index, row] of rows.entries()) {
       const line = index + 2;
       const customer = String(row.customer ?? "").trim();
@@ -23,11 +31,14 @@
       const rowCurrency = String(row.currency ?? "").trim().toUpperCase();
       const rawRevenue = String(row.revenue ?? "").trim();
       if (!customer) throw new Error(`Revenue row ${line} needs a customer ID matching the request log.`);
-      if (customers.has(customer)) throw new Error(`Revenue row ${line} repeats customer ${customer}; supply one total per customer for this period.`);
-      if (start !== period.start || end !== period.end) throw new Error(`Revenue row ${line} must cover the request log's UTC period, ${period.start} through ${period.end}.`);
+      const key = customerKey(customer, normalizeCustomers);
+      if (customers.has(key)) throw new Error(`Revenue row ${line} repeats customer ${customer}; supply one total per customer for this period.`);
+      if (start > period.start || end < period.end || !/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) throw new Error(`Revenue row ${line} must cover the request log's UTC period, ${period.start} through ${period.end}.`);
+      if (start !== period.start || end !== period.end) coveringPeriod = true;
       if (rowCurrency !== currency) throw new Error(`Revenue row ${line} must use ${currency}, the request log currency.`);
-      if (!rawRevenue || !Number.isFinite(Number(rawRevenue)) || Number(rawRevenue) < 0 || Number(rawRevenue) > 1e15) throw new Error(`Revenue row ${line} needs a non-negative finite revenue amount.`);
-      customers.set(customer, { customer, revenue: Number(rawRevenue), selected_cost: 0, requests: 0, unpriced: 0, cost_basis: new Set() });
+      const parsedRevenue = moneyInput(rawRevenue);
+      if (!rawRevenue || !Number.isFinite(parsedRevenue) || parsedRevenue < 0 || parsedRevenue > 1e15) throw new Error(`Revenue row ${line} needs a non-negative finite revenue amount.`);
+      customers.set(key, { customer, revenue: parsedRevenue, selected_cost: 0, requests: 0, unpriced: 0, cost_basis: new Set() });
     }
     let unallocatedCost = 0;
     let unallocatedRequests = 0;
@@ -52,7 +63,7 @@
     if (method !== "none" && denominator <= 0) throw new Error("No comparable requests are available to allocate the entered operating costs.");
     let unassignedAdjacent = 0;
     for (const event of selectedEvents) {
-      const key = String(event.customer ?? "").trim();
+      const key = customerKey(event.customer, normalizeCustomers);
       const target = customers.get(key);
       const allocated = method === "none" ? 0 : adjacent * (method === "requests" ? 1 : event.selected_cost) / denominator;
       if (event.selected_cost === null || !Number.isFinite(event.selected_cost)) unpricedRequests += 1;
@@ -76,16 +87,18 @@
       customer: item.customer, revenue: item.revenue, requests: item.requests,
       unpriced: item.unpriced, selected_cost: Number(item.selected_cost.toFixed(6)),
       cost_basis: [...item.cost_basis].sort(),
-      ai_cost_share: item.requests && !item.unpriced && item.revenue > 0 ? item.selected_cost / item.revenue : null,
-      known_ai_cost_share_lower_bound: item.requests && item.unpriced && item.revenue > 0 ? item.selected_cost / item.revenue : null,
-      revenue_after_ai_requests: item.requests && !item.unpriced ? Number((item.revenue - item.selected_cost).toFixed(6)) : null,
+      ai_cost_share: item.requests && !item.unpriced && !coveringPeriod && item.revenue > 0 ? item.selected_cost / item.revenue : null,
+      known_ai_cost_share_lower_bound: item.requests && (item.unpriced || coveringPeriod) && item.revenue > 0 ? item.selected_cost / item.revenue : null,
+      revenue_after_ai_requests: item.requests && !item.unpriced && !coveringPeriod ? Number((item.revenue - item.selected_cost).toFixed(6)) : null,
       allocated_adjacent_cost: method === "none" ? null : Number((item.allocated_adjacent || 0).toFixed(6)),
-      known_ai_operating_share: method !== "none" && item.requests && !item.unpriced && item.revenue > 0
+      known_ai_operating_share: method !== "none" && item.requests && !item.unpriced && !coveringPeriod && item.revenue > 0
         ? (item.selected_cost + (item.allocated_adjacent || 0)) / item.revenue : null,
     }));
     results.sort((a, b) => (b.known_ai_operating_share ?? b.ai_cost_share ?? -1) - (a.known_ai_operating_share ?? a.ai_cost_share ?? -1) || b.selected_cost - a.selected_cost || a.customer.localeCompare(b.customer));
     return {
       period: { start: period.start, end: period.end }, currency, customers: results,
+      period_coverage_exact: !coveringPeriod,
+      normalized_customer_ids: normalizeCustomers,
       unallocated_cost: Number(unallocatedCost.toFixed(6)), unallocated_requests: unallocatedRequests,
       unmatched_cost: Number(unmatchedCost.toFixed(6)), unmatched_requests: unmatchedRequests,
       unpriced_requests: unpricedRequests,
@@ -95,9 +108,9 @@
       allocated_adjacent_total: method === "none" ? null : adjacent,
       unassigned_adjacent_cost: method === "none" ? null : Number(unassignedAdjacent.toFixed(6)),
       missing_categories: costStack?.missing_categories || [],
-      limitations: method === "none"
+      limitations: `${coveringPeriod ? "Revenue covers extra days; ratios are lower bounds because request cost may be missing for those days. " : ""}${normalizeCustomers ? "Customer IDs were joined after trimming and case folding; inspect aliases before relying on the match. " : ""}${method === "none"
         ? "Selected AI request cost only. Shared infrastructure, human work and other service costs are excluded. Revenue is user supplied. This is not gross margin or an invoice audit."
-        : "Entered same-period operating costs are spread by the selected proxy, not observed per customer. Missing categories remain excluded; unmatched and unattributed customers retain their share outside the customer table. Revenue is user supplied. This is not verified gross margin or an invoice audit.",
+        : "Entered same-period operating costs are spread by the selected proxy, not observed per customer. Missing categories remain excluded; unmatched and unattributed customers retain their share outside the customer table. Revenue is user supplied. This is not verified gross margin or an invoice audit."}`,
     };
   }
   return Object.freeze({ analyze });

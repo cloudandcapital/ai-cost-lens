@@ -28,6 +28,10 @@
     pendingVerification: null,
     pendingScenario: null,
     actualsLedger: null,
+    customerEconomicsRecord: null,
+    customerEconomicsReview: null,
+    growthPlannerRecord: null,
+    growthPlannerReview: null,
     breakEvenReady: false,
   };
 
@@ -63,6 +67,11 @@
   const sampleIntervalAvailable = (scenario) => scenario.outcomes?.basis === "sampled"
     && scenario.outcomes.sample_method === "declared random or systematic"
     && Array.isArray(scenario.outcomes.ready_rate_interval_95);
+  const sampleQualityStatus = (scenario, floor) => {
+    if (!sampleIntervalAvailable(scenario)) return scenario.measures.usable_result_rate < floor ? "below" : "met";
+    const [low, high] = scenario.outcomes.ready_rate_interval_95;
+    return high < floor ? "below" : low < floor ? "inconclusive" : "met";
+  };
   const cents = (value) => `${(value * 100).toFixed(1)}¢`;
   const unitMoney = (value) => (value < 1 && (!state.data?.currency || state.data.currency === "USD") ? cents(value) : money(value, 2));
   const signedMoney = (value) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${money(Math.abs(value), 2)}`;
@@ -539,14 +548,15 @@
     );
   }
 
-  function failedSavingsGateText(comparison, baseline, proposed) {
+  function failedSavingsGateText(comparison, baseline, proposed, qualityStatus = comparison.quality_holds ? "met" : "below") {
+    const qualityGate = qualityStatus === "inconclusive" ? "the quality sample crossing the minimum" : qualityStatus === "below" ? "the declared quality requirement" : null;
     if ([baseline, proposed].some((route) => route.evidence.coverage_status === "illustrative")) {
-      return comparison.quality_holds
+      return !qualityGate
         ? "the invented example inputs"
-        : "the declared quality requirement and invented example inputs";
+        : `${qualityGate} and invented example inputs`;
     }
     const failures = [
-      !comparison.quality_holds && "the declared quality requirement",
+      qualityGate,
       !comparison.both_policy_approved && "policy approval",
       !comparison.evidence_complete && "complete outcome evidence",
       !comparison.same_cost_basis && "the same kind of cost data on both routes",
@@ -580,7 +590,8 @@
         direction: amount > 0 ? "unfavorable" : amount < 0 ? "favorable" : "on_plan",
       }));
     const monthlyOperatingSavings =
-      (baseline.measures.cost_per_usable_result - proposed.measures.cost_per_usable_result) *
+      (baseline.costs.recurring_operating_cost / baseline.outcomes.usable_results
+        - proposed.costs.recurring_operating_cost / proposed.outcomes.usable_results) *
       planning.expectedReadyPerMonth;
     const changeCost = proposed.costs.one_time_change_cost;
     const horizonNet = monthlyOperatingSavings * planning.horizonMonths - changeCost;
@@ -2446,7 +2457,7 @@
       </div>
       ${renderYieldRoute(baseline)}
       ${renderYieldRoute(proposed)}
-      ${sampleIntervalAvailable(proposed) ? `<p class="sample-range">Proposed ready-rate 95% sample range: ${escapeHtml(pct(proposed.outcomes.ready_rate_interval_95[0], 1))}–${escapeHtml(pct(proposed.outcomes.ready_rate_interval_95[1], 1))}. ${proposed.outcomes.ready_rate_interval_95[0] < state.data.workload.accepted_quality_threshold && proposed.outcomes.ready_rate_interval_95[1] >= state.data.workload.accepted_quality_threshold ? "This range crosses your quality minimum; the sample is inconclusive." : "This range describes sampling uncertainty, not a guarantee."}</p>` : proposed.outcomes.basis === "sampled" ? '<p class="sample-range">No statistical range: the sample was not declared random or systematic.</p>' : ""}`;
+      ${sampleIntervalAvailable(proposed) ? `<p class="sample-range">Proposed ready-rate 95% sample range: ${escapeHtml(pct(proposed.outcomes.ready_rate_interval_95[0], 1))}–${escapeHtml(pct(proposed.outcomes.ready_rate_interval_95[1], 1))}. ${sampleQualityStatus(proposed, state.data.workload.accepted_quality_threshold) === "inconclusive" ? "This range crosses your quality minimum; the sample is inconclusive." : sampleQualityStatus(proposed, state.data.workload.accepted_quality_threshold) === "below" ? "The full range is below your quality minimum." : "The full range is above the minimum; this does not guarantee future quality."}</p>` : proposed.outcomes.basis === "sampled" ? '<p class="sample-range">No statistical range: the sample was not declared random or systematic.</p>' : ""}`;
     configureBreakEvenExplorer();
     renderLumenPanel();
   }
@@ -2595,8 +2606,7 @@
       ? unitMoney(modeledUnit)
       : "Unavailable";
     const hasReadyResults = readyResults > 0;
-    const meetsQuality = yieldRate >= state.data.workload.accepted_quality_threshold &&
-      yieldRate >= baseline.measures.usable_result_rate;
+    const meetsQuality = yieldRate >= state.data.workload.accepted_quality_threshold;
     document.getElementById("break-even-verdict").textContent = !hasReadyResults
       ? "NO READY RESULTS"
       : !meetsQuality
@@ -2609,9 +2619,9 @@
       ? "The current option has zero cost on the supplied inputs. A percentage saving is undefined; the other option can only match zero or cost more. Quality and approval requirements still apply."
       : !hasReadyResults
       ? `At 0% ready, the proposed route produces no usable result, so a unit cost cannot be calculated. At these costs it needs ${breakEvenYield.toFixed(1)}% of attempts to be ready to match ${unitMoney(currentUnit)}.`
-      : `${breakEvenYield <= 100
+        : `${breakEvenYield <= 100
         ? `At these costs, the proposed route needs ${breakEvenYield.toFixed(1)}% of attempts to be ready to match ${unitMoney(currentUnit)}. The slider models ${readyResults.toFixed(0)} ready results and a ${Math.abs(delta).toFixed(1)}% ${delta <= 0 ? "cost advantage" : "cost premium"}.`
-        : `Even a 100% ready result rate would not match ${unitMoney(currentUnit)} at these costs. Reduce the provider or human work line first.`} ${meetsQuality ? "" : `The selected ready rate does not meet the ${pct(state.data.workload.accepted_quality_threshold)} floor and the current route's ${pct(baseline.measures.usable_result_rate)} rate.`} Human cost stays fixed in this slider; adjust it separately if review effort changes with yield.`;
+        : `Even a 100% ready result rate would not match ${unitMoney(currentUnit)} at these costs. Reduce the provider or human work line first.`} ${meetsQuality ? "" : `The selected ready rate does not meet the ${pct(state.data.workload.accepted_quality_threshold)} floor.`} Human cost stays fixed in this slider; adjust it separately if review effort changes with yield.`;
   }
 
   function lumenFacts() {
@@ -3663,6 +3673,10 @@
 
   function renderRequestSpendOverview(review) {
     const spend = review.spend;
+    const breakdownSlice = review.currency === "MIXED" || review.currency === null
+      ? [...(spend.currency_slices || [])].sort((a, b) => b.rows - a.rows || b.priced_rows - a.priced_rows || a.currency.localeCompare(b.currency))[0]
+      : null;
+    const breakdownCurrency = breakdownSlice?.currency || spend.currency;
     const period = spend.period;
     const periodLabel = period.start && period.end
       ? period.start === period.end ? period.start : `${period.start} to ${period.end}`
@@ -3771,16 +3785,16 @@
       ["session_id", "Session"],
       ["environment", "Environment"],
     ];
-    document.getElementById("request-spend-breakdowns").innerHTML = dimensions.filter(([key]) => spend.breakdowns[key] || !["processing_mode", "inference_geography"].includes(key)).map(([key, label]) => {
+    document.getElementById("request-spend-breakdowns").innerHTML = `${breakdownSlice ? `<p class="request-variance-note"><strong>Breakdowns below use ${escapeHtml(breakdownCurrency)} only:</strong> ${wholeNumber(breakdownSlice.priced_rows)} priced of ${wholeNumber(breakdownSlice.rows)} ${escapeHtml(breakdownCurrency)} rows. ${wholeNumber(review.event_count - breakdownSlice.rows)} other or untagged rows are excluded. Unpriced rows stay in the request counts and cannot establish a complete cost share.</p>` : ""}${dimensions.filter(([key]) => spend.breakdowns[key] || !["processing_mode", "inference_geography"].includes(key)).map(([key, label]) => {
       const rows = spend.breakdowns[key] || [];
       const visible = rows.slice(0, 6);
       return `<article>
         <h4>By ${escapeHtml(label.toLowerCase())}</h4>
         <div role="region" aria-label="Spend by ${escapeHtml(label.toLowerCase())}" tabindex="0"><table><thead><tr><th>${escapeHtml(label)}</th><th>Requests</th><th>Selected cost</th><th>Average</th><th>Share</th></tr></thead>
-        <tbody>${visible.map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${wholeNumber(item.event_count)}<span>${wholeNumber(item.priced_rows)} priced</span></td><td>${requestReviewMoney(item.selected_cost, spend.currency)}</td><td>${requestReviewMoney(item.average_selected_cost_per_priced_row, spend.currency)}</td><td>${item.share_of_selected_cost === null ? "Not available" : `${(item.share_of_selected_cost * 100).toFixed(1)}%`}</td></tr>`).join("")}</tbody></table></div>
+        <tbody>${visible.map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${wholeNumber(item.event_count)}<span>${wholeNumber(item.priced_rows)} priced</span></td><td>${requestReviewMoney(item.selected_cost, breakdownCurrency)}</td><td>${requestReviewMoney(item.average_selected_cost_per_priced_row, breakdownCurrency)}</td><td>${item.share_of_selected_cost === null ? "Not available" : `${(item.share_of_selected_cost * 100).toFixed(1)}%${breakdownSlice && breakdownSlice.unpriced_rows ? " of priced cost" : ""}`}</td></tr>`).join("")}</tbody></table></div>
         ${rows.length > visible.length ? `<p>Showing the top ${visible.length} of ${rows.length} values. Use the local filters below for row-level review.</p>` : ""}
       </article>`;
-    }).join("");
+    }).join("")}`;
     const slices = spend.currency_slices || [];
     document.getElementById("request-currency-slices").innerHTML = slices.length > 1 || review.currency === null
       ? `<h4>Comparable cost within each currency</h4><p>All ${wholeNumber(review.event_count)} rows remain in the record. Currencies are never added together. These subtotals cover only priced rows and do not reconcile to a mixed-currency bill or support a savings claim.</p>${slices.map((slice) => `<article><strong>${escapeHtml(slice.currency)} ${requestReviewMoney(slice.selected_cost, slice.currency)}</strong><span>${wholeNumber(slice.priced_rows)} priced of ${wholeNumber(slice.rows)} ${escapeHtml(slice.currency)} rows; ${wholeNumber(slice.unpriced_rows)} unpriced</span><div role="region" aria-label="${escapeHtml(slice.currency)} customer costs" tabindex="0"><table><thead><tr><th>Customer</th><th>Requests</th><th>Selected request cost</th></tr></thead><tbody>${slice.breakdowns.customer.slice(0, 8).map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${wholeNumber(item.event_count)}</td><td>${requestReviewMoney(item.selected_cost, slice.currency)}</td></tr>`).join("")}</tbody></table></div></article>`).join("")}`
@@ -3800,7 +3814,8 @@
       ? "What the example calls show"
       : "What the imported calls support";
     const currency = review.currency;
-    const headline = currency === "MIXED" ? null : review.headline.conservative_non_additive_opportunity;
+    const comparable = review.comparable_currency_review;
+    const headline = comparable ? comparable.headline.conservative_non_additive_opportunity : review.headline.conservative_non_additive_opportunity;
     const bill = review.reconciliation.bill;
     const billPresentation = {
       NOT_SUPPLIED: {
@@ -3810,6 +3825,10 @@
       SCOPE_NOT_CONFIRMED: {
         title: "Scope not confirmed",
         copy: "Confirm the same provider, account, currency, and period before comparing these totals.",
+      },
+      PROVIDER_SCOPE_UNCLEAR: {
+        title: "Provider scope unclear",
+        copy: "This request log has multiple providers or rows without a provider. A single-provider bill cannot be compared with the combined request cost. Filter to the billed provider and account first.",
       },
       REQUEST_COST_MISSING: {
         title: "Request cost unavailable",
@@ -3839,19 +3858,21 @@
         }
       : billPresentation[bill.status] || { title: "Not comparable", copy: "The imported evidence cannot be reconciled to this bill." };
     const primarySlice = currency === "MIXED" || currency === null
-      ? [...(review.spend.currency_slices || [])].sort((a, b) => b.rows - a.rows || b.priced_rows - a.priced_rows)[0]
+      ? [...(review.spend.currency_slices || [])].sort((a, b) => b.rows - a.rows || b.priced_rows - a.priced_rows || a.currency.localeCompare(b.currency))[0]
       : null;
+    const duplicateReference = review.reconciliation.selected_cost_excluding_later_duplicate_rows;
     summary.innerHTML = `
       <article><span>Imported events</span><strong>${wholeNumber(review.event_count)}</strong><p>${wholeNumber(review.reconciliation.priced_rows)} priced; ${wholeNumber(review.reconciliation.unpriced_rows)} retained as unpriced.</p></article>
-      <article><span>${primarySlice ? "Largest comparable currency subset" : "Selected request cost"}</span><strong>${primarySlice ? requestReviewMoney(primarySlice.selected_cost, primarySlice.currency) : requestReviewMoney(review.reconciliation.selected_observed_cost, currency)}</strong><p>${primarySlice ? `${wholeNumber(primarySlice.priced_rows)} priced of ${wholeNumber(primarySlice.rows)} ${escapeHtml(primarySlice.currency)} rows. ${wholeNumber(review.event_count - primarySlice.rows)} other or untagged rows excluded; see currency subtotals below. No cross-currency total.` : "Provider-reported cost wins for the same row. Calculated cost fills only missing reported cost."}</p></article>
-      <article><span>Investigation cost boundary</span><strong>${requestReviewMoney(headline, currency)}</strong><p>Duplicate and failed-attempt cost, with overlapping events counted once. Successful retries are excluded. This is not savings.</p></article>
+      <article><span>${primarySlice ? "Largest comparable currency subset" : "Selected request cost · all rows"}</span><strong>${primarySlice ? requestReviewMoney(primarySlice.selected_cost, primarySlice.currency) : requestReviewMoney(review.reconciliation.selected_observed_cost, currency)}</strong><p>${primarySlice ? `${wholeNumber(primarySlice.priced_rows)} priced of ${wholeNumber(primarySlice.rows)} ${escapeHtml(primarySlice.currency)} rows. ${wholeNumber(review.event_count - primarySlice.rows)} other or untagged rows excluded; see currency subtotals below. No cross-currency total.` : `Provider-reported cost wins for the same row. Calculated cost fills only missing reported cost.${review.findings.some((item) => item.id === "duplicate-billed-event") && duplicateReference !== null ? ` Excluding later repeated-ID rows as an investigation reference: ${requestReviewMoney(duplicateReference, currency)}; confirm actual duplicates before removing charges.` : ""}`}</p></article>
+      <article><span>${comparable ? `Investigation cost · ${escapeHtml(comparable.currency)} subset` : "Investigation cost boundary"}</span><strong>${requestReviewMoney(headline, comparable?.currency || currency)}</strong><p>Duplicate and failed-attempt cost, with overlapping events counted once. Successful retries are excluded.${comparable ? ` Covers only ${wholeNumber(comparable.rows)} of ${wholeNumber(review.event_count)} imported rows; other currencies and untagged rows are excluded.` : ""} This is not savings.</p></article>
       <article><span>User-entered bill comparison</span><strong>${escapeHtml(billCard.title)}</strong><p>${escapeHtml(billCard.copy)} The entered total was not verified against an invoice.</p></article>`;
     document.getElementById("request-analysis-boundary").textContent = review.evidence_gate.reason;
     renderRequestSpendOverview(review);
     populateRequestExplorer(review);
     renderRequestEventExplorer();
-    list.innerHTML = review.findings.length ? review.findings.map((item, index) => {
-      const amount = currency === "MIXED" ? null : item.estimated_avoidable_cost;
+    const visibleFindings = comparable ? comparable.findings : review.findings;
+    list.innerHTML = visibleFindings.length ? `${comparable ? `<p class="request-variance-note">Findings below cover ${wholeNumber(comparable.rows)} ${escapeHtml(comparable.currency)} rows only. The full import remains in the analysis record; cost figures never combine currencies.</p>` : ""}${visibleFindings.map((item, index) => {
+      const amount = item.estimated_avoidable_cost;
       const ids = item.affected_event_ids || [];
       const idCopy = ids.length ? `${wholeNumber(ids.length)} row${ids.length === 1 ? "" : "s"}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ` + ${ids.length - 3} more` : ""}` : "No individual row IDs";
       return `<article class="workbench-finding request-finding">
@@ -3859,13 +3880,13 @@
         <div><p class="kicker">${escapeHtml(item.category || "Investigation")}</p><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.explanation)}</p><details><summary>Calculation and limitation</summary><p><strong>Calculation:</strong> ${escapeHtml(item.calculation)}</p><p><strong>Limitation:</strong> ${escapeHtml(item.limitations)}</p></details></div>
         <dl class="finding-meta">
           <div><dt>Affected requests</dt><dd>${escapeHtml(idCopy)}</dd></div>
-          <div><dt>Potential amount</dt><dd>${requestReviewMoney(amount, currency)}</dd></div>
+          <div><dt>Potential amount</dt><dd>${requestReviewMoney(amount, comparable?.currency || currency)}</dd></div>
           <div><dt>Evidence · dollar confidence</dt><dd>${escapeHtml(item.evidence_basis)} · ${escapeHtml(item.confidence_in_dollar_estimate)}</dd></div>
           <div><dt>Overlap group</dt><dd>${escapeHtml(item.overlap_group || "None")}</dd></div>
         </dl>
         <div class="finding-action"><strong>${escapeHtml(item.action.replaceAll("_", " "))}</strong><p>${escapeHtml(item.verification_requirement)}</p></div>
       </article>`;
-    }).join("") : '<p class="workbench-empty">No supported request-level finding was detected. That does not prove the workload is optimized; it means the imported fields did not trigger a deterministic rule.</p>';
+    }).join("")}` : '<p class="workbench-empty">No supported request-level finding was detected. That does not prove the workload is optimized; it means the imported fields did not trigger a deterministic rule.</p>';
     const fields = ["event_id", "timestamp", "provider", "model", "processing_mode", "inference_geography", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_storage_token_hours", "provider_reported_cost", "currency", "request_status", "retry_parent_event_id", "prefix_fingerprint", "tool_call_count", "outcome_status"];
     const coverage = fields.map((field) => {
       const supplied = review.events.filter((event) => event[field] !== null && event[field] !== undefined).length;
@@ -3942,10 +3963,12 @@
       showToast("Review inputs changed. Choose Analyze locally to update the results.");
     });
   });
-  ["customer-allocation-method", "customer-share-warning"].forEach((id) => {
+  ["customer-allocation-method", "customer-share-warning", "customer-normalize-ids"].forEach((id) => {
     document.getElementById(id).addEventListener("input", () => {
       document.getElementById("customer-revenue-result").hidden = true;
       document.getElementById("customer-revenue-error").textContent = "Choose Compare locally to update the customer figures for these settings.";
+      state.customerEconomicsRecord = null;
+      state.customerEconomicsReview = null;
     });
   });
   document.getElementById("request-log-file").addEventListener("change", (event) => {
@@ -3974,13 +3997,15 @@
       const warningValue = document.getElementById("customer-share-warning").value.trim();
       const warning = warningValue === "" ? null : finiteNumber(warningValue, "AI cost / revenue warning") / 100;
       if (warning !== null && (warning <= 0 || warning > 10)) throw new Error("Choose a warning between 0.1% and 1000%.");
-      const analysis = customerEconomics.analyze(state.usageReview, rows, { allocation_method: allocationMethod });
+      const analysis = customerEconomics.analyze(state.usageReview, rows, { allocation_method: allocationMethod, normalize_customer_ids: document.getElementById("customer-normalize-ids").checked });
+      state.customerEconomicsRecord = { usage_review_generated_at: state.usageReview.generated_at, revenue_rows: rows, analysis };
+      state.customerEconomicsReview = state.usageReview;
       const moneyFor = (value) => requestReviewMoney(value, analysis.currency);
       output.innerHTML = `<p class="request-variance-note">${escapeHtml(analysis.period.start)} through ${escapeHtml(analysis.period.end)} · ${escapeHtml(analysis.currency)} · ${wholeNumber(analysis.selected_currency_requests)} request rows. ${analysis.excluded_currency_requests ? `${wholeNumber(analysis.excluded_currency_requests)} other-currency or untagged rows excluded. ` : ""}${state.usageReview.spend.period.complete_period_confirmed ? "Complete period declared by the user. " : "Complete period not confirmed: ratios cover only the imported rows. "}${state.usageReviewIllustrative || exampleRevenue ? "Illustrative inputs: these figures are an example, not observed customer economics. " : ""}${escapeHtml(analysis.limitations)}</p>
-        <p class="request-variance-note"><strong>Outside the customer join:</strong> ${wholeNumber(analysis.unallocated_requests)} requests (${moneyFor(analysis.unallocated_cost)}) lack customer IDs; ${wholeNumber(analysis.unmatched_requests)} requests (${moneyFor(analysis.unmatched_cost)}) have no matching revenue row; ${wholeNumber(analysis.unpriced_requests)} requests have no selected cost. ${analysis.allocation_method !== "none" ? `${moneyFor(analysis.unassigned_adjacent_cost)} of the ${moneyFor(analysis.allocated_adjacent_total)} entered operating cost stays outside matched customers; ${wholeNumber(analysis.missing_categories.length)} categories are missing. ` : ""}These amounts are excluded from matched customer ratios.</p>
-        <div class="request-variance-table-wrap" role="region" aria-label="Customer AI request cost versus revenue" tabindex="0"><table><thead><tr><th>Customer ID</th><th>Revenue supplied</th><th>AI request cost</th><th>Share of revenue</th>${analysis.allocation_method === "none" ? "" : "<th>Allocated operating cost</th><th>Known AI cost / revenue</th>"}<th>Revenue after AI requests</th><th>Coverage</th></tr></thead><tbody>${analysis.customers.map((item) => `<tr><th>${escapeHtml(item.customer)}</th><td>${moneyFor(item.revenue)}</td><td>${item.requests ? moneyFor(item.selected_cost) : "No matched requests"}</td><td>${item.ai_cost_share !== null ? `${(item.ai_cost_share * 100).toFixed(1)}%` : item.known_ai_cost_share_lower_bound !== null ? `At least ${(item.known_ai_cost_share_lower_bound * 100).toFixed(1)}% · ${wholeNumber(item.unpriced)} unpriced` : "Unavailable"}</td>${analysis.allocation_method === "none" ? "" : `<td>${moneyFor(item.allocated_adjacent_cost)}</td><td>${item.known_ai_operating_share === null ? "Unavailable · incomplete cost or revenue" : `${(item.known_ai_operating_share * 100).toFixed(1)}%${warning !== null && item.known_ai_operating_share > warning ? " · Above your threshold" : ""}`}</td>`}<td>${item.revenue_after_ai_requests === null ? "Unavailable" : moneyFor(item.revenue_after_ai_requests)}</td><td>${wholeNumber(item.requests)} requests · ${wholeNumber(item.unpriced)} unpriced · ${escapeHtml(item.cost_basis.join(" / ") || "No cost basis")}</td></tr>`).join("")}</tbody></table></div>`;
+        <p class="request-variance-note"><strong>Outside the customer join:</strong> ${wholeNumber(analysis.unallocated_requests)} requests (${moneyFor(analysis.unallocated_cost)}) lack customer IDs; ${wholeNumber(analysis.unmatched_requests)} requests (${moneyFor(analysis.unmatched_cost)}) have no matching revenue row; ${wholeNumber(analysis.unpriced_requests)} requests have no selected cost. ${analysis.allocation_method !== "none" ? `${moneyFor(analysis.unassigned_adjacent_cost)} of the ${moneyFor(analysis.allocated_adjacent_total)} entered operating cost stays outside matched customers; ${wholeNumber(analysis.missing_categories.length)} categories are missing. ` : ""}These amounts are excluded from matched customer ratios.${analysis.customers.every((item) => !item.requests) && analysis.unmatched_requests ? " No customer IDs matched. Check spelling and try the optional case-and-space matching choice above." : ""}</p>
+        <div class="request-variance-table-wrap" role="region" aria-label="Customer AI request cost versus revenue" tabindex="0"><table><thead><tr><th>Customer ID</th><th>Revenue supplied</th><th>AI request cost</th><th>Share of revenue</th>${analysis.allocation_method === "none" ? "" : "<th>Allocated operating cost</th><th>Known AI cost / revenue</th>"}<th>Revenue after AI requests</th><th>Coverage</th></tr></thead><tbody>${analysis.customers.map((item) => `<tr><th>${escapeHtml(item.customer)}</th><td>${moneyFor(item.revenue)}</td><td>${item.requests ? moneyFor(item.selected_cost) : "No matched requests"}</td><td>${item.requests && item.revenue === 0 ? `No revenue · ${moneyFor(item.selected_cost)} known AI cost` : item.ai_cost_share !== null ? `${(item.ai_cost_share * 100).toFixed(1)}%` : item.known_ai_cost_share_lower_bound !== null ? `At least ${(item.known_ai_cost_share_lower_bound * 100).toFixed(1)}%${item.unpriced ? ` · ${wholeNumber(item.unpriced)} unpriced` : " · revenue covers extra days"}` : "Unavailable"}</td>${analysis.allocation_method === "none" ? "" : `<td>${moneyFor(item.allocated_adjacent_cost)}</td><td>${item.requests && item.revenue === 0 ? `No revenue · ${moneyFor(item.selected_cost + item.allocated_adjacent_cost)} known cost` : item.known_ai_operating_share === null ? "Unavailable · incomplete cost or revenue" : `${(item.known_ai_operating_share * 100).toFixed(1)}%${warning !== null && item.known_ai_operating_share > warning ? " · Above your threshold" : ""}`}</td>`}<td>${item.revenue_after_ai_requests === null ? "Unavailable" : moneyFor(item.revenue_after_ai_requests)}</td><td>${wholeNumber(item.requests)} requests · ${wholeNumber(item.unpriced)} unpriced · ${escapeHtml(item.cost_basis.join(" / ") || "No cost basis")}</td></tr>`).join("")}</tbody></table></div>`;
       output.hidden = false;
-    } catch (caught) { error.textContent = caught.message || "Revenue could not be compared."; error.classList.add("visible"); }
+    } catch (caught) { state.customerEconomicsRecord = null; state.customerEconomicsReview = null; error.textContent = caught.message || "Revenue could not be compared."; error.classList.add("visible"); }
   }
   document.getElementById("analyze-customer-revenue").addEventListener("click", async () => {
     try {
@@ -4108,7 +4133,7 @@
         ? `${pricedCandidate.pricing_basis === "user_supplied" ? "User-supplied rate" : "Official list-price"} estimate · test first`
         : "Route in the current decision record";
     const interval = proposed.outcomes.ready_rate_interval_95;
-    const qualityStatus = !comparison.quality_holds ? "below floor" : sampleIntervalAvailable(proposed) && interval[0] < workload.accepted_quality_threshold ? "sample crosses floor; inconclusive" : "floor met on the recorded route";
+    const qualityStatus = sampleQualityStatus(proposed, workload.accepted_quality_threshold) === "inconclusive" ? "sample crosses floor; inconclusive" : sampleQualityStatus(proposed, workload.accepted_quality_threshold) === "below" ? "below floor" : "floor met on the recorded route";
     const newCandidate = candidateLabel !== proposed.label;
     status.innerHTML = `
       <article><span>Quality floor</span><strong>${pct(workload.accepted_quality_threshold, 1)}</strong></article>
@@ -4572,18 +4597,14 @@
     const baselineUnit = baseline.measures.cost_per_usable_result;
     const proposedUnit = proposed.measures.cost_per_usable_result;
     const proposedIsLower = proposedUnit < baselineUnit;
-    const decisionCode = comparison.savings_claim_allowed && proposedIsLower
-      ? "SAVE NOW"
-      : proposedIsLower
-        ? "TEST FIRST"
-        : "KEEP CURRENT ROUTE";
+    const decisionCode = comparison.decision_code || (comparison.savings_claim_allowed && proposedIsLower ? "SAVE NOW" : proposedIsLower ? "TEST FIRST" : "KEEP CURRENT ROUTE");
     document.getElementById("memo-title").textContent = mode === "illustrative" ? "ILLUSTRATIVE · AI spend decision memo" : "AI spend decision memo";
     document.getElementById("memo-meta").textContent = `${workload.name}\n${period.start} to ${period.end} · ${period.timezone}`;
     document.getElementById("memo-decision-code").textContent = decisionCode;
     document.getElementById("memo-decision-title").textContent = comparison.recommendation;
     document.getElementById("memo-decision-limit").textContent = comparison.limitation;
     document.getElementById("memo-numbers-title").textContent = "Current route versus proposed route";
-    document.getElementById("memo-table-head").innerHTML = `<tr><th>Measure</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Difference (proposed − current)</th></tr>`;
+    document.getElementById("memo-table-head").innerHTML = `<tr><th>Measure</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Change (proposed vs current)</th></tr>`;
     const routeRows = [
       [state.data.pricing_estimate ? "Estimated API cost" : "Provider cost", money(baseline.costs.model_cost), money(proposed.costs.model_cost), percentChange(baseline.costs.model_cost, proposed.costs.model_cost)],
       ["Shared infrastructure", state.data.pricing_estimate ? "Not supplied" : money(baseline.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Not supplied" : money(proposed.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Excluded" : signedMoney(proposed.costs.shared_infrastructure_cost - baseline.costs.shared_infrastructure_cost)],
@@ -4602,7 +4623,7 @@
       ["Quality floor", pct(workload.accepted_quality_threshold, 1)],
       ["Policy", mode === "illustrative" ? "Assumed approved for this invented comparison; no real reviewer approval" : `Current: ${baseline.policy.approved ? "approved by reviewer" : "approval not established"}; proposed: ${proposed.policy.approved ? "approved by reviewer" : "approval not established"}`],
       ["Cost boundary", baseline.evidence.cost_boundary],
-      ...(sampleIntervalAvailable(proposed) ? [["Proposed ready-rate 95% sample range", `${pct(proposed.outcomes.ready_rate_interval_95[0], 1)}–${pct(proposed.outcomes.ready_rate_interval_95[1], 1)}; ${proposed.outcomes.ready_rate_interval_95[0] < workload.accepted_quality_threshold && proposed.outcomes.ready_rate_interval_95[1] >= workload.accepted_quality_threshold ? "crosses the quality minimum; inconclusive" : "sample estimate"}`]] : proposed.outcomes.basis === "sampled" ? [["Statistical range", "Not shown: sample not declared random or systematic"]] : []),
+      ...(sampleIntervalAvailable(proposed) ? [["Proposed ready-rate 95% sample range", `${pct(proposed.outcomes.ready_rate_interval_95[0], 1)}–${pct(proposed.outcomes.ready_rate_interval_95[1], 1)}; ${sampleQualityStatus(proposed, workload.accepted_quality_threshold) === "inconclusive" ? "crosses the quality minimum; inconclusive" : sampleQualityStatus(proposed, workload.accepted_quality_threshold) === "below" ? "entirely below the quality minimum" : "above the quality minimum in this sample"}`]] : proposed.outcomes.basis === "sampled" ? [["Statistical range", "Not shown: sample not declared random or systematic"]] : []),
     ]);
     document.getElementById("memo-evidence").innerHTML = memoList([
       ["Current route", `${baseline.evidence.coverage_status}: ${baseline.evidence.coverage}`],
@@ -4619,7 +4640,9 @@
       document.getElementById("memo-plan-grid").innerHTML = [
         ["Current cost vs plan (actual − plan)", signedMoney(planning.variance.recurring_operating_cost)],
         ["Current ready results vs plan", `${planning.variance.ready_results >= 0 ? "+" : "−"}${compact(Math.abs(planning.variance.ready_results))}`],
-        ["Modeled monthly savings (current − proposed)", signedMoney(payback.monthly_operating_savings)],
+        ["Modeled monthly cost difference (current − proposed)", signedMoney(payback.monthly_operating_savings)],
+        ["One time change cost", money(payback.one_time_change_cost)],
+        [`Modeled ${payback.decision_horizon_months}-month net after change cost`, signedMoney(payback.horizon_net_savings)],
         ["Proposed change payback", paybackLabel],
       ].map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
       document.getElementById("memo-plan-basis").textContent =
@@ -4649,6 +4672,7 @@
     const revenue = document.getElementById("growth-revenue").value.trim();
     results.replaceChildren();
     if (!revenue) {
+      state.growthPlannerRecord = null;
       message.textContent = "Enter revenue to see a modeled gross margin at 1×, 2×, 5×, and 10× volume.";
       return;
     }
@@ -4664,9 +4688,12 @@
         model_discount: percentages[1],
         review_effort_share: percentages[2],
       });
+      state.growthPlannerRecord = { inputs: { revenue_per_ready: Number(revenue), fixed_infrastructure_share: percentages[0], model_discount: percentages[1], review_effort_share: percentages[2] }, rows };
+      state.growthPlannerReview = state.data;
       message.textContent = "Modeled gross margin, using the invented example workload and your entered assumptions:";
       results.innerHTML = `<table class="usage-table"><thead><tr><th>Monthly volume</th><th>Current gross margin</th><th>Proposed gross margin</th><th>Gross profit change</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${row.factor}× · ${wholeNumber(row.volume)} completed</td><td>${row.baseline.margin_pct === null ? "No revenue" : `${round(row.baseline.margin_pct, 1)}%`}</td><td>${row.proposed.margin_pct === null ? "No revenue" : `${round(row.proposed.margin_pct, 1)}%`}</td><td>${signedMoney(row.gross_profit_difference)}</td></tr>`).join("")}</tbody></table>`;
     } catch (error) {
+      state.growthPlannerRecord = null;
       message.textContent = error.message;
     }
   }
@@ -4749,14 +4776,14 @@
       code = "CHECK APPROVAL";
       posture = "INSUFFICIENT EVIDENCE";
       reason = "Policy approval for both options has not been established. Resolve approval before testing or switching.";
-    } else if (!comparison.quality_holds) {
+    } else if (sampleQualityStatus(proposed, data.workload?.accepted_quality_threshold ?? 0) === "inconclusive") {
+      code = "QUALITY INCONCLUSIVE";
+      posture = "INSUFFICIENT EVIDENCE";
+      reason = "The 95% sample range crosses the minimum usable-result rate. Check more outputs before deciding to switch.";
+    } else if (!comparison.quality_holds || sampleQualityStatus(proposed, data.workload?.accepted_quality_threshold ?? 0) === "below") {
       code = "QUALITY BELOW MINIMUM";
       posture = "STOP CHANGE";
       reason = "The other option does not meet your minimum usable-result rate. A lower cost does not override that requirement.";
-    } else if (delta < 0 && comparison.human_cost_included !== false && sampleIntervalAvailable(proposed) && proposed.outcomes.ready_rate_interval_95[0] < data.workload.accepted_quality_threshold) {
-      code = "QUALITY INCONCLUSIVE";
-      posture = "INSUFFICIENT EVIDENCE";
-      reason = "The observed usable rate meets the minimum, but its 95% sample range crosses that minimum. Check more outputs before deciding to switch.";
     } else if (comparison.human_cost_included === false) {
       code = "ADD MISSING TIME";
       posture = "INSUFFICIENT EVIDENCE";
@@ -4775,7 +4802,7 @@
       reason = comparison.savings_claim_allowed ? "The supplied evidence supports a lower cost per qualifying result for this workload and period." : "The other option costs less per qualifying result in this estimate. Repeat the comparison before treating the difference as savings.";
     }
     if (data.experience !== "simple" && !comparison.savings_claim_allowed) {
-      const gates = failedSavingsGateText(comparison, baseline, proposed);
+      const gates = failedSavingsGateText(comparison, baseline, proposed, sampleQualityStatus(proposed, data.workload?.accepted_quality_threshold ?? 0));
       reason += ` ${sentenceCase(gates)} still ${/,| and /.test(gates) ? "block" : "blocks"} a savings claim.`;
     }
     return { code, posture, reason, delta, percent: a > 0 ? delta / a * 100 : null };
@@ -6346,6 +6373,29 @@
     anchor.href = url;
     const label = state.data.workload?.name || (state.data.provider === "openai" ? "openai-bill-review" : "review");
     anchor.download = `ai-cost-lens-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "review"}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  document.getElementById("download-workspace").addEventListener("click", () => {
+    if (!state.data) return;
+    const archive = {
+      schema_version: "ai-cost-lens-workspace/1.0",
+      exported_at: new Date().toISOString(),
+      decision_record: state.data,
+      request_review: state.usageReview,
+      customer_cost_to_serve: state.customerEconomicsReview === state.usageReview ? state.customerEconomicsRecord : null,
+      growth_scenario: state.growthPlannerReview === state.data ? state.growthPlannerRecord : null,
+      verification_record: state.verificationRecord,
+      actuals_ledger: state.actualsLedger,
+      limitations: "Local archive of completed sections. Null means that section has no current result. The Open saved review control accepts the decision record, not this archive. Provider bills and savings are not verified by packaging the records together.",
+    };
+    const url = URL.createObjectURL(new Blob([`${JSON.stringify(archive, null, 2)}\n`], { type: "application/json" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "ai-cost-lens-workspace-archive.json";
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();

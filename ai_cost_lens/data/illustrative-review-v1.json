@@ -2,10 +2,10 @@
   "schema_version": "ai-cost-lens-review/1.0",
   "mode": "illustrative",
   "currency": "USD",
-  "period": {"start": "2026-07-31", "end": "2026-08-31", "timezone": "UTC"},
+  "period": {"start": "2026-07-01", "end": "2026-08-31", "timezone": "UTC"},
   "workload": {
     "name": "Contract risk summaries",
-    "description": "Monthly review of a model-routing change. The provider bill falls, but more correction and escalation make each ready result cost more.",
+    "description": "Two monthly snapshots, July and August 2026, of a model-routing change. The provider bill falls, but more correction and escalation make each ready result cost more.",
     "outcome_unit": "ready result",
     "accepted_quality_threshold": 0.9
   },

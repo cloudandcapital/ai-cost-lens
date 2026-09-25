@@ -1205,6 +1205,14 @@
   }
 
   function spendSummary(events, rawOptions, currency, selectedObservedCost, currencyComparable) {
+    const primaryCurrency = currencyComparable ? null : [...new Set(events.map((event) => event.currency).filter(Boolean))]
+      .map((value) => ({ value, rows: events.filter((event) => event.currency === value).length, priced: events.filter((event) => event.currency === value && event.selected_cost !== null).length }))
+      .sort((a, b) => b.rows - a.rows || b.priced - a.priced || a.value.localeCompare(b.value))[0]?.value;
+    const breakdownEvents = primaryCurrency ? events.filter((event) => event.currency === primaryCurrency) : events;
+    const breakdownCost = primaryCurrency
+      ? breakdownEvents.reduce((sum, event) => sum + (event.selected_cost || 0), 0)
+      : selectedObservedCost;
+    const comparableBreakdown = currencyComparable || Boolean(primaryCurrency);
     const dated = events.filter((event) => event.timestamp);
     const dates = dated.map((event) => event.timestamp.slice(0, 10)).sort();
     const periodStart = dates[0] || null;
@@ -1251,20 +1259,20 @@
       period_variance: periodVariance(events, period, currency, currencyComparable),
       operational_metrics: operationalSummary(events, rawOptions.source_rows || []),
       breakdowns: {
-        provider: spendBreakdown(events, "provider", currencyComparable, selectedObservedCost),
-        model: spendBreakdown(events, "model", currencyComparable, selectedObservedCost),
-        processing_mode: spendBreakdown(events, "processing_mode", currencyComparable, selectedObservedCost),
-        inference_geography: spendBreakdown(events, "inference_geography", currencyComparable, selectedObservedCost),
-        project: spendBreakdown(events, "project", currencyComparable, selectedObservedCost),
-        team_owner: spendBreakdown(events, "team_owner", currencyComparable, selectedObservedCost),
-        feature: spendBreakdown(events, "feature", currencyComparable, selectedObservedCost),
-        customer: spendBreakdown(events, "customer", currencyComparable, selectedObservedCost),
-        product: spendBreakdown(events, "product", currencyComparable, selectedObservedCost),
-        workload: spendBreakdown(events, "workload", currencyComparable, selectedObservedCost),
-        workflow: spendBreakdown(events, "workflow", currencyComparable, selectedObservedCost),
-        session_id: spendBreakdown(events, "session_id", currencyComparable, selectedObservedCost),
-        environment: spendBreakdown(events, "environment", currencyComparable, selectedObservedCost),
-        customer_product: spendBreakdown(events, "customer_product", currencyComparable, selectedObservedCost),
+        provider: spendBreakdown(breakdownEvents, "provider", comparableBreakdown, breakdownCost),
+        model: spendBreakdown(breakdownEvents, "model", comparableBreakdown, breakdownCost),
+        processing_mode: spendBreakdown(breakdownEvents, "processing_mode", comparableBreakdown, breakdownCost),
+        inference_geography: spendBreakdown(breakdownEvents, "inference_geography", comparableBreakdown, breakdownCost),
+        project: spendBreakdown(breakdownEvents, "project", comparableBreakdown, breakdownCost),
+        team_owner: spendBreakdown(breakdownEvents, "team_owner", comparableBreakdown, breakdownCost),
+        feature: spendBreakdown(breakdownEvents, "feature", comparableBreakdown, breakdownCost),
+        customer: spendBreakdown(breakdownEvents, "customer", comparableBreakdown, breakdownCost),
+        product: spendBreakdown(breakdownEvents, "product", comparableBreakdown, breakdownCost),
+        workload: spendBreakdown(breakdownEvents, "workload", comparableBreakdown, breakdownCost),
+        workflow: spendBreakdown(breakdownEvents, "workflow", comparableBreakdown, breakdownCost),
+        session_id: spendBreakdown(breakdownEvents, "session_id", comparableBreakdown, breakdownCost),
+        environment: spendBreakdown(breakdownEvents, "environment", comparableBreakdown, breakdownCost),
+        customer_product: spendBreakdown(breakdownEvents, "customer_product", comparableBreakdown, breakdownCost),
       },
       currency_slices: currencySlices(events),
     };
@@ -1305,6 +1313,8 @@
       : String(rawOptions.billed_currency).trim().toUpperCase();
     if (billCurrency && !/^[A-Z]{3}$/.test(billCurrency)) throw new Error("Billed currency must be a three-letter code.");
     const billScopeConfirmed = Boolean(rawOptions.bill_scope_confirmed);
+    const billProviders = new Set(events.map((event) => event.provider).filter(Boolean));
+    const providerScopeUnclear = billProviders.size > 1;
     const selectedObservedCost = priced.length
       ? priced.reduce((sum, event) => sum + event.selected_cost, 0)
       : null;
@@ -1314,6 +1324,7 @@
     let billDuplicateExcludedDifference = null;
     if (billTotal !== null) {
       if (!billScopeConfirmed) billStatus = "SCOPE_NOT_CONFIRMED";
+      else if (providerScopeUnclear) billStatus = "PROVIDER_SCOPE_UNCLEAR";
       else if (priced.length !== events.length) billStatus = "REQUEST_COST_MISSING";
       else if (mixedCurrency) billStatus = "MIXED_CURRENCY";
       else if (pricedCurrencyMissing) billStatus = "REQUEST_CURRENCY_MISSING";
@@ -1353,6 +1364,12 @@
       method: "Unverified user-entered total minus selected request cost after scope confirmation. The duplicate-excluded difference retains the first source row in each repeated-ID group as a review reference only; no row is deleted or presumed invalid.",
     };
     const spend = spendSummary(events, reviewOptions, reviewCurrency, selectedObservedCost, !currencyNotComparable);
+    const primarySlice = currencyNotComparable ? [...spend.currency_slices].sort((a, b) => b.rows - a.rows || b.priced_rows - a.priced_rows || a.currency.localeCompare(b.currency))[0] : null;
+    const comparableCurrencyReview = primarySlice ? (() => {
+      const subset = events.filter((event) => event.currency === primarySlice.currency);
+      const subsetFindings = analyzeEvents(subset, rawOptions.catalog || null);
+      return { currency: primarySlice.currency, rows: subset.length, priced_rows: primarySlice.priced_rows, findings: subsetFindings, headline: headline(subsetFindings) };
+    })() : null;
     return {
       schema_version: REVIEW_SCHEMA,
       generated_at: rawOptions.generated_at || new Date().toISOString(),
@@ -1377,6 +1394,7 @@
       evidence_layers: evidenceLayers(events, bill),
       findings,
       headline: reviewHeadline,
+      comparable_currency_review: comparableCurrencyReview,
       evidence_gate: {
         status: "OBSERVED_REQUEST_REVIEW",
         savings_claim_allowed: false,

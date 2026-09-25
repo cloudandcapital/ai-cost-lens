@@ -95,6 +95,40 @@ console.log(JSON.stringify(decide(JSON.parse(process.argv[1]))));
     assert decision["posture"] == "FUND CHANGE"
 
 
+@pytest.mark.parametrize(
+    "ready,interval,expected",
+    [
+        (0.7, [0.52, 0.83], "QUALITY INCONCLUSIVE"),
+        (26 / 30, [0.70, 0.95], "QUALITY INCONCLUSIVE"),
+        (0.6, [0.45, 0.75], "QUALITY BELOW MINIMUM"),
+    ],
+)
+def test_sample_quality_verdict_uses_the_same_range_as_evidence(
+    ready, interval, expected
+):
+    script = """
+const fs = require('fs');
+let source = fs.readFileSync('web/app.js', 'utf8');
+source = source.replace('  function renderAll() {', '  globalThis.decide = decisionFor; return;\\n  function renderAll() {');
+eval(source);
+const ready = Number(process.argv[1]);
+const interval = JSON.parse(process.argv[2]);
+const data = {experience:'simple', workload:{accepted_quality_threshold:0.8},
+  baseline:{measures:{cost_per_usable_result:5}},
+  proposed:{measures:{cost_per_usable_result:4,usable_result_rate:ready},outcomes:{basis:'sampled',sample_method:'declared random or systematic',ready_rate_interval_95:interval}},
+  comparison:{quality_holds:ready>=0.8,both_policy_approved:true,human_cost_included:true,savings_claim_allowed:false}};
+console.log(JSON.stringify(decide(data)));
+"""
+    result = subprocess.run(
+        ["node", "-e", script, str(ready), json.dumps(interval)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert json.loads(result.stdout)["code"] == expected
+
+
 def test_simple_evidence_is_not_a_provider_invoice():
     app = (ROOT / "web/app.js").read_text()
     simple = app.split('if (state.builderMode === "simple") {', 1)[1].split(
