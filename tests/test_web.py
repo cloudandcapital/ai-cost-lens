@@ -519,6 +519,48 @@ eval(source);
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_fictional_monthly_provider_exports_reconcile_only_supported_scope():
+    script = r"""
+const fs = require("fs");
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function validateResult(data) {",
+  "  globalThis.__buildBill = buildOpenAIBillReview; return;\n  function validateResult(data) {",
+);
+eval(source);
+(async () => {
+  const review = await globalThis.__buildBill(
+    fs.readFileSync(process.argv[2], "utf8"),
+    fs.readFileSync(process.argv[3], "utf8"),
+  );
+  console.log(JSON.stringify(review));
+})().catch((error) => { console.error(error); process.exit(1); });
+"""
+    result = subprocess.run(
+        [
+            "node", "-e", script, str(WEB / "app.js"),
+            str(ROOT / "tests" / "fixtures" / "fictional-asterdesk-openai-activity.csv"),
+            str(ROOT / "tests" / "fixtures" / "fictional-asterdesk-openai-cost.csv"),
+        ],
+        check=False, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    review = __import__("json").loads(result.stdout)
+    assert review["period"]["aligned"] is True
+    assert review["period"]["start"] == "2026-08-01"
+    assert review["period"]["end"] == "2026-08-31"
+    assert review["bill"]["total"] == 563.58
+    assert review["bill"]["populated_rows"] == 62
+    assert review["usage"]["totals"]["requests"] == 171120
+    assert review["usage"]["populated_rows"] == 62
+    assert review["usage"]["totals"]["cache_write_input_tokens"] is None
+    assert review["reconciliation"]["project_cost_join_supported"] is True
+    assert review["reconciliation"]["model_cost_allocation_supported"] is False
+    assert review["reconciliation"]["outcome_cost_supported"] is False
+    assert review["reconciliation"]["savings_claim_allowed"] is False
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_browser_workload_builder_accepts_three_state_outcome_template():
     script = r"""
 const fs = require("fs");
