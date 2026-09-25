@@ -538,11 +538,18 @@ eval(source);
 """
     result = subprocess.run(
         [
-            "node", "-e", script, str(WEB / "app.js"),
-            str(ROOT / "tests" / "fixtures" / "fictional-asterdesk-openai-activity.csv"),
+            "node",
+            "-e",
+            script,
+            str(WEB / "app.js"),
+            str(
+                ROOT / "tests" / "fixtures" / "fictional-asterdesk-openai-activity.csv"
+            ),
             str(ROOT / "tests" / "fixtures" / "fictional-asterdesk-openai-cost.csv"),
         ],
-        check=False, capture_output=True, text=True,
+        check=False,
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 0, result.stderr
     review = __import__("json").loads(result.stdout)
