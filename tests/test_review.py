@@ -72,10 +72,10 @@ def test_demo_plan_variance_and_time_payback_reconcile():
             "direction": "unfavorable",
         },
     ]
-    assert planning["payback"]["monthly_operating_savings"] == -6436.00046
+    assert planning["payback"]["monthly_operating_savings"] == -6436
     assert planning["payback"]["payback_months"] is None
     assert planning["payback"]["within_decision_horizon"] is False
-    assert planning["payback"]["horizon_net_savings"] == -77232.00552
+    assert planning["payback"]["horizon_net_savings"] == -77232
     assert planning["payback"]["status"] == "no_operating_payback"
 
 

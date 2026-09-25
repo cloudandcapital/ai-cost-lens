@@ -3612,7 +3612,7 @@ body.story-mode .cockpit-grid {
 
   .memo-plan-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     border-top: 1px solid #171816;
     border-bottom: 1px solid #171816;
   }
@@ -3622,8 +3622,12 @@ body.story-mode .cockpit-grid {
     border-right: 1px solid rgba(23, 24, 22, 0.22);
   }
 
-  .memo-plan-grid div:last-child {
+  .memo-plan-grid div:nth-child(3n) {
     border-right: 0;
+  }
+
+  .memo-plan-grid div:nth-child(n+4) {
+    border-top: 1px solid rgba(23, 24, 22, 0.22);
   }
 
   .memo-plan-grid span {
