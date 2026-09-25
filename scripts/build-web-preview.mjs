@@ -30,6 +30,7 @@ const requestLogTemplate = await readFile(
 const verificationTemplate = await readFile(
   resolve(web, "templates", "ai-cost-lens-verification-template.csv"),
 );
+const verificationExample = await readFile(resolve(web, "templates", "ai-cost-lens-verification-example.csv"));
 let app = await readFile(resolve(web, "app.js"), "utf8");
 const pricingCatalog = await readFile(
   resolve(web, "data", "pricing-catalog-v0.5.js"),
@@ -41,6 +42,10 @@ const usageEventEngine = await readFile(resolve(web, "usage-event-engine.js"), "
 const verificationEngine = await readFile(resolve(web, "verification-engine.js"), "utf8");
 const scenarioEngine = await readFile(resolve(web, "scenario-engine.js"), "utf8");
 const actualsEngine = await readFile(resolve(web, "actuals-engine.js"), "utf8");
+const growthEngine = await readFile(resolve(web, "growth-engine.js"), "utf8");
+const evidenceTools = await readFile(resolve(web, "evidence-tools.js"), "utf8");
+const customerEconomics = await readFile(resolve(web, "customer-economics-engine.js"), "utf8");
+const customerRevenueTemplate = await readFile(resolve(web, "templates", "ai-cost-lens-customer-revenue-template.csv"));
 
 const loaderPattern =
   /  \/\* AI_COST_LENS_DEMO_LOADER_START \*\/[\s\S]*?  \/\* AI_COST_LENS_DEMO_LOADER_END \*\//;
@@ -70,6 +75,8 @@ html = html
     'href="templates/ai-cost-lens-verification-template.csv"',
     `href="data:text/csv;base64,${verificationTemplate.toString("base64")}"`,
   )
+  .replaceAll('href="templates/ai-cost-lens-verification-example.csv"', `href="data:text/csv;base64,${verificationExample.toString("base64")}"`)
+  .replaceAll('href="templates/ai-cost-lens-customer-revenue-template.csv"', `href="data:text/csv;base64,${customerRevenueTemplate.toString("base64")}"`)
   .replace('<script src="data/pricing-catalog-v0.5.js"></script>', () => `<script>${pricingCatalog}</script>`)
   .replace('<script src="pricing-engine.js"></script>', () => `<script>${pricingEngine}</script>`)
   .replace('<script src="opportunity-engine.js"></script>', () => `<script>${opportunityEngine}</script>`)
@@ -77,6 +84,9 @@ html = html
   .replace('<script src="verification-engine.js"></script>', () => `<script>${verificationEngine}</script>`)
   .replace('<script src="scenario-engine.js"></script>', () => `<script>${scenarioEngine}</script>`)
   .replace('<script src="actuals-engine.js"></script>', () => `<script>${actualsEngine}</script>`)
+  .replace('<script src="growth-engine.js"></script>', () => `<script>${growthEngine}</script>`)
+  .replace('<script src="evidence-tools.js"></script>', () => `<script>${evidenceTools}</script>`)
+  .replace('<script src="customer-economics-engine.js"></script>', () => `<script>${customerEconomics}</script>`)
   .replace('<script src="app.js"></script>', () => `<script>${app}</script>`);
 
 if (!html.includes(`<script>${app}</script>`)) {

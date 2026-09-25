@@ -89,8 +89,14 @@ async function saveJsonDownload(page, selector, filename) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
+async function openAdvancedChoices(page) {
+  const choices = page.locator(".builder-more-paths");
+  if (!(await choices.evaluate((element) => element.open))) await choices.locator("summary").click();
+}
+
 async function verifyFinanceMemoPdf(page) {
   await page.locator("#start-review").click();
+  await openAdvancedChoices(page);
   await page.locator('[data-builder-mode="example"]').click();
   await page.waitForFunction(() => document.querySelector("#memo-decision-code")?.textContent?.trim());
   await page.evaluate(() => { window.print = () => {}; });
@@ -109,7 +115,7 @@ async function verifyFinanceMemoPdf(page) {
     pages.push(content.items.map((item) => item.str).join(" "));
   }
   const text = pages.join(" ").toLowerCase();
-  for (const expected of ["ai spend decision memo", "the other option does not meet", "provider cost", "cost per ready result", "what finance can rely on", "current cost vs plan", "proposed monthly scenario", "not booked savings", "not supported"]) {
+  for (const expected of ["ai spend decision memo", "the other option does not meet", "provider cost", "cost per ready result", "what finance can rely on", "current cost vs plan", "monthly scenario compares route unit costs", "one time change cost", "month net after change cost", "not booked savings", "not supported"]) {
     assert(text.includes(expected), `finance memo PDF is missing ${expected}.`);
   }
   await loadingTask.destroy();
@@ -143,6 +149,7 @@ async function verifyRichDecisionFlow(page) {
     const directory = join(root, "examples", "synthetic-cases");
     const config = JSON.parse(await readFile(join(directory, `${scenario.name}-config.json`), "utf8"));
     await page.locator("#start-review").click();
+    await openAdvancedChoices(page);
     await page.locator('[data-builder-mode="workload"]').click();
     await page.locator("#spend-file").setInputFiles(join(directory, `${scenario.name}-spend.csv`));
     await page.locator('[data-outcome-mode="detailed"]').click();
@@ -177,6 +184,7 @@ async function verifyOpenAIPartialBucket(page) {
   const usage = (await readFile(join(fixtureDir, "openai-dashboard-usage.csv"), "utf8"))
     .replaceAll("1788307200,1788393600", "1788310800,1788393600");
   await page.locator("#start-review").click();
+  await openAdvancedChoices(page);
   await page.locator('[data-builder-mode="openai"]').click();
   await page.locator("#openai-usage-file").setInputFiles({ name: "partial-usage.csv", mimeType: "text/csv", buffer: Buffer.from(usage) });
   await page.locator("#openai-cost-file").setInputFiles(join(fixtureDir, "openai-dashboard-cost.csv"));
@@ -203,8 +211,24 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert((await page.locator("#decision-title").innerText()) === "Test the lower-cost route", `${engineName}: startup example overclaims the route change.`);
   assert((await page.locator("#opportunity-ledger").innerText()).includes("One time change cost"), `${engineName}: growth example omitted migration cost.`);
   assert((await page.locator("#review-title").innerText()).includes("Cost per ready result down 19%"), `${engineName}: startup example hides its result.`);
+  assert((await page.locator("#receipt-grid").innerText()).includes("ILLUSTRATIVE"), `${engineName}: receipt lost its evidence label.`);
+  assert((await page.locator("#receipt-grid").innerText()).includes("$1.77"), `${engineName}: receipt lines do not support the proposed unit cost.`);
+  assert((await page.locator("#price-crosscheck-result").innerText()).includes("$22,000.00"), `${engineName}: token-to-cost check did not reprice the example.`);
+  const [receiptDownload] = await Promise.all([page.waitForEvent("download"), page.locator("#download-receipt").click()]);
+  assert(receiptDownload.suggestedFilename().endsWith(".svg"), `${engineName}: receipt did not export as an image.`);
+  await page.locator("#growth-revenue").fill("3");
+  assert(await page.locator("#growth-results tbody tr").count() === 4, `${engineName}: growth planner lacks volume scenarios.`);
+  assert((await page.locator("#growth-results tbody tr").first().innerText()).includes("26.7%"), `${engineName}: modeled current gross margin is wrong.`);
+  await page.locator('.nav-item[data-view="evidence"]').click();
+  assert((await page.locator("#evidence-kit-list").innerText()).includes("Replace the example"), `${engineName}: evidence kit lost its concrete next step.`);
+  assert((await page.locator("#sample-size-result").innerText()).includes("385"), `${engineName}: sample planner returned an incorrect precision estimate.`);
+  const [kitDownload] = await Promise.all([page.waitForEvent("download"), page.locator("#download-evidence-kit").click()]);
+  assert(kitDownload.suggestedFilename().endsWith(".md"), `${engineName}: evidence action list did not download.`);
+  await page.locator('.nav-item[data-view="review"]').click();
   await page.locator("#start-review-inline").click();
+  assert(await page.locator("#baseline-population").inputValue() === "" && await page.locator("#proposed-ready").inputValue() === "", `${engineName}: example outcomes leaked into a real review.`);
   assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: inline review action did not open.`);
+  assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 3, `${engineName}: start dialog still presents too many choices.`);
   await page.locator("#close-review").click();
   await page.locator('[data-example="cost-trap"]').click();
   assert((await page.locator("#workload-name").innerText()) === "Contract risk summaries", `${engineName}: could not return to the original example.`);
@@ -289,6 +313,71 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const usage = await saveJsonDownload(page, "#download-usage-review", `${engineName}-usage-review.json`);
   assert(usage.event_count === 7, `${engineName}: usage import did not retain all seven rows.`);
   assert(usage.evidence_gate.savings_claim_allowed === false, `${engineName}: usage review allowed a savings claim.`);
+  await page.locator("#request-billed-total").fill("70");
+  await page.locator("#request-billed-currency").fill("USD");
+  await page.locator("#request-bill-scope-confirmed").check();
+  await page.locator("#request-period-complete").check();
+  const malformedLog = [
+    "event_id,timestamp,provider,model,provider_reported_cost,currency",
+    "good,2026-09-01T12:00:00Z,OpenAI,gpt-5.6-sol,10,USD",
+    "bad,2026-09-02T12:00:00Z,OpenAI,gpt-5.6-sol,oops,USD",
+    "wrong-fields,2026-09-03T12:00:00Z,OpenAI,gpt-5.6-sol,10",
+  ].join("\n");
+  await page.locator("#request-log-file").setInputFiles({ name: "malformed.csv", mimeType: "text/csv", buffer: Buffer.from(malformedLog) });
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  const partial = await saveJsonDownload(page, "#download-usage-review", `${engineName}-partial-usage-review.json`);
+  assert(partial.event_count === 1 && partial.import_coverage.excluded_rows === 2, `${engineName}: partial import lost coverage.`);
+  assert(partial.reconciliation.bill.status === "ROWS_EXCLUDED" && partial.spend.run_rate_status === "NOT_SUPPORTED", `${engineName}: excluded rows allowed a whole-log financial claim.`);
+  const issuesDownload = page.waitForEvent("download");
+  await page.locator("#download-request-issues").click();
+  const issues = await readFile(await (await issuesDownload).path(), "utf8");
+  assert(issues.includes("3,") && issues.includes("4,"), `${engineName}: issue export lost source record numbers.`);
+  assert((await page.locator("#request-analysis-boundary").innerText()).includes("valid rows only"), `${engineName}: scoped warning missing.`);
+  const allBadLog = "event_id,provider_reported_cost,currency\nbad,oops,USD\n";
+  await page.locator("#request-log-file").setInputFiles({ name: "all-bad.csv", mimeType: "text/csv", buffer: Buffer.from(allBadLog) });
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-log-error.visible").waitFor({ state: "visible" });
+  assert((await page.locator("#request-log-error").innerText()).includes("No valid request rows"), `${engineName}: wholly invalid import was not stopped.`);
+  assert(await page.locator("#download-request-issues").isVisible(), `${engineName}: wholly invalid import lost the issue download.`);
+  await page.locator("#request-billed-total").fill("");
+  await page.locator("#request-bill-scope-confirmed").uncheck();
+  await page.locator("#request-period-complete").uncheck();
+  const mixedLog = [
+    "event_id,timestamp,provider,model,customer,input_tokens,output_tokens,cached_input_tokens,tool_charges,provider_reported_cost,currency",
+    "a,2026-09-01T10:00:00Z,OpenAI,gpt-5.6-sol,A,100,20,0,0,12,USD",
+    "b,2026-09-01T10:01:00Z,OpenAI,gpt-5.6-sol,A,100,20,,,,USD",
+    "c,2026-09-01T10:02:00Z,OpenAI,gpt-5.6-sol,B,100,20,0,0,5,EUR",
+  ].join("\n");
+  await page.locator("#request-log-file").setInputFiles({ name: "mixed.csv", mimeType: "text/csv", buffer: Buffer.from(mixedLog) });
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  assert((await page.locator("#request-analysis-summary").innerText()).includes("$12.00"), `${engineName}: a EUR row hid comparable USD cost.`);
+  assert((await page.locator("#request-currency-slices").innerText()).includes("EUR"), `${engineName}: currency coverage was hidden.`);
+  assert((await page.locator("#request-spend-breakdowns").innerText()).includes("Breakdowns below use USD only"), `${engineName}: mixed currency breakdowns lack an explicit scope.`);
+  const revenueLog = "customer,period_start,period_end,revenue,currency\nA,2026-09-01,2026-09-01,100,USD\n";
+  await page.locator("#customer-revenue-file").setInputFiles({ name: "revenue.csv", mimeType: "text/csv", buffer: Buffer.from(revenueLog) });
+  await page.locator("#analyze-customer-revenue").click();
+  await page.locator("#customer-revenue-result").waitFor({ state: "visible" });
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("At least"), `${engineName}: unpriced customer cost lost its lower-bound label. Error: ${await page.locator("#customer-revenue-error").innerText()}; result: ${await page.locator("#customer-revenue-result").innerText()}`);
+  await page.locator("#try-illustrative-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  await page.locator("#try-customer-economics").click();
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("Example customer A"), `${engineName}: customer example failed to join.`);
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("Illustrative inputs"), `${engineName}: customer example lost its evidence label.`);
+  assert((await page.locator("#customer-revenue-result").innerText()).includes("lack customer IDs"), `${engineName}: unallocated cost is hidden.`);
+  await page.locator("#request-human-review-cost").evaluate((input) => { input.closest("details").open = true; });
+  await page.locator("#request-human-review-cost").fill("0.12");
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  await page.locator("#customer-allocation-method").selectOption("requests");
+  await page.locator("#try-customer-economics").click();
+  assert((await page.locator("#customer-revenue-result").innerText()).toLowerCase().includes("allocated operating cost"), `${engineName}: entered human cost was not available for explicit allocation. Error: ${await page.locator("#customer-revenue-error").innerText()}`);
+  if (engineName === "chromium") {
+    await page.locator('[data-view="evidence"]').click();
+    const workspace = await saveJsonDownload(page, "#download-workspace", "workspace-archive.json");
+    assert(workspace.schema_version === "ai-cost-lens-workspace/1.0" && workspace.request_review?.event_count === 7 && workspace.customer_cost_to_serve?.analysis?.customers?.length, "Workspace archive lost imported request or customer analysis.");
+  }
 
   const financeMemoPdf = engineName === "chromium" ? await verifyFinanceMemoPdf(page) : null;
   const savedReview = engineName === "chromium" ? await verifySavedReviewRoundTrip(page) : null;
@@ -337,6 +426,12 @@ async function mobileAndAccessibility(origin) {
   assert(titleBox && titleBox.y < 560, `mobile: primary content begins too low (${titleBox?.y ?? "missing"}px).`);
   const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert(horizontalOverflow <= 1, `mobile: page overflows horizontally by ${horizontalOverflow}px.`);
+  await page.locator('[data-example="growth"]').click();
+  await page.locator("#growth-revenue").fill("3");
+  assert((await page.locator("#receipt-grid").innerText()).includes("$1.77"), "mobile: receipt failed to render.");
+  assert(await page.locator("#growth-results").evaluate((element) => element.scrollWidth > element.clientWidth), "mobile: growth results should scroll inside their own region.");
+  assert(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 1, "mobile: growth planner causes page overflow.");
+  await page.locator('[data-example="cost-trap"]').click();
 
   await page.locator("#header-menu-toggle").click();
   assert(await page.locator("#header-actions").isVisible(), "mobile: action menu did not open.");
@@ -348,6 +443,13 @@ async function mobileAndAccessibility(origin) {
   await page.locator("#mobile-section-nav").selectOption("review");
   const overviewA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   assert(overviewA11y.violations.length === 0, `mobile overview accessibility violations: ${axeSummary(overviewA11y)}`);
+  await page.locator("#mobile-section-nav").selectOption("opportunities");
+  await page.locator("#try-illustrative-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  assert(await page.locator(".request-deep-dive").first().evaluate((element) => !element.open), "mobile: detailed request analysis should start collapsed.");
+  await page.locator(".request-deep-dive").first().locator("summary").click();
+  assert(await page.locator("#request-spend-overview-title").isVisible(), "mobile: spend context could not be opened.");
+  assert(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 1, "mobile: request analysis causes page overflow.");
 
   await page.locator("#header-menu-toggle").click();
   await page.locator("#price-prompt").click();

@@ -406,7 +406,7 @@ def _calculate_planning(
     actual_ready = Decimal(str(baseline["outcomes"]["usable_results"]))
     actual_completed = int(baseline["outcomes"]["completed_results"])
     actual_ready_rate = Decimal(str(baseline["measures"]["usable_result_rate"]))
-    actual_unit = Decimal(str(baseline["measures"]["cost_per_usable_result"]))
+    actual_unit = actual_recurring / actual_ready
 
     cost_drivers = [
         ("Provider cost", actual_provider - plan_provider),
@@ -415,7 +415,9 @@ def _calculate_planning(
     ]
     cost_drivers.sort(key=lambda item: abs(item[1]), reverse=True)
 
-    proposed_unit = Decimal(str(proposed["measures"]["cost_per_usable_result"]))
+    proposed_unit = Decimal(
+        str(proposed["costs"]["recurring_operating_cost"])
+    ) / Decimal(str(proposed["outcomes"]["usable_results"]))
     change_cost = Decimal(str(proposed["costs"]["one_time_change_cost"]))
     savings_per_ready = actual_unit - proposed_unit
     monthly_operating_savings = savings_per_ready * Decimal(expected_monthly_ready)

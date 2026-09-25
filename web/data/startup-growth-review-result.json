@@ -214,11 +214,11 @@
     "payback": {
       "expected_ready_results_per_month": 18200,
       "decision_horizon_months": 12,
-      "monthly_operating_savings": 7709.6656,
+      "monthly_operating_savings": 7709.677419,
       "one_time_change_cost": 18000.0,
-      "payback_months": 2.334732,
+      "payback_months": 2.334728,
       "within_decision_horizon": true,
-      "horizon_net_savings": 74515.9872,
+      "horizon_net_savings": 74516.129032,
       "status": "within_horizon"
     }
   }

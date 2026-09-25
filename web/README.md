@@ -32,6 +32,10 @@ files.
 
 ## Start a review
 
+For route comparisons, the receipt breaks recurring model, infrastructure, and human costs into cents per ready result. Its evidence label is part of the exported SVG. The token-to-cost check appears only when a route names one model in the dated catalog and provides compatible token and cost totals. A gap above 10% requests investigation; agreement with a list rate never verifies an invoice, tier, discount, or per-request long-context treatment.
+
+Request-log findings can flag a session with at least 20 steps and at least 20% of comparable priced request cost. This is a trace review prompt, with no avoidable-savings number. A terminal outcome in the same session connects intermediate steps to session-level outcome evidence, without treating every step as independently quality reviewed.
+
 The opening presents seven paths:
 
 - **Price a prompt** opens the local direct-API pricing workspace without requiring a bill or review file.

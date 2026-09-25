@@ -36,6 +36,8 @@ const element = (id) => {
 navButtons.push(element('review-tab'), element('anatomy-tab'), element('evidence-tab'));
 const document = { getElementById: element, querySelector: element, querySelectorAll() { return []; }, body: element('body') };
 const context = { TextEncoder, crypto: webcrypto, document, window: { scrollTo() {} } };
+runInNewContext(read('web/growth-engine.js'), context);
+runInNewContext(read('web/evidence-tools.js'), context);
 runInNewContext(source.slice(0, boundary) + 'globalThis.api = {parseCsv, validDate, validateResult, buildLocalReview, buildSampledReview, buildOpenAIBillReview, buildSingleBillReview, buildClaudeSpendReview, buildClaudeApiReview, parseFlatStructured, suggestStructuredMapping, buildMappedReview, extractPdfText, extractInvoiceCandidate, inspectUploadedFiles, summarizeSingleBill, failedSavingsGateText, lumenResponse, renderAll, state};})();', context);
 const api = context.api;
 for (const date of ['2026-02-31', '2026-02-29', '2026-04-31', '2026-13-01', 'not-a-date']) assert.throws(() => api.validDate(date, 'Date'));
@@ -510,10 +512,10 @@ for (const [review, expected] of gateCases) {
   assert.match(api.lumenResponse('cfo'), expected);
 }
 api.state.data = gateCases[0][0];
-assert.equal(api.lumenResponse('evidence'), 'The files match, but policy approval still blocks a savings claim.');
+assert.equal(api.lumenResponse('evidence'), 'The files match, but these checks remain open: policy approval. A savings claim is blocked.');
 assert.match(api.lumenResponse('cfo'), /\. Policy approval still blocks a savings claim\.$/);
 api.state.data = gateCases[3][0];
-assert.equal(api.lumenResponse('evidence'), 'The files match, but the declared quality requirement and policy approval still block a savings claim.');
+assert.equal(api.lumenResponse('evidence'), 'The files match, but these checks remain open: the declared quality requirement and policy approval. A savings claim is blocked.');
 assert.match(api.lumenResponse('cfo'), /\. The declared quality requirement and policy approval still block a savings claim\.$/);
 for (const response of [api.lumenResponse('evidence'), api.lumenResponse('cfo')]) {
   assert.doesNotMatch(response, /(?:^|[.!?]\s+)[a-z]/);

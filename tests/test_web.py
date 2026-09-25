@@ -39,7 +39,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert (
         "universal spend and work templates for any provider, including OpenAI" in html
     )
-    assert "Start with the records you already have" in html
+    assert "Choose what you have. You can add more evidence later." in html
     assert "Start with the reports you already have" in html
     assert "Put both routes in one spend file" in html
     assert "Add what happened to the work" in html
@@ -52,13 +52,10 @@ def test_web_assets_and_brand_contract_are_present():
     assert "Price a prompt" in html
     assert "Review AI usage" in html
     assert 'data-builder-mode="single"' in html
-    assert "CRAWL" in html
-    assert "WALK" in html
-    assert "RUN" in html
-    assert "Understand the bill" in html
-    assert "Explain the usage" in html
-    assert "Connect cost to outcomes" in html
-    assert "Understand one bill" in html
+    assert "Start with a bill" in html
+    assert "Review AI usage" in html
+    assert "Compare two options" in html
+    assert '<details class="builder-more-paths">' in html
     assert "Human effort is optional" in html
     assert "No human review record? Leave it blank" in (WEB / "app.js").read_text()
     assert "Blended cost per request" in (WEB / "app.js").read_text()
@@ -106,7 +103,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert 'id="print-memo"' in html
     assert 'id="finance-memo"' in html
     assert "Print finance memo" in html
-    assert "What would help you today?" in html
+    assert "Choose what you have. You can add more evidence later." in html
     assert 'id="baseline-policy-approved"' in html
     assert 'id="proposed-policy-approved"' in html
     assert 'id="policy-approved"' not in html
@@ -522,6 +519,55 @@ eval(source);
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_fictional_monthly_provider_exports_reconcile_only_supported_scope():
+    script = r"""
+const fs = require("fs");
+let source = fs.readFileSync(process.argv[1], "utf8");
+source = source.replace(
+  "  function validateResult(data) {",
+  "  globalThis.__buildBill = buildOpenAIBillReview; return;\n  function validateResult(data) {",
+);
+eval(source);
+(async () => {
+  const review = await globalThis.__buildBill(
+    fs.readFileSync(process.argv[2], "utf8"),
+    fs.readFileSync(process.argv[3], "utf8"),
+  );
+  console.log(JSON.stringify(review));
+})().catch((error) => { console.error(error); process.exit(1); });
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "app.js"),
+            str(
+                ROOT / "tests" / "fixtures" / "fictional-asterdesk-openai-activity.csv"
+            ),
+            str(ROOT / "tests" / "fixtures" / "fictional-asterdesk-openai-cost.csv"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    review = __import__("json").loads(result.stdout)
+    assert review["period"]["aligned"] is True
+    assert review["period"]["start"] == "2026-08-01"
+    assert review["period"]["end"] == "2026-08-31"
+    assert review["bill"]["total"] == 563.58
+    assert review["bill"]["populated_rows"] == 62
+    assert review["usage"]["totals"]["requests"] == 171120
+    assert review["usage"]["populated_rows"] == 62
+    assert review["usage"]["totals"]["cache_write_input_tokens"] is None
+    assert review["reconciliation"]["project_cost_join_supported"] is True
+    assert review["reconciliation"]["model_cost_allocation_supported"] is False
+    assert review["reconciliation"]["outcome_cost_supported"] is False
+    assert review["reconciliation"]["savings_claim_allowed"] is False
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_browser_workload_builder_accepts_three_state_outcome_template():
     script = r"""
 const fs = require("fs");
@@ -685,6 +731,8 @@ eval(source);
       proposedShared: 0,
       changeCost: 0,
       sampleRandom: true,
+      // The tiny spend template is a parser fixture; this test explicitly models multiple results per call.
+      allowMultipleResultsPerRequest: true,
     },
   );
   console.log(JSON.stringify(result));

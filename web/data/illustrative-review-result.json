@@ -3,13 +3,13 @@
   "mode": "illustrative",
   "currency": "USD",
   "period": {
-    "start": "2026-07-31",
+    "start": "2026-07-01",
     "end": "2026-08-31",
     "timezone": "UTC"
   },
   "workload": {
     "name": "Contract risk summaries",
-    "description": "Monthly review of a model-routing change. The provider bill falls, but more correction and escalation make each ready result cost more.",
+    "description": "Two monthly snapshots, July and August 2026, of a model-routing change. The provider bill falls, but more correction and escalation make each ready result cost more.",
     "outcome_unit": "ready result",
     "accepted_quality_threshold": 0.9
   },
@@ -214,11 +214,11 @@
     "payback": {
       "expected_ready_results_per_month": 940,
       "decision_horizon_months": 12,
-      "monthly_operating_savings": -6436.00046,
+      "monthly_operating_savings": -6436.0,
       "one_time_change_cost": 0.0,
       "payback_months": null,
       "within_decision_horizon": false,
-      "horizon_net_savings": -77232.00552,
+      "horizon_net_savings": -77232.0,
       "status": "no_operating_payback"
     }
   }

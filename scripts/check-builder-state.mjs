@@ -13,6 +13,7 @@ const usageEventEngine = require('../web/usage-event-engine.js');
 const scenarioEngine = require('../web/scenario-engine.js');
 const verificationEngine = require('../web/verification-engine.js');
 const actualsEngine = require('../web/actuals-engine.js');
+const evidenceTools = require('../web/evidence-tools.js');
 
 // Minimal DOM adapter: actual HTML defaults and actual app event handlers.
 // This checks state transitions, not browser layout or native file dialogs.
@@ -94,6 +95,7 @@ const context = {
   AICostLensScenarios:scenarioEngine,
   AICostLensVerification:verificationEngine,
   AICostLensActuals:actualsEngine,
+  AICostLensEvidenceTools:evidenceTools,
 };
 runInNewContext(source, context);
 const {api} = context;
@@ -534,5 +536,6 @@ await el('actuals-form').emit('submit');
 assert.equal(api.state.actualsLedger.gates.source_record_is_real,false);
 assert.equal(api.state.actualsLedger.gates.realized_savings_claim_allowed,false);
 assert.equal(el('actuals-result').hidden,false);
-assert.match(el('actuals-conclusion').textContent,/evidence gates remain open/);
+assert.match(el('actuals-conclusion').textContent,/not a realized savings claim/);
+assert.match(el('actuals-open-gates').innerHTML,/illustrative or sampled/);
 console.log('PASS: prompt pricing, opportunity, scenario-to-verification and actuals event flows');

@@ -334,7 +334,7 @@
       defaultCurrency,
     };
     if (options.defaultCurrency && !/^[A-Z]{3}$/.test(options.defaultCurrency)) throw new Error("Default currency must be a three-letter code.");
-    const events = rows.map((row, index) => normalizeRow(row, index, options));
+    const events = rows.map((row, index) => normalizeRow(row, row?.__source_index ?? index, options));
     markDuplicates(events);
     return events;
   }
@@ -528,6 +528,37 @@
       headline_eligible: true,
     }));
 
+    const sessions = new Map();
+    events.filter((event) => event.session_id && !duplicateCopies.has(event.record_id)).forEach((event) => {
+      if (!sessions.has(event.session_id)) sessions.set(event.session_id, []);
+      sessions.get(event.session_id).push(event);
+    });
+    const pricedTotalForSessions = currencyComparable ? pricedEvents.reduce((sum, event) => sum + event.selected_cost, 0) : null;
+    const costlySessions = [...sessions.entries()].map(([sessionId, members]) => ({
+      sessionId,
+      members,
+      cost: members.reduce((sum, event) => sum + (event.selected_cost || 0), 0),
+    })).filter(({ members, cost }) => members.length >= 20 && pricedTotalForSessions > 0 && cost / pricedTotalForSessions >= 0.2);
+    if (costlySessions.length) {
+      const affected = costlySessions.flatMap(({ members }) => members);
+      const largest = costlySessions.sort((a, b) => b.cost - a.cost)[0];
+      const sorted = [...largest.members].filter((event) => event.input_tokens !== null && event.timestamp).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      const growth = sorted.length >= 5 && sorted.slice(1).filter((event, index) => event.input_tokens >= sorted[index].input_tokens).length / (sorted.length - 1) >= 0.8;
+      findings.push(finding({
+        id: "high-cost-multistep-session", kind: "high_cost_multistep_session", category: "Agent sessions",
+        title: "One multi-step session deserves a closer look",
+        explanation: `${largest.members.length} calls in one supplied session account for ${round(largest.cost / pricedTotalForSessions * 100, 1)}% of priced request cost.${growth ? " Input tokens rose on most sequential calls; check whether context was repeatedly carried forward." : " Check whether its steps were needed to produce the final result."}`,
+        affected_scope: `${costlySessions.length} session${costlySessions.length === 1 ? "" : "s"} with 20+ calls and at least 20% of comparable request cost`,
+        current_cost: round(affected.reduce((sum, event) => sum + (event.selected_cost || 0), 0)),
+        calculation: "Selected cost of the flagged session requests; no avoidable cost calculated.",
+        evidence_basis: "observed", confidence: "directional", confidence_in_dollar_estimate: "not_quantified", overlap_group: "session-investigation",
+        affected_event_ids: affected.map((event) => event.record_id),
+        verification_requirement: "Inspect the session trace and terminal outcome before setting a step limit, shortening context, or changing tools.",
+        suggested_next_step: "Inspect the expensive session trace", action: "investigate",
+        limitations: "A long session may be necessary and valuable. Session IDs do not show tool identity, actual task difficulty, or avoidable savings.", headline_eligible: false,
+      }));
+    }
+
     const prefixGroups = new Map();
     events.filter((event) => event.prefix_fingerprint && event.input_tokens !== null).forEach((event) => {
       const key = `${analysisWorkload(event)}\u0000${event.prefix_fingerprint}`;
@@ -668,7 +699,8 @@
       action: "verify", limitations: "Shared workload labels do not establish equal task difficulty, capabilities, output length, or usable-result yield.", headline_eligible: false,
     }));
 
-    const noOutcome = pricedEvents.filter((event) => !event.outcome_status);
+    const sessionsWithOutcome = new Set(events.filter((event) => event.session_id && event.outcome_status).map((event) => event.session_id));
+    const noOutcome = pricedEvents.filter((event) => !event.outcome_status && !(event.session_id && sessionsWithOutcome.has(event.session_id)));
     const noOutcomeHasCost = noOutcome.some((event) => event.selected_cost > 0);
     const pricedTotal = currencyComparable ? pricedEvents.reduce((sum, event) => sum + event.selected_cost, 0) : null;
     const noOutcomeCost = currencyComparable ? noOutcome.reduce((sum, event) => sum + event.selected_cost, 0) : null;
@@ -804,6 +836,24 @@
     })).sort((left, right) => {
       const costDifference = (right.selected_cost || 0) - (left.selected_cost || 0);
       return costDifference || right.event_count - left.event_count || left.label.localeCompare(right.label);
+    });
+  }
+
+  function currencySlices(events) {
+    const currencies = [...new Set(events.map((event) => event.currency).filter(Boolean))].sort();
+    return currencies.map((currency) => {
+      const rows = events.filter((event) => event.currency === currency);
+      const priced = rows.filter((event) => event.selected_cost !== null);
+      const total = priced.reduce((sum, event) => sum + event.selected_cost, 0);
+      return {
+        currency, rows: rows.length, priced_rows: priced.length, unpriced_rows: rows.length - priced.length,
+        selected_cost: priced.length ? round(total) : null,
+        breakdowns: {
+          customer: spendBreakdown(rows, "customer", true, total),
+          model: spendBreakdown(rows, "model", true, total),
+          feature: spendBreakdown(rows, "feature", true, total),
+        },
+      };
     });
   }
 
@@ -1155,6 +1205,14 @@
   }
 
   function spendSummary(events, rawOptions, currency, selectedObservedCost, currencyComparable) {
+    const primaryCurrency = currencyComparable ? null : [...new Set(events.map((event) => event.currency).filter(Boolean))]
+      .map((value) => ({ value, rows: events.filter((event) => event.currency === value).length, priced: events.filter((event) => event.currency === value && event.selected_cost !== null).length }))
+      .sort((a, b) => b.rows - a.rows || b.priced - a.priced || a.value.localeCompare(b.value))[0]?.value;
+    const breakdownEvents = primaryCurrency ? events.filter((event) => event.currency === primaryCurrency) : events;
+    const breakdownCost = primaryCurrency
+      ? breakdownEvents.reduce((sum, event) => sum + (event.selected_cost || 0), 0)
+      : selectedObservedCost;
+    const comparableBreakdown = currencyComparable || Boolean(primaryCurrency);
     const dated = events.filter((event) => event.timestamp);
     const dates = dated.map((event) => event.timestamp.slice(0, 10)).sort();
     const periodStart = dates[0] || null;
@@ -1201,27 +1259,53 @@
       period_variance: periodVariance(events, period, currency, currencyComparable),
       operational_metrics: operationalSummary(events, rawOptions.source_rows || []),
       breakdowns: {
-        provider: spendBreakdown(events, "provider", currencyComparable, selectedObservedCost),
-        model: spendBreakdown(events, "model", currencyComparable, selectedObservedCost),
-        processing_mode: spendBreakdown(events, "processing_mode", currencyComparable, selectedObservedCost),
-        inference_geography: spendBreakdown(events, "inference_geography", currencyComparable, selectedObservedCost),
-        project: spendBreakdown(events, "project", currencyComparable, selectedObservedCost),
-        team_owner: spendBreakdown(events, "team_owner", currencyComparable, selectedObservedCost),
-        feature: spendBreakdown(events, "feature", currencyComparable, selectedObservedCost),
-        customer: spendBreakdown(events, "customer", currencyComparable, selectedObservedCost),
-        product: spendBreakdown(events, "product", currencyComparable, selectedObservedCost),
-        workload: spendBreakdown(events, "workload", currencyComparable, selectedObservedCost),
-        workflow: spendBreakdown(events, "workflow", currencyComparable, selectedObservedCost),
-        session_id: spendBreakdown(events, "session_id", currencyComparable, selectedObservedCost),
-        environment: spendBreakdown(events, "environment", currencyComparable, selectedObservedCost),
-        customer_product: spendBreakdown(events, "customer_product", currencyComparable, selectedObservedCost),
+        provider: spendBreakdown(breakdownEvents, "provider", comparableBreakdown, breakdownCost),
+        model: spendBreakdown(breakdownEvents, "model", comparableBreakdown, breakdownCost),
+        processing_mode: spendBreakdown(breakdownEvents, "processing_mode", comparableBreakdown, breakdownCost),
+        inference_geography: spendBreakdown(breakdownEvents, "inference_geography", comparableBreakdown, breakdownCost),
+        project: spendBreakdown(breakdownEvents, "project", comparableBreakdown, breakdownCost),
+        team_owner: spendBreakdown(breakdownEvents, "team_owner", comparableBreakdown, breakdownCost),
+        feature: spendBreakdown(breakdownEvents, "feature", comparableBreakdown, breakdownCost),
+        customer: spendBreakdown(breakdownEvents, "customer", comparableBreakdown, breakdownCost),
+        product: spendBreakdown(breakdownEvents, "product", comparableBreakdown, breakdownCost),
+        workload: spendBreakdown(breakdownEvents, "workload", comparableBreakdown, breakdownCost),
+        workflow: spendBreakdown(breakdownEvents, "workflow", comparableBreakdown, breakdownCost),
+        session_id: spendBreakdown(breakdownEvents, "session_id", comparableBreakdown, breakdownCost),
+        environment: spendBreakdown(breakdownEvents, "environment", comparableBreakdown, breakdownCost),
+        customer_product: spendBreakdown(breakdownEvents, "customer_product", comparableBreakdown, breakdownCost),
       },
+      currency_slices: currencySlices(events),
     };
   }
 
   function buildReview(rows, rawOptions = {}) {
-    const events = normalizeRows(rows, rawOptions);
-    const reviewOptions = { ...rawOptions, source_rows: rows };
+    if (!Array.isArray(rows) || rows.length + (rows.__import_issues || []).length > MAX_ROWS) throw new Error("Supply 1 to 20,000 request rows.");
+    const issues = [...(rows.__import_issues || [])];
+    const validRows = [];
+    if (rawOptions.quarantine_invalid_rows) {
+      rows.forEach((row, index) => {
+        try {
+          normalizeRows([row], rawOptions);
+          validRows.push(row);
+        } catch (error) {
+          issues.push({ row: row?.__source_row ?? index + 1, reason: error.message });
+        }
+      });
+    } else {
+      if (issues.length) throw new Error(`Request log record ${issues[0].row}: ${issues[0].reason}`);
+      validRows.push(...rows);
+    }
+    if (!validRows.length) {
+      const error = new Error("No valid request rows remain. Download the issue list and correct the source file.");
+      error.import_issues = issues;
+      error.source_rows = rows.length + (rows.__import_issues || []).length;
+      throw error;
+    }
+    const events = normalizeRows(validRows, rawOptions);
+    const reviewOptions = { ...rawOptions, source_rows: validRows, period_complete_confirmed: issues.length ? false : rawOptions.period_complete_confirmed };
+    if (issues.length) {
+      for (const [field] of OPERATING_COST_CATEGORIES) reviewOptions[field] = null;
+    }
     const priced = events.filter((event) => event.selected_cost !== null);
     const pricedCurrencies = [...new Set(priced.map((event) => event.currency).filter(Boolean))];
     const pricedCurrencyMissing = priced.some((event) => !event.currency);
@@ -1254,6 +1338,8 @@
       : String(rawOptions.billed_currency).trim().toUpperCase();
     if (billCurrency && !/^[A-Z]{3}$/.test(billCurrency)) throw new Error("Billed currency must be a three-letter code.");
     const billScopeConfirmed = Boolean(rawOptions.bill_scope_confirmed);
+    const billProviders = new Set(events.map((event) => event.provider).filter(Boolean));
+    const providerScopeUnclear = billProviders.size > 1;
     const selectedObservedCost = priced.length
       ? priced.reduce((sum, event) => sum + event.selected_cost, 0)
       : null;
@@ -1262,7 +1348,9 @@
     let billDifference = null;
     let billDuplicateExcludedDifference = null;
     if (billTotal !== null) {
-      if (!billScopeConfirmed) billStatus = "SCOPE_NOT_CONFIRMED";
+      if (issues.length) billStatus = "ROWS_EXCLUDED";
+      else if (!billScopeConfirmed) billStatus = "SCOPE_NOT_CONFIRMED";
+      else if (providerScopeUnclear) billStatus = "PROVIDER_SCOPE_UNCLEAR";
       else if (priced.length !== events.length) billStatus = "REQUEST_COST_MISSING";
       else if (mixedCurrency) billStatus = "MIXED_CURRENCY";
       else if (pricedCurrencyMissing) billStatus = "REQUEST_CURRENCY_MISSING";
@@ -1302,14 +1390,21 @@
       method: "Unverified user-entered total minus selected request cost after scope confirmation. The duplicate-excluded difference retains the first source row in each repeated-ID group as a review reference only; no row is deleted or presumed invalid.",
     };
     const spend = spendSummary(events, reviewOptions, reviewCurrency, selectedObservedCost, !currencyNotComparable);
+    const primarySlice = currencyNotComparable ? [...spend.currency_slices].sort((a, b) => b.rows - a.rows || b.priced_rows - a.priced_rows || a.currency.localeCompare(b.currency))[0] : null;
+    const comparableCurrencyReview = primarySlice ? (() => {
+      const subset = events.filter((event) => event.currency === primarySlice.currency);
+      const subsetFindings = analyzeEvents(subset, rawOptions.catalog || null);
+      return { currency: primarySlice.currency, rows: subset.length, priced_rows: primarySlice.priced_rows, findings: subsetFindings, headline: headline(subsetFindings) };
+    })() : null;
     return {
       schema_version: REVIEW_SCHEMA,
       generated_at: rawOptions.generated_at || new Date().toISOString(),
       application_version: "1.0.0",
       pricing_catalog_version: rawOptions.catalog?.catalog_version || null,
-      source: { name: rawOptions.source_name || "Local request-log import", adapter: detectAdapter(rows), sha256: rawOptions.source_file_hash || null, uploaded: false },
+      source: { name: rawOptions.source_name || "Local request-log import", adapter: detectAdapter(validRows), sha256: rawOptions.source_file_hash || null, uploaded: false },
       currency: reviewCurrency,
       event_count: events.length,
+      import_coverage: { source_rows: rows.length + (rows.__import_issues || []).length, analyzed_rows: events.length, excluded_rows: issues.length, issues },
       events,
       reconciliation: {
         provider_reported_cost: currencyNotComparable || reportedCost === null ? null : round(reportedCost),
@@ -1326,10 +1421,11 @@
       evidence_layers: evidenceLayers(events, bill),
       findings,
       headline: reviewHeadline,
+      comparable_currency_review: comparableCurrencyReview,
       evidence_gate: {
         status: "OBSERVED_REQUEST_REVIEW",
         savings_claim_allowed: false,
-        reason: "Request-level findings identify investigation and verification targets. They do not prove realized savings.",
+        reason: `${issues.length ? `${issues.length} source row(s) were excluded. All findings and costs cover valid rows only; bill reconciliation, run rate, and whole-log conclusions are blocked. ` : ""}Request-level findings identify investigation and verification targets. They do not prove realized savings.`,
       },
       privacy: { parsed_locally: true, prompt_text_required: false, prompt_text_stored: false, source_file_uploaded: false },
     };
@@ -1348,5 +1444,10 @@
     return `${fields.join(",")}\n${review.events.map((event) => fields.map((field) => csvCell(event[field])).join(",")).join("\n")}\n`;
   }
 
-  return Object.freeze({ SCHEMA, REVIEW_SCHEMA, aliases, normalizeRows, analyzeEvents, buildReview, normalizedCsv, detectAdapter, spendSummary, operationalSummary, periodVariance, budgetSummary, operatingCostStack, allocationSummary, evidenceLayers });
+  function issuesCsv(review) {
+    if (!review?.import_coverage) throw new Error("A usage review is required.");
+    return `source_row,reason\n${review.import_coverage.issues.map((issue) => [issue.row, issue.reason].map(csvCell).join(",")).join("\n")}\n`;
+  }
+
+  return Object.freeze({ SCHEMA, REVIEW_SCHEMA, aliases, normalizeRows, analyzeEvents, buildReview, normalizedCsv, issuesCsv, detectAdapter, spendSummary, operationalSummary, periodVariance, budgetSummary, operatingCostStack, allocationSummary, evidenceLayers });
 });

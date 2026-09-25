@@ -95,6 +95,40 @@ console.log(JSON.stringify(decide(JSON.parse(process.argv[1]))));
     assert decision["posture"] == "FUND CHANGE"
 
 
+@pytest.mark.parametrize(
+    "ready,interval,expected",
+    [
+        (0.7, [0.52, 0.83], "QUALITY INCONCLUSIVE"),
+        (26 / 30, [0.70, 0.95], "QUALITY INCONCLUSIVE"),
+        (0.6, [0.45, 0.75], "QUALITY BELOW MINIMUM"),
+    ],
+)
+def test_sample_quality_verdict_uses_the_same_range_as_evidence(
+    ready, interval, expected
+):
+    script = """
+const fs = require('fs');
+let source = fs.readFileSync('web/app.js', 'utf8');
+source = source.replace('  function renderAll() {', '  globalThis.decide = decisionFor; return;\\n  function renderAll() {');
+eval(source);
+const ready = Number(process.argv[1]);
+const interval = JSON.parse(process.argv[2]);
+const data = {experience:'simple', workload:{accepted_quality_threshold:0.8},
+  baseline:{measures:{cost_per_usable_result:5}},
+  proposed:{measures:{cost_per_usable_result:4,usable_result_rate:ready},outcomes:{basis:'sampled',sample_method:'declared random or systematic',ready_rate_interval_95:interval}},
+  comparison:{quality_holds:ready>=0.8,both_policy_approved:true,human_cost_included:true,savings_claim_allowed:false}};
+console.log(JSON.stringify(decide(data)));
+"""
+    result = subprocess.run(
+        ["node", "-e", script, str(ready), json.dumps(interval)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert json.loads(result.stdout)["code"] == expected
+
+
 def test_simple_evidence_is_not_a_provider_invoice():
     app = (ROOT / "web/app.js").read_text()
     simple = app.split('if (state.builderMode === "simple") {', 1)[1].split(
@@ -114,6 +148,7 @@ const elements = {};
 const element = id => elements[id] ||= {textContent:'',innerHTML:'',value:'',hidden:false,style:{},dataset:{},classList:{add(){},remove(){},toggle(){}},setAttribute(){},replaceChildren(){},querySelectorAll(){return []}};
 global.document = {getElementById:element,querySelector:element,querySelectorAll:()=>[],body:element('body')};
 global.window = {scrollTo(){}};
+global.AICostLensEvidenceTools = require('./web/evidence-tools.js');
 let source = fs.readFileSync('web/app.js','utf8');
 source = source.replace('  function renderAll() {', '  globalThis.api = {validDate, finiteNumber, buildSampledReview: buildSimpleReview, validateResult, renderAll, updateBreakEvenExplorer, lumenResponse, setData(d){state.data=d}}; return;\n  function renderAll() {');
 eval(source);
@@ -121,7 +156,7 @@ const config = {acceptanceRule:'First-pass usable',verifier:'Test reviewer',qual
 const header = 'period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,cost_basis,currency';
 async function build(a,b,minutesA=30,minutesB=200,readyB=16,overrides={}) {
  const csv = header+'\nbaseline,2026-09-01,Same tasks,A,A,Current,40,0,0,0,0,'+a+',calculated,USD\nproposed,2026-09-01,Same tasks,B,B,Other,40,0,0,0,0,'+b+',calculated,USD';
- const result = await api.buildSampledReview(csv,{baseline:{population:40,ready:19,correction:1,escalation:0,humanMinutes:minutesA},proposed:{population:40,ready:readyB,correction:20-readyB,escalation:0,humanMinutes:minutesB}},{...config,...overrides});
+ const result = await api.buildSampledReview(csv,{baseline:{population:overrides.samplePopulationOverride||40,ready:19,correction:1,escalation:0,humanMinutes:minutesA},proposed:{population:40,ready:readyB,correction:20-readyB,escalation:0,humanMinutes:minutesB}},{...config,...overrides});
  result.experience="simple"; return result;
 }
 function render(d,code) {
@@ -139,6 +174,7 @@ function render(d,code) {
  assert.equal(api.validDate('2024-02-29','Date'),'2024-02-29');
  assert.throws(()=>api.finiteNumber('9007199254740992','Count',{integer:true}), /number/);
  const d = await build(40,20);
+ await assert.rejects(build(40,20,30,200,16,{samplePopulationOverride:1000}), /results but only/);
  assert.equal(d.baseline.costs.recurring_operating_cost,70);
  assert.equal(d.proposed.costs.recurring_operating_cost,220);
  assert.equal(d.baseline.outcomes.usable_results,38);
@@ -158,7 +194,7 @@ function render(d,code) {
  assert.ok(elements['unit-cost-chart'].innerHTML.includes('Recurring cost per ready result'));
  assert.ok(!elements['unit-cost-chart'].innerHTML.includes('Recurring operating cost'));
 
- render(await build(40,20,0,0,16),'QUALITY INCONCLUSIVE');
+ render(await build(40,20,0,0,16),'TEST FIRST');
  render(await build(40,1,0,0,10),'QUALITY BELOW MINIMUM');
  render(await build(40,1,0,0,19,{proposedPolicyApproved:false}),'CHECK APPROVAL');
  render(await build(0,20,0,0,19),'KEEP CURRENT ROUTE');
@@ -166,7 +202,7 @@ function render(d,code) {
  render(await build(0,0,0,0,19),'NO COST ADVANTAGE');
  assert.equal(elements['break-even-verdict'].textContent,'NO COST ADVANTAGE');
  render(await build(40,40,0,0,19),'NO COST ADVANTAGE');
- render(await build(1000000,500000,0,0,19),'QUALITY INCONCLUSIVE');
+ render(await build(1000000,500000,0,0,19),'TEST FIRST');
  await assert.rejects(build(40,20,0,0,0), /zero usable outputs/);
  const tampered = JSON.parse(JSON.stringify(d)); tampered.proposed.measures.cost_per_usable_result = .001;
  assert.throws(()=>api.validateResult(tampered), /inconsistent|validation failed/);
@@ -191,7 +227,8 @@ const element = id => elements[id] ||= {textContent:'',innerHTML:'',value:'',sty
 global.document = {getElementById:element,querySelector:element,querySelectorAll:()=>[],body:element('body'),createElement:()=>element('anchor')};
 let printed = false, blob;
 global.window = {scrollTo(){},setTimeout(){},addEventListener(){},print(){printed=true;assert.ok(classes.has('printing-memo'));assert.equal(elements['memo-decision-code'].textContent,'QUALITY BELOW MINIMUM')}};
-global.URL = {createObjectURL(b){blob=b;return 'blob:test'},revokeObjectURL(){}};
+    global.URL = {createObjectURL(b){blob=b;return 'blob:test'},revokeObjectURL(){}};
+    global.AICostLensEvidenceTools = require('./web/evidence-tools.js');
 let source = fs.readFileSync('web/app.js','utf8');
 source = source.replace('  function renderAll() {','  globalThis.useRecord = d => {state.data=d;renderAll()};\n  function renderAll() {');
 source = source.replace('  loadDemo().catch((error) => showToast(error.message));','');

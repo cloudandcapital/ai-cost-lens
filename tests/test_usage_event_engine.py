@@ -67,6 +67,42 @@ console.log(JSON.stringify(review));
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_invalid_request_rows_remain_scoped_and_block_whole_log_finance():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const rows = Array.from({length: 7}, (_, index) => ({
+  event_id: `valid-${index}`, timestamp: `2026-09-0${index + 1}T12:00:00Z`,
+  provider: "OpenAI", model: "gpt-5.6-sol", provider_reported_cost: 10, currency: "USD",
+}));
+rows.splice(3, 0, {event_id:"bad", timestamp:"2026-09-04T12:00:00Z", provider_reported_cost:"oops", currency:"USD"});
+const review = engine.buildReview(rows, {
+  quarantine_invalid_rows:true, period_complete_confirmed:true, bill_scope_confirmed:true,
+  billed_total:70, billed_currency:"USD", compute_cost:2,
+});
+let allInvalid;
+try {
+  engine.buildReview([{event_id:"bad", provider_reported_cost:"oops"}], {quarantine_invalid_rows:true});
+} catch (error) {
+  allInvalid = {reason:error.message, issues:error.import_issues};
+}
+console.log(JSON.stringify({review, issues:engine.issuesCsv(review), allInvalid}));
+""",
+        ENGINE,
+    )
+    review = result["review"]
+    assert review["import_coverage"]["source_rows"] == 8
+    assert review["import_coverage"]["analyzed_rows"] == 7
+    assert review["import_coverage"]["issues"][0]["row"] == 4
+    assert "provider-reported cost" in result["issues"]
+    assert review["reconciliation"]["bill"]["status"] == "ROWS_EXCLUDED"
+    assert review["reconciliation"]["bill"]["raw_selected_cost_difference"] is None
+    assert review["spend"]["run_rate_status"] == "NOT_SUPPORTED"
+    assert review["spend"]["cost_stack"]["status"] != "COMPLETE"
+    assert result["allInvalid"]["issues"][0]["row"] == 1
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_catalog_cost_requires_explicit_pricing_inputs_and_matching_currency_date():
     result = run_node(
         r"""
@@ -248,13 +284,29 @@ console.log(JSON.stringify(engine.buildReview(rows, {generated_at: "2026-09-21T0
     assert result["currency"] == "MIXED"
     assert result["reconciliation"]["selected_observed_cost"] is None
     assert result["spend"]["selected_cost"] is None
+    assert [
+        (item["currency"], item["selected_cost"], item["priced_rows"])
+        for item in result["spend"]["currency_slices"]
+    ] == [("EUR", 8, 1), ("USD", 10, 1)]
     assert result["spend"]["cost_per_priced_request"] is None
     assert result["spend"]["projected_30_day_cost"] is None
-    assert all(
-        item["selected_cost"] is None
-        for rows in result["spend"]["breakdowns"].values()
-        for item in rows
+    assert result["comparable_currency_review"]["currency"] == "EUR"
+    assert (
+        result["comparable_currency_review"]["headline"][
+            "conservative_non_additive_opportunity"
+        ]
+        == 8
     )
+    assert result["spend"]["breakdowns"]["workload"] == [
+        {
+            "label": "Route B",
+            "event_count": 1,
+            "priced_rows": 1,
+            "selected_cost": 8,
+            "average_selected_cost_per_priced_row": 8,
+            "share_of_selected_cost": 1,
+        }
+    ]
     assert result["headline"]["conservative_non_additive_opportunity"] is None
     assert "No cross-currency amount" in result["headline"]["method"]
     assert all(
@@ -300,6 +352,36 @@ console.log(JSON.stringify(engine.buildReview(rows, {catalog, generated_at: "202
     assert "does not prove" in candidate["explanation"]
     assert result["headline"]["conservative_non_additive_opportunity"] is None
     assert result["evidence_gate"]["savings_claim_allowed"] is False
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_long_expensive_session_is_investigated_without_imaginary_savings():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const catalog = require(process.argv[2]);
+const rows = Array.from({length: 30}, (_, index) => ({
+  event_id: `step-${index}`, session_id: "agent-run-1", workload: "Research",
+  timestamp: new Date(Date.UTC(2026, 8, 20, 0, index)).toISOString(),
+  provider: "OpenAI", model: "gpt-6-astra", input_tokens: 1000 + index * 100,
+  output_tokens: 100, cached_input_tokens: 0, cost_usd: 4, currency: "USD",
+  outcome_status: index === 29 ? "ready_to_use" : "",
+}));
+rows.push({event_id: "other", session_id: "other-session", workload: "Research", provider: "OpenAI", model: "gpt-6-astra", input_tokens: 2000, output_tokens: 100, cached_input_tokens: 0, cost_usd: 180, currency: "USD", outcome_status: "ready_to_use"});
+const review = engine.buildReview(rows, {catalog, generated_at: "2026-09-21T00:00:00Z"});
+console.log(JSON.stringify(review));
+""",
+        ENGINE,
+        CATALOG,
+    )
+    by_id = {finding["id"]: finding for finding in result["findings"]}
+    session = by_id["high-cost-multistep-session"]
+    assert "30 calls" in session["explanation"]
+    assert "40%" in session["explanation"]
+    assert "Input tokens rose" in session["explanation"]
+    assert session["estimated_avoidable_cost"] is None
+    assert session["headline_eligible"] is False
+    assert "spend-without-outcome-evidence" not in by_id
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -862,7 +944,9 @@ def test_usage_event_and_review_schemas_are_versioned_and_fail_closed():
     assert reconciliation["additionalProperties"] is False
     assert reconciliation["properties"]["bill"]["properties"]["status"]["enum"] == [
         "NOT_SUPPLIED",
+        "ROWS_EXCLUDED",
         "SCOPE_NOT_CONFIRMED",
+        "PROVIDER_SCOPE_UNCLEAR",
         "REQUEST_COST_MISSING",
         "MIXED_CURRENCY",
         "REQUEST_CURRENCY_MISSING",
@@ -1094,3 +1178,19 @@ console.log(JSON.stringify(engine.buildReview(rows,{catalog}).events.map(event =
     )
     assert result[0]["basis"] == "unpriced"
     assert result[1]["basis"] == "calculated"
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_multi_provider_bill_cannot_be_comparable_by_checkbox_alone():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const rows = [
+  {event_id:'a',provider:'OpenAI',provider_reported_cost:5,currency:'USD'},
+  {event_id:'b',provider:'Anthropic',provider_reported_cost:7,currency:'USD'}];
+console.log(JSON.stringify(engine.buildReview(rows,{billed_total:12,billed_currency:'USD',bill_scope_confirmed:true})));
+""",
+        ENGINE,
+    )
+    assert result["reconciliation"]["bill"]["status"] == "PROVIDER_SCOPE_UNCLEAR"
+    assert result["reconciliation"]["bill"]["raw_selected_cost_difference"] is None

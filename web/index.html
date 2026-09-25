@@ -36,7 +36,7 @@
           <button class="text-button price-prompt-launch" id="price-prompt" type="button">Price a prompt</button>
           <button class="text-button" id="review-usage" type="button">Review AI usage</button>
           <button class="text-button" id="story-toggle" type="button">Presentation view</button>
-          <button class="text-button" id="download-review" type="button" title="Save the complete machine-readable review">Download decision record (JSON)</button>
+          <button class="text-button" id="download-review" type="button" title="Save this route or bill review; verification and actuals have separate downloads">Download decision record (JSON)</button>
           <button class="text-button" id="print-memo" type="button" title="Open the print dialog, where you can save the memo as a PDF">Print finance memo</button>
           <button class="file-button primary-action" id="start-review" type="button">Start a review</button>
           <button class="text-button" id="open-review" type="button">Open saved review</button>
@@ -170,6 +170,22 @@
             <button type="button" id="start-review-inline">Use my own numbers</button>
           </div>
           <p class="growth-projection" id="growth-projection" hidden></p>
+          <section class="growth-planner" id="growth-planner" hidden aria-labelledby="growth-planner-title">
+            <div>
+              <p class="kicker">STARTUP UNIT ECONOMICS</p>
+              <h2 id="growth-planner-title">Would the margin hold as usage grows?</h2>
+              <p>Try your own sale price per ready result. Both routes keep their example ready rates; infrastructure can stay fixed while model and review costs scale.</p>
+            </div>
+            <div class="growth-inputs">
+              <label>Revenue per ready result ($)<input id="growth-revenue" type="number" min="0" step="0.01" placeholder="Enter your price" /></label>
+              <label>Infrastructure fixed share (%)<input id="growth-fixed" type="number" min="0" max="100" step="1" value="100" /></label>
+              <label>Model rate discount (%)<input id="growth-discount" type="number" min="0" max="100" step="1" value="0" /></label>
+              <label>Human review effort retained (%)<input id="growth-review" type="number" min="0" max="100" step="1" value="100" /></label>
+            </div>
+            <p id="growth-planner-message" role="status">Enter revenue to see a modeled gross margin at 1×, 2×, 5×, and 10× volume.</p>
+            <div class="growth-results" id="growth-results" role="region" aria-label="Modeled margin at growth" tabindex="0"></div>
+            <p class="growth-assumptions">Illustrative scenario only. Revenue applies to ready results; the entered discount applies to both model bills; review effort uses the entered share at every volume. Quality, prices, fixed costs, demand, and capacity may change. One-time change cost is excluded from gross margin.</p>
+          </section>
 
           <section class="truth-section share-card" aria-labelledby="truth-title">
             <div class="truth-heading">
@@ -238,6 +254,21 @@
             </details>
           </section>
 
+          <section class="evidence-receipt" id="evidence-receipt" aria-labelledby="receipt-title">
+            <div class="section-heading">
+              <div><p class="kicker">THE RECEIPT</p><h2 id="receipt-title">What one ready result costs</h2></div>
+              <button class="text-button" id="download-receipt" type="button">Save receipt as image (SVG)</button>
+            </div>
+            <p>Model usage is one part of the cost. The evidence label travels with the numbers.</p>
+            <div class="receipt-grid" id="receipt-grid"></div>
+            <p class="receipt-footnote" id="receipt-note"></p>
+          </section>
+
+          <section class="price-crosscheck" id="price-crosscheck" aria-labelledby="price-crosscheck-title" hidden>
+            <div class="section-heading"><div><p class="kicker">TOKEN-TO-COST CHECK</p><h2 id="price-crosscheck-title">Do the tokens support this amount?</h2></div></div>
+            <div id="price-crosscheck-result"></div>
+          </section>
+
           <article class="finding" aria-labelledby="finding-title">
             <div class="finding-mark" aria-hidden="true">↘</div>
             <div>
@@ -280,7 +311,7 @@
                 </div>
                 <div class="planning-table-wrap" role="region" aria-label="Plan and actual comparison" tabindex="0">
                   <table class="planning-table">
-                    <thead><tr><th>Measure</th><th>Plan</th><th>Actual</th><th>Variance</th></tr></thead>
+                    <thead><tr><th>Measure</th><th>Plan</th><th>Actual</th><th>Variance (actual − plan)</th></tr></thead>
                     <tbody id="planning-rows"></tbody>
                   </table>
                 </div>
@@ -391,18 +422,24 @@
                 <button class="build-button" id="analyze-request-log" type="button">Analyze locally</button>
               </div>
             </div>
+            <p class="request-format-note">Rows with invalid values or the wrong number of CSV fields are excluded from a scoped review. Download the issue list, correct the source, and analyze again for a whole-log comparison.</p>
             <p class="request-format-note">Use one row per AI request or trace observation. The CLI canonical CSV is a separate period-level billing format and is not interchangeable with this request log.</p>
             <div class="request-reconciliation-inputs">
               <label><span>User-entered billed total (unverified)</span><input id="request-billed-total" type="number" min="0" step="any" placeholder="Not supplied" /><small>Compare with request cost only after checking the same scope. This field does not verify an invoice.</small></label>
-              <label><span>Bill currency</span><input id="request-billed-currency" type="text" maxlength="3" placeholder="USD" /></label>
+              <label><span>Bill currency</span><input id="request-billed-currency" type="text" maxlength="3" placeholder="e.g. USD" /></label>
               <label><span>Request currency fallback</span><input id="request-default-currency" type="text" maxlength="3" placeholder="Only if the file omits it" /></label>
-              <label><span>Optional monthly budget</span><input id="request-monthly-budget" type="number" min="0.01" step="any" placeholder="Not supplied" /></label>
-              <label><span>Budget warning threshold</span><div class="input-suffix"><input id="request-budget-warning" type="number" min="0.1" max="100" step="0.1" value="80" /><em>%</em></div></label>
-              <label><span>Decision allocation field</span><select id="request-allocation-basis"><option value="workload">Workload</option><option value="project">Project</option><option value="team_owner">Team or owner</option><option value="feature">Feature</option><option value="customer">Customer</option><option value="product">Product</option><option value="workflow">Workflow</option><option value="session_id">Session</option><option value="environment">Environment</option></select></label>
-              <label><span>Maximum unallocated cost</span><div class="input-suffix"><input id="request-allocation-warning" type="number" min="0" max="100" step="0.1" value="10" /><em>%</em></div><small>Cost missing the selected ownership field. This threshold is your review policy, not an industry standard.</small></label>
               <label class="check-field"><input id="request-bill-scope-confirmed" type="checkbox" /><span>The bill and request log cover the same provider, account, currency, and period</span></label>
               <label class="check-field"><input id="request-period-complete" type="checkbox" /><span>The log covers one complete, continuous period from its first through last UTC date</span></label>
             </div>
+            <details class="request-data-details request-advanced-settings">
+              <summary>Budget and allocation settings (optional)</summary>
+              <div class="request-reconciliation-inputs">
+                <label><span>Optional monthly budget</span><input id="request-monthly-budget" type="number" min="0.01" step="any" placeholder="Not supplied" /></label>
+                <label><span>Budget warning threshold</span><div class="input-suffix"><input id="request-budget-warning" type="number" min="0.1" max="100" step="0.1" value="80" /><em>%</em></div></label>
+                <label><span>Decision allocation field</span><select id="request-allocation-basis"><option value="workload">Workload</option><option value="project">Project</option><option value="team_owner">Team or owner</option><option value="feature">Feature</option><option value="customer">Customer</option><option value="product">Product</option><option value="workflow">Workflow</option><option value="session_id">Session</option><option value="environment">Environment</option></select></label>
+                <label><span>Maximum unallocated cost</span><div class="input-suffix"><input id="request-allocation-warning" type="number" min="0" max="100" step="0.1" value="10" /><em>%</em></div><small>Cost missing the selected ownership field. This threshold is your review policy, not an industry standard.</small></label>
+              </div>
+            </details>
             <details class="request-data-details request-cost-boundary-inputs">
               <summary>Add compute, data, network, tooling, pipeline, and human costs</summary>
               <p>Use totals for the same period and currency as the request log. Enter only costs not already included in provider request cost or another category. Blank means unknown. Enter zero only when you confirmed there was no cost. AI Cost Lens shows a fully loaded total only when every request is priced and every category is supplied.</p>
@@ -416,6 +453,11 @@
               </div>
             </details>
             <div class="builder-error" id="request-log-error" role="alert"></div>
+            <div class="request-import-issues" id="request-import-issues" hidden role="status">
+                <strong id="request-import-issues-title"></strong>
+                <p id="request-import-issues-copy">Costs and findings cover valid rows only. Bill comparison, run rate, and whole-log claims are unavailable until you correct and reimport the excluded rows.</p>
+                <button class="text-button" id="download-request-issues" type="button">Download issues CSV</button>
+            </div>
             <div id="request-analysis-results" hidden>
               <div class="request-analysis-head">
                 <div><p class="kicker" id="request-analysis-mode">OBSERVED REQUEST REVIEW</p><h3 id="request-analysis-title">What the imported calls support</h3></div>
@@ -426,6 +468,9 @@
               </div>
               <div class="workbench-summary" id="request-analysis-summary"></div>
               <p class="request-analysis-boundary" id="request-analysis-boundary"></p>
+              <div class="opportunity-workbench-list" id="request-finding-list"></div>
+              <details class="request-deep-dive" open>
+                <summary>Spend context and operating signals</summary>
               <section class="request-spend-overview" aria-labelledby="request-spend-overview-title">
                 <div class="request-explorer-head">
                   <div><p class="kicker">SPEND CONTEXT</p><h3 id="request-spend-overview-title">What shaped the imported cost?</h3></div>
@@ -451,7 +496,22 @@
                   <div id="request-variance"></div>
                 </section>
                 <div class="request-spend-breakdowns" id="request-spend-breakdowns"></div>
+                <div id="request-currency-slices" class="request-currency-slices"></div>
               </section>
+              </details>
+              <details class="request-deep-dive" open>
+                <summary>Customer cost to serve</summary>
+              <section class="customer-economics" aria-labelledby="customer-economics-title">
+                <div class="section-heading"><div><p class="kicker">COST TO SERVE</p><h3 id="customer-economics-title">Which customers carry the AI cost?</h3></div><span class="mode-tag">OPTIONAL · LOCAL CSV</span></div>
+                <p>Join customer IDs from this request log to revenue covering the log dates in the same currency. Extra days in the revenue period make the cost share a lower bound. Optionally spread entered operating costs, with missing and unattributed amounts shown.</p>
+                <div class="request-reconciliation-inputs"><label><span>Spread entered operating costs</span><select id="customer-allocation-method"><option value="none">Keep unallocated</option><option value="requests">By request count (estimate)</option><option value="cost">By request cost (estimate)</option></select><small>Uses only compute, data, network, tools, pipeline and human costs entered above. Missing categories remain missing.</small></label><label><span>Optional AI cost / revenue warning</span><div class="input-suffix"><input id="customer-share-warning" type="number" min="0.1" max="1000" step="0.1" placeholder="Your threshold" /><em>%</em></div></label><label class="check-field"><input id="customer-normalize-ids" type="checkbox" /><span>Match customer IDs ignoring case and surrounding spaces</span></label></div>
+                <div class="request-import-row"><label><span>Customer revenue CSV</span><input id="customer-revenue-file" type="file" accept=".csv,text/csv" /><small>Columns: customer, period_start, period_end, revenue, currency. One row per customer; up to 5 MiB. Replace the template's example row with your own records.</small></label><div class="request-import-actions"><a class="text-button" href="templates/ai-cost-lens-customer-revenue-template.csv" download>Download template</a><button class="text-button" id="try-customer-economics" type="button">Try illustrative revenue</button><button class="build-button" id="analyze-customer-revenue" type="button">Compare locally</button></div></div>
+                <p id="customer-revenue-error" class="builder-error" role="alert"></p>
+                <div id="customer-revenue-result" aria-live="polite" hidden></div>
+              </section>
+              </details>
+              <details class="request-deep-dive" open>
+                <summary>Request rows and filters</summary>
               <section class="request-event-explorer" aria-labelledby="request-event-explorer-title">
                 <div class="request-explorer-head">
                   <div><p class="kicker">LOCAL SPEND EXPLORER</p><h3 id="request-event-explorer-title">Trace the finding back to its rows</h3></div>
@@ -475,7 +535,7 @@
                 </div>
                 <p class="request-row-limit" id="request-row-limit"></p>
               </section>
-              <div class="opportunity-workbench-list" id="request-finding-list"></div>
+              </details>
               <details class="request-data-details">
                 <summary>Import coverage and limitations</summary>
                 <div id="request-import-coverage"></div>
@@ -552,14 +612,14 @@
               </div>
               <span class="mode-tag">OUTPUTS ARE NOT SAVED</span>
             </div>
-            <p class="paired-verification-intro">Import one baseline row and one candidate row for every case. AI Cost Lens can check valid JSON, required or forbidden terms, required JSON fields, an exact label, and a maximum length. Human outcomes and review time remain separate evidence.</p>
+            <p class="paired-verification-intro">Import one baseline row and one candidate row for every case. AI Cost Lens can check valid JSON, required or forbidden terms, required JSON fields, an exact label, and a maximum length. Separate multiple terms or JSON fields with a semicolon (;), as shown in the separate illustrative example. Human outcomes and review time remain separate evidence.</p>
             <div class="verification-import-grid">
               <label class="field-wide">
                 <span>Paired verification CSV</span>
                 <input id="verification-file" type="file" accept=".csv,text/csv" />
                 <small id="verification-file-status">The file is read only in this browser. Raw output text is discarded from the saved verification record.</small>
               </label>
-              <div class="verification-template-action"><a class="text-button" href="templates/ai-cost-lens-verification-template.csv" download>Download blank template</a></div>
+              <div class="verification-template-action"><a class="text-button" href="templates/ai-cost-lens-verification-template.csv" download>Download blank template</a><a class="text-button" href="templates/ai-cost-lens-verification-example.csv" download>See illustrative example</a></div>
             </div>
             <div class="verification-control-grid">
               <label><span>Minimum deterministic pass rate</span><div class="input-suffix"><input id="verification-check-floor" type="number" min="0" max="100" step="0.1" value="100" /><em>%</em></div></label>
@@ -620,6 +680,13 @@
 
           <div class="evidence-grid" id="evidence-grid"></div>
 
+          <section class="evidence-kit" aria-labelledby="evidence-kit-title">
+            <div class="section-heading"><div><p class="kicker">NEXT RECORDS TO COLLECT</p><h2 id="evidence-kit-title">Make the next test count</h2></div><div><button class="text-button" id="download-evidence-kit" type="button">Download action list</button><button class="text-button" id="download-workspace" type="button" title="Archive the current decision, request analysis, customer cost, verification, growth scenario, and actuals when present">Download workspace archive</button></div></div>
+            <p>The workspace archive includes completed sections and customer IDs when supplied. Keep it private. “Open saved review” accepts the decision record separately.</p>
+            <ol id="evidence-kit-list"></ol>
+            <div class="sample-planner"><label><span>Ready-rate precision target (± percentage points)</span><input id="sample-margin" type="number" min="1" max="20" step="1" value="5" /></label><p id="sample-size-result" role="status"></p><a class="text-button" href="templates/ai-cost-lens-work-log-template.csv" download>Download outcome log template</a></div>
+          </section>
+
           <section class="boundary-note">
             <div>
               <p class="kicker">ACCOUNTING BOUNDARY</p>
@@ -637,7 +704,7 @@
           <div class="section-page-title">
             <p class="kicker">ACTUALS</p>
             <h1 id="actuals-title">Did the savings appear after the change?</h1>
-            <p>Normalize for ready-result volume, subtract implementation cost, and keep the result out of “realized” until every evidence gate passes. Amounts stay in the review currency; no conversion is applied.</p>
+            <p>Enter the post-change period from your records. Compare recurring costs at the same ready-result volume, then show any one-time implementation cost separately. Amounts stay in the review currency.</p>
           </div>
           <form class="workbench-form actuals-form" id="actuals-form" novalidate>
             <div class="actuals-period-grid">
@@ -650,6 +717,7 @@
               </fieldset>
               <fieldset>
                 <legend>Post-change period</legend>
+                <p>Enter observed post-change figures here. A proposed route is not an actual result.</p>
                 <label><span>Period label</span><input id="actuals-post-period" type="text" placeholder="September 2026" /></label>
                 <label><span>Recurring cost</span><input id="actuals-post-cost" type="number" min="0" step="0.01" /></label>
                 <label><span>Completed results</span><input id="actuals-post-volume" type="number" min="1" step="1" /></label>
@@ -675,7 +743,9 @@
             <div class="actuals-result-head"><div><p class="kicker">SAVINGS LEDGER</p><h2 id="actuals-status"></h2></div><button class="text-button" id="download-actuals" type="button">Download ledger (JSON)</button></div>
             <div class="savings-stages" id="savings-stages" role="region" aria-label="Savings evidence stages" tabindex="0"></div>
             <div class="savings-waterfall" id="savings-waterfall"></div>
+            <p>One-time implementation cost is deducted in this period only. The recurring difference excludes it; subsequent periods need their own actuals.</p>
             <p class="actuals-conclusion" id="actuals-conclusion"></p>
+            <div id="actuals-open-gates" role="status"></div>
           </section>
         </section>
       </main>
@@ -765,32 +835,12 @@
           <p>Use non-negative costs after documented discounts. Reconcile credits and refunds first, and use the same gross or net basis on both sides.</p>
         </div>
 
-        <section class="maturity-ladder" aria-label="AI cost review depth">
-          <div>
-            <small>CRAWL</small>
-            <strong>Understand the bill</strong>
-            <span>Start with cost. Usage, retries, outcomes, and human effort can all be blank.</span>
-          </div>
-          <div>
-            <small>WALK</small>
-            <strong>Explain the usage</strong>
-            <span>Add requests, tokens, models, routes, or cache data when your source provides them.</span>
-          </div>
-          <div>
-            <small>RUN</small>
-            <strong>Connect cost to outcomes</strong>
-            <span>Add ready results when you need to test value. Human effort remains optional.</span>
-          </div>
-        </section>
-        <p class="maturity-note">These labels describe the depth of this review, not a formal FinOps maturity rating. Start with the records you already have.</p>
-
-        <p class="builder-choice-label">What would help you today?</p>
+        <p class="builder-choice-label">Choose what you have. You can add more evidence later.</p>
         <div class="builder-mode-choice" role="group" aria-label="Choose how to start">
-          <button class="builder-mode builder-mode-featured" data-builder-mode="price" type="button" aria-pressed="false">
-            <small>NO FILES · LOCAL CALCULATOR</small>
-            <strong>Price a prompt</strong>
-            <span>Compare direct API costs, cache, batch, retries, and cost per expected usable result.</span>
-            <em>FASTEST WAY TO ESTIMATE A WORKLOAD</em>
+          <button class="builder-mode builder-mode-featured" data-builder-mode="single" type="button" aria-pressed="false">
+            <small>BILL OR SUBSCRIPTION</small>
+            <strong>Start with a bill</strong>
+            <span>Enter a total and period. Add usage or outcomes when you have them.</span>
           </button>
           <button class="builder-mode builder-mode-featured" data-builder-mode="usage" type="button" aria-pressed="false">
             <small>CSV OR JSON · LOCAL ANALYSIS</small>
@@ -798,11 +848,14 @@
             <span>Find spend drivers, budget risk, operational patterns, variance, and credible optimization targets.</span>
             <em>BEST FOR REQUEST OR TRACE EXPORTS</em>
           </button>
-          <button class="builder-mode builder-mode-simple" data-builder-mode="simple" type="button" aria-pressed="false">
+          <button class="builder-mode builder-mode-featured" data-builder-mode="simple" type="button" aria-pressed="false">
             <small>SIMPLE · NO FILES NEEDED</small>
-            <strong>Compare two AI tools or plans</strong>
+            <strong>Compare two options</strong>
             <span>For subscriptions, solo work, and small teams. Enter two monthly costs and check a small sample of work.</span>
-            <em>START HERE FOR A QUICK COMPARISON</em>
+          </button>
+          <details class="builder-more-paths"><summary>Other ways to start <span>Prompt price, file upload, detailed comparison, and examples</span></summary><div class="builder-more-grid">
+          <button class="builder-mode" data-builder-mode="price" type="button" aria-pressed="false">
+            <small>NO FILES · LOCAL CALCULATOR</small><strong>Price a prompt</strong><span>Compare API prices, cache, batch, retries, and expected usable results.</span>
           </button>
           <button class="builder-mode builder-mode-featured" data-builder-mode="growth-example" type="button" aria-pressed="false">
             <small>ILLUSTRATIVE · NO FILES NEEDED</small>
@@ -815,11 +868,6 @@
             <strong>See a cheaper bill backfire</strong>
             <span>Follow a lower provider bill that turns into more expensive work.</span>
           </button>
-          <button class="builder-mode" data-builder-mode="single" type="button" aria-pressed="false">
-            <small>ANY PROVIDER · START WITH COST</small>
-            <strong>Understand one bill</strong>
-            <span>Get a cost baseline and practical next steps. Usage, outcomes, retries, and human effort are optional.</span>
-          </button>
           <button class="builder-mode" data-builder-mode="openai" type="button" aria-pressed="false">
             <small>OPENAI OR CLAUDE · START HERE</small>
             <strong>Upload what you have</strong>
@@ -830,6 +878,7 @@
             <strong>Compare cost per ready result</strong>
             <span>Use universal spend and work templates for any provider, including OpenAI.</span>
           </button>
+          </div></details>
         </div>
 
         <p class="builder-path-help" id="builder-path-help">Not sure? Start with one bill. The review becomes more detailed as you add the usage or outcome data you already have.</p>
@@ -1073,21 +1122,21 @@
                 <fieldset class="sample-route-card">
                   <legend>Current route</legend>
                   <div class="sample-field-grid">
-                    <label><span>Results in period</span><input id="baseline-population" type="number" min="1" step="1" value="1000" /></label>
-                    <label><span>Ready in sample</span><input id="baseline-ready" type="number" min="1" step="1" value="22" /></label>
-                    <label><span>Still needs correction</span><input id="baseline-correction" type="number" min="0" step="1" value="6" /></label>
-                    <label><span>Needs escalation</span><input id="baseline-escalation" type="number" min="0" step="1" value="2" /></label>
-                    <label class="field-wide"><span>Total human minutes in sample</span><input id="baseline-human-minutes" type="number" min="0" step="0.1" value="120" /></label>
+                    <label><span>Results in period</span><input id="baseline-population" type="number" min="1" step="1" placeholder="Enter your count" /></label>
+                    <label><span>Ready in sample</span><input id="baseline-ready" type="number" min="1" step="1" placeholder="Enter your count" /></label>
+                    <label><span>Still needs correction</span><input id="baseline-correction" type="number" min="0" step="1" placeholder="Enter 0 if none" /></label>
+                    <label><span>Needs escalation</span><input id="baseline-escalation" type="number" min="0" step="1" placeholder="Enter 0 if none" /></label>
+                    <label class="field-wide"><span>Total human minutes in sample</span><input id="baseline-human-minutes" type="number" min="0" step="0.1" placeholder="Enter your minutes" /></label>
                   </div>
                 </fieldset>
                 <fieldset class="sample-route-card">
                   <legend>Proposed route</legend>
                   <div class="sample-field-grid">
-                    <label><span>Results in period</span><input id="proposed-population" type="number" min="1" step="1" value="1000" /></label>
-                    <label><span>Ready in sample</span><input id="proposed-ready" type="number" min="1" step="1" value="24" /></label>
-                    <label><span>Still needs correction</span><input id="proposed-correction" type="number" min="0" step="1" value="5" /></label>
-                    <label><span>Needs escalation</span><input id="proposed-escalation" type="number" min="0" step="1" value="1" /></label>
-                    <label class="field-wide"><span>Total human minutes in sample</span><input id="proposed-human-minutes" type="number" min="0" step="0.1" value="90" /></label>
+                    <label><span>Results in period</span><input id="proposed-population" type="number" min="1" step="1" placeholder="Enter your count" /></label>
+                    <label><span>Ready in sample</span><input id="proposed-ready" type="number" min="1" step="1" placeholder="Enter your count" /></label>
+                    <label><span>Still needs correction</span><input id="proposed-correction" type="number" min="0" step="1" placeholder="Enter 0 if none" /></label>
+                    <label><span>Needs escalation</span><input id="proposed-escalation" type="number" min="0" step="1" placeholder="Enter 0 if none" /></label>
+                    <label class="field-wide"><span>Total human minutes in sample</span><input id="proposed-human-minutes" type="number" min="0" step="0.1" placeholder="Enter your minutes" /></label>
                   </div>
                 </fieldset>
               </div>
@@ -1095,6 +1144,7 @@
                 <input id="sample-random" type="checkbox" />
                 <span>The outputs were selected randomly or by a repeatable sampling rule</span>
               </label>
+              <label class="check-field sample-method-check"><input id="sample-multi-output" type="checkbox" /><span>One billed request can produce multiple completed results in this workload; I checked how results map to requests</span></label>
               <p class="sample-caveat">AI Cost Lens will extrapolate the sampled outcome rate and human time across the declared period. A user-selected sample stays directional and will not show a statistical range. Every result remains labeled as sampled, not observed production truth.</p>
             </div>
 
@@ -1455,7 +1505,7 @@
         <p class="lumen-boundary">This is a deterministic record explainer, not a general AI chat. It uses only the calculated review in this browser and does not contact an AI API. Your file is not uploaded.</p>
         <div class="lumen-conversation" id="lumen-conversation" role="log" tabindex="0" aria-live="polite"></div>
         <div class="lumen-prompts" role="group" aria-label="Suggested questions">
-          <button type="button" data-lumen-question="why">Why isn't the cheaper route cheaper?</button>
+          <button type="button" data-lumen-question="why">How do these costs compare?</button>
           <button type="button" data-lumen-question="changed">What changed?</button>
           <button type="button" data-lumen-question="improve">What has to improve?</button>
           <button type="button" data-lumen-question="evidence">What evidence is missing?</button>
@@ -1468,11 +1518,11 @@
     </dialog>
     <template id="illustrative-request-log-data">
       [
-        {"event_id":"example-001","timestamp":"2026-09-01T10:00:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-101","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":80,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"success","latency_ms":820,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
-        {"event_id":"example-002","timestamp":"2026-09-01T10:01:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"failed","latency_ms":1400,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"needs_escalation"},
-        {"event_id":"example-003","timestamp":"2026-09-01T10:02:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"retried","retry_parent_event_id":"example-002","latency_ms":900,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
-        {"event_id":"example-004","timestamp":"2026-09-01T10:03:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"retried","retry_parent_event_id":"example-002","latency_ms":930,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
-        {"event_id":"example-004","timestamp":"2026-09-01T10:03:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"retried","retry_parent_event_id":"example-002","latency_ms":930,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
+        {"event_id":"example-001","timestamp":"2026-09-01T10:00:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","customer":"Example customer A","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-101","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":80,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"success","latency_ms":820,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
+        {"event_id":"example-002","timestamp":"2026-09-01T10:01:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","customer":"Example customer A","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"failed","latency_ms":1400,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"needs_escalation"},
+        {"event_id":"example-003","timestamp":"2026-09-01T10:02:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","customer":"Example customer A","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"retried","retry_parent_event_id":"example-002","latency_ms":900,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
+        {"event_id":"example-004","timestamp":"2026-09-01T10:03:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","customer":"Example customer A","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"retried","retry_parent_event_id":"example-002","latency_ms":930,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
+        {"event_id":"example-004","timestamp":"2026-09-01T10:03:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","customer":"Example customer B","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-102","environment":"production","input_tokens":1000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0064,"currency":"USD","request_status":"retried","retry_parent_event_id":"example-002","latency_ms":930,"prefix_fingerprint":"support-v1","tool_call_count":1,"outcome_status":"ready_to_use"},
         {"event_id":"example-006","timestamp":"2026-09-01T10:05:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":"Customer operations","team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-103","environment":"production","input_tokens":6000,"output_tokens":120,"reasoning_tokens":20,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.0264,"currency":"USD","request_status":"success","latency_ms":1200,"prefix_fingerprint":"support-v2","tool_call_count":1,"outcome_status":"ready_to_use"},
         {"event_id":"example-007","timestamp":"2026-09-01T10:06:00Z","provider":"OpenAI","model":"gpt-5.6-sol","project":null,"team_owner":"Support platform","feature":"Case summary","product":"Service desk","workload":"Support summary","workflow":"Draft and review","session_id":"case-104","environment":"production","input_tokens":1000,"output_tokens":900,"reasoning_tokens":700,"cached_input_tokens":0,"batch":false,"provider_reported_cost":0.022,"currency":"USD","request_status":"success","latency_ms":2100,"prefix_fingerprint":"support-v2","tool_call_count":7,"outcome_status":"needs_correction"}
       ]
@@ -1484,6 +1534,9 @@
     <script src="scenario-engine.js"></script>
     <script src="verification-engine.js"></script>
     <script src="actuals-engine.js"></script>
+    <script src="growth-engine.js"></script>
+    <script src="evidence-tools.js"></script>
+    <script src="customer-economics-engine.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
