@@ -332,7 +332,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const issuesDownload = page.waitForEvent("download");
   await page.locator("#download-request-issues").click();
   const issues = await readFile(await (await issuesDownload).path(), "utf8");
-  assert(issues.includes("2,") && issues.includes("4,"), `${engineName}: issue export lost source record numbers.`);
+  assert(issues.includes("3,") && issues.includes("4,"), `${engineName}: issue export lost source record numbers.`);
   assert((await page.locator("#request-analysis-boundary").innerText()).includes("valid rows only"), `${engineName}: scoped warning missing.`);
   const allBadLog = "event_id,provider_reported_cost,currency\nbad,oops,USD\n";
   await page.locator("#request-log-file").setInputFiles({ name: "all-bad.csv", mimeType: "text/csv", buffer: Buffer.from(allBadLog) });
