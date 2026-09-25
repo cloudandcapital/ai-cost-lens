@@ -402,7 +402,7 @@ eval(source);
     assert memo["memo-decision-code"]["textContent"] == "COST AND USAGE"
     assert "$12.75" in memo["memo-table-body"]["innerHTML"]
     assert "Blended cost per request" in memo["memo-table-body"]["innerHTML"]
-    assert "Start with gpt-economy" in memo["memo-next-step"]["textContent"]
+    assert "Project billed cost is unavailable" in memo["memo-next-step"]["textContent"]
     assert "Unavailable from these exports" in memo["memo-evidence"]["innerHTML"]
     assert "Not supported" in memo["memo-evidence"]["innerHTML"]
     assert memo["memo-planning"]["hidden"] is True
@@ -558,6 +558,14 @@ eval(source);
     assert review["period"]["end"] == "2026-08-31"
     assert review["bill"]["total"] == 563.58
     assert review["bill"]["populated_rows"] == 62
+    assert [row["project"] for row in review["bill"]["by_project"]] == [
+        "proj_aster_support",
+        "proj_aster_qa",
+    ]
+    assert [row["rows"] for row in review["bill"]["by_project"]] == [31, 31]
+    assert [row["amount"] for row in review["bill"]["by_project"]] == pytest.approx(
+        [487.2, 76.38]
+    )
     assert review["usage"]["totals"]["requests"] == 171120
     assert review["usage"]["populated_rows"] == 62
     assert review["usage"]["totals"]["cache_write_input_tokens"] is None
