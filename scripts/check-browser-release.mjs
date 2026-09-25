@@ -337,6 +337,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const allBadLog = "event_id,provider_reported_cost,currency\nbad,oops,USD\n";
   await page.locator("#request-log-file").setInputFiles({ name: "all-bad.csv", mimeType: "text/csv", buffer: Buffer.from(allBadLog) });
   await page.locator("#analyze-request-log").click();
+  await page.locator("#request-log-error.visible").waitFor({ state: "visible" });
   assert((await page.locator("#request-log-error").innerText()).includes("No valid request rows"), `${engineName}: wholly invalid import was not stopped.`);
   assert(await page.locator("#download-request-issues").isVisible(), `${engineName}: wholly invalid import lost the issue download.`);
   await page.locator("#request-billed-total").fill("");
