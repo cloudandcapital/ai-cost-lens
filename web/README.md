@@ -159,3 +159,5 @@ The test suite compares the committed browser demo byte-for-value with the Pytho
 - Language: financial questions first; technical detail remains available without leading the page
 
 The interface must always label illustrative data and must not display example or public evidence as customer results.
+
+The October 5, 2026 catalog review adds GPT-6.1 Sol and Claude Sonnet 5.5 with release-date coverage and rechecks every retained entry. See [the provider audit](../docs/pricing-snapshots/2026-10-05-review.md) for rates, geography rules, exclusions and the unchanged November 21 review deadline.

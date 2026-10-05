@@ -160,6 +160,9 @@
     const eventDate = event.timestamp.slice(0, 10);
     if (eventDate < (model.effective_at || catalog.effective_at) || eventDate > catalog.review_by) return null;
     const pricedMode = event.processing_mode === "priority" && model.provider === "OpenAI" && model.fast ? "fast" : event.processing_mode;
+    if (model.unsupported_combinations?.includes(`${pricedMode}+${event.inference_geography || "global"}`)) return null;
+    if ((model.promotional_rate_guaranteed_through && eventDate > model.promotional_rate_guaranteed_through) ||
+      (model.scheduled_rate_change && eventDate >= model.scheduled_rate_change.effective_at)) return null;
     const base = model[pricedMode];
     if (!base) return null;
     const hasSeparateWriteRate = ["cache_write", "cache_write_5m", "cache_write_1h"].some((field) => base[field] !== null && base[field] !== undefined);

@@ -56,7 +56,7 @@ console.log(JSON.stringify({catalog, comparison, record}));
     payload = json.loads(result.stdout)
     catalog = payload["catalog"]
     assert catalog["schema_version"] == "ai-cost-lens-pricing-catalog/0.5"
-    assert catalog["catalog_version"] == "2026-09-23"
+    assert catalog["catalog_version"] == "2026-10-05"
     assert {model["provider"] for model in catalog["models"]} == {
         "OpenAI",
         "Anthropic",
@@ -180,6 +180,12 @@ console.log(JSON.stringify(Object.fromEntries(catalog.models.map((model) => [mod
         "google/gemini-3.5-flash-lite": ((0.3, 0.03, 2.5), (0.15, 0.02, 1.25)),
         "google/gemini-3.1-flash-lite": ((0.25, 0.025, 1.5), (0.125, 0.0125, 0.75)),
     }
+    expected.update(
+        {
+            "openai/gpt-6.1-sol": ((2, 0.1, 10), (1, 0.05, 5)),
+            "anthropic/claude-sonnet-5.5": ((2, 0.2, 10), (1, 0.1, 5)),
+        }
+    )
     assert set(actual) == set(expected)
     for model_id, (standard, batch) in expected.items():
         for field, value in zip(
@@ -218,7 +224,7 @@ console.log(JSON.stringify({sol, luna, opus, prelaunchRejected,
             "node",
             "-e",
             script,
-            str(WEB / "data" / "pricing-catalog-v0.5.js"),
+            str(ROOT / "docs" / "pricing-snapshots" / "pricing-catalog-2026-09-23.js"),
             str(ROOT / "docs" / "pricing-snapshots" / "pricing-catalog-2026-09-22.js"),
             str(WEB / "pricing-engine.js"),
         ],
@@ -562,7 +568,7 @@ const catalog = require(process.argv[1]);
 const engine = require(process.argv[2]);
 const older = require(process.argv[3]);
 const selected = engine.selectCatalog([catalog, older], "2026-09-22");
-const current = engine.selectCatalog([catalog, older], "2026-09-23");
+const current = engine.selectCatalog([catalog, older], "2026-10-05");
 const model = catalog.models.find((item) => item.id === "openai/gpt-5.6-sol");
 const longContext = engine.priceModel(model, {
   input_tokens: 300000, output_tokens: 10000, calls_per_month: 1,
@@ -611,7 +617,7 @@ console.log(JSON.stringify({selected: selected.catalog_version, current: current
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["selected"] == "2026-09-22"
-    assert payload["current"] == "2026-09-23"
+    assert payload["current"] == "2026-10-05"
     assert payload["longContext"]["pricing_adjustment"] == "long_context"
     assert payload["longContext"]["rates_per_1m_tokens"] == {
         "input": 8,
