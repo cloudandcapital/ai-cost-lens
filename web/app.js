@@ -5591,7 +5591,7 @@
   }
 
   function geographyLabel(geography, multiplier) {
-    const base = ({ global: "Global / default", regional: "Regional processing", us: "US-only inference" })[geography] || geography;
+    const base = ({ global: "Global / default", regional: "Regional processing", us: "US-only inference", eu: "EU regional processing" })[geography] || geography;
     return multiplier > 1 ? `${base} (+${((multiplier - 1) * 100).toFixed(0)}%)` : base;
   }
 

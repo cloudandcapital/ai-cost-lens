@@ -7837,16 +7837,16 @@ body{min-width:0}
 
   return Object.freeze({
     schema_version: "ai-cost-lens-pricing-catalog/0.5",
-    catalog_version: "2026-09-23",
+    catalog_version: "2026-10-05",
     effective_at: "2026-09-22",
     review_by: "2026-11-21",
     currency: "USD",
     unit: "per_1m_tokens",
     scope: "Direct API list prices for text input, cached input, cache writes, output, and published processing modes. Taxes, negotiated discounts, tools, grounding, and data-transfer charges are excluded; Gemini cache storage is listed but only calculated when token-hours are supplied.",
     sources: [
-      { provider: "OpenAI", checked_at: "2026-09-23", url: "https://developers.openai.com/api/docs/pricing" },
-      { provider: "Anthropic", checked_at: "2026-09-23", url: "https://platform.claude.com/docs/en/about-claude/pricing" },
-      { provider: "Google", checked_at: "2026-09-22", url: "https://ai.google.dev/gemini-api/docs/pricing" },
+      { provider: "OpenAI", checked_at: "2026-10-05", url: "https://developers.openai.com/api/docs/pricing" },
+      { provider: "Anthropic", checked_at: "2026-10-05", url: "https://platform.claude.com/docs/en/about-claude/pricing" },
+      { provider: "Google", checked_at: "2026-10-05", url: "https://ai.google.dev/gemini-api/docs/pricing" },
     ],
     models: [
       {
@@ -7855,19 +7855,45 @@ body{min-width:0}
         label: "GPT-6 Astra",
         model: "gpt-6-astra",
         context_window_tokens: 1050000,
+        input_token_limit: 922000,
         max_output_tokens: 128000,
         source_url: "https://developers.openai.com/api/docs/pricing",
-        capability_source_url: "https://developers.openai.com/api/docs/models",
+        capability_source_url: "https://developers.openai.com/api/docs/models/gpt-6-astra",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 10, cached_input: 1, cache_write: 12.5, output: 50 },
         batch: { input: 5, cached_input: 0.5, cache_write: 6.25, output: 25 },
         flex: { input: 5, cached_input: 0.5, cache_write: 6.25, output: 25 },
         fast: { input: 20, cached_input: 2, cache_write: 25, output: 100 },
-        geography_multipliers: { global: 1, regional: 1.1 },
+        geography_multipliers: { global: 1, regional: 1.1, us: 1.1, eu: 1.1 },
         long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
-        unsupported_combinations: ["fast+eu_regional"],
-        note: "Direct API. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional-processing rates are represented. Fast mode is not available with EU data residency.",
+        unsupported_combinations: ["fast+eu", "fast+regional"],
+        note: "Direct API. For Fast regional pricing select US explicitly. Ultrafast is outside this catalog. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional-processing rates are represented. Fast mode is not available with EU data residency.",
+      },
+      {
+        id: "openai/gpt-6.1-sol",
+        effective_at: "2026-09-29",
+        released_at: "2026-09-29",
+        release_source_url: "https://developers.openai.com/api/docs/changelog",
+        provider: "OpenAI",
+        label: "GPT-6.1 Sol",
+        model: "gpt-6.1-sol",
+        context_window_tokens: 1050000,
+        input_token_limit: 922000,
+        max_output_tokens: 128000,
+        source_url: "https://developers.openai.com/api/docs/pricing",
+        capability_source_url: "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+        workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
+        verified_at: "2026-10-05",
+        standard: { input: 2, cached_input: 0.1, cache_write: 2.5, output: 10 },
+        batch: { input: 1, cached_input: 0.05, cache_write: 1.25, output: 5 },
+        flex: { input: 1, cached_input: 0.05, cache_write: 1.25, output: 5 },
+        fast: { input: 4, cached_input: 0.2, cache_write: 5, output: 20 },
+        geography_multipliers: { global: 1, us: 1.1, eu: 1.1 },
+        unsupported_combinations: ["fast+eu"],
+        geography_source_url: "https://developers.openai.com/api/docs/guides/your-data",
+        long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
+        note: "Direct API. Standard, Batch, Flex and Fast; no Ultrafast rate. Cache reads are 5% of input; writes are 1.25x. Above 272K input tokens, full-request input/cache rates double and output is 1.5x. Only US/EU residency is supported, at +10%; EU excludes Fast. FedRAMP pricing is +10% where eligible, but endpoint eligibility is not inferred here.",
       },
       {
         id: "openai/gpt-6-sol",
@@ -7876,18 +7902,20 @@ body{min-width:0}
         label: "GPT-6 Sol",
         model: "gpt-6-sol",
         context_window_tokens: 1050000,
+        input_token_limit: 922000,
         max_output_tokens: 128000,
         source_url: "https://developers.openai.com/api/docs/pricing",
-        capability_source_url: "https://developers.openai.com/api/docs/models",
+        capability_source_url: "https://developers.openai.com/api/docs/models/gpt-6-sol",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 10 },
         batch: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 5 },
         flex: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 5 },
         fast: { input: 4, cached_input: 0.4, cache_write: 5, output: 20 },
-        geography_multipliers: { global: 1, regional: 1.1 },
+        geography_multipliers: { global: 1, regional: 1.1, us: 1.1, eu: 1.1 },
+        unsupported_combinations: ["fast+eu", "fast+regional"],
         long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
-        note: "Direct API list rate. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional rates are represented; EU data residency supports Standard only.",
+        note: "Direct API list rate. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional rates are represented; EU data residency supports Standard, Flex and Batch; Fast is unavailable in the EU.",
       },
       {
         id: "openai/gpt-6-luna",
@@ -7896,18 +7924,20 @@ body{min-width:0}
         label: "GPT-6 Luna",
         model: "gpt-6-luna",
         context_window_tokens: 1050000,
+        input_token_limit: 922000,
         max_output_tokens: 128000,
         source_url: "https://developers.openai.com/api/docs/pricing",
-        capability_source_url: "https://developers.openai.com/api/docs/models",
+        capability_source_url: "https://developers.openai.com/api/docs/models/gpt-6-luna",
         workload_tags: ["general", "reasoning", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 0.1, cached_input: 0.01, cache_write: 0.125, output: 0.5 },
         batch: { input: 0.05, cached_input: 0.005, cache_write: 0.0625, output: 0.25 },
         flex: { input: 0.05, cached_input: 0.005, cache_write: 0.0625, output: 0.25 },
         fast: { input: 0.2, cached_input: 0.02, cache_write: 0.25, output: 1 },
-        geography_multipliers: { global: 1, regional: 1.1 },
+        geography_multipliers: { global: 1, regional: 1.1, us: 1.1, eu: 1.1 },
+        unsupported_combinations: ["fast+eu", "fast+regional"],
         long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
-        note: "Direct API list rate. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional rates are represented; EU data residency supports Standard only.",
+        note: "Direct API list rate. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional rates are represented; EU data residency supports Standard, Flex and Batch; Fast is unavailable in the EU.",
       },
       {
         id: "openai/gpt-5.6-sol",
@@ -7916,11 +7946,12 @@ body{min-width:0}
         model: "gpt-5.6-sol",
         promotional_rate_guaranteed_through: "2026-11-21",
         context_window_tokens: 1050000,
+        input_token_limit: 922000,
         max_output_tokens: 128000,
         source_url: "https://developers.openai.com/api/docs/pricing",
-        capability_source_url: "https://developers.openai.com/api/docs/models",
+        capability_source_url: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 4, cached_input: 0.4, cache_write: 5, output: 20 },
         batch: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 10 },
         flex: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 10 },
@@ -7935,11 +7966,12 @@ body{min-width:0}
         label: "GPT-5.6 Terra",
         model: "gpt-5.6-terra",
         context_window_tokens: 1050000,
+        input_token_limit: 922000,
         max_output_tokens: 128000,
         source_url: "https://developers.openai.com/api/docs/pricing",
-        capability_source_url: "https://developers.openai.com/api/docs/models",
+        capability_source_url: "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
         workload_tags: ["general", "reasoning", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 12 },
         batch: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 6 },
         flex: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 6 },
@@ -7954,11 +7986,12 @@ body{min-width:0}
         label: "GPT-5.6 Luna",
         model: "gpt-5.6-luna",
         context_window_tokens: 1050000,
+        input_token_limit: 922000,
         max_output_tokens: 128000,
         source_url: "https://developers.openai.com/api/docs/pricing",
-        capability_source_url: "https://developers.openai.com/api/docs/models",
+        capability_source_url: "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
         workload_tags: ["general", "reasoning", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 0.2, cached_input: 0.02, cache_write: 0.25, output: 1.2 },
         batch: { input: 0.1, cached_input: 0.01, cache_write: 0.125, output: 0.6 },
         flex: { input: 0.1, cached_input: 0.01, cache_write: 0.125, output: 0.6 },
@@ -7975,9 +8008,9 @@ body{min-width:0}
         context_window_tokens: 1000000,
         max_output_tokens: 128000,
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
-        capability_source_url: "https://platform.claude.com/docs/en/models/overview",
+        capability_source_url: "https://platform.claude.com/docs/en/models/fable-5-1/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 10, cached_input: 0.25, cache_write_5m: 12.5, cache_write_1h: 20, output: 50 },
         batch: { input: 5, cached_input: 0.125, cache_write_5m: 6.25, cache_write_1h: 10, output: 25 },
         geography_multipliers: { global: 1, us: 1.1 },
@@ -7992,9 +8025,9 @@ body{min-width:0}
         context_window_tokens: 1000000,
         max_output_tokens: 128000,
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
-        capability_source_url: "https://platform.claude.com/docs/en/models/overview",
+        capability_source_url: "https://platform.claude.com/docs/en/models/opus-5-5/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 4, cached_input: 0.2, cache_write_5m: 5, cache_write_1h: 8, output: 20 },
         batch: { input: 2, cached_input: 0.1, cache_write_5m: 2.5, cache_write_1h: 4, output: 10 },
         fast: { input: 8, cached_input: 0.4, cache_write_5m: 10, cache_write_1h: 16, output: 40 },
@@ -8010,15 +8043,35 @@ body{min-width:0}
         context_window_tokens: 1000000,
         max_output_tokens: 128000,
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
-        capability_source_url: "https://platform.claude.com/docs/en/models/overview",
+        capability_source_url: "https://platform.claude.com/docs/en/models/opus-5/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 5, cached_input: 0.5, cache_write_5m: 6.25, cache_write_1h: 10, output: 25 },
         batch: { input: 2.5, cached_input: 0.25, cache_write_5m: 3.125, cache_write_1h: 5, output: 12.5 },
         fast: { input: 10, cached_input: 1, cache_write_5m: 12.5, cache_write_1h: 20, output: 50 },
         geography_multipliers: { global: 1, us: 1.1 },
         unsupported_combinations: ["fast+batch"],
         note: "Direct Claude API. The catalog represents 5-minute and 1-hour cache writes, Batch, Fast, and the 10% US-only inference multiplier. Fast and Batch cannot be combined; server-side tools remain excluded.",
+      },
+      {
+        id: "anthropic/claude-sonnet-5.5",
+        provider: "Anthropic",
+        label: "Claude Sonnet 5.5",
+        model: "claude-sonnet-5-5",
+        released_at: "2026-09-28",
+        effective_at: "2026-09-28",
+        release_source_url: "https://platform.claude.com/docs/en/models/sonnet-5-5/overview",
+        geography_source_url: "https://platform.claude.com/docs/en/manage-claude/data-residency",
+        context_window_tokens: 1000000,
+        max_output_tokens: 128000,
+        source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
+        capability_source_url: "https://platform.claude.com/docs/en/models/sonnet-5-5/overview",
+        workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
+        verified_at: "2026-10-05",
+        standard: { input: 2, cached_input: 0.2, cache_write_5m: 2.5, cache_write_1h: 4, output: 10 },
+        batch: { input: 1, cached_input: 0.1, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 },
+        geography_multipliers: { global: 1, us: 1.1 },
+        note: "Direct Claude API. Standard and Batch only; no Fast, Flex or Priority rate. Full 1M context has no long-context premium. Cache writes: 5m at 1.25x input, 1h at 2x; reads at 0.1x. Batch halves token rates including cache; US-only inference adds 10% to all token categories. Partner cloud rates and beta 300K Batch output are outside this catalog.",
       },
       {
         id: "anthropic/claude-sonnet-5",
@@ -8028,9 +8081,9 @@ body{min-width:0}
         context_window_tokens: 1000000,
         max_output_tokens: 128000,
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
-        capability_source_url: "https://platform.claude.com/docs/en/models/overview",
+        capability_source_url: "https://platform.claude.com/docs/en/models/sonnet-5/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 2, cached_input: 0.2, cache_write_5m: 2.5, cache_write_1h: 4, output: 10 },
         batch: { input: 1, cached_input: 0.1, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 },
         geography_multipliers: { global: 1, us: 1.1 },
@@ -8042,11 +8095,11 @@ body{min-width:0}
         label: "Claude Sonnet 4.6",
         model: "claude-sonnet-4-6",
         context_window_tokens: 1000000,
-        max_output_tokens: null,
+        max_output_tokens: 128000,
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
-        capability_source_url: "https://platform.claude.com/docs/en/models/overview",
+        capability_source_url: "https://platform.claude.com/docs/en/models/sonnet-4-6/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 3, cached_input: 0.3, cache_write_5m: 3.75, cache_write_1h: 6, output: 15 },
         batch: { input: 1.5, cached_input: 0.15, cache_write_5m: 1.875, cache_write_1h: 3, output: 7.5 },
         geography_multipliers: { global: 1, us: 1.1 },
@@ -8060,9 +8113,9 @@ body{min-width:0}
         context_window_tokens: 200000,
         max_output_tokens: 64000,
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
-        capability_source_url: "https://platform.claude.com/docs/en/models/overview",
+        capability_source_url: "https://platform.claude.com/docs/en/models/haiku-4-5/overview",
         workload_tags: ["general", "reasoning", "high_volume", "multimodal"],
-        verified_at: "2026-09-23",
+        verified_at: "2026-10-05",
         standard: { input: 1, cached_input: 0.1, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 },
         batch: { input: 0.5, cached_input: 0.05, cache_write_5m: 0.625, cache_write_1h: 1, output: 2.5 },
         geography_multipliers: { global: 1 },
@@ -8076,9 +8129,9 @@ body{min-width:0}
         input_token_limit: 1048576,
         max_output_tokens: 65536,
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
-        capability_source_url: "https://ai.google.dev/gemini-api/docs/models",
+        capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-10-05",
         standard: { input: 0.75, cached_input: 0.075, cache_storage_per_1m_token_hour: 0.5, output: 3.75 },
         batch: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
         flex: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
@@ -8095,9 +8148,9 @@ body{min-width:0}
         input_token_limit: 1048576,
         max_output_tokens: 65536,
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
-        capability_source_url: "https://ai.google.dev/gemini-api/docs/models",
+        capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.7-flash",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-10-05",
         standard: { input: 0.75, cached_input: 0.075, cache_storage_per_1m_token_hour: 0.5, output: 3.75 },
         batch: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
         flex: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
@@ -8114,9 +8167,9 @@ body{min-width:0}
         input_token_limit: 1048576,
         max_output_tokens: 65536,
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
-        capability_source_url: "https://ai.google.dev/gemini-api/docs/models",
+        capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash",
         workload_tags: ["general", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-10-05",
         standard: { input: 1.5, cached_input: 0.15, cache_storage_per_1m_token_hour: 1, output: 9 },
         batch: { input: 0.75, cached_input: 0.075, cache_storage_per_1m_token_hour: 1, output: 4.5 },
         flex: { input: 0.75, cached_input: 0.08, cache_storage_per_1m_token_hour: 1, output: 4.5 },
@@ -8132,9 +8185,9 @@ body{min-width:0}
         input_token_limit: 1048576,
         max_output_tokens: 65536,
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
-        capability_source_url: "https://ai.google.dev/gemini-api/docs/models",
+        capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite",
         workload_tags: ["general", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-10-05",
         standard: { input: 0.3, cached_input: 0.03, cache_storage_per_1m_token_hour: 1, output: 2.5 },
         batch: { input: 0.15, cached_input: 0.02, cache_storage_per_1m_token_hour: 1, output: 1.25 },
         flex: { input: 0.15, cached_input: 0.02, cache_storage_per_1m_token_hour: 1, output: 1.25 },
@@ -8150,9 +8203,9 @@ body{min-width:0}
         input_token_limit: 1048576,
         max_output_tokens: 65536,
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
-        capability_source_url: "https://ai.google.dev/gemini-api/docs/models",
+        capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite",
         workload_tags: ["general", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-09-22",
+        verified_at: "2026-10-05",
         standard: { input: 0.25, cached_input: 0.025, cache_storage_per_1m_token_hour: 1, output: 1.5 },
         batch: { input: 0.125, cached_input: 0.0125, cache_storage_per_1m_token_hour: 0.5, output: 0.75 },
         flex: { input: 0.125, cached_input: 0.0125, cache_storage_per_1m_token_hour: 0.5, output: 0.75 },
@@ -8275,6 +8328,11 @@ body{min-width:0}
       }
       if (new Set(model.workload_tags).size !== model.workload_tags.length) throw new Error(`${model.id} has duplicate workload tags.`);
       isoDate(model.verified_at, `${model.id} verified date`);
+      if (model.released_at) {
+        isoDate(model.released_at, `${model.id} release date`);
+        if (!model.effective_at || model.effective_at < model.released_at) throw new Error(`${model.id} cannot be priced before release.`);
+        if (!/^https:\/\//.test(model.release_source_url || "")) throw new Error(`${model.id} needs an HTTPS release source.`);
+      }
       if (model.effective_at) {
         isoDate(model.effective_at, `${model.id} effective date`);
         if (model.effective_at < catalog.effective_at || model.effective_at > catalog.catalog_version) {
@@ -8448,6 +8506,9 @@ body{min-width:0}
       const available = Object.keys(model.geography_multipliers || { global: 1 }).join(", ");
       throw new Error(`${model.label} has no published ${geography} geography rate in this catalog. Available locations: ${available}.`);
     }
+    if (model.unsupported_combinations?.includes(`${processingMode}+${geography}`)) {
+      throw new Error(`${model.label} does not support ${processingMode} with ${geography} processing. Select an explicitly supported geography and mode.`);
+    }
     const longContext = Boolean(model.long_context && scenario.input_tokens > model.long_context.input_threshold_tokens);
     const contextRates = Object.fromEntries(RATE_FIELDS.flatMap((field) => {
       if (baseRates[field] === null || baseRates[field] === undefined) return [];
@@ -8481,6 +8542,10 @@ body{min-width:0}
     const scenario = normalizeScenario(rawScenario);
     if (scenario.pricing_date && model.effective_at && scenario.pricing_date < model.effective_at) {
       throw new Error(`${model.label} has no verified list price before ${model.effective_at}.`);
+    }
+    if (scenario.pricing_date && ((model.promotional_rate_guaranteed_through && scenario.pricing_date > model.promotional_rate_guaranteed_through) ||
+      (model.scheduled_rate_change && scenario.pricing_date >= model.scheduled_rate_change.effective_at))) {
+      throw new Error(`${model.label} needs a freshly verified rate for ${scenario.pricing_date}.`);
     }
     if (model.context_window_tokens && scenario.input_tokens + scenario.output_tokens > model.context_window_tokens) {
       throw new Error(`${model.label} cannot fit ${scenario.input_tokens + scenario.output_tokens} total tokens in its ${model.context_window_tokens}-token context window.`);
@@ -9074,6 +9139,9 @@ body{min-width:0}
     const eventDate = event.timestamp.slice(0, 10);
     if (eventDate < (model.effective_at || catalog.effective_at) || eventDate > catalog.review_by) return null;
     const pricedMode = event.processing_mode === "priority" && model.provider === "OpenAI" && model.fast ? "fast" : event.processing_mode;
+    if (model.unsupported_combinations?.includes(`${pricedMode}+${event.inference_geography || "global"}`)) return null;
+    if ((model.promotional_rate_guaranteed_through && eventDate > model.promotional_rate_guaranteed_through) ||
+      (model.scheduled_rate_change && eventDate >= model.scheduled_rate_change.effective_at)) return null;
     const base = model[pricedMode];
     if (!base) return null;
     const hasSeparateWriteRate = ["cache_write", "cache_write_5m", "cache_write_1h"].some((field) => base[field] !== null && base[field] !== undefined);
@@ -16900,7 +16968,7 @@ body{min-width:0}
   }
 
   function geographyLabel(geography, multiplier) {
-    const base = ({ global: "Global / default", regional: "Regional processing", us: "US-only inference" })[geography] || geography;
+    const base = ({ global: "Global / default", regional: "Regional processing", us: "US-only inference", eu: "EU regional processing" })[geography] || geography;
     return multiplier > 1 ? `${base} (+${((multiplier - 1) * 100).toFixed(0)}%)` : base;
   }
 

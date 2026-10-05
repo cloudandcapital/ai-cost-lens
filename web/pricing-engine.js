@@ -109,6 +109,11 @@
       }
       if (new Set(model.workload_tags).size !== model.workload_tags.length) throw new Error(`${model.id} has duplicate workload tags.`);
       isoDate(model.verified_at, `${model.id} verified date`);
+      if (model.released_at) {
+        isoDate(model.released_at, `${model.id} release date`);
+        if (!model.effective_at || model.effective_at < model.released_at) throw new Error(`${model.id} cannot be priced before release.`);
+        if (!/^https:\/\//.test(model.release_source_url || "")) throw new Error(`${model.id} needs an HTTPS release source.`);
+      }
       if (model.effective_at) {
         isoDate(model.effective_at, `${model.id} effective date`);
         if (model.effective_at < catalog.effective_at || model.effective_at > catalog.catalog_version) {
@@ -282,6 +287,9 @@
       const available = Object.keys(model.geography_multipliers || { global: 1 }).join(", ");
       throw new Error(`${model.label} has no published ${geography} geography rate in this catalog. Available locations: ${available}.`);
     }
+    if (model.unsupported_combinations?.includes(`${processingMode}+${geography}`)) {
+      throw new Error(`${model.label} does not support ${processingMode} with ${geography} processing. Select an explicitly supported geography and mode.`);
+    }
     const longContext = Boolean(model.long_context && scenario.input_tokens > model.long_context.input_threshold_tokens);
     const contextRates = Object.fromEntries(RATE_FIELDS.flatMap((field) => {
       if (baseRates[field] === null || baseRates[field] === undefined) return [];
@@ -315,6 +323,10 @@
     const scenario = normalizeScenario(rawScenario);
     if (scenario.pricing_date && model.effective_at && scenario.pricing_date < model.effective_at) {
       throw new Error(`${model.label} has no verified list price before ${model.effective_at}.`);
+    }
+    if (scenario.pricing_date && ((model.promotional_rate_guaranteed_through && scenario.pricing_date > model.promotional_rate_guaranteed_through) ||
+      (model.scheduled_rate_change && scenario.pricing_date >= model.scheduled_rate_change.effective_at))) {
+      throw new Error(`${model.label} needs a freshly verified rate for ${scenario.pricing_date}.`);
     }
     if (model.context_window_tokens && scenario.input_tokens + scenario.output_tokens > model.context_window_tokens) {
       throw new Error(`${model.label} cannot fit ${scenario.input_tokens + scenario.output_tokens} total tokens in its ${model.context_window_tokens}-token context window.`);

@@ -264,12 +264,14 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert((await page.locator("#price-result-rows").innerText()).toLowerCase().includes("global / default"), `${engineName}: route geography is missing from results.`);
 
   await page.locator(".model-catalog-browser").evaluate((details) => { details.open = true; });
-  const sonnet = page.locator(".model-catalog-card").filter({ hasText: "Claude Sonnet 5" });
+  const sonnet = page.locator(".model-catalog-card").filter({ has: page.getByRole("link", { name: "Claude Sonnet 5", exact: true }) });
   const sonnetText = await sonnet.innerText();
   for (const expected of ["INPUT\n$2.00", "CACHED INPUT\n$0.20", "CACHE WRITE · 5 MIN\n$2.50", "OUTPUT\n$10.00"]) {
     assert(sonnetText.toUpperCase().includes(expected), `${engineName}: Claude Sonnet 5 card is missing ${expected.replace("\n", " ")}.`);
   }
   const currentRates = [
+    ["GPT-6.1 Sol", ["INPUT\n$2.00", "CACHED INPUT\n$0.10", "CACHE WRITE\n$2.50", "OUTPUT\n$10.00"]],
+    ["Claude Sonnet 5.5", ["INPUT\n$2.00", "CACHED INPUT\n$0.20", "CACHE WRITE · 5 MIN\n$2.50", "OUTPUT\n$10.00"]],
     ["GPT-6 Sol", ["INPUT\n$2.00", "CACHED INPUT\n$0.20", "CACHE WRITE\n$2.50", "OUTPUT\n$10.00"]],
     ["GPT-6 Luna", ["INPUT\n$0.10", "CACHED INPUT\n$0.01", "CACHE WRITE\n$0.125", "OUTPUT\n$0.50"]],
     ["Claude Opus 5.5", ["INPUT\n$4.00", "CACHED INPUT\n$0.20", "CACHE WRITE · 5 MIN\n$5.00", "OUTPUT\n$20.00"]],
@@ -281,7 +283,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
       assert(row.toUpperCase().includes(expected), `${engineName}: ${name} missing ${expected.replace("\n", " ")}.`);
     }
     const provenance = await card.locator(".model-catalog-card-head span").textContent();
-    assert(provenance.includes("checked 2026-09-23"), `${engineName}: ${name} is missing its checked date: ${provenance}`);
+    assert(provenance.includes("checked 2026-10-05"), `${engineName}: ${name} is missing its checked date: ${provenance}`);
   }
   for (const [name, rates] of [
     ["GPT-6 Sol", ["INPUT\n$4.00", "CACHED INPUT\n$0.40", "CACHE WRITE\n$5.00", "OUTPUT\n$15.00"]],
