@@ -90,7 +90,7 @@ async function saveJsonDownload(page, selector, filename) {
 }
 
 async function openAdvancedChoices(page) {
-  const choices = page.locator(".builder-more-paths");
+  const choices = page.locator(".builder-mode-choice > .builder-more-paths");
   if (!(await choices.evaluate((element) => element.open))) await choices.locator("summary").click();
 }
 
