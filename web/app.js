@@ -382,6 +382,21 @@
     }
     const basis = spendCostBasis(spend, "single bill");
     const totals = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true });
+    let billBudget = null;
+    if (config.billBudget !== undefined) {
+      const budget = config.billBudget;
+      if (!budget || typeof budget !== "object" || Array.isArray(budget) ||
+          typeof budget.amount !== "string" || typeof budget.sameScope !== "boolean" ||
+          !["invoice_form", "invoice_pdf"].includes(config.reviewSource)) throw new Error("Budget must be a complete manual-bill entry.");
+      const amount = costNumber(budget.amount, "Budget for this service period");
+      if (amount <= 0) throw new Error("Budget for this service period must be greater than zero.");
+      const limitations = [];
+      if (!budget.sameScope) limitations.push("Matching provider, account, workload, currency, gross or net basis, and service period were not confirmed.");
+      if (!declaredStart || !declaredEnd) limitations.push("Declare the bill's complete service period before comparing it with a period budget.");
+      const comparable = limitations.length === 0;
+      billBudget = { amount, comparable, limitations, difference: comparable ? totals.providerCost - amount : null,
+        usedPct: comparable ? totals.providerCost / amount : null };
+    }
     if (config.grossNet) {
       const { gross, net, adjustment, classification } = config.grossNet;
       if (config.reviewSource !== "claude_spend_report" || classification !== "unclassified_gross_to_net" ||
@@ -455,7 +470,7 @@
       level: outcomeSupported ? "Cost, usage and outcomes" : hasUsage ? "Cost and usage" : "Invoice or subscription only",
       providerUnit: outcomeSupported && ready ? totals.providerCost / ready : null,
       fullUnit: outcomeSupported && ready && fullCost !== null ? fullCost / ready : null,
-      humanCost, shared, fullCost, billHistory,
+      humanCost, shared, fullCost, billHistory, billBudget,
     };
     const checkNumbers = (value) => {
       if (typeof value === "number" && (!Number.isFinite(value) || Math.abs(value) > 1e15)) throw new Error("Review totals exceed the supported numeric range.");
@@ -2278,6 +2293,9 @@
       if (data.config.previousBill !== undefined) shape(data.config.previousBill, {
         amount: "string", invoiceDate: "string", serviceStart: "string", serviceEnd: "string", sameScope: "boolean",
       }, "config.previousBill");
+      if (data.config.billBudget !== undefined) shape(data.config.billBudget, {
+        amount: "string", sameScope: "boolean",
+      }, "config.billBudget");
       for (const row of [...data.source.spend, ...data.source.work]) {
         Object.values(row).forEach((value) => shape(value, "string", "source row"));
       }
@@ -4462,6 +4480,23 @@
           ? "The service periods have different lengths, so raw bill totals are not like-for-like. Calendar-day amounts are arithmetic references only; fixed monthly plans can differ per day solely because of month length. This does not explain the cause or establish savings."
         : `A like-for-like change is withheld: ${history.limitations.join(" ")} The two user-entered amounts remain separate. No savings claim is supported.`;
     }
+    const budgetSection = document.getElementById("bill-budget-result");
+    budgetSection.hidden = !review.billBudget;
+    if (review.billBudget) {
+      const budget = review.billBudget;
+      const rows = [
+        ["Entered period budget", money(budget.amount, 2), "User entered; no budget source was verified"],
+        ["Current bill", money(totals.providerCost, 2), "User entered; no invoice was independently verified"],
+      ];
+      if (budget.comparable) {
+        const status = budget.difference > 0 ? "over" : budget.difference < 0 ? "under" : "on";
+        rows.push(["Bill versus budget", budget.difference === 0 ? money(0, 2) : `${budget.difference > 0 ? "+" : "−"}${money(Math.abs(budget.difference), 2)}`, `${pct(budget.usedPct, 1)} of the entered budget used · ${status} the entered budget.`]);
+      }
+      document.getElementById("bill-budget-metrics").innerHTML = rows.map(([label, value, note]) => `<div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`).join("");
+      document.getElementById("bill-budget-boundary").textContent = budget.comparable
+        ? "This compares two user-entered amounts for the declared same period and scope. It is not a live alert, forecast, verified invoice reconciliation, or savings claim. Check credits, taxes, discounts, and included charges before acting."
+        : `Budget variance is withheld: ${budget.limitations.join(" ")} The two entered amounts remain separate; no alert or savings claim is supported.`;
+    }
     const stage = singleBillStage(review);
     const guidance = singleBillGuidance(review);
     const count = (value) => value === null ? "Not supplied" : compact(value);
@@ -4908,6 +4943,7 @@
     });
     document.getElementById("bill-review-screen").classList.toggle("active", isBill);
     document.getElementById("bill-history-result").hidden = true;
+    document.getElementById("bill-budget-result").hidden = true;
     document.querySelectorAll(".view").forEach((section) => {
       if (isBill) section.classList.remove("active");
     });
@@ -5469,6 +5505,7 @@
     // Native reset restores declared defaults and empties every file input.
     builderForm.reset();
     document.getElementById("bill-history-input").open = false;
+    document.getElementById("bill-budget-input").open = false;
     document.getElementById("review-file").value = "";
     filenameDefaults.forEach((text, id) => { document.getElementById(id).textContent = text; });
     const error = document.getElementById("builder-error");
@@ -6373,8 +6410,12 @@
         const routedUniversal = !spendFile && state.uploadRoute?.kind === "universal";
         const previousInputs = ["previous-bill-amount", "previous-bill-date", "previous-bill-start", "previous-bill-end"].map((id) => document.getElementById(id).value.trim());
         const hasPrevious = previousInputs.some(Boolean) || document.getElementById("previous-bill-scope").checked;
+        const budgetAmount = document.getElementById("bill-budget-amount").value.trim();
+        const hasBudget = Boolean(budgetAmount) || document.getElementById("bill-budget-scope").checked;
         if (hasPrevious && (spendFile || routedUniversal)) throw new Error("Compare two entered bills using the manual bill fields, not the universal spend CSV.");
+        if (hasBudget && (spendFile || routedUniversal)) throw new Error("Check a budget against an entered bill using the manual bill fields, not the universal spend CSV.");
         if (hasPrevious && (!previousInputs[0] || !previousInputs[1])) throw new Error("Supply the previous bill amount and invoice date, or leave all previous-bill fields blank.");
+        if (hasBudget && !budgetAmount) throw new Error("Supply a budget amount or leave the budget fields blank.");
         let spendText = spendFile ? await readLocalFile(spendFile) : routedUniversal ? state.uploadRoute.text : "";
         if (!spendFile && !routedUniversal) {
           const provider = safeImportedLabel(document.getElementById("invoice-provider").value, "Provider");
@@ -6395,6 +6436,7 @@
           serviceEnd: spendFile ? "" : document.getElementById("invoice-period-end").value,
           reviewSource: spendFile || routedUniversal ? "universal_template" : state.invoicePdfCandidate ? "invoice_pdf" : "invoice_form",
           ...(hasPrevious ? { previousBill: { amount: previousInputs[0], invoiceDate: previousInputs[1], serviceStart: previousInputs[2], serviceEnd: previousInputs[3], sameScope: document.getElementById("previous-bill-scope").checked } } : {}),
+          ...(hasBudget ? { billBudget: { amount: budgetAmount, sameScope: document.getElementById("bill-budget-scope").checked } } : {}),
         });
         discardImportedSourceState();
         renderAll();
