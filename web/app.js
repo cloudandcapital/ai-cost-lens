@@ -4431,7 +4431,7 @@
       if (history.comparable) {
         const direction = history.change > 0 ? "higher" : history.change < 0 ? "lower" : "unchanged";
         rows.push(["Bill change", `${history.change < 0 ? "−" : history.change > 0 ? "+" : ""}${money(Math.abs(history.change), 2)}`, history.changePct === null ? "Percentage unavailable: the previous bill was zero." : `${pct(Math.abs(history.changePct), 1)} ${direction} across equal-length declared periods.`]);
-        rows.push(["Cost per calendar day", `${money(history.previousPerDay, 2)} → ${money(history.currentPerDay, 2)}`, `${history.currentDays} days in each declared service period.`]);
+        rows.push(["Cost per calendar day", `${money(history.previousPerDay, history.previousPerDay < 1 ? 4 : 2)} → ${money(history.currentPerDay, history.currentPerDay < 1 ? 4 : 2)}`, `${history.currentDays} days in each declared service period.`]);
       }
       document.getElementById("bill-history-metrics").innerHTML = rows.map(([label, value, note]) => `<div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`).join("");
       document.getElementById("bill-history-boundary").textContent = history.comparable
