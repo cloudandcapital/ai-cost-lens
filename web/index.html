@@ -116,6 +116,12 @@
             <p id="bill-history-boundary"></p>
           </section>
 
+          <section class="comparison-section" id="bill-budget-result" aria-labelledby="bill-budget-title" hidden>
+            <div class="section-heading"><div><p class="kicker">BUDGET CHECK</p><h2 id="bill-budget-title">How does this bill compare with the plan?</h2></div></div>
+            <div class="metric-ledger bill-metrics" id="bill-budget-metrics"></div>
+            <p id="bill-budget-boundary"></p>
+          </section>
+
           <section class="comparison-section" aria-labelledby="model-mix-title">
             <div class="section-heading">
               <div>
@@ -933,6 +939,14 @@
                 </div>
                 <label><input id="previous-bill-scope" type="checkbox" /> I checked that both bills cover the same provider, account, workload, currency, and gross or net basis, with no overlapping charges.</label>
                 <p>Both service periods must be supplied, complete, and non-overlapping. Equal lengths allow a raw bill change; different lengths show calendar-day amounts as a reference only. Fixed monthly plans can differ per day because of month length. Neither comparison proves a cause or savings.</p>
+              </details>
+              <details class="builder-more-paths" id="bill-budget-input"><summary>Have a budget for this bill? <span>Check it against the same period</span></summary>
+                <p>Use a budget for this bill's provider, account, workload, currency, and declared service period. A monthly budget cannot be compared with an annual invoice or an unknown service period.</p>
+                <div class="field-grid compact-fields">
+                  <label><span>Budget for this service period</span><input id="bill-budget-amount" type="number" min="0" step="any" /></label>
+                </div>
+                <label><input id="bill-budget-scope" type="checkbox" /> I checked that the budget and bill cover the same provider, account, workload, currency, gross or net basis, and service period.</label>
+                <p>This is a one-time check of entered amounts. AI Cost Lens does not monitor spend or send budget alerts.</p>
               </details>
               <p>An invoice proves cost, not usage or outcomes. Missing requests, tokens, retries, and human effort stay unavailable. One bill cannot establish savings. Add detailed usage later only when it is useful.</p>
               <details class="builder-more-paths"><summary>Have more detail? <span>Add usage with a universal CSV</span></summary>
