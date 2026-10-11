@@ -3612,6 +3612,15 @@
       const rows = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.data) ? parsed.data : null;
       if (!rows?.length) throw new Error("The request-log JSON needs a top-level array or a data array with at least one flat object.");
       if (rows.length > 20000) throw new Error("The request log exceeds 20,000 data rows.");
+      if (!Array.isArray(parsed) && rows.some((row) => row && Object.prototype.hasOwnProperty.call(row, "spend")
+        && (Object.prototype.hasOwnProperty.call(row, "model_group") || Object.prototype.hasOwnProperty.call(row, "startTime")))) {
+        const total = Number(parsed.total);
+        const page = Number(parsed.page);
+        if (parsed.total_is_capped === true || (Number.isFinite(total) && total > rows.length)
+          || (Number.isFinite(page) && page > 1) || Number(parsed.total_pages) > 1) {
+          throw new Error("This LiteLLM response contains only part of the spend log. Export all pages for the same period as one JSON array before analyzing or reconciling a bill.");
+        }
+      }
       rows.forEach((row, index) => {
         if (row && typeof row === "object" && !Array.isArray(row)) {
           Object.defineProperties(row, { __source_row: { value: index + 1 }, __source_index: { value: index } });
@@ -3937,7 +3946,10 @@
       const supplied = review.events.filter((event) => event[field] !== null && event[field] !== undefined).length;
       return `<div><dt>${escapeHtml(field.replaceAll("_", " "))}</dt><dd>${wholeNumber(supplied)} of ${wholeNumber(review.event_count)}</dd></div>`;
     }).join("");
-    document.getElementById("request-import-coverage").innerHTML = `<p><strong>Detected adapter:</strong> ${escapeHtml(review.source.adapter)}. AI Cost Lens accepts universal flat files plus flat OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone field names; it does not send credentials or query those services.</p><dl>${coverage}</dl><p>Source SHA-256: ${escapeHtml(review.source.sha256 || "Unavailable in this browser")}. Prompt contents and unknown source fields were not copied. Automatic catalog pricing requires a timestamp inside the catalog validity window, matching USD currency, a supported processing mode or batch flag, cached-input tokens, and tool charges. Routes with separate cache-write or storage charges also require explicit write tokens, duration where applicable, and storage token-hours. Missing inputs leave the row unpriced. ${review.reconciliation.duplicate_rows_flagged ? `${wholeNumber(review.reconciliation.duplicate_rows_flagged)} rows share a repeated event ID and remain in the export with a duplicate-group flag. The duplicate-excluded total is a reconciliation reference only: AI Cost Lens does not delete, allocate, or presume any row is invalid.` : "No repeated provider/event-ID group was detected."}</p>`;
+    const liteLLMNote = review.source.adapter.includes("LiteLLM")
+      ? " LiteLLM spend is a gateway calculation in USD, not provider billing evidence; reconcile it to the provider bill before acting. A $0 gateway row with tokens may mean missing proxy pricing; verify it before relying on the total. Timestamps without a timezone are left undated, so period analysis needs timestamp offsets."
+      : "";
+    document.getElementById("request-import-coverage").innerHTML = `<p><strong>Detected adapter:</strong> ${escapeHtml(review.source.adapter)}. AI Cost Lens accepts universal flat files, LiteLLM spend logs, and flat OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone fields. It does not send credentials or query those services.</p><dl>${coverage}</dl><p>Source SHA-256: ${escapeHtml(review.source.sha256 || "Unavailable in this browser")}. Prompt contents and unknown source fields were not copied.${liteLLMNote} Automatic catalog pricing requires a timestamp inside the catalog validity window, matching USD currency, a supported processing mode or batch flag, cached-input tokens, and tool charges. Routes with separate cache-write or storage charges also require explicit write tokens, duration where applicable, and storage token-hours. Missing inputs leave the row unpriced. ${review.reconciliation.duplicate_rows_flagged ? `${wholeNumber(review.reconciliation.duplicate_rows_flagged)} rows share a repeated event ID and remain in the export with a duplicate-group flag. The duplicate-excluded total is a reconciliation reference only: AI Cost Lens does not delete, allocate, or presume any row is invalid.` : "No repeated provider/event-ID group was detected."}</p>`;
     result.hidden = false;
   }
 
