@@ -340,6 +340,7 @@ assert.equal(api.state.data.config.previousBill.amount,'100');
 assert.match(el('bill-history-metrics').innerHTML,/−\$10\.00/);
 assert.match(el('bill-history-metrics').innerHTML,/10\.0% lower/);
 assert.match(el('bill-history-boundary').textContent,/does not explain why.*savings/);
+assert.match(el('bill-opportunity-ledger').textContent || el('bill-opportunity-ledger').innerHTML,/two unverified bill totals/);
 const savedTwoBills=JSON.parse(JSON.stringify(api.state.data));
 savedTwoBills.config.previousBill.amount='-100';
 api.state.data=savedTwoBills;
@@ -357,6 +358,29 @@ el('previous-bill-scope').checked=true;
 await submit();
 assert.match(el('bill-history-boundary').textContent,/different lengths/);
 assert.doesNotMatch(el('bill-history-metrics').innerHTML,/Bill change/);
+assert.match(el('bill-history-metrics').innerHTML,/Calendar-day reference/);
+assert.match(el('bill-history-boundary').textContent,/fixed monthly plans/);
+assert.doesNotMatch(el('bill-opportunity-ledger').innerHTML,/\d+\.\d% lower/);
+await click('start-review'); await mode('single');
+for (const [id,value] of Object.entries({
+  'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',
+  'invoice-period-start':'2026-09-01','invoice-period-end':'2026-09-30','invoice-amount':'90','invoice-currency':'EUR',
+  'previous-bill-amount':'100','previous-bill-date':'2026-08-31','previous-bill-start':'2026-08-01','previous-bill-end':'2026-08-31',
+})) el(id).value=value;
+el('previous-bill-scope').checked=true;
+await submit();
+assert.match(el('bill-history-metrics').innerHTML,/Calendar-day reference/);
+assert.match(el('bill-history-metrics').innerHTML,/€3\.23.*€3\.00/);
+assert.doesNotMatch(el('bill-history-metrics').innerHTML,/Bill change|\$100/);
+await click('start-review'); await mode('single');
+for (const [id,value] of Object.entries({
+  'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',
+  'invoice-period-start':'2026-09-01','invoice-period-end':'2026-09-30','invoice-amount':'90','invoice-currency':'USD',
+  'previous-bill-amount':'100','previous-bill-date':'2026-08-30','previous-bill-start':'2026-08-01','previous-bill-end':'2026-08-30',
+})) el(id).value=value;
+await submit();
+assert.match(el('bill-history-boundary').textContent,/Matching provider/);
+assert.doesNotMatch(el('bill-history-metrics').innerHTML,/Bill change|Calendar-day reference/);
 await click('start-review'); await mode('single');
 for (const [id,value] of Object.entries({
   'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',
@@ -367,6 +391,7 @@ el('previous-bill-scope').checked=true;
 await submit();
 assert.match(el('bill-history-metrics').innerHTML,/Percentage unavailable: the previous bill was zero/);
 assert.match(el('bill-history-boundary').textContent,/does not.*savings/);
+assert.doesNotMatch(el('bill-opportunity-ledger').innerHTML,/0\.0% higher/);
 assert.equal(el('builder-error').classList.contains('visible'),false);
 await click('review-usage');
 assert.equal(document.body.classList.contains('bill-usage-mode'),true);
