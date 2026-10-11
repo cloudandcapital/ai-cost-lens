@@ -337,6 +337,7 @@ for (const [id,value] of Object.entries({
 el('previous-bill-scope').checked=true;
 await submit();
 assert.equal(api.state.data.config.previousBill.amount,'100');
+assert.match(el('bill-period-label').textContent,/declared service period, not independently verified/);
 assert.match(el('bill-history-metrics').innerHTML,/−\$10\.00/);
 assert.match(el('bill-history-metrics').innerHTML,/10\.0% lower/);
 assert.match(el('bill-history-boundary').textContent,/does not explain why.*savings/);
