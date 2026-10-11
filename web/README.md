@@ -160,4 +160,4 @@ The test suite compares the committed browser demo byte-for-value with the Pytho
 
 The interface must always label illustrative data and must not display example or public evidence as customer results.
 
-The October 5, 2026 catalog review adds GPT-6.1 Sol and Claude Sonnet 5.5 with release-date coverage and rechecks every retained entry. See [the provider audit](../docs/pricing-snapshots/2026-10-05-review.md) for rates, geography rules, exclusions and the unchanged November 21 review deadline.
+The October 11, 2026 catalog refresh corrects Sonnet 5.5 cache-read pricing, adds Haiku 5.5 and Gemini 3.6 Flash, and treats deprecated Gemini 3.5/3.7 Flash IDs as historical routed aliases. See [the refresh record](../docs/pricing-snapshots/2026-10-11-review.md) and [the October 5 provider audit](../docs/pricing-snapshots/2026-10-05-review.md). The review deadline remains November 21.

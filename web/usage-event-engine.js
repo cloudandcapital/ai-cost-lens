@@ -154,16 +154,29 @@
   }
 
   function calculatedTokenCost(event, catalog) {
-    const model = findModel(catalog, event.provider, event.model);
+    let model = findModel(catalog, event.provider, event.model);
     if (!model || event.input_tokens === null || event.output_tokens === null) return null;
     if (event.currency !== catalog.currency || event.processing_mode === null || event.cached_input_tokens === null || event.tool_charges === null || !event.timestamp) return null;
     const eventDate = event.timestamp.slice(0, 10);
+    let routedModelId = null;
+    if (model.routed_to_model_id) {
+      if (eventDate > model.last_verified_unrouted_at && eventDate < model.routing_confirmed_at) return null;
+      if (eventDate >= model.routing_confirmed_at) {
+        const target = catalog.models.find((candidate) => candidate.id === model.routed_to_model_id);
+        if (!target || target.routed_to_model_id) return null;
+        model = target;
+        routedModelId = target.id;
+      }
+    }
     if (eventDate < (model.effective_at || catalog.effective_at) || eventDate > catalog.review_by) return null;
     const pricedMode = event.processing_mode === "priority" && model.provider === "OpenAI" && model.fast ? "fast" : event.processing_mode;
     if (model.unsupported_combinations?.includes(`${pricedMode}+${event.inference_geography || "global"}`)) return null;
     if ((model.promotional_rate_guaranteed_through && eventDate > model.promotional_rate_guaranteed_through) ||
       (model.scheduled_rate_change && eventDate >= model.scheduled_rate_change.effective_at)) return null;
-    const base = model[pricedMode];
+    const currentRates = model[pricedMode];
+    const base = currentRates && model.rate_change && eventDate <= model.rate_change.prior_through
+      ? { ...currentRates, ...(model.rate_change.prior_rates[pricedMode] || {}) }
+      : currentRates;
     if (!base) return null;
     const hasSeparateWriteRate = ["cache_write", "cache_write_5m", "cache_write_1h"].some((field) => base[field] !== null && base[field] !== undefined);
     if (hasSeparateWriteRate && event.cache_write_tokens === null) return null;
@@ -204,7 +217,7 @@
       + cacheWrite * (cacheWriteRate || 0)
       + event.output_tokens * rates.output
     ) / 1_000_000 + storageCost;
-    return round(tokenCost + event.tool_charges);
+    return { cost: round(tokenCost + event.tool_charges), routed_model_id: routedModelId };
   }
 
   function normalizeStatus(value) {
@@ -279,6 +292,7 @@
       tool_call_count: number(pick(map, "tool_call_count"), `Row ${index + 1} tool-call count`, { integer: true }),
       outcome_status: text(pick(map, "outcome_status"), `Row ${index + 1} outcome status`),
       duplicate_group: null,
+      routed_model_id: null,
     };
     if (!event.customer_product) event.customer_product = [event.customer, event.product].filter(Boolean).join(" · ") || null;
     if (event.currency && !/^[A-Z]{3}$/.test(event.currency)) throw new Error(`Row ${index + 1} currency must be a three-letter code.`);
@@ -291,7 +305,11 @@
     if (event.input_tokens !== null && (event.cached_input_tokens || 0) + (event.cache_write_tokens || 0) > event.input_tokens) {
       throw new Error(`Row ${index + 1} cache-read and cache-write tokens cannot exceed input tokens.`);
     }
-    if (event.calculated_cost === null) event.calculated_cost = calculatedTokenCost(event, options.catalog);
+    if (event.calculated_cost === null) {
+      const calculated = calculatedTokenCost(event, options.catalog);
+      event.calculated_cost = calculated?.cost ?? null;
+      event.routed_model_id = calculated?.routed_model_id || null;
+    }
     event.selected_cost = event.provider_reported_cost !== null ? event.provider_reported_cost : event.calculated_cost;
     event.cost_basis = event.provider_reported_cost !== null ? "provider_reported" : event.calculated_cost !== null ? "calculated" : "unpriced";
     return event;
@@ -1443,7 +1461,7 @@
 
   function normalizedCsv(review) {
     if (!review || review.schema_version !== REVIEW_SCHEMA || !Array.isArray(review.events)) throw new Error("A normalized usage review is required.");
-    const fields = ["record_id", "event_id", "timestamp", "provider", "billing_channel", "processing_mode", "inference_geography", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "customer_product", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_duration_seconds", "cache_storage_token_hours", "batch", "tool_charges", "provider_reported_cost", "calculated_cost", "selected_cost", "cost_basis", "currency", "request_status", "retry_parent_event_id", "latency_ms", "evidence_source", "source_file_hash", "prefix_fingerprint", "tool_call_count", "outcome_status", "duplicate_group"];
+    const fields = ["record_id", "event_id", "timestamp", "provider", "billing_channel", "processing_mode", "inference_geography", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "customer_product", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_duration_seconds", "cache_storage_token_hours", "batch", "tool_charges", "provider_reported_cost", "calculated_cost", "selected_cost", "cost_basis", "currency", "request_status", "retry_parent_event_id", "latency_ms", "evidence_source", "source_file_hash", "prefix_fingerprint", "tool_call_count", "outcome_status", "duplicate_group", "routed_model_id"];
     return `${fields.join(",")}\n${review.events.map((event) => fields.map((field) => csvCell(event[field])).join(",")).join("\n")}\n`;
   }
 

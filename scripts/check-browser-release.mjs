@@ -271,7 +271,9 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   }
   const currentRates = [
     ["GPT-6.1 Sol", ["INPUT\n$2.00", "CACHED INPUT\n$0.10", "CACHE WRITE\n$2.50", "OUTPUT\n$10.00"]],
-    ["Claude Sonnet 5.5", ["INPUT\n$2.00", "CACHED INPUT\n$0.20", "CACHE WRITE · 5 MIN\n$2.50", "OUTPUT\n$10.00"]],
+    ["Claude Sonnet 5.5", ["INPUT\n$2.00", "CACHED INPUT\n$0.10", "CACHE WRITE · 5 MIN\n$2.50", "OUTPUT\n$10.00"]],
+    ["Claude Haiku 5.5", ["INPUT\n$0.10", "CACHED INPUT\n$0.01", "CACHE WRITE · 5 MIN\n$0.125", "OUTPUT\n$0.50"]],
+    ["Gemini 3.6 Flash", ["INPUT\n$0.75", "CACHED INPUT\n$0.075", "OUTPUT\n$3.75"]],
     ["GPT-6 Sol", ["INPUT\n$2.00", "CACHED INPUT\n$0.20", "CACHE WRITE\n$2.50", "OUTPUT\n$10.00"]],
     ["GPT-6 Luna", ["INPUT\n$0.10", "CACHED INPUT\n$0.01", "CACHE WRITE\n$0.125", "OUTPUT\n$0.50"]],
     ["Claude Opus 5.5", ["INPUT\n$4.00", "CACHED INPUT\n$0.20", "CACHE WRITE · 5 MIN\n$5.00", "OUTPUT\n$20.00"]],
@@ -283,8 +285,16 @@ async function priceAndUsageFlow(engineName, engine, origin) {
       assert(row.toUpperCase().includes(expected), `${engineName}: ${name} missing ${expected.replace("\n", " ")}.`);
     }
     const provenance = await card.locator(".model-catalog-card-head span").textContent();
-    assert(provenance.includes("checked 2026-10-05"), `${engineName}: ${name} is missing its checked date: ${provenance}`);
+    const expectedCheck = ["Claude Sonnet 5.5", "Claude Haiku 5.5", "Gemini 3.6 Flash"].includes(name) ? "2026-10-11" : "2026-10-05";
+    assert(provenance.includes(`checked ${expectedCheck}`), `${engineName}: ${name} is missing its checked date: ${provenance}`);
   }
+  for (const oldName of ["Gemini 3.5 Flash", "Gemini 3.7 Flash"]) {
+    assert(await page.locator(".model-catalog-card").filter({ has: page.getByRole("link", { name: oldName, exact: true }) }).count() === 0,
+      `${engineName}: deprecated ${oldName} is still a current catalog choice.`);
+  }
+  const haikuCard = page.locator(".model-catalog-card").filter({ has: page.getByRole("link", { name: "Claude Haiku 5.5", exact: true }) });
+  assert((await haikuCard.innerText()).includes("over 100,000 input tokens per request"), `${engineName}: Haiku threshold is missing.`);
+  assert((await haikuCard.innerText()).includes("1-hour cache write $1.00"), `${engineName}: Haiku long-context 1-hour cache write is missing.`);
   for (const [name, rates] of [
     ["GPT-6 Sol", ["INPUT\n$4.00", "CACHED INPUT\n$0.40", "CACHE WRITE\n$5.00", "OUTPUT\n$15.00"]],
     ["GPT-6 Luna", ["INPUT\n$0.20", "CACHED INPUT\n$0.02", "CACHE WRITE\n$0.25", "OUTPUT\n$0.75"]],

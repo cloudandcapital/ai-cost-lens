@@ -84,10 +84,13 @@ for (const [model, before, release] of [[sol, "2026-09-28", "2026-09-29"], [sonn
  e.priceModel(model, {...scenario, pricing_date: release});
 }
 const prior = require("./docs/pricing-snapshots/pricing-catalog-2026-09-23.js");
+const october5 = require("./docs/pricing-snapshots/pricing-catalog-2026-10-05.js");
 assert.equal(prior.models.length, 17);
-assert.equal(c.models.length, 19);
+assert.equal(october5.models.length, 19);
+assert.equal(c.models.length, 21);
 assert.equal(e.selectCatalog([prior, c], "2026-10-04").catalog_version, "2026-09-23");
-assert.equal(e.selectCatalog([prior, c], "2026-10-05").catalog_version, "2026-10-05");
+assert.equal(e.selectCatalog([prior, october5, c], "2026-10-05").catalog_version, "2026-10-05");
+assert.equal(e.selectCatalog([prior, october5, c], "2026-10-11").catalog_version, "2026-10-11");
 e.requireCatalogDateCoverage(c, "2026-11-21");
 assert.throws(() => e.requireCatalogDateCoverage(c, "2026-11-22"), /review date/);
 assert.throws(() => e.requireCatalogDateCoverage(c, "2026-02-30"), /real calendar date/);
@@ -150,4 +153,63 @@ const review = usage.buildReview([row], {catalog: c});
 assert.equal(review.evidence_gate.savings_claim_allowed, false);
 assert.equal(review.privacy.source_file_uploaded, false);
 assert.equal(review.privacy.parsed_locally, true);
+""")
+
+
+def test_october_rate_history_haiku_boundary_and_routed_gemini():
+    run_node(r"""
+const haiku = byId["anthropic/claude-haiku-5.5"];
+const old = e.priceModel(sonnet, {...scenario, pricing_date: "2026-10-06"});
+const current = e.priceModel(sonnet, {...scenario, pricing_date: "2026-10-07"});
+assert.equal(old.estimated_monthly_cost_usd, 6.215);
+assert.equal(old.rates_per_1m_tokens.cached_input, .2);
+assert.equal(old.estimated_annual_cost_usd, null);
+assert.equal(current.estimated_monthly_cost_usd, 6.17);
+assert.equal(current.rates_per_1m_tokens.cached_input, .1);
+assert.equal(current.pricing_effective_at, "2026-10-07");
+assert.equal(e.priceModel(sonnet, {...scenario, pricing_date: "2026-10-07"},
+ {processing_mode: "batch"}).rates_per_1m_tokens.cached_input, .05);
+
+const base = {...scenario, calls_per_month: 1, cache_refreshes_per_month: 0,
+ cached_input_share: .5, input_tokens: 100000, output_tokens: 1000, pricing_date: "2026-10-11"};
+const at = e.priceModel(haiku, base);
+const over = e.priceModel(haiku, {...base, input_tokens: 100001});
+assert.equal(at.estimated_monthly_cost_usd, .006);
+assert.equal(at.pricing_adjustment, "standard_context");
+assert.equal(over.pricing_adjustment, "long_context");
+assert.deepEqual(over.rates_per_1m_tokens, {input: .5, cached_input: .05,
+ cache_write_5m: .625, cache_write_1h: 1, output: 2.5});
+const batchUs = e.priceModel(haiku, {...base, input_tokens: 100001, cache_refreshes_per_month: 1,
+ cache_write_duration: "1h"}, {processing_mode: "batch", geography: "us"});
+assert.equal(batchUs.rates_per_1m_tokens.cache_write_1h, .55);
+assert.equal(batchUs.rates_per_1m_tokens.output, 1.375);
+assert.throws(() => e.priceModel(haiku, {...base, input_tokens: 1000}), /512/);
+assert.equal(e.buildEstimateRecord(c, e.compareModels(c, [haiku.id, sonnet.id], base), base,
+ {tokens: 100000, method: "manual"}).evidence_gate.savings_claim_allowed, false);
+
+const gemini = byId["google/gemini-3.5-flash"];
+assert.throws(() => e.priceModel(gemini, {...base}), /historical route/);
+assert.equal(e.priceModel(gemini, {...base, pricing_date: "2026-10-05"}).rates_per_1m_tokens.output, 9);
+for (const id of ["google/gemini-3.5-flash", "google/gemini-3.7-flash"]) {
+ assert.throws(() => e.compareModels(c, [id], base), /historical route/);
+}
+const usage = require("./web/usage-event-engine.js");
+const row = {provider: "Google", model: "gemini-3.5-flash", timestamp: "2026-10-05T12:00:00Z",
+ input_tokens: 1000, output_tokens: 500, cached_input_tokens: 0, cache_write_tokens: 0,
+ cache_storage_token_hours: 0, processing_mode: "standard", currency: "USD", tool_charges: 0};
+const price = (changes = {}) => usage.normalizeRows([{...row, ...changes}], {catalog: c})[0];
+assert.equal(price().calculated_cost, .006);
+assert.equal(price({timestamp: "2026-10-06T12:00:00Z"}).cost_basis, "unpriced");
+assert.equal(price({timestamp: "2026-10-08T12:00:00Z", provider_reported_cost: .02}).selected_cost, .02);
+const routed = price({timestamp: "2026-10-09T12:00:00Z"});
+assert.equal(routed.calculated_cost, .002625);
+assert.equal(routed.routed_model_id, "google/gemini-3.6-flash");
+assert.match(usage.normalizedCsv(usage.buildReview([{...row, timestamp: "2026-10-09T12:00:00Z"}],
+ {catalog: c})), /google\/gemini-3.6-flash/);
+assert.equal(price({model: "gemini-3.7-flash", timestamp: "2026-10-09T12:00:00Z"}).routed_model_id,
+ "google/gemini-3.8-flash");
+const claudeRow = {...row, provider: "Anthropic", model: "claude-sonnet-5-5",
+ cached_input_tokens: 400, cache_storage_token_hours: null};
+assert.equal(price({...claudeRow, timestamp: "2026-10-06T12:00:00Z"}).calculated_cost, .00628);
+assert.equal(price({...claudeRow, timestamp: "2026-10-07T12:00:00Z"}).calculated_cost, .00624);
 """)
