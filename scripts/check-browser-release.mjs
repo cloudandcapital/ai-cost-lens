@@ -90,7 +90,7 @@ async function saveJsonDownload(page, selector, filename) {
 }
 
 async function openAdvancedChoices(page) {
-  const choices = page.locator(".builder-more-paths");
+  const choices = page.locator(".builder-mode-choice > .builder-more-paths");
   if (!(await choices.evaluate((element) => element.open))) await choices.locator("summary").click();
 }
 
@@ -444,6 +444,17 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   if (engineName === "chromium") await verifyFictionalProjectCost(page);
   await page.locator("#start-review").click();
   await page.locator('[data-builder-mode="single"]').click();
+  assert((await page.locator("#single-builder-fields .path-requirements").first().innerText()).includes("no file is required"), `${engineName}: bill-only path incorrectly requires a CSV.`);
+  const detailedCsv = page.locator("#single-builder-fields details").filter({ hasText: "Have more detail?" });
+  assert(!(await page.locator("#single-spend-file").isVisible()), `${engineName}: advanced CSV instructions obscure the manual bill entry.`);
+  assert(!(await page.locator("#single-work-file").isVisible()), `${engineName}: optional outcome inputs obscure the manual bill entry.`);
+  await detailedCsv.locator("summary").click();
+  assert(await page.locator("#single-spend-file").isVisible(), `${engineName}: detailed CSV path cannot be opened.`);
+  await detailedCsv.locator("summary").click();
+  const outcomeDetails = page.locator("#single-builder-fields details").filter({ hasText: "Add outcome evidence" });
+  await outcomeDetails.locator("summary").click();
+  assert(await page.locator("#single-work-file").isVisible(), `${engineName}: optional outcome path cannot be opened.`);
+  await outcomeDetails.locator("summary").click();
   await page.locator("#invoice-provider").fill("OpenAI");
   await page.locator("#invoice-workload").fill("Personal plan");
   await page.locator("#invoice-date").fill("2026-09-23");

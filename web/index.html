@@ -898,14 +898,14 @@
         <div id="single-builder-fields" hidden>
           <div class="path-requirements">
             <strong>What you need</strong>
-            <span>One completed spend template with the bill amount. Requests, tokens, models, outcomes, retries, and human effort are optional.</span>
+            <span>One bill amount and its date. Enter them below; no file is required. Usage, outcomes, retries, and human effort are optional.</span>
           </div>
           <section class="builder-step">
             <div class="step-number">01</div>
             <div>
               <h3>Start with one bill</h3>
               <p>For a simple subscription or invoice, enter the bill below. No CSV is required.</p>
-              <p><strong>Purchased usage credits?</strong> A credit purchase receipt records cash paid in advance, not the cost of work completed on the invoice date. Do not enter the purchase as provider cost for that work. Review the purchase and remaining balance separately; attributing consumed credits to a period or workload needs usage records.</p>
+              <details class="builder-more-paths"><summary>Purchased usage credits? <span>Check how to treat a prepayment</span></summary><p>A credit purchase receipt records cash paid in advance, not the cost of work completed on the invoice date. Do not enter the purchase as provider cost for that work. Review the purchase and remaining balance separately; attributing consumed credits to a period or workload needs usage records.</p></details>
               <div id="invoice-pdf-status" class="path-requirements" role="status" hidden></div>
               <label id="invoice-amount-choice-label" hidden><span>Choose the invoice amount to review</span><select id="invoice-amount-choice"><option value="">Review the invoice totals</option></select><small>Choose only after checking the label and amount against the invoice.</small></label>
               <div class="field-grid compact-fields invoice-entry">
@@ -918,7 +918,8 @@
                 <label><span>Currency</span><input id="invoice-currency" type="text" maxlength="3" placeholder="USD" /></label>
               </div>
               <p>An invoice proves cost, not usage or outcomes. Missing requests, tokens, retries, and human effort stay unavailable. One bill cannot establish savings. Add detailed usage later only when it is useful.</p>
-              <p><strong>More detail?</strong> Upload the universal CSV instead.</p>
+              <details class="builder-more-paths"><summary>Have more detail? <span>Add usage with a universal CSV</span></summary>
+              <p>Upload the universal CSV instead.</p>
               <p>Download the template, delete every example row, and keep the column headers. Use <strong>baseline</strong> on every new row; no proposed period is needed.</p>
               <div class="template-links"><a href="templates/ai-cost-lens-spend-template.csv" download>Download spend template</a></div>
               <p>For an invoice or subscription, enter one row with <code>period=baseline</code>, the invoice date in <code>date</code> (YYYY-MM-DD), the subscription or workload name in <code>workload</code>, the billed amount in <code>provider_cost</code>, <code>cost_basis=provider_reported</code>, and a three-letter <code>currency</code>. Enter <code>provider</code> if known. Leave model, route, requests and tokens blank unless the source supports them. An invoice date is not evidence of the service-period duration.</p>
@@ -926,6 +927,7 @@
               <p>Each cost amount must appear once. If cost cannot be joined to model-level usage, aggregate usage to the bill boundary in one row and leave model/route blank; do not spread dollars by token share. Use <code>calculated</code> for quantity × rate or <code>allocated</code> for a documented share of a bill, never label those billed evidence. Keep one currency, workload and cost basis per review.</p>
               <p>This detailed upload expects the completed universal CSV. Use Upload what you have for supported provider exports, structured-file mapping, or a text-based OpenAI or Anthropic invoice PDF. Scans and screenshots are not read.</p>
               <div class="file-pair single-file-row"><label class="field-wide"><span>Universal spend CSV</span><input id="single-spend-file" type="file" accept=".csv,text/csv" /></label></div>
+              </details>
             </div>
           </section>
           <section class="builder-step">
@@ -933,6 +935,7 @@
             <div>
               <h3>Optional: connect the bill to finished work</h3>
               <p>No outcome file is needed for a useful bill and usage review. Add one only when you want to calculate provider cost per ready result. Each result is finished work, not an API call.</p>
+              <details class="builder-more-paths"><summary>Add outcome evidence <span>Optional work log and cost inputs</span></summary>
               <div class="template-links"><a href="templates/ai-cost-lens-work-log-template.csv" download>Download work template</a></div>
               <p>Replace all examples. Use <code>period=baseline</code>, a unique <code>result_id</code>, and an <code>outcome_status</code> of ready_to_use, needs_correction or needs_escalation. Add <code>model_requests</code>, <code>retry_requests</code>, or <code>human_minutes</code> only when your records support them. Missing optional fields stay unavailable and do not block the earlier bill or usage review.</p>
               <p class="result-unit-note"><strong>Human effort is optional.</strong> Use it only when a person actively reviews, corrects, reruns, escalates, or approves the output. Use workflow timestamps or a short timed sample when available. If nobody reviews the output, leave human minutes and the hourly rate blank. Never invent a zero.</p>
@@ -946,6 +949,7 @@
               <label><input id="single-complete" type="checkbox" /> The cost, usage and full outcome log cover the same workload and service period, with no omitted results.</label>
               <p>Without outcomes, the result is still a useful cost and usage review. With reconciled complete outcomes, it adds provider cost per ready result. Full operating unit cost appears only when relevant human and shared costs are supplied. Zero ready results means unit cost is unavailable. For a route comparison, use the separate comparison path and its evidence gates.</p>
               <p>Downloaded single-bill JSON includes the supplied CSV rows, including result IDs. Keep it private. It is recalculated and validated when reopened; files are not uploaded.</p>
+              </details>
             </div>
           </section>
         </div>
