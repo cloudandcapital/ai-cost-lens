@@ -340,6 +340,34 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const usage = await saveJsonDownload(page, "#download-usage-review", `${engineName}-usage-review.json`);
   assert(usage.event_count === 7, `${engineName}: usage import did not retain all seven rows.`);
   assert(usage.evidence_gate.savings_claim_allowed === false, `${engineName}: usage review allowed a savings claim.`);
+  const gatewayRows = [
+    { request_id: "gateway-1", startTime: "2026-10-09T12:00:00Z", model: "gpt-6-sol", model_group: "route-a",
+      custom_llm_provider: "openai", team_id: "team-a", prompt_tokens: 100, completion_tokens: 20,
+      spend: 0.2, metadata: { prompt: "private prompt" }, messages: { content: "private message" }, api_key: "private key" },
+    { request_id: "gateway-2", startTime: "2026-10-09T12:01:00Z", model: "gpt-6-sol", model_group: "route-a",
+      custom_llm_provider: "openai", prompt_tokens: 200, completion_tokens: 30, spend: 0.3 },
+  ];
+  await page.locator("#request-log-file").setInputFiles({
+    name: "litellm-spend.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(gatewayRows)),
+  });
+  await page.locator("#request-billed-total").fill("0.60");
+  await page.locator("#request-billed-currency").fill("USD");
+  await page.locator("#request-bill-scope-confirmed").check();
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  const gateway = await saveJsonDownload(page, "#download-usage-review", `${engineName}-litellm-review.json`);
+  assert(gateway.source.adapter.includes("LiteLLM") && gateway.event_count === 2, `${engineName}: LiteLLM adapter lost rows.`);
+  assert(gateway.reconciliation.provider_reported_cost === null
+    && gateway.reconciliation.bill.raw_selected_cost_difference === 0.1, `${engineName}: gateway spend was misclassified as invoice evidence.`);
+  assert(gateway.evidence_gate.savings_claim_allowed === false, `${engineName}: gateway telemetry became a savings claim.`);
+  assert(!JSON.stringify(gateway).includes("private"), `${engineName}: LiteLLM private fields entered the normalized export.`);
+  await page.locator("#request-log-file").setInputFiles({
+    name: "litellm-page.json", mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({ data: gatewayRows.slice(0, 1), total: 2, page: 1, page_size: 1, total_pages: 2 })),
+  });
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-log-error.visible").waitFor({ state: "visible" });
+  assert((await page.locator("#request-log-error").innerText()).includes("only part of the spend log"), `${engineName}: paginated LiteLLM file was accepted as complete.`);
   await page.locator("#request-billed-total").fill("70");
   await page.locator("#request-billed-currency").fill("USD");
   await page.locator("#request-bill-scope-confirmed").check();

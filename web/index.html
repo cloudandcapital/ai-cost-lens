@@ -421,7 +421,7 @@
               </div>
               <span class="mode-tag">LOCAL FILE · NO PROMPTS REQUIRED</span>
             </div>
-            <p class="request-review-intro">Add a flat CSV or JSON request log to break down spend, calculate an evidence-gated run rate, and detect duplicate billing records, failed and repeated calls, retry loops, repeated uncached prefixes, oversized inputs, excessive outputs, reasoning intensity, and repeated tool use. Your source file is parsed in this browser and is not uploaded.</p>
+            <p class="request-review-intro">Add a CSV or JSON request log, including a LiteLLM spend-log export, to break down spend, calculate an evidence-gated run rate, and detect duplicate records, failed and repeated calls, retry loops, repeated uncached prefixes, oversized inputs, excessive outputs, reasoning intensity, and repeated tool use. Gateway spend remains separate from provider billing evidence. Your source file is parsed in this browser and is not uploaded.</p>
             <div class="request-import-row">
               <label>
                 <span>Request log</span>
@@ -435,7 +435,7 @@
               </div>
             </div>
             <p class="request-format-note">Rows with invalid values or the wrong number of CSV fields are excluded from a scoped review. Download the issue list, correct the source, and analyze again for a whole-log comparison.</p>
-            <p class="request-format-note">Use one row per AI request or trace observation. The CLI canonical CSV is a separate period-level billing format and is not interchangeable with this request log.</p>
+            <p class="request-format-note">Use one row per AI request or trace observation. For LiteLLM, export all pages of individual spend logs; a single paginated response is incomplete. The CLI canonical CSV is a separate period-level billing format and is not interchangeable with this request log.</p>
             <div class="request-reconciliation-inputs">
               <label><span>User-entered billed total (unverified)</span><input id="request-billed-total" type="number" min="0" step="any" placeholder="Not supplied" /><small>Compare with request cost only after checking the same scope. This field does not verify an invoice.</small></label>
               <label><span>Bill currency</span><input id="request-billed-currency" type="text" maxlength="3" placeholder="e.g. USD" /></label>

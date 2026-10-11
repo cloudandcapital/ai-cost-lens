@@ -79,6 +79,47 @@
     return result;
   }
 
+  function isLiteLLMSpendRow(row) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+    const keys = new Set(Object.keys(row).map(normalizeKey));
+    return keys.has("spend") && (keys.has("model_group") || keys.has("starttime") || keys.has("custom_llm_provider"))
+      && (keys.has("prompt_tokens") || keys.has("completion_tokens"));
+  }
+
+  function liteLLMSpendRow(row) {
+    // LiteLLM's spend is a gateway calculation, not a provider invoice. Copy only
+    // the fields needed for local analysis; never retain messages, response,
+    // metadata, API keys, request bodies, IP addresses, or unknown fields.
+    const source = valueMap(row);
+    const read = (name) => source.get(name) ?? null;
+    const rawTime = read("starttime") ?? read("start_time");
+    const time = typeof rawTime === "string" && /(?:Z|[+-]\d{2}:\d{2})$/i.test(rawTime.trim())
+      ? rawTime : null;
+    const providerCode = String(read("custom_llm_provider") || "").toLowerCase();
+    const provider = { openai: "OpenAI", anthropic: "Anthropic", gemini: "Google", vertex_ai: "Vertex AI",
+      azure: "Azure", bedrock: "AWS Bedrock", aws_bedrock: "AWS Bedrock" }[providerCode]
+      || providerCode || providerFromModel(read("model") || read("model_group"));
+    return {
+      event_id: read("request_id"),
+      timestamp: time,
+      provider,
+      billing_channel: "gateway",
+      model: read("model") || read("model_group"),
+      team_owner: read("team_id"),
+      customer: read("end_user"),
+      session_id: read("session_id"),
+      input_tokens: read("prompt_tokens"),
+      output_tokens: read("completion_tokens"),
+      calculated_cost: read("spend"),
+      currency: "USD",
+      request_status: read("status"),
+      latency_ms: read("request_duration_ms"),
+      evidence_source: "LiteLLM gateway calculated spend; provider bill not verified",
+      __source_index: row.__source_index,
+      __source_row: row.__source_row,
+    };
+  }
+
   function pick(map, field) {
     const present = aliases[field]
       .filter((name) => map.has(name))
@@ -232,6 +273,7 @@
 
   function normalizeRow(row, index, options) {
     if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error(`Row ${index + 1} must be one flat object.`);
+    if (isLiteLLMSpendRow(row)) row = liteLLMSpendRow(row);
     if (Object.values(row).some((value) => value !== null && typeof value === "object")) throw new Error(`Row ${index + 1} must not contain nested data.`);
     const map = valueMap(row);
     const model = text(pick(map, "model"), `Row ${index + 1} model`);
@@ -334,6 +376,7 @@
 
   function detectAdapter(rows) {
     const keys = new Set(Object.keys(rows[0] || {}).map(normalizeKey));
+    if (isLiteLLMSpendRow(rows[0])) return "LiteLLM spend log (gateway calculated USD)";
     if (["generation_id", "is_byok", "upstream_inference_cost"].some((key) => keys.has(key))) return "OpenRouter flat usage";
     if (["trace_id", "observation_id", "usage_details_input", "cost_details_total"].some((key) => keys.has(key))) return "Langfuse flat observation export";
     if (["helicone_id", "helicone_user", "helicone_property"].some((key) => keys.has(key))) return "Helicone flat request export";

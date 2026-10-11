@@ -67,6 +67,60 @@ console.log(JSON.stringify(review));
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_litellm_spend_log_is_gateway_cost_and_not_billing_evidence():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const rows = [
+  {request_id:"l-1",startTime:"2026-10-09T12:00:00Z",model:"gpt-6-sol",
+   model_group:"public-route",custom_llm_provider:"openai",team_id:"team-a",
+   end_user:"customer-a",prompt_tokens:100,completion_tokens:20,
+   spend:0.20,status:"success",request_duration_ms:40,
+   metadata:{project_id:"sensitive-internal",spend_logs_metadata:{prompt:"private"}},
+   messages:{role:"user",content:"secret prompt"},api_key:"secret-key"},
+  {request_id:"l-2",startTime:"2026-10-09T12:01:00Z",model:"gpt-6-sol",
+   model_group:"public-route",custom_llm_provider:"openai",team_id:"team-a",
+   prompt_tokens:200,completion_tokens:30,spend:0.30,
+   response:{content:"secret output"}},
+];
+const review = engine.buildReview(rows,{
+  billed_total:0.60,billed_currency:"USD",bill_scope_confirmed:true,
+  period_complete_confirmed:true,
+});
+const naive = engine.buildReview([{...rows[0],startTime:"2026-10-09T12:00:00"}]);
+const bedrock = engine.buildReview([{...rows[0],custom_llm_provider:"bedrock",model:"anthropic/claude-sonnet-5.5"}]);
+let rejected = false;
+try { engine.buildReview([{...rows[0],spend:"not a number"}]); }
+catch (error) { rejected = /calculated cost/.test(error.message); }
+let otherNested = false;
+try { engine.buildReview([{event_id:"other",metadata:{private:true}}]); }
+catch (error) { otherNested = true; }
+console.log(JSON.stringify({review,naive,bedrock,rejected,otherNested,normalized:engine.normalizedCsv(review)}));
+""",
+        ENGINE,
+    )
+    review = result["review"]
+    assert review["source"]["adapter"] == "LiteLLM spend log (gateway calculated USD)"
+    assert review["reconciliation"]["provider_reported_cost"] is None
+    assert review["reconciliation"]["calculated_cost_used_when_reported_missing"] == 0.5
+    assert review["reconciliation"]["bill"]["source"] == "user_entered_unverified"
+    assert review["reconciliation"]["bill"]["raw_selected_cost_difference"] == 0.1
+    assert review["evidence_gate"]["savings_claim_allowed"] is False
+    assert review["events"][0]["team_owner"] == "team-a"
+    assert review["events"][0]["customer"] == "customer-a"
+    assert review["events"][0]["cost_basis"] == "calculated"
+    assert review["events"][0]["provider_reported_cost"] is None
+    assert result["naive"]["events"][0]["timestamp"] is None
+    assert result["naive"]["spend"]["run_rate_status"] != "AVAILABLE"
+    assert result["bedrock"]["events"][0]["provider"] == "AWS Bedrock"
+    assert result["rejected"] is True
+    assert result["otherNested"] is True
+    for secret in ["secret prompt", "secret output", "secret-key", "sensitive-internal"]:
+        assert secret not in json.dumps(review)
+        assert secret not in result["normalized"]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_invalid_request_rows_remain_scoped_and_block_whole_log_finance():
     result = run_node(
         r"""
