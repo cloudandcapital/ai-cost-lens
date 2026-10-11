@@ -326,6 +326,47 @@ assert.equal(el('single-verifier').value,'Preserve while correcting');
 assert.equal(el('builder-error').classList.contains('visible'),true);
 await file('single-spend-file',invoice); await submit();
 assert.equal(api.state.data.source.spend[0].workload,'Unrelated subscription');
+
+// A second entered bill is a bounded comparison, never evidence of savings.
+await click('start-review'); await mode('single');
+for (const [id,value] of Object.entries({
+  'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',
+  'invoice-period-start':'2026-09-01','invoice-period-end':'2026-09-30','invoice-amount':'90','invoice-currency':'USD',
+  'previous-bill-amount':'100','previous-bill-date':'2026-08-30','previous-bill-start':'2026-08-01','previous-bill-end':'2026-08-30',
+})) el(id).value=value;
+el('previous-bill-scope').checked=true;
+await submit();
+assert.equal(api.state.data.config.previousBill.amount,'100');
+assert.match(el('bill-history-metrics').innerHTML,/−\$10\.00/);
+assert.match(el('bill-history-metrics').innerHTML,/10\.0% lower/);
+assert.match(el('bill-history-boundary').textContent,/does not explain why.*savings/);
+const savedTwoBills=JSON.parse(JSON.stringify(api.state.data));
+savedTwoBills.config.previousBill.amount='-100';
+api.state.data=savedTwoBills;
+assert.throws(()=>api.renderAll(),/negative cost rows/,'Tampered saved bill must be recalculated and rejected.');
+api.state.data=JSON.parse(JSON.stringify(savedTwoBills));
+api.state.data.config.previousBill.amount='100';
+api.renderAll();
+await click('start-review'); await mode('single');
+for (const [id,value] of Object.entries({
+  'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',
+  'invoice-period-start':'2026-09-01','invoice-period-end':'2026-09-30','invoice-amount':'90','invoice-currency':'USD',
+  'previous-bill-amount':'0','previous-bill-date':'2026-08-31','previous-bill-start':'2026-08-01','previous-bill-end':'2026-08-31',
+})) el(id).value=value;
+el('previous-bill-scope').checked=true;
+await submit();
+assert.match(el('bill-history-boundary').textContent,/different lengths/);
+assert.doesNotMatch(el('bill-history-metrics').innerHTML,/Bill change/);
+await click('start-review'); await mode('single');
+for (const [id,value] of Object.entries({
+  'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',
+  'invoice-period-start':'2026-09-01','invoice-period-end':'2026-09-30','invoice-amount':'90','invoice-currency':'USD',
+  'previous-bill-amount':'0','previous-bill-date':'2026-08-30','previous-bill-start':'2026-08-01','previous-bill-end':'2026-08-30',
+})) el(id).value=value;
+el('previous-bill-scope').checked=true;
+await submit();
+assert.match(el('bill-history-metrics').innerHTML,/Percentage unavailable: the previous bill was zero/);
+assert.match(el('bill-history-boundary').textContent,/does not.*savings/);
 assert.equal(el('builder-error').classList.contains('visible'),false);
 await click('review-usage');
 assert.equal(document.body.classList.contains('bill-usage-mode'),true);
@@ -333,7 +374,7 @@ assert.equal(el('view-opportunities').classList.contains('active'),true);
 assert.equal(el('bill-review-screen').classList.contains('active'),false);
 await click('back-to-bill');
 assert.equal(el('bill-review-screen').classList.contains('active'),true);
-assert.equal(api.state.data.source.spend[0].workload,'Unrelated subscription');
+assert.equal(api.state.data.source.spend[0].workload,'Support summaries');
 
 await click('print-memo');
 while (timers.length) timers.shift()();
