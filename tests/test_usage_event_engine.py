@@ -115,7 +115,13 @@ console.log(JSON.stringify({review,naive,bedrock,rejected,otherNested,normalized
     assert result["bedrock"]["events"][0]["provider"] == "AWS Bedrock"
     assert result["rejected"] is True
     assert result["otherNested"] is True
-    for secret in ["secret prompt", "secret output", "secret-key", "sensitive-internal"]:
+    private_values = [
+        "secret prompt",
+        "secret output",
+        "secret-key",
+        "sensitive-internal",
+    ]
+    for secret in private_values:
         assert secret not in json.dumps(review)
         assert secret not in result["normalized"]
 
