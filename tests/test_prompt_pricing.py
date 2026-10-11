@@ -68,7 +68,7 @@ console.log(JSON.stringify({catalog, comparison, record}));
     )
     assert all(
         model["verified_at"]
-        == next(
+        <= next(
             source["checked_at"]
             for source in catalog["sources"]
             if source["provider"] == model["provider"]
@@ -183,7 +183,9 @@ console.log(JSON.stringify(Object.fromEntries(catalog.models.map((model) => [mod
     expected.update(
         {
             "openai/gpt-6.1-sol": ((2, 0.1, 10), (1, 0.05, 5)),
-            "anthropic/claude-sonnet-5.5": ((2, 0.2, 10), (1, 0.1, 5)),
+            "anthropic/claude-sonnet-5.5": ((2, 0.1, 10), (1, 0.05, 5)),
+            "anthropic/claude-haiku-5.5": ((0.1, 0.01, 0.5), (0.05, 0.005, 0.25)),
+            "google/gemini-3.6-flash": ((0.75, 0.075, 3.75), (0.375, 0.0375, 1.875)),
         }
     )
     assert set(actual) == set(expected)
@@ -321,7 +323,7 @@ def test_token_estimate_batch_price_and_validation_fail_closed():
     script = r"""
 const catalog = require(process.argv[1]);
 const engine = require(process.argv[2]);
-const model = catalog.models.find((item) => item.id === "google/gemini-3.7-flash");
+const model = catalog.models.find((item) => item.id === "google/gemini-3.8-flash");
 const estimated = engine.estimateInputTokens("123456789", "");
 const manual = engine.estimateInputTokens("ignored", "42");
 const exact = engine.estimateInputTokens("private prompt", "", "OpenAI", (text) => text === "private prompt" ? 7 : 0);

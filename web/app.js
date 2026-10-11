@@ -3695,7 +3695,7 @@
     document.getElementById("request-event-rows").innerHTML = visible.map((event) => `<tr>
       <th>${escapeHtml(event.event_id || event.record_id)}${event.duplicate_group ? `<span>${escapeHtml(event.duplicate_group)}</span>` : ""}</th>
       <td>${escapeHtml(event.timestamp ? event.timestamp.replace("T", " ").replace(".000Z", "Z") : "Not supplied")}</td>
-       <td>${escapeHtml(event.provider || "Not supplied")}<span>${escapeHtml(event.model || "Not supplied")}${event.routed_model_id ? ` · priced as ${escapeHtml(event.routed_model_id)}` : ""}</span></td>
+      <td>${escapeHtml(event.provider || "Not supplied")}<span>${escapeHtml(event.model || "Not supplied")}${event.routed_model_id ? ` · priced as ${escapeHtml(event.routed_model_id)}` : ""}</span></td>
       <td>${escapeHtml(event.project || "Not supplied")}<span>${escapeHtml(event.workload)}</span></td>
       <td>${escapeHtml(event.request_status || "Not supplied")}</td>
       <td>${event.input_tokens === null ? "Not supplied" : wholeNumber(event.input_tokens)}</td>
