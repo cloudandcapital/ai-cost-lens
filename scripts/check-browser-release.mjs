@@ -514,7 +514,8 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     await page.locator("#previous-bill-scope").check();
     await page.locator("#build-review").click();
     const unequalTrend = await page.locator("#bill-history-result").innerText();
-    assert(unequalTrend.includes("different lengths") && unequalTrend.includes("Calendar-day reference") && unequalTrend.includes("fixed monthly plans") && !unequalTrend.includes("Bill change"), "Unequal service periods were presented as a like-for-like change or lacked the daily caveat.");
+    const unequalLabels = await page.locator("#bill-history-metrics .metric-cell span").allTextContents();
+    assert(/different lengths/i.test(unequalTrend) && /calendar-day reference/i.test(unequalTrend) && /fixed monthly plans/i.test(unequalTrend) && !unequalLabels.some((label) => label.trim().toLowerCase() === "bill change"), `Unequal service periods were presented as a like-for-like change or lacked the daily caveat: ${unequalTrend}`);
   }
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `${engineName}: browser errors: ${observed.errors.join(" | ")}`);
