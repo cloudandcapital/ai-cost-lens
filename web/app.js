@@ -367,15 +367,17 @@
       if (!currentDays || !previousDays) limitations.push("Both service periods are needed; invoice dates alone do not establish coverage.");
       else {
         if (previousEnd >= declaredStart) limitations.push("The declared service periods overlap or are out of order.");
-        if (currentDays !== previousDays) limitations.push("The service periods have different lengths.");
       }
-      const comparable = limitations.length === 0;
+      const dailyComparable = limitations.length === 0;
+      const comparable = dailyComparable && currentDays === previousDays;
+      if (dailyComparable && !comparable) limitations.push("The service periods have different lengths.");
       const current = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true }).providerCost;
       billHistory = { previousAmount: amount, previousStart, previousEnd, previousDays, currentDays, comparable, limitations,
         change: comparable ? current - amount : null,
         changePct: comparable && amount > 0 ? (current - amount) / amount : null,
-        previousPerDay: previousDays ? amount / previousDays : null,
-        currentPerDay: currentDays ? current / currentDays : null,
+        previousPerDay: dailyComparable ? amount / previousDays : null,
+        currentPerDay: dailyComparable ? current / currentDays : null,
+        dailyComparable,
       };
     }
     const basis = spendCostBasis(spend, "single bill");
@@ -519,6 +521,24 @@
         : "This is provider cost divided by all supplied requests. It is a workload-level baseline, not a model price.";
 
     if (review.level === "Invoice or subscription only") {
+      const history = review.billHistory;
+      if (history?.comparable) {
+        const direction = history.change > 0 ? "rose" : history.change < 0 ? "fell" : "stayed the same";
+        return [
+          ["test", "BILL MOVEMENT", `The entered bill ${direction}`, history.change === 0 ? "No change" : history.changePct === null ? "No percentage" : `${pct(Math.abs(history.changePct), 1)} ${history.change > 0 ? "higher" : "lower"}`, "This is a change in two unverified bill totals, not a change in unit cost or proof of savings. Check line items, usage volume, plan or rate changes, and credits before assigning a cause."],
+          ["test", "CHECK NEXT", "Find what changed in use", "Usage", "For an API, compare requests, tokens, model mix, and processing mode across the same scope. For a subscription, check active seats and actual use. Add only records you have."],
+          ["leave", "QUALITY", "Check whether the work stayed useful", "Unknown", "A lower provider bill can accompany fewer ready results or more correction. Keep that unknown until a comparable outcome sample or work log is available."],
+          ["fix", "CONTROL", "Give this cost an owner and limit", "One owner", "Assign the bill to a team or use case and set a monthly budget or usage alert before the cost grows unnoticed."],
+        ];
+      }
+      if (history) {
+        return [
+          ["test", "PERIOD CHECK", "Resolve what the two bills cover", "Review", history.dailyComparable ? "The declared periods have different lengths. The calendar-day amounts above are a reference, not a like-for-like bill change; a fixed monthly subscription can differ per day solely because of month length." : `A like-for-like bill change is withheld: ${history.limitations.join(" ")}`],
+          ["test", "CHECK NEXT", "Find the relevant usage or line items", "Usage", "Check active seats for a subscription, or requests, tokens, model mix, and discounts for an API. Do not assign a cause from two totals alone."],
+          ["leave", "QUALITY", "Keep outcome quality unknown", "Unknown", "A bill does not say how many results were ready to use or how much correction they needed."],
+          ["fix", "CONTROL", "Give this cost an owner and limit", "One owner", "Set a monthly budget or usage alert for this workload when the source supports it."],
+        ];
+      }
       return [
         ["save", "START HERE", "Use this bill as the cost baseline", cost(totals.providerCost), `The review records ${cost(totals.providerCost)} against ${review.workload}. That is enough to begin tracking the cost over time.`],
         ["test", "CHECK NEXT", "Find what is using the subscription or API", "Usage", "For a subscription, check active seats and actual use. For API spend, add requests or tokens by workload when the source provides them."],
@@ -4432,10 +4452,14 @@
         const direction = history.change > 0 ? "higher" : history.change < 0 ? "lower" : "unchanged";
         rows.push(["Bill change", `${history.change < 0 ? "−" : history.change > 0 ? "+" : ""}${money(Math.abs(history.change), 2)}`, history.changePct === null ? "Percentage unavailable: the previous bill was zero." : `${pct(Math.abs(history.changePct), 1)} ${direction} across equal-length declared periods.`]);
         rows.push(["Cost per calendar day", `${money(history.previousPerDay, history.previousPerDay < 1 ? 4 : 2)} → ${money(history.currentPerDay, history.currentPerDay < 1 ? 4 : 2)}`, `${history.currentDays} days in each declared service period.`]);
+      } else if (history.dailyComparable) {
+        rows.push(["Calendar-day reference", `${money(history.previousPerDay, history.previousPerDay < 1 ? 4 : 2)} → ${money(history.currentPerDay, history.currentPerDay < 1 ? 4 : 2)}`, `${history.previousDays} days previously; ${history.currentDays} days currently. No like-for-like bill change is calculated.`]);
       }
       document.getElementById("bill-history-metrics").innerHTML = rows.map(([label, value, note]) => `<div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`).join("");
       document.getElementById("bill-history-boundary").textContent = history.comparable
         ? "This arithmetic change uses two user-entered, unverified amounts and declared matching periods. It does not explain why the bill changed or establish realized savings. Add usage or line-item evidence to investigate the cause."
+        : history.dailyComparable
+          ? "The service periods have different lengths, so raw bill totals are not like-for-like. Calendar-day amounts are arithmetic references only; fixed monthly plans can differ per day solely because of month length. This does not explain the cause or establish savings."
         : `A like-for-like change is withheld: ${history.limitations.join(" ")} The two user-entered amounts remain separate. No savings claim is supported.`;
     }
     const stage = singleBillStage(review);
@@ -4498,7 +4522,7 @@
     document.getElementById("bill-source-copy").textContent = grossNet
       ? `Provider gross ${cost(grossNet.gross)}, reported net ${cost(grossNet.net)}, gross-to-net adjustment ${cost(grossNet.adjustment)}. The export does not identify that difference as a credit; reconcile credits, discounts, and taxes with the actual invoice. List-price estimates remain separate.`
       : "Start with the records you already have. Each additional layer deepens the review without replacing the bill.";
-    document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · supplied date buckets, not proof of service-period coverage`;
+    document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${state.data.config.serviceStart ? "declared service period, not independently verified" : "supplied date buckets, not proof of service-period coverage"}`;
     document.getElementById("bill-mode-tag").textContent = stage.tag;
     document.getElementById("bill-finding-title").textContent = headline;
     document.getElementById("bill-finding-limit").textContent = stage.key === "bill"
