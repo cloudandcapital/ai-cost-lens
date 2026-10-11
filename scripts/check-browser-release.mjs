@@ -489,14 +489,19 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#previous-bill-start").fill("2026-08-01");
   await page.locator("#previous-bill-end").fill("2026-08-30");
   await page.locator("#previous-bill-scope").check();
+  await page.locator("#bill-budget-input summary").click();
+  await page.locator("#bill-budget-amount").fill("80");
+  await page.locator("#bill-budget-scope").check();
   await page.locator("#build-review").click();
   assert(await page.locator("#bill-history-result").isVisible(), `${engineName}: two-bill comparison is missing.`);
   const billTrend = await page.locator("#bill-history-result").innerText();
   assert(billTrend.includes("$100.00") && billTrend.includes("$90.00") && billTrend.includes("−$10.00") && billTrend.includes("10.0% lower"), `${engineName}: equal-period bill difference is incorrect: ${billTrend}`);
   assert(billTrend.includes("unverified") && billTrend.includes("does not explain why") && billTrend.includes("does not") && billTrend.includes("savings"), `${engineName}: a lower typed bill became a savings or causal claim.`);
+  const budgetCheck = await page.locator("#bill-budget-result").innerText();
+  assert(budgetCheck.includes("$80.00") && budgetCheck.includes("+$10.00") && budgetCheck.includes("112.5%") && budgetCheck.includes("not a live alert") && budgetCheck.includes("savings claim"), `${engineName}: same-period budget comparison is incorrect or misrepresented: ${budgetCheck}`);
   if (engineName === "chromium") {
     const savedTrend = await saveJsonDownload(page, "#download-review", "two-bill-review.json");
-    assert(savedTrend.config.previousBill.amount === "100" && savedTrend.config.previousBill.sameScope === true, "Two-bill raw inputs were not saved for recomputation.");
+    assert(savedTrend.config.previousBill.amount === "100" && savedTrend.config.previousBill.sameScope === true && savedTrend.config.billBudget.amount === "80", "Two-bill and budget raw inputs were not saved for recomputation.");
     await page.locator("#start-review").click();
     await page.locator('[data-builder-mode="single"]').click();
     await page.locator("#invoice-provider").fill("OpenAI");
@@ -513,6 +518,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     await page.locator("#previous-bill-end").fill("2026-08-31");
     await page.locator("#previous-bill-scope").check();
     await page.locator("#build-review").click();
+    assert(!(await page.locator("#bill-budget-result").isVisible()), "A previous budget persisted into a new bill review.");
     const unequalTrend = await page.locator("#bill-history-result").innerText();
     const unequalLabels = await page.locator("#bill-history-metrics .metric-cell span").allTextContents();
     assert(/different lengths/i.test(unequalTrend) && /calendar-day reference/i.test(unequalTrend) && /fixed monthly plans/i.test(unequalTrend) && !unequalLabels.some((label) => label.trim().toLowerCase() === "bill change"), `Unequal service periods were presented as a like-for-like change or lacked the daily caveat: ${unequalTrend}`);

@@ -393,6 +393,56 @@ await submit();
 assert.match(el('bill-history-metrics').innerHTML,/Percentage unavailable: the previous bill was zero/);
 assert.match(el('bill-history-boundary').textContent,/does not.*savings/);
 assert.doesNotMatch(el('bill-opportunity-ledger').innerHTML,/0\.0% higher/);
+await click('start-review'); await mode('single');
+for (const [id,value] of Object.entries({
+  'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',
+  'invoice-period-start':'2026-09-01','invoice-period-end':'2026-09-30','invoice-amount':'120','invoice-currency':'USD',
+  'bill-budget-amount':'100',
+})) el(id).value=value;
+el('bill-budget-scope').checked=true;
+await submit();
+assert.equal(api.state.data.config.billBudget.amount,'100');
+assert.match(el('bill-budget-metrics').innerHTML,/\+\$20\.00/);
+assert.match(el('bill-budget-metrics').innerHTML,/120\.0% of the entered budget used/);
+assert.match(el('bill-budget-boundary').textContent,/not a live alert.*savings claim/);
+const tamperedBudget=JSON.parse(JSON.stringify(api.state.data));
+tamperedBudget.config.billBudget.amount='-1';
+api.state.data=tamperedBudget;
+assert.throws(()=>api.renderAll(),/negative cost rows/);
+api.state.data=JSON.parse(JSON.stringify(tamperedBudget));
+api.state.data.config.billBudget.amount='100';
+api.renderAll();
+await click('start-review'); await mode('single');
+for (const [id,value] of Object.entries({
+  'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',
+  'invoice-period-start':'2026-09-01','invoice-period-end':'2026-09-30','invoice-amount':'120','invoice-currency':'USD',
+  'bill-budget-amount':'100',
+})) el(id).value=value;
+await submit();
+assert.match(el('bill-budget-boundary').textContent,/Budget variance is withheld.*Matching provider/);
+assert.doesNotMatch(el('bill-budget-metrics').innerHTML,/Bill versus budget/);
+await click('start-review'); await mode('single');
+for (const [id,value] of Object.entries({
+  'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',
+  'invoice-amount':'120','invoice-currency':'USD','bill-budget-amount':'100',
+})) el(id).value=value;
+el('bill-budget-scope').checked=true;
+await submit();
+assert.match(el('bill-budget-boundary').textContent,/Declare the bill.s complete service period/);
+assert.doesNotMatch(el('bill-budget-metrics').innerHTML,/Bill versus budget/);
+await click('start-review'); await mode('single');
+for (const [id,value] of Object.entries({
+  'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',
+  'invoice-period-start':'2026-09-01','invoice-period-end':'2026-09-30','invoice-amount':'120','invoice-currency':'USD',
+  'bill-budget-amount':'0',
+})) el(id).value=value;
+const beforeZeroBudget=api.state.data;
+await submit();
+assert.equal(api.state.data,beforeZeroBudget);
+assert.match(el('builder-error').textContent,/must be greater than zero/);
+el('bill-budget-amount').value='';
+await submit();
+assert.equal(el('bill-budget-result').hidden,true);
 assert.equal(el('builder-error').classList.contains('visible'),false);
 await click('review-usage');
 assert.equal(document.body.classList.contains('bill-usage-mode'),true);
