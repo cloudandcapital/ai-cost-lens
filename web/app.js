@@ -534,6 +534,14 @@
       : costPerRequest === null
         ? "Requests were not supplied for every cost row. Leave the metric blank until the source supports it."
         : "This is provider cost divided by all supplied requests. It is a workload-level baseline, not a model price.";
+    const budget = review.billBudget;
+    const budgetGuidance = !budget
+      ? ["fix", "CONTROL", "Give the cost an owner and a limit", "One owner", "Assign the bill to a team or use case and set a monthly budget or usage alert before the cost grows unnoticed."]
+      : !budget.comparable
+        ? ["test", "BUDGET SCOPE", "Confirm what the budget covers", "Withheld", "The budget and bill amounts are visible, but no variance is calculated until their provider, account, workload, currency, cost basis, and declared service period match."]
+        : budget.difference > 0
+          ? ["fix", "BUDGET CHECK", "Investigate the entered budget overage", `${cost(budget.difference)} over`, "Reconcile invoice line items, credits, taxes, discounts, and usage against the same-period budget before changing a limit or assigning a cause."]
+          : ["save", "BUDGET CHECK", budget.difference < 0 ? "The entered bill is within budget" : "The entered bill matches the budget", budget.difference < 0 ? `${cost(Math.abs(budget.difference))} under` : "On budget", "This is arithmetic against a user-entered period budget, not a verified invoice, live alert, or realized saving."];
 
     if (review.level === "Invoice or subscription only") {
       const history = review.billHistory;
@@ -543,7 +551,7 @@
           ["test", "BILL MOVEMENT", `The entered bill ${direction}`, history.change === 0 ? "No change" : history.changePct === null ? "No percentage" : `${pct(Math.abs(history.changePct), 1)} ${history.change > 0 ? "higher" : "lower"}`, "This is a change in two unverified bill totals, not a change in unit cost or proof of savings. Check line items, usage volume, plan or rate changes, and credits before assigning a cause."],
           ["test", "CHECK NEXT", "Find what changed in use", "Usage", "For an API, compare requests, tokens, model mix, and processing mode across the same scope. For a subscription, check active seats and actual use. Add only records you have."],
           ["leave", "QUALITY", "Check whether the work stayed useful", "Unknown", "A lower provider bill can accompany fewer ready results or more correction. Keep that unknown until a comparable outcome sample or work log is available."],
-          ["fix", "CONTROL", "Give this cost an owner and limit", "One owner", "Assign the bill to a team or use case and set a monthly budget or usage alert before the cost grows unnoticed."],
+          budgetGuidance,
         ];
       }
       if (history) {
@@ -551,14 +559,14 @@
           ["test", "PERIOD CHECK", "Resolve what the two bills cover", "Review", history.dailyComparable ? "The declared periods have different lengths. The calendar-day amounts above are a reference, not a like-for-like bill change; a fixed monthly subscription can differ per day solely because of month length." : `A like-for-like bill change is withheld: ${history.limitations.join(" ")}`],
           ["test", "CHECK NEXT", "Find the relevant usage or line items", "Usage", "Check active seats for a subscription, or requests, tokens, model mix, and discounts for an API. Do not assign a cause from two totals alone."],
           ["leave", "QUALITY", "Keep outcome quality unknown", "Unknown", "A bill does not say how many results were ready to use or how much correction they needed."],
-          ["fix", "CONTROL", "Give this cost an owner and limit", "One owner", "Set a monthly budget or usage alert for this workload when the source supports it."],
+          budgetGuidance,
         ];
       }
       return [
         ["save", "START HERE", "Use this bill as the cost baseline", cost(totals.providerCost), `The review records ${cost(totals.providerCost)} against ${review.workload}. That is enough to begin tracking the cost over time.`],
         ["test", "CHECK NEXT", "Find what is using the subscription or API", "Usage", "For a subscription, check active seats and actual use. For API spend, add requests or tokens by workload when the source provides them."],
         ["leave", "OPTIONAL", "No human review record? Leave it blank", "No penalty", "Human effort belongs in the analysis only when people actively review or correct AI output. It is not required for this bill review."],
-        ["fix", "CONTROL", "Give the cost an owner and a limit", "One owner", "Assign the bill to a team or use case and set a monthly budget or usage alert before the cost grows unnoticed."],
+        budgetGuidance,
       ];
     }
 
