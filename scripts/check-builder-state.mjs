@@ -405,6 +405,8 @@ assert.equal(api.state.data.config.billBudget.amount,'100');
 assert.match(el('bill-budget-metrics').innerHTML,/\+\$20\.00/);
 assert.match(el('bill-budget-metrics').innerHTML,/120\.0% of the entered budget used/);
 assert.match(el('bill-budget-boundary').textContent,/not a live alert.*savings claim/);
+assert.match(el('bill-opportunity-ledger').innerHTML,/Investigate the entered budget overage/);
+assert.doesNotMatch(el('bill-opportunity-ledger').innerHTML,/set a monthly budget/);
 const tamperedBudget=JSON.parse(JSON.stringify(api.state.data));
 tamperedBudget.config.billBudget.amount='-1';
 api.state.data=tamperedBudget;
@@ -421,6 +423,7 @@ for (const [id,value] of Object.entries({
 await submit();
 assert.match(el('bill-budget-boundary').textContent,/Budget variance is withheld.*Matching provider/);
 assert.doesNotMatch(el('bill-budget-metrics').innerHTML,/Bill versus budget/);
+assert.match(el('bill-opportunity-ledger').innerHTML,/Confirm what the budget covers/);
 await click('start-review'); await mode('single');
 for (const [id,value] of Object.entries({
   'invoice-provider':'OpenAI','invoice-workload':'Support summaries','invoice-date':'2026-09-30',

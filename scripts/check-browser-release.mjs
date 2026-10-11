@@ -499,6 +499,8 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert(billTrend.includes("unverified") && billTrend.includes("does not explain why") && billTrend.includes("does not") && billTrend.includes("savings"), `${engineName}: a lower typed bill became a savings or causal claim.`);
   const budgetCheck = await page.locator("#bill-budget-result").innerText();
   assert(budgetCheck.includes("$80.00") && budgetCheck.includes("+$10.00") && budgetCheck.includes("112.5%") && budgetCheck.includes("not a live alert") && budgetCheck.includes("savings claim"), `${engineName}: same-period budget comparison is incorrect or misrepresented: ${budgetCheck}`);
+  const budgetGuidance = await page.locator("#bill-opportunity-ledger").innerText();
+  assert(budgetGuidance.includes("Investigate the entered budget overage") && !budgetGuidance.includes("set a monthly budget"), `${engineName}: next steps ignored the entered budget.`);
   if (engineName === "chromium") {
     const savedTrend = await saveJsonDownload(page, "#download-review", "two-bill-review.json");
     assert(savedTrend.config.previousBill.amount === "100" && savedTrend.config.previousBill.sameScope === true && savedTrend.config.billBudget.amount === "80", "Two-bill and budget raw inputs were not saved for recomputation.");
