@@ -4522,7 +4522,7 @@
     document.getElementById("bill-source-copy").textContent = grossNet
       ? `Provider gross ${cost(grossNet.gross)}, reported net ${cost(grossNet.net)}, gross-to-net adjustment ${cost(grossNet.adjustment)}. The export does not identify that difference as a credit; reconcile credits, discounts, and taxes with the actual invoice. List-price estimates remain separate.`
       : "Start with the records you already have. Each additional layer deepens the review without replacing the bill.";
-    document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · supplied date buckets, not proof of service-period coverage`;
+    document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${state.data.config.serviceStart ? "declared service period, not independently verified" : "supplied date buckets, not proof of service-period coverage"}`;
     document.getElementById("bill-mode-tag").textContent = stage.tag;
     document.getElementById("bill-finding-title").textContent = headline;
     document.getElementById("bill-finding-limit").textContent = stage.key === "bill"
