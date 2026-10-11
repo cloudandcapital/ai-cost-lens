@@ -3752,12 +3752,18 @@
         : review.reconciliation.unpriced_rows
           ? `${wholeNumber(review.reconciliation.unpriced_rows)} request rows remain unpriced, so no fully loaded claim is shown.`
           : `${wholeNumber(costStack.missing_categories.length)} categories remain unknown, so no fully loaded claim is shown.`;
+    const gatewaySpend = review.source.adapter.includes("LiteLLM");
+    const costStatusLabel = gatewaySpend && costStack.status === "PROVIDER_ONLY"
+      ? "GATEWAY SPEND ONLY" : costStack.status.replaceAll("_", " ");
+    const costBaseCopy = gatewaySpend
+      ? "LiteLLM-calculated gateway spend. Check it against the provider bill."
+      : "The selected row-level provider or calculated cost.";
     document.getElementById("request-cost-stack").innerHTML = `
-      <div class="request-explorer-head"><div><p class="kicker">FULL COST BOUNDARY</p><h4>What sits beyond the model or provider charge?</h4></div><p>${escapeHtml(costStack.status.replaceAll("_", " "))}</p></div>
+      <div class="request-explorer-head"><div><p class="kicker">FULL COST BOUNDARY</p><h4>What sits beyond the model or provider charge?</h4></div><p>${escapeHtml(costStatusLabel)}</p></div>
       <div class="request-spend-context">
-        <article><span>Provider request cost</span><strong>${requestReviewMoney(costStack.provider_request_cost, costStack.currency)}</strong><p>The selected row-level provider or calculated cost.</p></article>
-        <article><span>Known operating cost</span><strong>${requestReviewMoney(costStack.known_operating_cost, costStack.currency)}</strong><p>Provider request cost plus only the additional period costs supplied below.</p></article>
-        <article><span>Fully loaded cost</span><strong>${requestReviewMoney(costStack.fully_loaded_cost, costStack.currency)}</strong><p>${fullyLoadedCopy}</p></article>
+        <article><span>Selected request cost</span><strong>${requestReviewMoney(costStack.provider_request_cost, costStack.currency)}</strong><p>${costBaseCopy}</p></article>
+        <article><span>Known operating cost</span><strong>${requestReviewMoney(costStack.known_operating_cost, costStack.currency)}</strong><p>Selected request cost plus only the additional period costs supplied below.</p></article>
+        <article><span>${gatewaySpend ? "Fully loaded estimate" : "Fully loaded cost"}</span><strong>${requestReviewMoney(costStack.fully_loaded_cost, costStack.currency)}</strong><p>${fullyLoadedCopy}${gatewaySpend ? " Gateway spend remains unverified against the provider bill." : ""}</p></article>
       </div>
       <div class="request-variance-table-wrap" role="region" aria-label="Additional cost categories" tabindex="0"><table><thead><tr><th>Additional category</th><th>Same-period amount</th></tr></thead><tbody>${categoryRows}</tbody></table></div>
       <p class="request-variance-note">${escapeHtml(costStack.method)}</p>`;
