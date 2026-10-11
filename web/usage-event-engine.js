@@ -1146,7 +1146,7 @@
       known_operating_cost: knownOperatingCost,
       fully_loaded_cost: complete ? knownOperatingCost : null,
       missing_categories: categories.filter((item) => !item.supplied).map((item) => item.key),
-      method: "Known operating cost equals selected provider request cost plus only the period-level cost categories explicitly supplied. Additional categories must exclude charges already included in provider request cost or another category. Fully loaded cost appears only when every request is priced and compute, retrieval/data, network, tooling, pipeline, and human review are each supplied; enter zero only when confirmed none. These totals are not spread across requests or allocation dimensions.",
+      method: "Known operating cost equals selected request cost plus only the period-level cost categories explicitly supplied. Selected request cost can be provider-reported or calculated from usage or a gateway; calculated cost is not invoice evidence. Additional categories must exclude charges already included in request cost or another category. Fully loaded cost appears only when every request is priced and compute, retrieval/data, network, tooling, pipeline, and human review are each supplied; enter zero only when confirmed none. These totals are not spread across requests or allocation dimensions.",
       savings_claim_allowed: false,
     };
   }

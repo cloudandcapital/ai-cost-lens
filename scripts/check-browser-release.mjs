@@ -361,6 +361,9 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     && gateway.reconciliation.bill.raw_selected_cost_difference === 0.1, `${engineName}: gateway spend was misclassified as invoice evidence.`);
   assert(gateway.evidence_gate.savings_claim_allowed === false, `${engineName}: gateway telemetry became a savings claim.`);
   assert(!JSON.stringify(gateway).includes("private"), `${engineName}: LiteLLM private fields entered the normalized export.`);
+  const gatewayStack = await page.locator("#request-cost-stack").innerText();
+  assert(gatewayStack.includes("GATEWAY SPEND ONLY") && gatewayStack.includes("Selected request cost")
+    && gatewayStack.includes("LiteLLM-calculated gateway spend"), `${engineName}: gateway spend was mislabeled as provider billing.`);
   await page.locator("#request-log-file").setInputFiles({
     name: "litellm-page.json", mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify({ data: gatewayRows.slice(0, 1), total: 2, page: 1, page_size: 1, total_pages: 2 })),
