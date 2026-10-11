@@ -1212,7 +1212,7 @@
         policy_note: "The threshold is a user-set AI Cost Lens review policy, not an industry standard. A pass clears only this allocation check, not the other evidence or savings gates.",
         savings_claim_allowed: false,
       },
-      method: "Allocation percentages use known operating cost. Request-level provider cost is allocated only when the selected field is present. Period-level compute, retrieval/data, network, tooling, pipeline, and human costs remain unallocated; AI Cost Lens never spreads them automatically.",
+      method: "Allocation percentages use known operating cost. Request-level selected cost is allocated only when the selected field is present; calculated gateway spend is not invoice evidence. Period-level compute, retrieval/data, network, tooling, pipeline, and human costs remain unallocated; AI Cost Lens never spreads them automatically.",
     };
   }
 
