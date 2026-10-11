@@ -110,6 +110,12 @@
 
           <div class="metric-ledger bill-metrics" id="bill-metric-ledger"></div>
 
+          <section class="comparison-section" id="bill-history-result" aria-labelledby="bill-history-title" hidden>
+            <div class="section-heading"><div><p class="kicker">BILL TREND</p><h2 id="bill-history-title">How did the bill change?</h2></div></div>
+            <div class="metric-ledger bill-metrics" id="bill-history-metrics"></div>
+            <p id="bill-history-boundary"></p>
+          </section>
+
           <section class="comparison-section" aria-labelledby="model-mix-title">
             <div class="section-heading">
               <div>
@@ -917,6 +923,17 @@
                 <label><span>Billed amount</span><input id="invoice-amount" type="number" min="0" step="any" /></label>
                 <label><span>Currency</span><input id="invoice-currency" type="text" maxlength="3" placeholder="USD" /></label>
               </div>
+              <details class="builder-more-paths" id="bill-history-input"><summary>Have a previous bill? <span>Compare two periods locally</span></summary>
+                <p>Enter a previous amount for the same provider, account, workload, currency, and gross or net basis. Invoice dates alone do not establish comparable service periods.</p>
+                <div class="field-grid compact-fields">
+                  <label><span>Previous billed amount</span><input id="previous-bill-amount" type="number" min="0" step="any" /></label>
+                  <label><span>Previous invoice date</span><input id="previous-bill-date" type="date" /></label>
+                  <label><span>Previous service-period start</span><input id="previous-bill-start" type="date" /></label>
+                  <label><span>Previous service-period end</span><input id="previous-bill-end" type="date" /></label>
+                </div>
+                <label><input id="previous-bill-scope" type="checkbox" /> I checked that both bills cover the same provider, account, workload, currency, and gross or net basis, with no overlapping charges.</label>
+                <p>Both service periods must be supplied, complete, non-overlapping, and equally long for a like-for-like change. A change in the bill alone does not explain its cause or prove savings.</p>
+              </details>
               <p>An invoice proves cost, not usage or outcomes. Missing requests, tokens, retries, and human effort stay unavailable. One bill cannot establish savings. Add detailed usage later only when it is useful.</p>
               <details class="builder-more-paths"><summary>Have more detail? <span>Add usage with a universal CSV</span></summary>
               <p>Upload the universal CSV instead.</p>
