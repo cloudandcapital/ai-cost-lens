@@ -345,6 +345,39 @@
     if (Boolean(declaredStart) !== Boolean(declaredEnd)) throw new Error("Supply both service-period dates or leave both blank.");
     if (declaredStart && declaredEnd < declaredStart) throw new Error("Service-period end cannot be before its start.");
     const period = { start: declaredStart || dates[0], end: declaredEnd || dates.at(-1), timezone: "UTC" };
+    let billHistory = null;
+    if (config.previousBill !== undefined) {
+      const previous = config.previousBill;
+      if (!previous || typeof previous !== "object" || Array.isArray(previous) ||
+          typeof previous.amount !== "string" || typeof previous.invoiceDate !== "string" ||
+          typeof previous.serviceStart !== "string" || typeof previous.serviceEnd !== "string" ||
+          typeof previous.sameScope !== "boolean" ||
+          !["invoice_form", "invoice_pdf"].includes(config.reviewSource)) throw new Error("Previous bill must be a complete manual-bill entry.");
+      const amount = costNumber(previous.amount, "Previous billed amount");
+      validDate(previous.invoiceDate, "Previous invoice date");
+      if (Boolean(previous.serviceStart) !== Boolean(previous.serviceEnd)) throw new Error("Supply both previous service-period dates or leave both blank.");
+      const previousStart = previous.serviceStart ? validDate(previous.serviceStart, "Previous service-period start") : null;
+      const previousEnd = previous.serviceEnd ? validDate(previous.serviceEnd, "Previous service-period end") : null;
+      if (previousStart && previousEnd < previousStart) throw new Error("Previous service-period end cannot be before its start.");
+      const day = (date) => Date.parse(`${date}T00:00:00Z`) / 86400000;
+      const currentDays = declaredStart ? day(declaredEnd) - day(declaredStart) + 1 : null;
+      const previousDays = previousStart ? day(previousEnd) - day(previousStart) + 1 : null;
+      const limitations = [];
+      if (!previous.sameScope) limitations.push("Matching provider, account, workload, currency, gross or net basis, and charge overlap were not confirmed.");
+      if (!currentDays || !previousDays) limitations.push("Both service periods are needed; invoice dates alone do not establish coverage.");
+      else {
+        if (previousEnd >= declaredStart) limitations.push("The declared service periods overlap or are out of order.");
+        if (currentDays !== previousDays) limitations.push("The service periods have different lengths.");
+      }
+      const comparable = limitations.length === 0;
+      const current = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true }).providerCost;
+      billHistory = { previousAmount: amount, previousStart, previousEnd, previousDays, currentDays, comparable, limitations,
+        change: comparable ? current - amount : null,
+        changePct: comparable && amount > 0 ? (current - amount) / amount : null,
+        previousPerDay: previousDays ? amount / previousDays : null,
+        currentPerDay: currentDays ? current / currentDays : null,
+      };
+    }
     const basis = spendCostBasis(spend, "single bill");
     const totals = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true });
     if (config.grossNet) {
@@ -420,7 +453,7 @@
       level: outcomeSupported ? "Cost, usage and outcomes" : hasUsage ? "Cost and usage" : "Invoice or subscription only",
       providerUnit: outcomeSupported && ready ? totals.providerCost / ready : null,
       fullUnit: outcomeSupported && ready && fullCost !== null ? fullCost / ready : null,
-      humanCost, shared, fullCost,
+      humanCost, shared, fullCost, billHistory,
     };
     const checkNumbers = (value) => {
       if (typeof value === "number" && (!Number.isFinite(value) || Math.abs(value) > 1e15)) throw new Error("Review totals exceed the supported numeric range.");
@@ -2222,6 +2255,9 @@
       if (data.config.grossNet !== undefined) shape(data.config.grossNet, {
         gross: "number", net: "number", adjustment: "number", classification: "string",
       }, "config.grossNet");
+      if (data.config.previousBill !== undefined) shape(data.config.previousBill, {
+        amount: "string", invoiceDate: "string", serviceStart: "string", serviceEnd: "string", sameScope: "boolean",
+      }, "config.previousBill");
       for (const row of [...data.source.spend, ...data.source.work]) {
         Object.values(row).forEach((value) => shape(value, "string", "source row"));
       }
@@ -4384,6 +4420,24 @@
     const manualBill = ["invoice_form", "invoice_pdf"].includes(state.data.config.reviewSource);
     const basisLabel = manualBill ? "User-entered billed amount (unverified)" : costBasisLabel(review.basis);
     const { totals, period } = review;
+    const historySection = document.getElementById("bill-history-result");
+    historySection.hidden = !review.billHistory;
+    if (review.billHistory) {
+      const history = review.billHistory;
+      const rows = [
+        ["Previous bill · user entered", money(history.previousAmount, 2), history.previousStart ? `${history.previousStart} to ${history.previousEnd}` : "Service period not supplied"],
+        ["Current bill · user entered", money(totals.providerCost, 2), state.data.config.serviceStart ? `${period.start} to ${period.end}` : "Service period not supplied"],
+      ];
+      if (history.comparable) {
+        const direction = history.change > 0 ? "higher" : history.change < 0 ? "lower" : "unchanged";
+        rows.push(["Bill change", `${history.change < 0 ? "−" : history.change > 0 ? "+" : ""}${money(Math.abs(history.change), 2)}`, history.changePct === null ? "Percentage unavailable: the previous bill was zero." : `${pct(Math.abs(history.changePct), 1)} ${direction} across equal-length declared periods.`]);
+        rows.push(["Cost per calendar day", `${money(history.previousPerDay, 2)} → ${money(history.currentPerDay, 2)}`, `${history.currentDays} days in each declared service period.`]);
+      }
+      document.getElementById("bill-history-metrics").innerHTML = rows.map(([label, value, note]) => `<div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`).join("");
+      document.getElementById("bill-history-boundary").textContent = history.comparable
+        ? "This arithmetic change uses two user-entered, unverified amounts and declared matching periods. It does not explain why the bill changed or establish realized savings. Add usage or line-item evidence to investigate the cause."
+        : `A like-for-like change is withheld: ${history.limitations.join(" ")} The two user-entered amounts remain separate. No savings claim is supported.`;
+    }
     const stage = singleBillStage(review);
     const guidance = singleBillGuidance(review);
     const count = (value) => value === null ? "Not supplied" : compact(value);
@@ -4829,6 +4883,7 @@
       button.tabIndex = isBill ? -1 : 0;
     });
     document.getElementById("bill-review-screen").classList.toggle("active", isBill);
+    document.getElementById("bill-history-result").hidden = true;
     document.querySelectorAll(".view").forEach((section) => {
       if (isBill) section.classList.remove("active");
     });
@@ -6291,6 +6346,10 @@
         const [spendFile] = document.getElementById("single-spend-file").files;
         const [workFile] = document.getElementById("single-work-file").files;
         const routedUniversal = !spendFile && state.uploadRoute?.kind === "universal";
+        const previousInputs = ["previous-bill-amount", "previous-bill-date", "previous-bill-start", "previous-bill-end"].map((id) => document.getElementById(id).value.trim());
+        const hasPrevious = previousInputs.some(Boolean) || document.getElementById("previous-bill-scope").checked;
+        if (hasPrevious && (spendFile || routedUniversal)) throw new Error("Compare two entered bills using the manual bill fields, not the universal spend CSV.");
+        if (hasPrevious && (!previousInputs[0] || !previousInputs[1])) throw new Error("Supply the previous bill amount and invoice date, or leave all previous-bill fields blank.");
         let spendText = spendFile ? await readLocalFile(spendFile) : routedUniversal ? state.uploadRoute.text : "";
         if (!spendFile && !routedUniversal) {
           const provider = safeImportedLabel(document.getElementById("invoice-provider").value, "Provider");
@@ -6310,6 +6369,7 @@
           serviceStart: spendFile ? "" : document.getElementById("invoice-period-start").value,
           serviceEnd: spendFile ? "" : document.getElementById("invoice-period-end").value,
           reviewSource: spendFile || routedUniversal ? "universal_template" : state.invoicePdfCandidate ? "invoice_pdf" : "invoice_form",
+          ...(hasPrevious ? { previousBill: { amount: previousInputs[0], invoiceDate: previousInputs[1], serviceStart: previousInputs[2], serviceEnd: previousInputs[3], sameScope: document.getElementById("previous-bill-scope").checked } } : {}),
         });
         discardImportedSourceState();
         renderAll();
