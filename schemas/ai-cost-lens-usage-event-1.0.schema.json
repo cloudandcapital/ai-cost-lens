@@ -54,7 +54,8 @@
     "prefix_fingerprint": { "type": ["string", "null"] },
     "tool_call_count": { "$ref": "#/$defs/nullableNonnegativeInteger" },
     "outcome_status": { "type": ["string", "null"] },
-    "duplicate_group": { "type": ["string", "null"] }
+    "duplicate_group": { "type": ["string", "null"] },
+    "routed_model_id": { "type": ["string", "null"] }
   },
   "$defs": {
     "nullableNonnegativeInteger": { "type": ["integer", "null"], "minimum": 0 },

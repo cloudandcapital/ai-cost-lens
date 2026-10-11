@@ -150,11 +150,44 @@
           if (model.long_context[field] < 1) throw new Error(`${model.id} ${field} cannot be below 1.`);
         }
       }
+      if (model.minimum_cacheable_prompt_tokens !== undefined) {
+        number(model.minimum_cacheable_prompt_tokens, `${model.id} minimum cacheable prompt`, { integer: true });
+      }
+      if (model.rate_change) {
+        const change = model.rate_change;
+        isoDate(change.effective_at, `${model.id} rate-change date`);
+        isoDate(change.prior_through, `${model.id} prior-rate end date`);
+        if (change.effective_at > catalog.catalog_version || change.prior_through < (model.effective_at || catalog.effective_at) ||
+          new Date(Date.parse(`${change.prior_through}T00:00:00Z`) + 86400000).toISOString().slice(0, 10) !== change.effective_at) {
+          throw new Error(`${model.id} rate history must have consecutive dates within the catalog.`);
+        }
+        if (!/^https:\/\//.test(change.source_url || "")) throw new Error(`${model.id} rate change needs an HTTPS source.`);
+        if (!change.prior_rates || !Object.keys(change.prior_rates).length) throw new Error(`${model.id} rate change needs prior rates.`);
+        for (const [mode, overrides] of Object.entries(change.prior_rates)) {
+          if (!model[mode] || !overrides || !Object.keys(overrides).length) throw new Error(`${model.id} prior rates need a published mode.`);
+          for (const [field, value] of Object.entries(overrides)) {
+            if (!RATE_FIELDS.includes(field) || model[mode][field] === undefined) throw new Error(`${model.id} has an unsupported prior-rate field.`);
+            number(value, `${model.id} prior ${mode} ${field}`);
+          }
+        }
+      }
       if (model.scheduled_rate_change) {
         isoDate(model.scheduled_rate_change.effective_at, `${model.id} scheduled rate date`);
         number(model.scheduled_rate_change.multiplier, `${model.id} scheduled rate multiplier`);
         if (model.scheduled_rate_change.multiplier <= 0) throw new Error(`${model.id} scheduled rate multiplier must be positive.`);
         if (model.scheduled_rate_change.status !== "published_not_active") throw new Error(`${model.id} scheduled rate status is unsupported.`);
+      }
+    });
+    catalog.models.forEach((model) => {
+      if (!model.routed_to_model_id) return;
+      if (!ids.has(model.routed_to_model_id) || model.routed_to_model_id === model.id) {
+        throw new Error(`${model.id} needs a distinct routed-to model in the catalog.`);
+      }
+      isoDate(model.last_verified_unrouted_at, `${model.id} last unrouted verification`);
+      isoDate(model.routing_confirmed_at, `${model.id} routing confirmation`);
+      if (model.last_verified_unrouted_at >= model.routing_confirmed_at ||
+        model.routing_confirmed_at > catalog.catalog_version) {
+        throw new Error(`${model.id} routing dates are inconsistent.`);
       }
     });
     return catalog;
@@ -276,7 +309,10 @@
   function resolveRateProfile(model, scenario, routeOptions = {}) {
     const processingMode = String(routeOptions.processing_mode || scenario.processing_mode || (scenario.batch ? "batch" : "standard")).trim().toLowerCase();
     if (!PROCESSING_MODES.includes(processingMode)) throw new Error(`Processing mode must be one of: ${PROCESSING_MODES.join(", ")}.`);
-    const baseRates = model[processingMode];
+    const priorRate = Boolean(model.rate_change && scenario.pricing_date && scenario.pricing_date <= model.rate_change.prior_through);
+    const baseRates = model[processingMode] && (priorRate
+      ? { ...model[processingMode], ...(model.rate_change.prior_rates[processingMode] || {}) }
+      : model[processingMode]);
     if (!baseRates) {
       const available = availableProcessingModes(model).map((mode) => mode.replaceAll("_", " ")).join(", ");
       throw new Error(`${model.label} has no published ${processingMode} rate in this catalog. Available modes: ${available}.`);
@@ -307,6 +343,8 @@
       geography,
       geography_multiplier: geographyMultiplier,
       pricing_adjustment: longContext ? "long_context" : "standard_context",
+      rate_effective_at: priorRate ? model.effective_at : model.rate_change?.effective_at || model.effective_at,
+      rate_boundary: priorRate ? model.rate_change.prior_through : null,
       rates: contextRates,
     };
   }
@@ -321,6 +359,9 @@
 
   function priceModel(model, rawScenario, routeOptions = {}) {
     const scenario = normalizeScenario(rawScenario);
+    if (model.routed_to_model_id && (!scenario.pricing_date || scenario.pricing_date > model.last_verified_unrouted_at)) {
+      throw new Error(`${model.label} is a historical route. Current requests use ${model.routed_to_model_id}; choose that model. Pricing during the unconfirmed transition cannot be inferred.`);
+    }
     if (scenario.pricing_date && model.effective_at && scenario.pricing_date < model.effective_at) {
       throw new Error(`${model.label} has no verified list price before ${model.effective_at}.`);
     }
@@ -342,6 +383,10 @@
     const billedCalls = scenario.calls_per_month * (1 + scenario.retry_rate);
     if (scenario.cache_refreshes_per_month > billedCalls) throw new Error("Cache refreshes per month cannot exceed billed calls after retries.");
     const cachedTokensPerCall = scenario.input_tokens * scenario.cached_input_share;
+    if (cachedTokensPerCall > 0 && model.minimum_cacheable_prompt_tokens &&
+      cachedTokensPerCall < model.minimum_cacheable_prompt_tokens) {
+      throw new Error(`${model.label} requires a cacheable prefix of at least ${model.minimum_cacheable_prompt_tokens} tokens. Reduce the cached-input share to zero or enter a qualifying prefix.`);
+    }
     const uncachedTokensPerCall = scenario.input_tokens - cachedTokensPerCall;
     const cacheReadCalls = billedCalls - scenario.cache_refreshes_per_month;
     const writeRate = cacheWriteRate(rates, scenario.cache_write_duration);
@@ -357,7 +402,7 @@
     const monthly = uncachedInputCost + cacheReadCost + cacheWriteCost + cacheStorageCost + outputCost;
     const perCall = billedCalls ? monthly / billedCalls : 0;
     const expectedUsable = scenario.usable_rate === null ? null : scenario.calls_per_month * scenario.usable_rate;
-    const rateBoundary = model.promotional_rate_guaranteed_through ||
+    const rateBoundary = profile.rate_boundary || model.promotional_rate_guaranteed_through ||
       (model.scheduled_rate_change?.effective_at
         ? new Date(Date.parse(`${model.scheduled_rate_change.effective_at}T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
         : null);
@@ -382,7 +427,7 @@
       pricing_source_url: model.source_url || null,
       pricing_source_note: model.pricing_source_note || null,
       pricing_verified_at: model.verified_at || null,
-      pricing_effective_at: model.effective_at || null,
+      pricing_effective_at: profile.rate_effective_at || null,
       pricing_date: scenario.pricing_date || model.effective_at || null,
       promotional_rate_guaranteed_through: rateBoundary,
       annual_rate_known: annualRateKnown,

@@ -3695,7 +3695,7 @@
     document.getElementById("request-event-rows").innerHTML = visible.map((event) => `<tr>
       <th>${escapeHtml(event.event_id || event.record_id)}${event.duplicate_group ? `<span>${escapeHtml(event.duplicate_group)}</span>` : ""}</th>
       <td>${escapeHtml(event.timestamp ? event.timestamp.replace("T", " ").replace(".000Z", "Z") : "Not supplied")}</td>
-      <td>${escapeHtml(event.provider || "Not supplied")}<span>${escapeHtml(event.model || "Not supplied")}</span></td>
+       <td>${escapeHtml(event.provider || "Not supplied")}<span>${escapeHtml(event.model || "Not supplied")}${event.routed_model_id ? ` · priced as ${escapeHtml(event.routed_model_id)}` : ""}</span></td>
       <td>${escapeHtml(event.project || "Not supplied")}<span>${escapeHtml(event.workload)}</span></td>
       <td>${escapeHtml(event.request_status || "Not supplied")}</td>
       <td>${event.input_tokens === null ? "Not supplied" : wholeNumber(event.input_tokens)}</td>
@@ -5562,7 +5562,7 @@
 
   function promptModelOptions(blankLabel = "") {
     const groups = new Map();
-    pricingCatalog.models.forEach((model) => {
+    pricingCatalog.models.filter((model) => !model.routed_to_model_id).forEach((model) => {
       if (!groups.has(model.provider)) groups.set(model.provider, []);
       groups.get(model.provider).push(model);
     });
@@ -5697,7 +5697,8 @@
     const provider = document.getElementById("model-catalog-provider").value;
     const task = document.getElementById("model-catalog-task").value;
     const tagLabels = { general: "General", reasoning: "Reasoning", coding: "Coding", high_volume: "High-volume", long_context: "Long context", multimodal: "Multimodal" };
-    const models = pricingCatalog.models.filter((model) => {
+    const currentModels = pricingCatalog.models.filter((model) => !model.routed_to_model_id);
+    const models = currentModels.filter((model) => {
       const matchesProvider = !provider || model.provider === provider;
       const matchesTask = !task || model.workload_tags.includes(task);
       const haystack = `${model.label} ${model.model} ${model.provider} ${model.workload_tags.map((tag) => tagLabels[tag]).join(" ")}`.toLowerCase();
@@ -5716,21 +5717,22 @@
       const longContextRates = model.long_context && [
         ["Input", model.standard.input * model.long_context.input_multiplier],
         ["Cached input", model.standard.cached_input * model.long_context.cached_input_multiplier],
-        ["Cache write", model.standard.cache_write * (model.long_context.cache_write_multiplier || model.long_context.input_multiplier)],
+        [cacheSupplement[0], cacheSupplement[1] * (model.long_context.cache_write_multiplier || model.long_context.input_multiplier)],
         ["Output", model.standard.output * model.long_context.output_multiplier],
       ];
       const modes = pricingEngine.availableProcessingModes(model).map(modeLabel).join(" · ");
       return `<article class="model-catalog-card" role="listitem">
         <div class="model-catalog-card-head"><div><a href="${escapeHtml(model.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(model.label)}</a><span>${escapeHtml(model.provider)} · checked ${escapeHtml(model.verified_at)}${model.effective_at ? ` · catalog use from ${escapeHtml(model.effective_at)}` : ""}</span></div><button class="text-button catalog-add-model" type="button" data-model-id="${escapeHtml(model.id)}">Add</button></div>
-        <p class="model-catalog-tier">Standard mode · ${longContextRates ? `up to ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens per request` : "published text rates"}</p>
+        <p class="model-catalog-tier">Standard mode · ${longContextRates ? `up to ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens per request, including cached tokens` : "published text rates"}</p>
         <div class="model-catalog-rates" role="group" aria-label="Standard USD rates. Token rates are per 1 million tokens; cache storage is per 1 million token-hours.">${rates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${value === null ? "Not listed" : modelRate(value)}</strong></div>`).join("")}</div>
         ${longContextRates ? `<p class="model-catalog-tier">Standard mode · over ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens per request; higher rates apply to the full request</p><div class="model-catalog-rates" role="group" aria-label="Standard long-context USD rates per 1 million tokens">${longContextRates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${modelRate(value)}</strong></div>`).join("")}</div>` : ""}
         ${model.standard.cache_write_1h !== undefined ? `<p class="model-catalog-tier">1-hour cache write: ${modelRate(model.standard.cache_write_1h)} / 1M tokens</p>` : ""}
-        ${model.provider === "Anthropic" && context >= 1000000 ? '<p class="model-catalog-tier">Published rates apply across the full 1,000,000-token context.</p>' : ""}
+        ${model.standard.cache_write_1h !== undefined && model.long_context ? `<p class="model-catalog-tier">Over ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens: 1-hour cache write ${modelRate(model.standard.cache_write_1h * (model.long_context.cache_write_multiplier || model.long_context.input_multiplier))} / 1M tokens.</p>` : ""}
+        ${model.provider === "Anthropic" && context >= 1000000 && !model.long_context ? '<p class="model-catalog-tier">Published rates apply across the full 1,000,000-token context.</p>' : ""}
         <div class="model-catalog-card-foot"><div><span class="model-catalog-context">${contextTokens(context)} context · ${escapeHtml(modes)}</span><div class="model-workload-signals">${model.workload_tags.map((tag) => `<span>${escapeHtml(tagLabels[tag])}</span>`).join("")}</div></div><a class="model-catalog-provider-notes" href="${escapeHtml(model.capability_source_url)}" target="_blank" rel="noreferrer">Provider notes</a></div>
       </article>`;
     }).join("") || '<p class="model-catalog-empty">No model matches this filter.</p>';
-    document.getElementById("model-catalog-count").textContent = `${models.length} of ${pricingCatalog.models.length} models · token rates per 1M tokens; storage per 1M token-hours · provider-described workload signals are reference only`;
+    document.getElementById("model-catalog-count").textContent = `${models.length} of ${currentModels.length} current models · token rates per 1M tokens; storage per 1M token-hours · provider-described workload signals are reference only`;
     document.querySelectorAll(".catalog-add-model").forEach((button) => {
       button.addEventListener("click", () => {
         const modelId = button.dataset.modelId;
@@ -5776,7 +5778,7 @@
       });
     });
     const sources = pricingCatalog.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.provider)} (checked ${escapeHtml(source.checked_at)})</a>`).join(", ");
-    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Direct API list-price sources: ${sources}. Model-specific start dates are shown below; review again by ${escapeHtml(pricingCatalog.review_by)}. Earlier pricing snapshots remain in the repository. Processing mode, cache-write treatment, and geography are recorded per route.${today > pricingCatalog.review_by ? " Catalog review is overdue. The selected date is historical; refresh rates before using this for a current decision." : ""}`;
+    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Direct API list-price sources: ${sources}. Model-specific start dates are shown below; review again by ${escapeHtml(pricingCatalog.review_by)}. Earlier pricing snapshots remain in the repository. Deprecated Gemini IDs are excluded from current comparisons; request-log aliases retain their routing provenance. Processing mode, cache-write treatment, and geography are recorded per route.${today > pricingCatalog.review_by ? " Catalog review is overdue. The selected date is historical; refresh rates before using this for a current decision." : ""}`;
     const providers = [...new Set(pricingCatalog.models.map((model) => model.provider))];
     document.getElementById("model-catalog-provider").innerHTML = '<option value="">All providers</option>' + providers.map((provider) => `<option value="${escapeHtml(provider)}">${escapeHtml(provider)}</option>`).join("");
     document.getElementById("model-catalog-search").addEventListener("input", renderModelCatalog);
@@ -5830,7 +5832,7 @@
       const difference = result.monthly_difference_from_current_usd;
       const differenceClass = difference < 0 ? "price-difference-lower" : difference > 0 ? "price-difference-higher" : "";
       const usable = result.estimated_cost_per_usable_result_usd === null ? "Not modeled" : promptPriceMoney(result.estimated_cost_per_usable_result_usd);
-      const priceBasis = result.pricing_basis === "user_supplied" ? `user-supplied · effective ${result.pricing_effective_at}` : `official list · checked ${result.pricing_verified_at}${result.promotional_rate_guaranteed_through ? ` · ${result.model_id === "openai/gpt-5.6-sol" ? "promotional rate available at least through" : "rate changes after"} ${result.promotional_rate_guaranteed_through}` : ""}`;
+      const priceBasis = result.pricing_basis === "user_supplied" ? `user-supplied · effective ${result.pricing_effective_at}` : `official list · checked ${result.pricing_verified_at} · rate effective ${result.pricing_effective_at}${result.promotional_rate_guaranteed_through ? ` · ${result.model_id === "openai/gpt-5.6-sol" ? "promotional rate available at least through" : "rate changes after"} ${result.promotional_rate_guaranteed_through}` : ""}`;
       return `<tr>
         <td class="price-route-name"><strong>${escapeHtml(result.label)}</strong><span>${escapeHtml(result.provider)} · ${escapeHtml(modeLabel(result.processing_mode))} · ${escapeHtml(geographyLabel(result.geography, result.geography_multiplier))}${result.pricing_adjustment === "long_context" ? " · long-context rates" : ""}${result.role === "current" ? " · current" : ""}</span><small>${wholeNumber(result.input_tokens)} input · ${result.input_token_method === "openai_o200k_base_exact_raw_text" ? "exact raw-text count" : result.input_token_method === "manual" ? "entered count" : "estimated count"} · ${escapeHtml(priceBasis)}</small></td>
         <td data-label="Per call">${promptPriceMoney(result.estimated_cost_per_call_usd)}</td>

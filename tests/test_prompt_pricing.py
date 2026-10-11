@@ -56,7 +56,7 @@ console.log(JSON.stringify({catalog, comparison, record}));
     payload = json.loads(result.stdout)
     catalog = payload["catalog"]
     assert catalog["schema_version"] == "ai-cost-lens-pricing-catalog/0.5"
-    assert catalog["catalog_version"] == "2026-10-05"
+    assert catalog["catalog_version"] == "2026-10-11"
     assert {model["provider"] for model in catalog["models"]} == {
         "OpenAI",
         "Anthropic",
@@ -568,7 +568,7 @@ const catalog = require(process.argv[1]);
 const engine = require(process.argv[2]);
 const older = require(process.argv[3]);
 const selected = engine.selectCatalog([catalog, older], "2026-09-22");
-const current = engine.selectCatalog([catalog, older], "2026-10-05");
+const current = engine.selectCatalog([catalog, older], "2026-10-11");
 const model = catalog.models.find((item) => item.id === "openai/gpt-5.6-sol");
 const longContext = engine.priceModel(model, {
   input_tokens: 300000, output_tokens: 10000, calls_per_month: 1,
@@ -617,7 +617,7 @@ console.log(JSON.stringify({selected: selected.catalog_version, current: current
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["selected"] == "2026-09-22"
-    assert payload["current"] == "2026-10-05"
+    assert payload["current"] == "2026-10-11"
     assert payload["longContext"]["pricing_adjustment"] == "long_context"
     assert payload["longContext"]["rates_per_1m_tokens"] == {
         "input": 8,
