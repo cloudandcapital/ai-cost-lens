@@ -334,6 +334,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert((await page.locator("#simple-example-caveat").innerText()).includes("came from your prompt estimate"), `${engineName}: Review handoff mislabeled estimate fields as a sample.`);
   await page.locator("#close-review").click();
 
+  await page.locator("#price-prompt").click();
   await page.locator("#prompt-alt-2").selectOption("google/gemini-4-argon");
   await page.locator("#prompt-input-tokens").fill("20000");
   await page.locator("#calculate-prompt-price").click();
@@ -344,6 +345,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     `${engineName}: Argon estimate did not use the official introductory rates.`);
   assert(argonResult.estimated_annual_cost_usd === null && argonEstimate.evidence_gate.savings_claim_allowed === false,
     `${engineName}: Argon estimate crossed the rate boundary or allowed a savings claim.`);
+  await page.locator("#close-price-prompt").click();
   await page.locator("#start-review").click();
   await page.locator('[data-builder-mode="simple"]').click();
   assert((await page.locator("#simple-example-caveat").innerText()).includes("small-business example"),
