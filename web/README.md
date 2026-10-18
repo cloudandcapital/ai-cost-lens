@@ -162,4 +162,4 @@ The test suite compares the committed browser demo byte-for-value with the Pytho
 
 The interface must always label illustrative data and must not display example or public evidence as customer results.
 
-The October 11, 2026 catalog refresh corrects Sonnet 5.5 cache-read pricing, adds Haiku 5.5 and Gemini 3.6 Flash, and treats deprecated Gemini 3.5/3.7 Flash IDs as historical routed aliases. See [the refresh record](../docs/pricing-snapshots/2026-10-11-review.md) and [the October 5 provider audit](../docs/pricing-snapshots/2026-10-05-review.md). The review deadline remains November 21.
+The October 18, 2026 catalog adds Gemini 4 Argon with its introductory rates and December 1 change boundary; see [the October 18 refresh record](../docs/pricing-snapshots/2026-10-18-review.md). The [October 11 refresh](../docs/pricing-snapshots/2026-10-11-review.md) corrected Sonnet 5.5 cache-read pricing, added Haiku 5.5 and Gemini 3.6 Flash, and retained deprecated Gemini 3.5/3.7 Flash IDs as historical routed aliases. The review deadline remains November 21.

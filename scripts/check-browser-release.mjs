@@ -274,6 +274,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     ["Claude Sonnet 5.5", ["INPUT\n$2.00", "CACHED INPUT\n$0.10", "CACHE WRITE · 5 MIN\n$2.50", "OUTPUT\n$10.00"]],
     ["Claude Haiku 5.5", ["INPUT\n$0.10", "CACHED INPUT\n$0.01", "CACHE WRITE · 5 MIN\n$0.125", "OUTPUT\n$0.50"]],
     ["Gemini 3.6 Flash", ["INPUT\n$0.75", "CACHED INPUT\n$0.075", "OUTPUT\n$3.75"]],
+    ["Gemini 4 Argon", ["INPUT\n$2.00", "CACHED INPUT\n$0.10", "OUTPUT\n$10.00"]],
     ["GPT-6 Sol", ["INPUT\n$2.00", "CACHED INPUT\n$0.20", "CACHE WRITE\n$2.50", "OUTPUT\n$10.00"]],
     ["GPT-6 Luna", ["INPUT\n$0.10", "CACHED INPUT\n$0.01", "CACHE WRITE\n$0.125", "OUTPUT\n$0.50"]],
     ["Claude Opus 5.5", ["INPUT\n$4.00", "CACHED INPUT\n$0.20", "CACHE WRITE · 5 MIN\n$5.00", "OUTPUT\n$20.00"]],
@@ -285,7 +286,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
       assert(row.toUpperCase().includes(expected), `${engineName}: ${name} missing ${expected.replace("\n", " ")}.`);
     }
     const provenance = await card.locator(".model-catalog-card-head span").textContent();
-    const expectedCheck = ["Claude Sonnet 5.5", "Claude Haiku 5.5", "Gemini 3.6 Flash"].includes(name) ? "2026-10-11" : "2026-10-05";
+    const expectedCheck = name === "Gemini 4 Argon" ? "2026-10-18" : ["Claude Sonnet 5.5", "Claude Haiku 5.5", "Gemini 3.6 Flash"].includes(name) ? "2026-10-11" : "2026-10-05";
     assert(provenance.includes(`checked ${expectedCheck}`), `${engineName}: ${name} is missing its checked date: ${provenance}`);
   }
   for (const oldName of ["Gemini 3.5 Flash", "Gemini 3.7 Flash"]) {
@@ -330,6 +331,25 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     assert(await page.locator(selector).inputValue() === "", `${engineName}: estimated pricing prefilled quality evidence.`);
   }
   assert((await page.locator("#builder-action-note").innerText()).toLowerCase().includes("same task sample"), `${engineName}: Review handoff omitted the quality-evidence requirement.`);
+  assert((await page.locator("#simple-example-caveat").innerText()).includes("came from your prompt estimate"), `${engineName}: Review handoff mislabeled estimate fields as a sample.`);
+  await page.locator("#close-review").click();
+
+  await page.locator("#price-prompt").click();
+  await page.locator("#prompt-alt-2").selectOption("google/gemini-4-argon");
+  await page.locator("#prompt-input-tokens").fill("20000");
+  await page.locator("#calculate-prompt-price").click();
+  await page.locator("#price-results").waitFor({ state: "visible" });
+  const argonEstimate = await saveJsonDownload(page, "#download-price-estimate", `${engineName}-argon-estimate.json`);
+  const argonResult = argonEstimate.comparison.find((result) => result.model_id === "google/gemini-4-argon");
+  assert(argonResult?.rates_per_1m_tokens.input === 2 && argonResult.rates_per_1m_tokens.output === 10,
+    `${engineName}: Argon estimate did not use the official introductory rates.`);
+  assert(argonResult.estimated_annual_cost_usd === null && argonEstimate.evidence_gate.savings_claim_allowed === false,
+    `${engineName}: Argon estimate crossed the rate boundary or allowed a savings claim.`);
+  await page.locator("#close-price-prompt").click();
+  await page.locator("#start-review").click();
+  await page.locator('[data-builder-mode="simple"]').click();
+  assert((await page.locator("#simple-example-caveat").innerText()).includes("small-business example"),
+    `${engineName}: sample-only Review path retained the prompt-estimate caveat.`);
   await page.locator("#close-review").click();
 
   await page.locator("#review-usage").click();

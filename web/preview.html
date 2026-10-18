@@ -6399,6 +6399,18 @@ body{min-width:0}
 
           <div class="metric-ledger bill-metrics" id="bill-metric-ledger"></div>
 
+          <section class="comparison-section" id="bill-history-result" aria-labelledby="bill-history-title" hidden>
+            <div class="section-heading"><div><p class="kicker">BILL TREND</p><h2 id="bill-history-title">How did the bill change?</h2></div></div>
+            <div class="metric-ledger bill-metrics" id="bill-history-metrics"></div>
+            <p id="bill-history-boundary"></p>
+          </section>
+
+          <section class="comparison-section" id="bill-budget-result" aria-labelledby="bill-budget-title" hidden>
+            <div class="section-heading"><div><p class="kicker">BUDGET CHECK</p><h2 id="bill-budget-title">How does this bill compare with the plan?</h2></div></div>
+            <div class="metric-ledger bill-metrics" id="bill-budget-metrics"></div>
+            <p id="bill-budget-boundary"></p>
+          </section>
+
           <section class="comparison-section" aria-labelledby="model-mix-title">
             <div class="section-heading">
               <div>
@@ -6710,7 +6722,7 @@ body{min-width:0}
               </div>
               <span class="mode-tag">LOCAL FILE · NO PROMPTS REQUIRED</span>
             </div>
-            <p class="request-review-intro">Add a flat CSV or JSON request log to break down spend, calculate an evidence-gated run rate, and detect duplicate billing records, failed and repeated calls, retry loops, repeated uncached prefixes, oversized inputs, excessive outputs, reasoning intensity, and repeated tool use. Your source file is parsed in this browser and is not uploaded.</p>
+            <p class="request-review-intro">Add a CSV or JSON request log, including a LiteLLM spend-log export, to break down spend, calculate an evidence-gated run rate, and detect duplicate records, failed and repeated calls, retry loops, repeated uncached prefixes, oversized inputs, excessive outputs, reasoning intensity, and repeated tool use. Gateway spend remains separate from provider billing evidence. Your source file is parsed in this browser and is not uploaded.</p>
             <div class="request-import-row">
               <label>
                 <span>Request log</span>
@@ -6724,7 +6736,7 @@ body{min-width:0}
               </div>
             </div>
             <p class="request-format-note">Rows with invalid values or the wrong number of CSV fields are excluded from a scoped review. Download the issue list, correct the source, and analyze again for a whole-log comparison.</p>
-            <p class="request-format-note">Use one row per AI request or trace observation. The CLI canonical CSV is a separate period-level billing format and is not interchangeable with this request log.</p>
+            <p class="request-format-note">Use one row per AI request or trace observation. For LiteLLM, export all pages of individual spend logs; a single paginated response is incomplete. The CLI canonical CSV is a separate period-level billing format and is not interchangeable with this request log.</p>
             <div class="request-reconciliation-inputs">
               <label><span>User-entered billed total (unverified)</span><input id="request-billed-total" type="number" min="0" step="any" placeholder="Not supplied" /><small>Compare with request cost only after checking the same scope. This field does not verify an invoice.</small></label>
               <label><span>Bill currency</span><input id="request-billed-currency" type="text" maxlength="3" placeholder="e.g. USD" /></label>
@@ -7187,14 +7199,14 @@ body{min-width:0}
         <div id="single-builder-fields" hidden>
           <div class="path-requirements">
             <strong>What you need</strong>
-            <span>One completed spend template with the bill amount. Requests, tokens, models, outcomes, retries, and human effort are optional.</span>
+            <span>One bill amount and its date. Enter them below; no file is required. Usage, outcomes, retries, and human effort are optional.</span>
           </div>
           <section class="builder-step">
             <div class="step-number">01</div>
             <div>
               <h3>Start with one bill</h3>
               <p>For a simple subscription or invoice, enter the bill below. No CSV is required.</p>
-              <p><strong>Purchased usage credits?</strong> A credit purchase receipt records cash paid in advance, not the cost of work completed on the invoice date. Do not enter the purchase as provider cost for that work. Review the purchase and remaining balance separately; attributing consumed credits to a period or workload needs usage records.</p>
+              <details class="builder-more-paths"><summary>Purchased usage credits? <span>Check how to treat a prepayment</span></summary><p>A credit purchase receipt records cash paid in advance, not the cost of work completed on the invoice date. Do not enter the purchase as provider cost for that work. Review the purchase and remaining balance separately; attributing consumed credits to a period or workload needs usage records.</p></details>
               <div id="invoice-pdf-status" class="path-requirements" role="status" hidden></div>
               <label id="invoice-amount-choice-label" hidden><span>Choose the invoice amount to review</span><select id="invoice-amount-choice"><option value="">Review the invoice totals</option></select><small>Choose only after checking the label and amount against the invoice.</small></label>
               <div class="field-grid compact-fields invoice-entry">
@@ -7206,8 +7218,28 @@ body{min-width:0}
                 <label><span>Billed amount</span><input id="invoice-amount" type="number" min="0" step="any" /></label>
                 <label><span>Currency</span><input id="invoice-currency" type="text" maxlength="3" placeholder="USD" /></label>
               </div>
+              <details class="builder-more-paths" id="bill-history-input"><summary>Have a previous bill? <span>Compare two periods locally</span></summary>
+                <p>Enter a previous amount for the same provider, account, workload, currency, and gross or net basis. Invoice dates alone do not establish comparable service periods.</p>
+                <div class="field-grid compact-fields">
+                  <label><span>Previous billed amount</span><input id="previous-bill-amount" type="number" min="0" step="any" /></label>
+                  <label><span>Previous invoice date</span><input id="previous-bill-date" type="date" /></label>
+                  <label><span>Previous service-period start</span><input id="previous-bill-start" type="date" /></label>
+                  <label><span>Previous service-period end</span><input id="previous-bill-end" type="date" /></label>
+                </div>
+                <label><input id="previous-bill-scope" type="checkbox" /> I checked that both bills cover the same provider, account, workload, currency, and gross or net basis, with no overlapping charges.</label>
+                <p>Both service periods must be supplied, complete, and non-overlapping. Equal lengths allow a raw bill change; different lengths show calendar-day amounts as a reference only. Fixed monthly plans can differ per day because of month length. Neither comparison proves a cause or savings.</p>
+              </details>
+              <details class="builder-more-paths" id="bill-budget-input"><summary>Have a budget for this bill? <span>Check it against the same period</span></summary>
+                <p>Use a budget for this bill's provider, account, workload, currency, and declared service period. A monthly budget cannot be compared with an annual invoice or an unknown service period.</p>
+                <div class="field-grid compact-fields">
+                  <label><span>Budget for this service period</span><input id="bill-budget-amount" type="number" min="0" step="any" /></label>
+                </div>
+                <label><input id="bill-budget-scope" type="checkbox" /> I checked that the budget and bill cover the same provider, account, workload, currency, gross or net basis, and service period.</label>
+                <p>This is a one-time check of entered amounts. AI Cost Lens does not monitor spend or send budget alerts.</p>
+              </details>
               <p>An invoice proves cost, not usage or outcomes. Missing requests, tokens, retries, and human effort stay unavailable. One bill cannot establish savings. Add detailed usage later only when it is useful.</p>
-              <p><strong>More detail?</strong> Upload the universal CSV instead.</p>
+              <details class="builder-more-paths"><summary>Have more detail? <span>Add usage with a universal CSV</span></summary>
+              <p>Upload the universal CSV instead.</p>
               <p>Download the template, delete every example row, and keep the column headers. Use <strong>baseline</strong> on every new row; no proposed period is needed.</p>
               <div class="template-links"><a href="data:text/csv;base64,cGVyaW9kLGRhdGUsd29ya2xvYWQscHJvdmlkZXIsbW9kZWwscm91dGUscmVxdWVzdHMsaW5wdXRfdG9rZW5zLGNhY2hlZF9pbnB1dF90b2tlbnMsY2FjaGVfd3JpdGVfaW5wdXRfdG9rZW5zLG91dHB1dF90b2tlbnMscHJvdmlkZXJfY29zdCxjb3N0X2Jhc2lzLGN1cnJlbmN5CmJhc2VsaW5lLDIwMjYtMDgtMDEsSW52b2ljZSBleHRyYWN0aW9uLE1vZGVsIEFQSSxDdXJyZW50IG1vZGVsLEN1cnJlbnQgcHJvZHVjdGlvbiByb3V0ZSwzLDI0MDAwMCw0MDAwMCwwLDMyMDAwLDE4LjQwLHByb3ZpZGVyX3JlcG9ydGVkLFVTRApwcm9wb3NlZCwyMDI2LTA4LTE1LEludm9pY2UgZXh0cmFjdGlvbixNb2RlbCBBUEksU21hbGxlciByb3V0ZWQgbW9kZWwsUHJvcG9zZWQgcGlsb3Qgcm91dGUsMiwyMTAwMDAsNzAwMDAsMCwzMDAwMCwxMS4yMCxjYWxjdWxhdGVkLFVTRAo=" download>Download spend template</a></div>
               <p>For an invoice or subscription, enter one row with <code>period=baseline</code>, the invoice date in <code>date</code> (YYYY-MM-DD), the subscription or workload name in <code>workload</code>, the billed amount in <code>provider_cost</code>, <code>cost_basis=provider_reported</code>, and a three-letter <code>currency</code>. Enter <code>provider</code> if known. Leave model, route, requests and tokens blank unless the source supports them. An invoice date is not evidence of the service-period duration.</p>
@@ -7215,6 +7247,7 @@ body{min-width:0}
               <p>Each cost amount must appear once. If cost cannot be joined to model-level usage, aggregate usage to the bill boundary in one row and leave model/route blank; do not spread dollars by token share. Use <code>calculated</code> for quantity × rate or <code>allocated</code> for a documented share of a bill, never label those billed evidence. Keep one currency, workload and cost basis per review.</p>
               <p>This detailed upload expects the completed universal CSV. Use Upload what you have for supported provider exports, structured-file mapping, or a text-based OpenAI or Anthropic invoice PDF. Scans and screenshots are not read.</p>
               <div class="file-pair single-file-row"><label class="field-wide"><span>Universal spend CSV</span><input id="single-spend-file" type="file" accept=".csv,text/csv" /></label></div>
+              </details>
             </div>
           </section>
           <section class="builder-step">
@@ -7222,6 +7255,7 @@ body{min-width:0}
             <div>
               <h3>Optional: connect the bill to finished work</h3>
               <p>No outcome file is needed for a useful bill and usage review. Add one only when you want to calculate provider cost per ready result. Each result is finished work, not an API call.</p>
+              <details class="builder-more-paths"><summary>Add outcome evidence <span>Optional work log and cost inputs</span></summary>
               <div class="template-links"><a href="data:text/csv;base64,cGVyaW9kLHJlc3VsdF9pZCxvdXRjb21lX3N0YXR1cyxtb2RlbF9yZXF1ZXN0cyxyZXRyeV9yZXF1ZXN0cyxodW1hbl9taW51dGVzCmJhc2VsaW5lLGJhc2UtMDAxLHJlYWR5X3RvX3VzZSwxLDAsMS4wCmJhc2VsaW5lLGJhc2UtMDAyLG5lZWRzX2NvcnJlY3Rpb24sMiwxLDMuMApwcm9wb3NlZCxwaWxvdC0wMDEscmVhZHlfdG9fdXNlLDEsMCwwLjUKcHJvcG9zZWQscGlsb3QtMDAyLHJlYWR5X3RvX3VzZSwxLDAsMC41Cg==" download>Download work template</a></div>
               <p>Replace all examples. Use <code>period=baseline</code>, a unique <code>result_id</code>, and an <code>outcome_status</code> of ready_to_use, needs_correction or needs_escalation. Add <code>model_requests</code>, <code>retry_requests</code>, or <code>human_minutes</code> only when your records support them. Missing optional fields stay unavailable and do not block the earlier bill or usage review.</p>
               <p class="result-unit-note"><strong>Human effort is optional.</strong> Use it only when a person actively reviews, corrects, reruns, escalates, or approves the output. Use workflow timestamps or a short timed sample when available. If nobody reviews the output, leave human minutes and the hourly rate blank. Never invent a zero.</p>
@@ -7235,6 +7269,7 @@ body{min-width:0}
               <label><input id="single-complete" type="checkbox" /> The cost, usage and full outcome log cover the same workload and service period, with no omitted results.</label>
               <p>Without outcomes, the result is still a useful cost and usage review. With reconciled complete outcomes, it adds provider cost per ready result. Full operating unit cost appears only when relevant human and shared costs are supplied. Zero ready results means unit cost is unavailable. For a route comparison, use the separate comparison path and its evidence gates.</p>
               <p>Downloaded single-bill JSON includes the supplied CSV rows, including result IDs. Keep it private. It is recalculated and validated when reopened; files are not uploaded.</p>
+              </details>
             </div>
           </section>
         </div>
@@ -7304,7 +7339,7 @@ body{min-width:0}
                 <label><span>Minimum usable rate you would accept</span><div class="input-suffix"><input id="simple-quality-floor" type="number" min="1" max="100" step="0.1" value="80" /><em>%</em></div></label>
                 <label class="check-field field-wide"><input id="simple-approved" type="checkbox" /><span>I have confirmed both tools are okay to use for this work</span></label>
               </div>
-              <p class="sample-caveat">The prefilled numbers are a small-business example. Replace them with your own before comparing.</p>
+              <p class="sample-caveat" id="simple-example-caveat">The prefilled numbers are a small-business example. Replace them with your own before comparing.</p>
             </div>
           </section>
         </div>
@@ -7837,16 +7872,16 @@ body{min-width:0}
 
   return Object.freeze({
     schema_version: "ai-cost-lens-pricing-catalog/0.5",
-    catalog_version: "2026-10-05",
+    catalog_version: "2026-10-18",
     effective_at: "2026-09-22",
     review_by: "2026-11-21",
     currency: "USD",
     unit: "per_1m_tokens",
     scope: "Direct API list prices for text input, cached input, cache writes, output, and published processing modes. Taxes, negotiated discounts, tools, grounding, and data-transfer charges are excluded; Gemini cache storage is listed but only calculated when token-hours are supplied.",
     sources: [
-      { provider: "OpenAI", checked_at: "2026-10-05", url: "https://developers.openai.com/api/docs/pricing" },
-      { provider: "Anthropic", checked_at: "2026-10-05", url: "https://platform.claude.com/docs/en/about-claude/pricing" },
-      { provider: "Google", checked_at: "2026-10-05", url: "https://ai.google.dev/gemini-api/docs/pricing" },
+      { provider: "OpenAI", checked_at: "2026-10-11", url: "https://developers.openai.com/api/docs/pricing" },
+      { provider: "Anthropic", checked_at: "2026-10-11", url: "https://platform.claude.com/docs/en/about-claude/pricing" },
+      { provider: "Google", checked_at: "2026-10-18", url: "https://ai.google.dev/gemini-api/docs/pricing" },
     ],
     models: [
       {
@@ -8067,11 +8102,17 @@ body{min-width:0}
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/sonnet-5-5/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
-        standard: { input: 2, cached_input: 0.2, cache_write_5m: 2.5, cache_write_1h: 4, output: 10 },
-        batch: { input: 1, cached_input: 0.1, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 },
+        verified_at: "2026-10-11",
+        standard: { input: 2, cached_input: 0.1, cache_write_5m: 2.5, cache_write_1h: 4, output: 10 },
+        batch: { input: 1, cached_input: 0.05, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 },
+        rate_change: {
+          effective_at: "2026-10-07",
+          prior_through: "2026-10-06",
+          source_url: "https://platform.claude.com/docs/en/release-notes/overview",
+          prior_rates: { standard: { cached_input: 0.2 }, batch: { cached_input: 0.1 } },
+        },
         geography_multipliers: { global: 1, us: 1.1 },
-        note: "Direct Claude API. Standard and Batch only; no Fast, Flex or Priority rate. Full 1M context has no long-context premium. Cache writes: 5m at 1.25x input, 1h at 2x; reads at 0.1x. Batch halves token rates including cache; US-only inference adds 10% to all token categories. Partner cloud rates and beta 300K Batch output are outside this catalog.",
+        note: "Direct Claude API. Standard and Batch only; no Fast, Flex or Priority rate. Full 1M context has no long-context premium. Cache reads fell to 0.05x input on October 7, 2026; earlier rates are retained by pricing date. Cache writes: 5m at 1.25x input, 1h at 2x. Batch halves token rates including cache; US-only inference adds 10% to all token categories. Partner cloud rates and beta 300K Batch output are outside this catalog.",
       },
       {
         id: "anthropic/claude-sonnet-5",
@@ -8106,6 +8147,27 @@ body{min-width:0}
         note: "Direct Claude API. The catalog represents 5-minute and 1-hour cache writes, the 50% Batch discount, and the 10% US-only inference multiplier. Server-side tools remain excluded.",
       },
       {
+        id: "anthropic/claude-haiku-5.5",
+        provider: "Anthropic",
+        label: "Claude Haiku 5.5",
+        model: "claude-haiku-5-5",
+        released_at: "2026-10-07",
+        effective_at: "2026-10-07",
+        release_source_url: "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
+        context_window_tokens: 1000000,
+        max_output_tokens: 128000,
+        source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
+        capability_source_url: "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
+        workload_tags: ["general", "reasoning", "high_volume", "long_context", "multimodal"],
+        verified_at: "2026-10-11",
+        standard: { input: 0.1, cached_input: 0.01, cache_write_5m: 0.125, cache_write_1h: 0.2, output: 0.5 },
+        batch: { input: 0.05, cached_input: 0.005, cache_write_5m: 0.0625, cache_write_1h: 0.1, output: 0.25 },
+        geography_multipliers: { global: 1, us: 1.1 },
+        long_context: { input_threshold_tokens: 100000, input_multiplier: 5, cached_input_multiplier: 5, cache_write_multiplier: 5, output_multiplier: 5 },
+        minimum_cacheable_prompt_tokens: 512,
+        note: "Direct Claude API. A prompt over 100K input tokens, including cache reads and writes, is charged 5x for the entire request. Standard and Batch, 5m and 1h cache writes, and US-only inference (+10%) are represented. The minimum cacheable prefix is 512 tokens. This model uses a newer tokenizer (approximately 30% more tokens for the same text than Haiku 4.5); adaptive thinking affects output tokens. Partner cloud rates, server-side tools and beta 300K Batch output are outside this catalog.",
+      },
+      {
         id: "anthropic/claude-haiku-4.5",
         provider: "Anthropic",
         label: "Claude Haiku 4.5",
@@ -8120,6 +8182,29 @@ body{min-width:0}
         batch: { input: 0.5, cached_input: 0.05, cache_write_5m: 0.625, cache_write_1h: 1, output: 2.5 },
         geography_multipliers: { global: 1 },
         note: "Direct Claude API. The catalog represents 5-minute and 1-hour cache writes and the 50% Batch discount. This model does not use the Claude 4.6+ US-only inference multiplier; server-side tools remain excluded.",
+      },
+      {
+        id: "google/gemini-4-argon",
+        provider: "Google",
+        label: "Gemini 4 Argon",
+        model: "gemini-4-argon",
+        released_at: "2026-10-13",
+        effective_at: "2026-10-13",
+        release_source_url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-argon/",
+        context_window_tokens: 1048576,
+        max_output_tokens: 65536,
+        source_url: "https://ai.google.dev/gemini-api/docs/pricing",
+        capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-4-argon",
+        workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
+        verified_at: "2026-10-18",
+        standard: { input: 2, cached_input: 0.1, output: 10 },
+        batch: { input: 1, cached_input: 0.05, output: 5 },
+        flex: { input: 1, cached_input: 0.05, output: 5 },
+        priority: { input: 3.6, cached_input: 0.18, output: 18 },
+        geography_multipliers: { global: 1 },
+        minimum_cacheable_prompt_tokens: 4096,
+        scheduled_rate_change: { effective_at: "2026-12-01", multiplier: 2, status: "published_not_active" },
+        note: "Gemini Developer API paid-tier introductory rates through November 30, 2026. Standard, Batch, Flex, Priority, and implicit cache reads are represented; cache hits need a 4,096-token prefix. Output includes thinking tokens and shares a 1,048,576-token window with input. This catalog supports the 65,536-token default synchronous output limit, not background long decode. Explicit cache writes, grounding, invite-only Contributor rates, and the published December price change are excluded pending a fresh review. No geography premium is published for the direct Developer API.",
       },
       {
         id: "google/gemini-3.8-flash",
@@ -8141,6 +8226,25 @@ body{min-width:0}
         note: "Gemini Developer API rates through December 31, 2026. Standard, Batch, Flex, Priority, and cache-storage rates are represented. Grounding and the published 2027 rate change are disclosed but not applied before a fresh catalog review.",
       },
       {
+        id: "google/gemini-3.6-flash",
+        provider: "Google",
+        label: "Gemini 3.6 Flash",
+        model: "gemini-3.6-flash",
+        input_token_limit: 1048576,
+        max_output_tokens: 65536,
+        source_url: "https://ai.google.dev/gemini-api/docs/pricing",
+        capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.6-flash",
+        workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
+        verified_at: "2026-10-11",
+        standard: { input: 0.75, cached_input: 0.075, cache_storage_per_1m_token_hour: 0.5, output: 3.75 },
+        batch: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
+        flex: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
+        priority: { input: 1.35, cached_input: 0.135, cache_storage_per_1m_token_hour: 0.5, output: 6.75 },
+        geography_multipliers: { global: 1 },
+        scheduled_rate_change: { effective_at: "2027-01-01", multiplier: 2, status: "published_not_active" },
+        note: "Gemini Developer API rates through December 31, 2026. Standard, Batch, Flex, Priority, and cache storage are represented. Gemini 3.5 Flash requests now route here; grounding and the published 2027 rate change are disclosed but not applied.",
+      },
+      {
         id: "google/gemini-3.7-flash",
         provider: "Google",
         label: "Gemini 3.7 Flash",
@@ -8151,13 +8255,16 @@ body{min-width:0}
         capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.7-flash",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
         verified_at: "2026-10-05",
+        routed_to_model_id: "google/gemini-3.8-flash",
+        last_verified_unrouted_at: "2026-10-05",
+        routing_confirmed_at: "2026-10-09",
         standard: { input: 0.75, cached_input: 0.075, cache_storage_per_1m_token_hour: 0.5, output: 3.75 },
         batch: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
         flex: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
         priority: { input: 1.35, cached_input: 0.135, cache_storage_per_1m_token_hour: 0.5, output: 6.75 },
         geography_multipliers: { global: 1 },
         scheduled_rate_change: { effective_at: "2027-01-01", multiplier: 2, status: "published_not_active" },
-        note: "Gemini Developer API rates through December 31, 2026. Standard, Batch, Flex, Priority, and cache-storage rates are represented. Grounding and the published 2027 rate change are disclosed but not applied before a fresh catalog review.",
+        note: "Historical rates only. Google says current requests to this ID route to Gemini 3.8 Flash; the exact transition date is not established. October 6–8 requests without provider-reported cost cannot be safely repriced from this catalog.",
       },
       {
         id: "google/gemini-3.5-flash",
@@ -8170,12 +8277,15 @@ body{min-width:0}
         capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash",
         workload_tags: ["general", "high_volume", "long_context", "multimodal"],
         verified_at: "2026-10-05",
+        routed_to_model_id: "google/gemini-3.6-flash",
+        last_verified_unrouted_at: "2026-10-05",
+        routing_confirmed_at: "2026-10-09",
         standard: { input: 1.5, cached_input: 0.15, cache_storage_per_1m_token_hour: 1, output: 9 },
         batch: { input: 0.75, cached_input: 0.075, cache_storage_per_1m_token_hour: 1, output: 4.5 },
         flex: { input: 0.75, cached_input: 0.08, cache_storage_per_1m_token_hour: 1, output: 4.5 },
         priority: { input: 2.7, cached_input: 0.27, cache_storage_per_1m_token_hour: 1, output: 16.2 },
         geography_multipliers: { global: 1 },
-        note: "Gemini Developer API. Standard, Batch, Flex, Priority, and cache-storage rates are represented. Grounding is excluded.",
+        note: "Historical rates only. Google says current requests to this ID route to Gemini 3.6 Flash; the exact transition date is not established. October 6–8 requests without provider-reported cost cannot be safely repriced from this catalog.",
       },
       {
         id: "google/gemini-3.5-flash-lite",
@@ -8369,11 +8479,44 @@ body{min-width:0}
           if (model.long_context[field] < 1) throw new Error(`${model.id} ${field} cannot be below 1.`);
         }
       }
+      if (model.minimum_cacheable_prompt_tokens !== undefined) {
+        number(model.minimum_cacheable_prompt_tokens, `${model.id} minimum cacheable prompt`, { integer: true });
+      }
+      if (model.rate_change) {
+        const change = model.rate_change;
+        isoDate(change.effective_at, `${model.id} rate-change date`);
+        isoDate(change.prior_through, `${model.id} prior-rate end date`);
+        if (change.effective_at > catalog.catalog_version || change.prior_through < (model.effective_at || catalog.effective_at) ||
+          new Date(Date.parse(`${change.prior_through}T00:00:00Z`) + 86400000).toISOString().slice(0, 10) !== change.effective_at) {
+          throw new Error(`${model.id} rate history must have consecutive dates within the catalog.`);
+        }
+        if (!/^https:\/\//.test(change.source_url || "")) throw new Error(`${model.id} rate change needs an HTTPS source.`);
+        if (!change.prior_rates || !Object.keys(change.prior_rates).length) throw new Error(`${model.id} rate change needs prior rates.`);
+        for (const [mode, overrides] of Object.entries(change.prior_rates)) {
+          if (!model[mode] || !overrides || !Object.keys(overrides).length) throw new Error(`${model.id} prior rates need a published mode.`);
+          for (const [field, value] of Object.entries(overrides)) {
+            if (!RATE_FIELDS.includes(field) || model[mode][field] === undefined) throw new Error(`${model.id} has an unsupported prior-rate field.`);
+            number(value, `${model.id} prior ${mode} ${field}`);
+          }
+        }
+      }
       if (model.scheduled_rate_change) {
         isoDate(model.scheduled_rate_change.effective_at, `${model.id} scheduled rate date`);
         number(model.scheduled_rate_change.multiplier, `${model.id} scheduled rate multiplier`);
         if (model.scheduled_rate_change.multiplier <= 0) throw new Error(`${model.id} scheduled rate multiplier must be positive.`);
         if (model.scheduled_rate_change.status !== "published_not_active") throw new Error(`${model.id} scheduled rate status is unsupported.`);
+      }
+    });
+    catalog.models.forEach((model) => {
+      if (!model.routed_to_model_id) return;
+      if (!ids.has(model.routed_to_model_id) || model.routed_to_model_id === model.id) {
+        throw new Error(`${model.id} needs a distinct routed-to model in the catalog.`);
+      }
+      isoDate(model.last_verified_unrouted_at, `${model.id} last unrouted verification`);
+      isoDate(model.routing_confirmed_at, `${model.id} routing confirmation`);
+      if (model.last_verified_unrouted_at >= model.routing_confirmed_at ||
+        model.routing_confirmed_at > catalog.catalog_version) {
+        throw new Error(`${model.id} routing dates are inconsistent.`);
       }
     });
     return catalog;
@@ -8495,7 +8638,10 @@ body{min-width:0}
   function resolveRateProfile(model, scenario, routeOptions = {}) {
     const processingMode = String(routeOptions.processing_mode || scenario.processing_mode || (scenario.batch ? "batch" : "standard")).trim().toLowerCase();
     if (!PROCESSING_MODES.includes(processingMode)) throw new Error(`Processing mode must be one of: ${PROCESSING_MODES.join(", ")}.`);
-    const baseRates = model[processingMode];
+    const priorRate = Boolean(model.rate_change && scenario.pricing_date && scenario.pricing_date <= model.rate_change.prior_through);
+    const baseRates = model[processingMode] && (priorRate
+      ? { ...model[processingMode], ...(model.rate_change.prior_rates[processingMode] || {}) }
+      : model[processingMode]);
     if (!baseRates) {
       const available = availableProcessingModes(model).map((mode) => mode.replaceAll("_", " ")).join(", ");
       throw new Error(`${model.label} has no published ${processingMode} rate in this catalog. Available modes: ${available}.`);
@@ -8526,6 +8672,8 @@ body{min-width:0}
       geography,
       geography_multiplier: geographyMultiplier,
       pricing_adjustment: longContext ? "long_context" : "standard_context",
+      rate_effective_at: priorRate ? model.effective_at : model.rate_change?.effective_at || model.effective_at,
+      rate_boundary: priorRate ? model.rate_change.prior_through : null,
       rates: contextRates,
     };
   }
@@ -8540,6 +8688,9 @@ body{min-width:0}
 
   function priceModel(model, rawScenario, routeOptions = {}) {
     const scenario = normalizeScenario(rawScenario);
+    if (model.routed_to_model_id && (!scenario.pricing_date || scenario.pricing_date > model.last_verified_unrouted_at)) {
+      throw new Error(`${model.label} is a historical route. Current requests use ${model.routed_to_model_id}; choose that model. Pricing during the unconfirmed transition cannot be inferred.`);
+    }
     if (scenario.pricing_date && model.effective_at && scenario.pricing_date < model.effective_at) {
       throw new Error(`${model.label} has no verified list price before ${model.effective_at}.`);
     }
@@ -8561,6 +8712,10 @@ body{min-width:0}
     const billedCalls = scenario.calls_per_month * (1 + scenario.retry_rate);
     if (scenario.cache_refreshes_per_month > billedCalls) throw new Error("Cache refreshes per month cannot exceed billed calls after retries.");
     const cachedTokensPerCall = scenario.input_tokens * scenario.cached_input_share;
+    if (cachedTokensPerCall > 0 && model.minimum_cacheable_prompt_tokens &&
+      cachedTokensPerCall < model.minimum_cacheable_prompt_tokens) {
+      throw new Error(`${model.label} requires a cacheable prefix of at least ${model.minimum_cacheable_prompt_tokens} tokens. Reduce the cached-input share to zero or enter a qualifying prefix.`);
+    }
     const uncachedTokensPerCall = scenario.input_tokens - cachedTokensPerCall;
     const cacheReadCalls = billedCalls - scenario.cache_refreshes_per_month;
     const writeRate = cacheWriteRate(rates, scenario.cache_write_duration);
@@ -8576,7 +8731,7 @@ body{min-width:0}
     const monthly = uncachedInputCost + cacheReadCost + cacheWriteCost + cacheStorageCost + outputCost;
     const perCall = billedCalls ? monthly / billedCalls : 0;
     const expectedUsable = scenario.usable_rate === null ? null : scenario.calls_per_month * scenario.usable_rate;
-    const rateBoundary = model.promotional_rate_guaranteed_through ||
+    const rateBoundary = profile.rate_boundary || model.promotional_rate_guaranteed_through ||
       (model.scheduled_rate_change?.effective_at
         ? new Date(Date.parse(`${model.scheduled_rate_change.effective_at}T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
         : null);
@@ -8601,7 +8756,7 @@ body{min-width:0}
       pricing_source_url: model.source_url || null,
       pricing_source_note: model.pricing_source_note || null,
       pricing_verified_at: model.verified_at || null,
-      pricing_effective_at: model.effective_at || null,
+      pricing_effective_at: profile.rate_effective_at || null,
       pricing_date: scenario.pricing_date || model.effective_at || null,
       promotional_rate_guaranteed_through: rateBoundary,
       annual_rate_known: annualRateKnown,
@@ -9058,6 +9213,47 @@ body{min-width:0}
     return result;
   }
 
+  function isLiteLLMSpendRow(row) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+    const keys = new Set(Object.keys(row).map(normalizeKey));
+    return keys.has("spend") && (keys.has("model_group") || keys.has("starttime") || keys.has("custom_llm_provider"))
+      && (keys.has("prompt_tokens") || keys.has("completion_tokens"));
+  }
+
+  function liteLLMSpendRow(row) {
+    // LiteLLM's spend is a gateway calculation, not a provider invoice. Copy only
+    // the fields needed for local analysis; never retain messages, response,
+    // metadata, API keys, request bodies, IP addresses, or unknown fields.
+    const source = valueMap(row);
+    const read = (name) => source.get(name) ?? null;
+    const rawTime = read("starttime") ?? read("start_time");
+    const time = typeof rawTime === "string" && /(?:Z|[+-]\d{2}:\d{2})$/i.test(rawTime.trim())
+      ? rawTime : null;
+    const providerCode = String(read("custom_llm_provider") || "").toLowerCase();
+    const provider = { openai: "OpenAI", anthropic: "Anthropic", gemini: "Google", vertex_ai: "Vertex AI",
+      azure: "Azure", bedrock: "AWS Bedrock", aws_bedrock: "AWS Bedrock" }[providerCode]
+      || providerCode || providerFromModel(read("model") || read("model_group"));
+    return {
+      event_id: read("request_id"),
+      timestamp: time,
+      provider,
+      billing_channel: "gateway",
+      model: read("model") || read("model_group"),
+      team_owner: read("team_id"),
+      customer: read("end_user"),
+      session_id: read("session_id"),
+      input_tokens: read("prompt_tokens"),
+      output_tokens: read("completion_tokens"),
+      calculated_cost: read("spend"),
+      currency: "USD",
+      request_status: read("status"),
+      latency_ms: read("request_duration_ms"),
+      evidence_source: "LiteLLM gateway calculated spend; provider bill not verified",
+      __source_index: row.__source_index,
+      __source_row: row.__source_row,
+    };
+  }
+
   function pick(map, field) {
     const present = aliases[field]
       .filter((name) => map.has(name))
@@ -9133,16 +9329,29 @@ body{min-width:0}
   }
 
   function calculatedTokenCost(event, catalog) {
-    const model = findModel(catalog, event.provider, event.model);
+    let model = findModel(catalog, event.provider, event.model);
     if (!model || event.input_tokens === null || event.output_tokens === null) return null;
     if (event.currency !== catalog.currency || event.processing_mode === null || event.cached_input_tokens === null || event.tool_charges === null || !event.timestamp) return null;
     const eventDate = event.timestamp.slice(0, 10);
+    let routedModelId = null;
+    if (model.routed_to_model_id) {
+      if (eventDate > model.last_verified_unrouted_at && eventDate < model.routing_confirmed_at) return null;
+      if (eventDate >= model.routing_confirmed_at) {
+        const target = catalog.models.find((candidate) => candidate.id === model.routed_to_model_id);
+        if (!target || target.routed_to_model_id) return null;
+        model = target;
+        routedModelId = target.id;
+      }
+    }
     if (eventDate < (model.effective_at || catalog.effective_at) || eventDate > catalog.review_by) return null;
     const pricedMode = event.processing_mode === "priority" && model.provider === "OpenAI" && model.fast ? "fast" : event.processing_mode;
     if (model.unsupported_combinations?.includes(`${pricedMode}+${event.inference_geography || "global"}`)) return null;
     if ((model.promotional_rate_guaranteed_through && eventDate > model.promotional_rate_guaranteed_through) ||
       (model.scheduled_rate_change && eventDate >= model.scheduled_rate_change.effective_at)) return null;
-    const base = model[pricedMode];
+    const currentRates = model[pricedMode];
+    const base = currentRates && model.rate_change && eventDate <= model.rate_change.prior_through
+      ? { ...currentRates, ...(model.rate_change.prior_rates[pricedMode] || {}) }
+      : currentRates;
     if (!base) return null;
     const hasSeparateWriteRate = ["cache_write", "cache_write_5m", "cache_write_1h"].some((field) => base[field] !== null && base[field] !== undefined);
     if (hasSeparateWriteRate && event.cache_write_tokens === null) return null;
@@ -9183,7 +9392,7 @@ body{min-width:0}
       + cacheWrite * (cacheWriteRate || 0)
       + event.output_tokens * rates.output
     ) / 1_000_000 + storageCost;
-    return round(tokenCost + event.tool_charges);
+    return { cost: round(tokenCost + event.tool_charges), routed_model_id: routedModelId };
   }
 
   function normalizeStatus(value) {
@@ -9198,6 +9407,7 @@ body{min-width:0}
 
   function normalizeRow(row, index, options) {
     if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error(`Row ${index + 1} must be one flat object.`);
+    if (isLiteLLMSpendRow(row)) row = liteLLMSpendRow(row);
     if (Object.values(row).some((value) => value !== null && typeof value === "object")) throw new Error(`Row ${index + 1} must not contain nested data.`);
     const map = valueMap(row);
     const model = text(pick(map, "model"), `Row ${index + 1} model`);
@@ -9258,6 +9468,7 @@ body{min-width:0}
       tool_call_count: number(pick(map, "tool_call_count"), `Row ${index + 1} tool-call count`, { integer: true }),
       outcome_status: text(pick(map, "outcome_status"), `Row ${index + 1} outcome status`),
       duplicate_group: null,
+      routed_model_id: null,
     };
     if (!event.customer_product) event.customer_product = [event.customer, event.product].filter(Boolean).join(" · ") || null;
     if (event.currency && !/^[A-Z]{3}$/.test(event.currency)) throw new Error(`Row ${index + 1} currency must be a three-letter code.`);
@@ -9270,7 +9481,11 @@ body{min-width:0}
     if (event.input_tokens !== null && (event.cached_input_tokens || 0) + (event.cache_write_tokens || 0) > event.input_tokens) {
       throw new Error(`Row ${index + 1} cache-read and cache-write tokens cannot exceed input tokens.`);
     }
-    if (event.calculated_cost === null) event.calculated_cost = calculatedTokenCost(event, options.catalog);
+    if (event.calculated_cost === null) {
+      const calculated = calculatedTokenCost(event, options.catalog);
+      event.calculated_cost = calculated?.cost ?? null;
+      event.routed_model_id = calculated?.routed_model_id || null;
+    }
     event.selected_cost = event.provider_reported_cost !== null ? event.provider_reported_cost : event.calculated_cost;
     event.cost_basis = event.provider_reported_cost !== null ? "provider_reported" : event.calculated_cost !== null ? "calculated" : "unpriced";
     return event;
@@ -9295,6 +9510,7 @@ body{min-width:0}
 
   function detectAdapter(rows) {
     const keys = new Set(Object.keys(rows[0] || {}).map(normalizeKey));
+    if (isLiteLLMSpendRow(rows[0])) return "LiteLLM spend log (gateway calculated USD)";
     if (["generation_id", "is_byok", "upstream_inference_cost"].some((key) => keys.has(key))) return "OpenRouter flat usage";
     if (["trace_id", "observation_id", "usage_details_input", "cost_details_total"].some((key) => keys.has(key))) return "Langfuse flat observation export";
     if (["helicone_id", "helicone_user", "helicone_property"].some((key) => keys.has(key))) return "Helicone flat request export";
@@ -10064,7 +10280,7 @@ body{min-width:0}
       known_operating_cost: knownOperatingCost,
       fully_loaded_cost: complete ? knownOperatingCost : null,
       missing_categories: categories.filter((item) => !item.supplied).map((item) => item.key),
-      method: "Known operating cost equals selected provider request cost plus only the period-level cost categories explicitly supplied. Additional categories must exclude charges already included in provider request cost or another category. Fully loaded cost appears only when every request is priced and compute, retrieval/data, network, tooling, pipeline, and human review are each supplied; enter zero only when confirmed none. These totals are not spread across requests or allocation dimensions.",
+      method: "Known operating cost equals selected request cost plus only the period-level cost categories explicitly supplied. Selected request cost can be provider-reported or calculated from usage or a gateway; calculated cost is not invoice evidence. Additional categories must exclude charges already included in request cost or another category. Fully loaded cost appears only when every request is priced and compute, retrieval/data, network, tooling, pipeline, and human review are each supplied; enter zero only when confirmed none. These totals are not spread across requests or allocation dimensions.",
       savings_claim_allowed: false,
     };
   }
@@ -10130,7 +10346,7 @@ body{min-width:0}
         policy_note: "The threshold is a user-set AI Cost Lens review policy, not an industry standard. A pass clears only this allocation check, not the other evidence or savings gates.",
         savings_claim_allowed: false,
       },
-      method: "Allocation percentages use known operating cost. Request-level provider cost is allocated only when the selected field is present. Period-level compute, retrieval/data, network, tooling, pipeline, and human costs remain unallocated; AI Cost Lens never spreads them automatically.",
+      method: "Allocation percentages use known operating cost. Request-level selected cost is allocated only when the selected field is present; calculated gateway spend is not invoice evidence. Period-level compute, retrieval/data, network, tooling, pipeline, and human costs remain unallocated; AI Cost Lens never spreads them automatically.",
     };
   }
 
@@ -10422,7 +10638,7 @@ body{min-width:0}
 
   function normalizedCsv(review) {
     if (!review || review.schema_version !== REVIEW_SCHEMA || !Array.isArray(review.events)) throw new Error("A normalized usage review is required.");
-    const fields = ["record_id", "event_id", "timestamp", "provider", "billing_channel", "processing_mode", "inference_geography", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "customer_product", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_duration_seconds", "cache_storage_token_hours", "batch", "tool_charges", "provider_reported_cost", "calculated_cost", "selected_cost", "cost_basis", "currency", "request_status", "retry_parent_event_id", "latency_ms", "evidence_source", "source_file_hash", "prefix_fingerprint", "tool_call_count", "outcome_status", "duplicate_group"];
+    const fields = ["record_id", "event_id", "timestamp", "provider", "billing_channel", "processing_mode", "inference_geography", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "customer_product", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_duration_seconds", "cache_storage_token_hours", "batch", "tool_charges", "provider_reported_cost", "calculated_cost", "selected_cost", "cost_basis", "currency", "request_status", "retry_parent_event_id", "latency_ms", "evidence_source", "source_file_hash", "prefix_fingerprint", "tool_call_count", "outcome_status", "duplicate_group", "routed_model_id"];
     return `${fields.join(",")}\n${review.events.map((event) => fields.map((field) => csvCell(event[field])).join(",")).join("\n")}\n`;
   }
 
@@ -11722,8 +11938,58 @@ body{min-width:0}
     if (Boolean(declaredStart) !== Boolean(declaredEnd)) throw new Error("Supply both service-period dates or leave both blank.");
     if (declaredStart && declaredEnd < declaredStart) throw new Error("Service-period end cannot be before its start.");
     const period = { start: declaredStart || dates[0], end: declaredEnd || dates.at(-1), timezone: "UTC" };
+    let billHistory = null;
+    if (config.previousBill !== undefined) {
+      const previous = config.previousBill;
+      if (!previous || typeof previous !== "object" || Array.isArray(previous) ||
+          typeof previous.amount !== "string" || typeof previous.invoiceDate !== "string" ||
+          typeof previous.serviceStart !== "string" || typeof previous.serviceEnd !== "string" ||
+          typeof previous.sameScope !== "boolean" ||
+          !["invoice_form", "invoice_pdf"].includes(config.reviewSource)) throw new Error("Previous bill must be a complete manual-bill entry.");
+      const amount = costNumber(previous.amount, "Previous billed amount");
+      validDate(previous.invoiceDate, "Previous invoice date");
+      if (Boolean(previous.serviceStart) !== Boolean(previous.serviceEnd)) throw new Error("Supply both previous service-period dates or leave both blank.");
+      const previousStart = previous.serviceStart ? validDate(previous.serviceStart, "Previous service-period start") : null;
+      const previousEnd = previous.serviceEnd ? validDate(previous.serviceEnd, "Previous service-period end") : null;
+      if (previousStart && previousEnd < previousStart) throw new Error("Previous service-period end cannot be before its start.");
+      const day = (date) => Date.parse(`${date}T00:00:00Z`) / 86400000;
+      const currentDays = declaredStart ? day(declaredEnd) - day(declaredStart) + 1 : null;
+      const previousDays = previousStart ? day(previousEnd) - day(previousStart) + 1 : null;
+      const limitations = [];
+      if (!previous.sameScope) limitations.push("Matching provider, account, workload, currency, gross or net basis, and charge overlap were not confirmed.");
+      if (!currentDays || !previousDays) limitations.push("Both service periods are needed; invoice dates alone do not establish coverage.");
+      else {
+        if (previousEnd >= declaredStart) limitations.push("The declared service periods overlap or are out of order.");
+      }
+      const dailyComparable = limitations.length === 0;
+      const comparable = dailyComparable && currentDays === previousDays;
+      if (dailyComparable && !comparable) limitations.push("The service periods have different lengths.");
+      const current = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true }).providerCost;
+      billHistory = { previousAmount: amount, previousStart, previousEnd, previousDays, currentDays, comparable, limitations,
+        change: comparable ? current - amount : null,
+        changePct: comparable && amount > 0 ? (current - amount) / amount : null,
+        previousPerDay: dailyComparable ? amount / previousDays : null,
+        currentPerDay: dailyComparable ? current / currentDays : null,
+        dailyComparable,
+      };
+    }
     const basis = spendCostBasis(spend, "single bill");
     const totals = summarizeSpendRows(spend, "single bill", { allowZeroRequests: true });
+    let billBudget = null;
+    if (config.billBudget !== undefined) {
+      const budget = config.billBudget;
+      if (!budget || typeof budget !== "object" || Array.isArray(budget) ||
+          typeof budget.amount !== "string" || typeof budget.sameScope !== "boolean" ||
+          !["invoice_form", "invoice_pdf"].includes(config.reviewSource)) throw new Error("Budget must be a complete manual-bill entry.");
+      const amount = costNumber(budget.amount, "Budget for this service period");
+      if (amount <= 0) throw new Error("Budget for this service period must be greater than zero.");
+      const limitations = [];
+      if (!budget.sameScope) limitations.push("Matching provider, account, workload, currency, gross or net basis, and service period were not confirmed.");
+      if (!declaredStart || !declaredEnd) limitations.push("Declare the bill's complete service period before comparing it with a period budget.");
+      const comparable = limitations.length === 0;
+      billBudget = { amount, comparable, limitations, difference: comparable ? totals.providerCost - amount : null,
+        usedPct: comparable ? totals.providerCost / amount : null };
+    }
     if (config.grossNet) {
       const { gross, net, adjustment, classification } = config.grossNet;
       if (config.reviewSource !== "claude_spend_report" || classification !== "unclassified_gross_to_net" ||
@@ -11797,7 +12063,7 @@ body{min-width:0}
       level: outcomeSupported ? "Cost, usage and outcomes" : hasUsage ? "Cost and usage" : "Invoice or subscription only",
       providerUnit: outcomeSupported && ready ? totals.providerCost / ready : null,
       fullUnit: outcomeSupported && ready && fullCost !== null ? fullCost / ready : null,
-      humanCost, shared, fullCost,
+      humanCost, shared, fullCost, billHistory, billBudget,
     };
     const checkNumbers = (value) => {
       if (typeof value === "number" && (!Number.isFinite(value) || Math.abs(value) > 1e15)) throw new Error("Review totals exceed the supported numeric range.");
@@ -11861,13 +12127,39 @@ body{min-width:0}
       : costPerRequest === null
         ? "Requests were not supplied for every cost row. Leave the metric blank until the source supports it."
         : "This is provider cost divided by all supplied requests. It is a workload-level baseline, not a model price.";
+    const budget = review.billBudget;
+    const budgetGuidance = !budget
+      ? ["fix", "CONTROL", "Give the cost an owner and a limit", "One owner", "Assign the bill to a team or use case and set a monthly budget or usage alert before the cost grows unnoticed."]
+      : !budget.comparable
+        ? ["test", "BUDGET SCOPE", "Confirm what the budget covers", "Withheld", "The budget and bill amounts are visible, but no variance is calculated until their provider, account, workload, currency, cost basis, and declared service period match."]
+        : budget.difference > 0
+          ? ["fix", "BUDGET CHECK", "Investigate the entered budget overage", `${cost(budget.difference)} over`, "Reconcile invoice line items, credits, taxes, discounts, and usage against the same-period budget before changing a limit or assigning a cause."]
+          : ["save", "BUDGET CHECK", budget.difference < 0 ? "The entered bill is within budget" : "The entered bill matches the budget", budget.difference < 0 ? `${cost(Math.abs(budget.difference))} under` : "On budget", "This is arithmetic against a user-entered period budget, not a verified invoice, live alert, or realized saving."];
 
     if (review.level === "Invoice or subscription only") {
+      const history = review.billHistory;
+      if (history?.comparable) {
+        const direction = history.change > 0 ? "rose" : history.change < 0 ? "fell" : "stayed the same";
+        return [
+          ["test", "BILL MOVEMENT", `The entered bill ${direction}`, history.change === 0 ? "No change" : history.changePct === null ? "No percentage" : `${pct(Math.abs(history.changePct), 1)} ${history.change > 0 ? "higher" : "lower"}`, "This is a change in two unverified bill totals, not a change in unit cost or proof of savings. Check line items, usage volume, plan or rate changes, and credits before assigning a cause."],
+          ["test", "CHECK NEXT", "Find what changed in use", "Usage", "For an API, compare requests, tokens, model mix, and processing mode across the same scope. For a subscription, check active seats and actual use. Add only records you have."],
+          ["leave", "QUALITY", "Check whether the work stayed useful", "Unknown", "A lower provider bill can accompany fewer ready results or more correction. Keep that unknown until a comparable outcome sample or work log is available."],
+          budgetGuidance,
+        ];
+      }
+      if (history) {
+        return [
+          ["test", "PERIOD CHECK", "Resolve what the two bills cover", "Review", history.dailyComparable ? "The declared periods have different lengths. The calendar-day amounts above are a reference, not a like-for-like bill change; a fixed monthly subscription can differ per day solely because of month length." : `A like-for-like bill change is withheld: ${history.limitations.join(" ")}`],
+          ["test", "CHECK NEXT", "Find the relevant usage or line items", "Usage", "Check active seats for a subscription, or requests, tokens, model mix, and discounts for an API. Do not assign a cause from two totals alone."],
+          ["leave", "QUALITY", "Keep outcome quality unknown", "Unknown", "A bill does not say how many results were ready to use or how much correction they needed."],
+          budgetGuidance,
+        ];
+      }
       return [
         ["save", "START HERE", "Use this bill as the cost baseline", cost(totals.providerCost), `The review records ${cost(totals.providerCost)} against ${review.workload}. That is enough to begin tracking the cost over time.`],
         ["test", "CHECK NEXT", "Find what is using the subscription or API", "Usage", "For a subscription, check active seats and actual use. For API spend, add requests or tokens by workload when the source provides them."],
         ["leave", "OPTIONAL", "No human review record? Leave it blank", "No penalty", "Human effort belongs in the analysis only when people actively review or correct AI output. It is not required for this bill review."],
-        ["fix", "CONTROL", "Give the cost an owner and a limit", "One owner", "Assign the bill to a team or use case and set a monthly budget or usage alert before the cost grows unnoticed."],
+        budgetGuidance,
       ];
     }
 
@@ -13599,6 +13891,12 @@ body{min-width:0}
       if (data.config.grossNet !== undefined) shape(data.config.grossNet, {
         gross: "number", net: "number", adjustment: "number", classification: "string",
       }, "config.grossNet");
+      if (data.config.previousBill !== undefined) shape(data.config.previousBill, {
+        amount: "string", invoiceDate: "string", serviceStart: "string", serviceEnd: "string", sameScope: "boolean",
+      }, "config.previousBill");
+      if (data.config.billBudget !== undefined) shape(data.config.billBudget, {
+        amount: "string", sameScope: "boolean",
+      }, "config.billBudget");
       for (const row of [...data.source.spend, ...data.source.work]) {
         Object.values(row).forEach((value) => shape(value, "string", "source row"));
       }
@@ -14989,6 +15287,15 @@ body{min-width:0}
       const rows = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.data) ? parsed.data : null;
       if (!rows?.length) throw new Error("The request-log JSON needs a top-level array or a data array with at least one flat object.");
       if (rows.length > 20000) throw new Error("The request log exceeds 20,000 data rows.");
+      if (!Array.isArray(parsed) && rows.some((row) => row && Object.prototype.hasOwnProperty.call(row, "spend")
+        && (Object.prototype.hasOwnProperty.call(row, "model_group") || Object.prototype.hasOwnProperty.call(row, "startTime")))) {
+        const total = Number(parsed.total);
+        const page = Number(parsed.page);
+        if (parsed.total_is_capped === true || (Number.isFinite(total) && total > rows.length)
+          || (Number.isFinite(page) && page > 1) || Number(parsed.total_pages) > 1) {
+          throw new Error("This LiteLLM response contains only part of the spend log. Export all pages for the same period as one JSON array before analyzing or reconciling a bill.");
+        }
+      }
       rows.forEach((row, index) => {
         if (row && typeof row === "object" && !Array.isArray(row)) {
           Object.defineProperties(row, { __source_row: { value: index + 1 }, __source_index: { value: index } });
@@ -15072,7 +15379,7 @@ body{min-width:0}
     document.getElementById("request-event-rows").innerHTML = visible.map((event) => `<tr>
       <th>${escapeHtml(event.event_id || event.record_id)}${event.duplicate_group ? `<span>${escapeHtml(event.duplicate_group)}</span>` : ""}</th>
       <td>${escapeHtml(event.timestamp ? event.timestamp.replace("T", " ").replace(".000Z", "Z") : "Not supplied")}</td>
-      <td>${escapeHtml(event.provider || "Not supplied")}<span>${escapeHtml(event.model || "Not supplied")}</span></td>
+      <td>${escapeHtml(event.provider || "Not supplied")}<span>${escapeHtml(event.model || "Not supplied")}${event.routed_model_id ? ` · priced as ${escapeHtml(event.routed_model_id)}` : ""}</span></td>
       <td>${escapeHtml(event.project || "Not supplied")}<span>${escapeHtml(event.workload)}</span></td>
       <td>${escapeHtml(event.request_status || "Not supplied")}</td>
       <td>${event.input_tokens === null ? "Not supplied" : wholeNumber(event.input_tokens)}</td>
@@ -15120,12 +15427,18 @@ body{min-width:0}
         : review.reconciliation.unpriced_rows
           ? `${wholeNumber(review.reconciliation.unpriced_rows)} request rows remain unpriced, so no fully loaded claim is shown.`
           : `${wholeNumber(costStack.missing_categories.length)} categories remain unknown, so no fully loaded claim is shown.`;
+    const gatewaySpend = review.source.adapter.includes("LiteLLM");
+    const costStatusLabel = gatewaySpend && costStack.status === "PROVIDER_ONLY"
+      ? "GATEWAY SPEND ONLY" : costStack.status.replaceAll("_", " ");
+    const costBaseCopy = gatewaySpend
+      ? "LiteLLM-calculated gateway spend. Check it against the provider bill."
+      : "The selected row-level provider or calculated cost.";
     document.getElementById("request-cost-stack").innerHTML = `
-      <div class="request-explorer-head"><div><p class="kicker">FULL COST BOUNDARY</p><h4>What sits beyond the model or provider charge?</h4></div><p>${escapeHtml(costStack.status.replaceAll("_", " "))}</p></div>
+      <div class="request-explorer-head"><div><p class="kicker">FULL COST BOUNDARY</p><h4>What sits beyond the model or provider charge?</h4></div><p>${escapeHtml(costStatusLabel)}</p></div>
       <div class="request-spend-context">
-        <article><span>Provider request cost</span><strong>${requestReviewMoney(costStack.provider_request_cost, costStack.currency)}</strong><p>The selected row-level provider or calculated cost.</p></article>
-        <article><span>Known operating cost</span><strong>${requestReviewMoney(costStack.known_operating_cost, costStack.currency)}</strong><p>Provider request cost plus only the additional period costs supplied below.</p></article>
-        <article><span>Fully loaded cost</span><strong>${requestReviewMoney(costStack.fully_loaded_cost, costStack.currency)}</strong><p>${fullyLoadedCopy}</p></article>
+        <article><span>Selected request cost</span><strong>${requestReviewMoney(costStack.provider_request_cost, costStack.currency)}</strong><p>${costBaseCopy}</p></article>
+        <article><span>Known operating cost</span><strong>${requestReviewMoney(costStack.known_operating_cost, costStack.currency)}</strong><p>Selected request cost plus only the additional period costs supplied below.</p></article>
+        <article><span>${gatewaySpend ? "Fully loaded estimate" : "Fully loaded cost"}</span><strong>${requestReviewMoney(costStack.fully_loaded_cost, costStack.currency)}</strong><p>${fullyLoadedCopy}${gatewaySpend ? " Gateway spend remains unverified against the provider bill." : ""}</p></article>
       </div>
       <div class="request-variance-table-wrap" role="region" aria-label="Additional cost categories" tabindex="0"><table><thead><tr><th>Additional category</th><th>Same-period amount</th></tr></thead><tbody>${categoryRows}</tbody></table></div>
       <p class="request-variance-note">${escapeHtml(costStack.method)}</p>`;
@@ -15314,7 +15627,10 @@ body{min-width:0}
       const supplied = review.events.filter((event) => event[field] !== null && event[field] !== undefined).length;
       return `<div><dt>${escapeHtml(field.replaceAll("_", " "))}</dt><dd>${wholeNumber(supplied)} of ${wholeNumber(review.event_count)}</dd></div>`;
     }).join("");
-    document.getElementById("request-import-coverage").innerHTML = `<p><strong>Detected adapter:</strong> ${escapeHtml(review.source.adapter)}. AI Cost Lens accepts universal flat files plus flat OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone field names; it does not send credentials or query those services.</p><dl>${coverage}</dl><p>Source SHA-256: ${escapeHtml(review.source.sha256 || "Unavailable in this browser")}. Prompt contents and unknown source fields were not copied. Automatic catalog pricing requires a timestamp inside the catalog validity window, matching USD currency, a supported processing mode or batch flag, cached-input tokens, and tool charges. Routes with separate cache-write or storage charges also require explicit write tokens, duration where applicable, and storage token-hours. Missing inputs leave the row unpriced. ${review.reconciliation.duplicate_rows_flagged ? `${wholeNumber(review.reconciliation.duplicate_rows_flagged)} rows share a repeated event ID and remain in the export with a duplicate-group flag. The duplicate-excluded total is a reconciliation reference only: AI Cost Lens does not delete, allocate, or presume any row is invalid.` : "No repeated provider/event-ID group was detected."}</p>`;
+    const liteLLMNote = review.source.adapter.includes("LiteLLM")
+      ? " LiteLLM spend is a gateway calculation in USD, not provider billing evidence; reconcile it to the provider bill before acting. A $0 gateway row with tokens may mean missing proxy pricing; verify it before relying on the total. Timestamps without a timezone are left undated, so period analysis needs timestamp offsets."
+      : "";
+    document.getElementById("request-import-coverage").innerHTML = `<p><strong>Detected adapter:</strong> ${escapeHtml(review.source.adapter)}. AI Cost Lens accepts universal flat files, LiteLLM spend logs, and flat OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone fields. It does not send credentials or query those services.</p><dl>${coverage}</dl><p>Source SHA-256: ${escapeHtml(review.source.sha256 || "Unavailable in this browser")}. Prompt contents and unknown source fields were not copied.${liteLLMNote} Automatic catalog pricing requires a timestamp inside the catalog validity window, matching USD currency, a supported processing mode or batch flag, cached-input tokens, and tool charges. Routes with separate cache-write or storage charges also require explicit write tokens, duration where applicable, and storage token-hours. Missing inputs leave the row unpriced. ${review.reconciliation.duplicate_rows_flagged ? `${wholeNumber(review.reconciliation.duplicate_rows_flagged)} rows share a repeated event ID and remain in the export with a duplicate-group flag. The duplicate-excluded total is a reconciliation reference only: AI Cost Lens does not delete, allocate, or presume any row is invalid.` : "No repeated provider/event-ID group was detected."}</p>`;
     result.hidden = false;
   }
 
@@ -15743,6 +16059,45 @@ body{min-width:0}
     const manualBill = ["invoice_form", "invoice_pdf"].includes(state.data.config.reviewSource);
     const basisLabel = manualBill ? "User-entered billed amount (unverified)" : costBasisLabel(review.basis);
     const { totals, period } = review;
+    const historySection = document.getElementById("bill-history-result");
+    historySection.hidden = !review.billHistory;
+    if (review.billHistory) {
+      const history = review.billHistory;
+      const rows = [
+        ["Previous bill · user entered", money(history.previousAmount, 2), history.previousStart ? `${history.previousStart} to ${history.previousEnd}` : "Service period not supplied"],
+        ["Current bill · user entered", money(totals.providerCost, 2), state.data.config.serviceStart ? `${period.start} to ${period.end}` : "Service period not supplied"],
+      ];
+      if (history.comparable) {
+        const direction = history.change > 0 ? "higher" : history.change < 0 ? "lower" : "unchanged";
+        rows.push(["Bill change", `${history.change < 0 ? "−" : history.change > 0 ? "+" : ""}${money(Math.abs(history.change), 2)}`, history.changePct === null ? "Percentage unavailable: the previous bill was zero." : `${pct(Math.abs(history.changePct), 1)} ${direction} across equal-length declared periods.`]);
+        rows.push(["Cost per calendar day", `${money(history.previousPerDay, history.previousPerDay < 1 ? 4 : 2)} → ${money(history.currentPerDay, history.currentPerDay < 1 ? 4 : 2)}`, `${history.currentDays} days in each declared service period.`]);
+      } else if (history.dailyComparable) {
+        rows.push(["Calendar-day reference", `${money(history.previousPerDay, history.previousPerDay < 1 ? 4 : 2)} → ${money(history.currentPerDay, history.currentPerDay < 1 ? 4 : 2)}`, `${history.previousDays} days previously; ${history.currentDays} days currently. No like-for-like bill change is calculated.`]);
+      }
+      document.getElementById("bill-history-metrics").innerHTML = rows.map(([label, value, note]) => `<div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`).join("");
+      document.getElementById("bill-history-boundary").textContent = history.comparable
+        ? "This arithmetic change uses two user-entered, unverified amounts and declared matching periods. It does not explain why the bill changed or establish realized savings. Add usage or line-item evidence to investigate the cause."
+        : history.dailyComparable
+          ? "The service periods have different lengths, so raw bill totals are not like-for-like. Calendar-day amounts are arithmetic references only; fixed monthly plans can differ per day solely because of month length. This does not explain the cause or establish savings."
+        : `A like-for-like change is withheld: ${history.limitations.join(" ")} The two user-entered amounts remain separate. No savings claim is supported.`;
+    }
+    const budgetSection = document.getElementById("bill-budget-result");
+    budgetSection.hidden = !review.billBudget;
+    if (review.billBudget) {
+      const budget = review.billBudget;
+      const rows = [
+        ["Entered period budget", money(budget.amount, 2), "User entered; no budget source was verified"],
+        ["Current bill", money(totals.providerCost, 2), "User entered; no invoice was independently verified"],
+      ];
+      if (budget.comparable) {
+        const status = budget.difference > 0 ? "over" : budget.difference < 0 ? "under" : "on";
+        rows.push(["Bill versus budget", budget.difference === 0 ? money(0, 2) : `${budget.difference > 0 ? "+" : "−"}${money(Math.abs(budget.difference), 2)}`, `${pct(budget.usedPct, 1)} of the entered budget used · ${status} the entered budget.`]);
+      }
+      document.getElementById("bill-budget-metrics").innerHTML = rows.map(([label, value, note]) => `<div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`).join("");
+      document.getElementById("bill-budget-boundary").textContent = budget.comparable
+        ? "This compares two user-entered amounts for the declared same period and scope. It is not a live alert, forecast, verified invoice reconciliation, or savings claim. Check credits, taxes, discounts, and included charges before acting."
+        : `Budget variance is withheld: ${budget.limitations.join(" ")} The two entered amounts remain separate; no alert or savings claim is supported.`;
+    }
     const stage = singleBillStage(review);
     const guidance = singleBillGuidance(review);
     const count = (value) => value === null ? "Not supplied" : compact(value);
@@ -15803,7 +16158,7 @@ body{min-width:0}
     document.getElementById("bill-source-copy").textContent = grossNet
       ? `Provider gross ${cost(grossNet.gross)}, reported net ${cost(grossNet.net)}, gross-to-net adjustment ${cost(grossNet.adjustment)}. The export does not identify that difference as a credit; reconcile credits, discounts, and taxes with the actual invoice. List-price estimates remain separate.`
       : "Start with the records you already have. Each additional layer deepens the review without replacing the bill.";
-    document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · supplied date buckets, not proof of service-period coverage`;
+    document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${state.data.config.serviceStart ? "declared service period, not independently verified" : "supplied date buckets, not proof of service-period coverage"}`;
     document.getElementById("bill-mode-tag").textContent = stage.tag;
     document.getElementById("bill-finding-title").textContent = headline;
     document.getElementById("bill-finding-limit").textContent = stage.key === "bill"
@@ -16188,6 +16543,8 @@ body{min-width:0}
       button.tabIndex = isBill ? -1 : 0;
     });
     document.getElementById("bill-review-screen").classList.toggle("active", isBill);
+    document.getElementById("bill-history-result").hidden = true;
+    document.getElementById("bill-budget-result").hidden = true;
     document.querySelectorAll(".view").forEach((section) => {
       if (isBill) section.classList.remove("active");
     });
@@ -16748,6 +17105,9 @@ body{min-width:0}
     // Reset only when beginning a new draft, never on submit or its failure.
     // Native reset restores declared defaults and empties every file input.
     builderForm.reset();
+    document.getElementById("simple-example-caveat").textContent = "The prefilled numbers are a small-business example. Replace them with your own before comparing.";
+    document.getElementById("bill-history-input").open = false;
+    document.getElementById("bill-budget-input").open = false;
     document.getElementById("review-file").value = "";
     filenameDefaults.forEach((text, id) => { document.getElementById(id).textContent = text; });
     const error = document.getElementById("builder-error");
@@ -16939,7 +17299,7 @@ body{min-width:0}
 
   function promptModelOptions(blankLabel = "") {
     const groups = new Map();
-    pricingCatalog.models.forEach((model) => {
+    pricingCatalog.models.filter((model) => !model.routed_to_model_id).forEach((model) => {
       if (!groups.has(model.provider)) groups.set(model.provider, []);
       groups.get(model.provider).push(model);
     });
@@ -17074,7 +17434,8 @@ body{min-width:0}
     const provider = document.getElementById("model-catalog-provider").value;
     const task = document.getElementById("model-catalog-task").value;
     const tagLabels = { general: "General", reasoning: "Reasoning", coding: "Coding", high_volume: "High-volume", long_context: "Long context", multimodal: "Multimodal" };
-    const models = pricingCatalog.models.filter((model) => {
+    const currentModels = pricingCatalog.models.filter((model) => !model.routed_to_model_id);
+    const models = currentModels.filter((model) => {
       const matchesProvider = !provider || model.provider === provider;
       const matchesTask = !task || model.workload_tags.includes(task);
       const haystack = `${model.label} ${model.model} ${model.provider} ${model.workload_tags.map((tag) => tagLabels[tag]).join(" ")}`.toLowerCase();
@@ -17093,21 +17454,22 @@ body{min-width:0}
       const longContextRates = model.long_context && [
         ["Input", model.standard.input * model.long_context.input_multiplier],
         ["Cached input", model.standard.cached_input * model.long_context.cached_input_multiplier],
-        ["Cache write", model.standard.cache_write * (model.long_context.cache_write_multiplier || model.long_context.input_multiplier)],
+        [cacheSupplement[0], cacheSupplement[1] * (model.long_context.cache_write_multiplier || model.long_context.input_multiplier)],
         ["Output", model.standard.output * model.long_context.output_multiplier],
       ];
       const modes = pricingEngine.availableProcessingModes(model).map(modeLabel).join(" · ");
       return `<article class="model-catalog-card" role="listitem">
         <div class="model-catalog-card-head"><div><a href="${escapeHtml(model.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(model.label)}</a><span>${escapeHtml(model.provider)} · checked ${escapeHtml(model.verified_at)}${model.effective_at ? ` · catalog use from ${escapeHtml(model.effective_at)}` : ""}</span></div><button class="text-button catalog-add-model" type="button" data-model-id="${escapeHtml(model.id)}">Add</button></div>
-        <p class="model-catalog-tier">Standard mode · ${longContextRates ? `up to ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens per request` : "published text rates"}</p>
+        <p class="model-catalog-tier">Standard mode · ${longContextRates ? `up to ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens per request, including cached tokens` : "published text rates"}</p>
         <div class="model-catalog-rates" role="group" aria-label="Standard USD rates. Token rates are per 1 million tokens; cache storage is per 1 million token-hours.">${rates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${value === null ? "Not listed" : modelRate(value)}</strong></div>`).join("")}</div>
         ${longContextRates ? `<p class="model-catalog-tier">Standard mode · over ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens per request; higher rates apply to the full request</p><div class="model-catalog-rates" role="group" aria-label="Standard long-context USD rates per 1 million tokens">${longContextRates.map(([label, value]) => `<div class="model-catalog-rate"><span>${escapeHtml(label)}</span><strong>${modelRate(value)}</strong></div>`).join("")}</div>` : ""}
         ${model.standard.cache_write_1h !== undefined ? `<p class="model-catalog-tier">1-hour cache write: ${modelRate(model.standard.cache_write_1h)} / 1M tokens</p>` : ""}
-        ${model.provider === "Anthropic" && context >= 1000000 ? '<p class="model-catalog-tier">Published rates apply across the full 1,000,000-token context.</p>' : ""}
+        ${model.standard.cache_write_1h !== undefined && model.long_context ? `<p class="model-catalog-tier">Over ${wholeNumber(model.long_context.input_threshold_tokens)} input tokens: 1-hour cache write ${modelRate(model.standard.cache_write_1h * (model.long_context.cache_write_multiplier || model.long_context.input_multiplier))} / 1M tokens.</p>` : ""}
+        ${model.provider === "Anthropic" && context >= 1000000 && !model.long_context ? '<p class="model-catalog-tier">Published rates apply across the full 1,000,000-token context.</p>' : ""}
         <div class="model-catalog-card-foot"><div><span class="model-catalog-context">${contextTokens(context)} context · ${escapeHtml(modes)}</span><div class="model-workload-signals">${model.workload_tags.map((tag) => `<span>${escapeHtml(tagLabels[tag])}</span>`).join("")}</div></div><a class="model-catalog-provider-notes" href="${escapeHtml(model.capability_source_url)}" target="_blank" rel="noreferrer">Provider notes</a></div>
       </article>`;
     }).join("") || '<p class="model-catalog-empty">No model matches this filter.</p>';
-    document.getElementById("model-catalog-count").textContent = `${models.length} of ${pricingCatalog.models.length} models · token rates per 1M tokens; storage per 1M token-hours · provider-described workload signals are reference only`;
+    document.getElementById("model-catalog-count").textContent = `${models.length} of ${currentModels.length} current models · token rates per 1M tokens; storage per 1M token-hours · provider-described workload signals are reference only`;
     document.querySelectorAll(".catalog-add-model").forEach((button) => {
       button.addEventListener("click", () => {
         const modelId = button.dataset.modelId;
@@ -17153,7 +17515,7 @@ body{min-width:0}
       });
     });
     const sources = pricingCatalog.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.provider)} (checked ${escapeHtml(source.checked_at)})</a>`).join(", ");
-    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Direct API list-price sources: ${sources}. Model-specific start dates are shown below; review again by ${escapeHtml(pricingCatalog.review_by)}. Earlier pricing snapshots remain in the repository. Processing mode, cache-write treatment, and geography are recorded per route.${today > pricingCatalog.review_by ? " Catalog review is overdue. The selected date is historical; refresh rates before using this for a current decision." : ""}`;
+    document.getElementById("prompt-catalog-stamp").innerHTML = `Catalog ${escapeHtml(pricingCatalog.catalog_version)}. Direct API list-price sources: ${sources}. Model-specific start dates are shown below; review again by ${escapeHtml(pricingCatalog.review_by)}. Earlier pricing snapshots remain in the repository. Deprecated Gemini IDs are excluded from current comparisons; request-log aliases retain their routing provenance. Processing mode, cache-write treatment, and geography are recorded per route.${today > pricingCatalog.review_by ? " Catalog review is overdue. The selected date is historical; refresh rates before using this for a current decision." : ""}`;
     const providers = [...new Set(pricingCatalog.models.map((model) => model.provider))];
     document.getElementById("model-catalog-provider").innerHTML = '<option value="">All providers</option>' + providers.map((provider) => `<option value="${escapeHtml(provider)}">${escapeHtml(provider)}</option>`).join("");
     document.getElementById("model-catalog-search").addEventListener("input", renderModelCatalog);
@@ -17207,7 +17569,7 @@ body{min-width:0}
       const difference = result.monthly_difference_from_current_usd;
       const differenceClass = difference < 0 ? "price-difference-lower" : difference > 0 ? "price-difference-higher" : "";
       const usable = result.estimated_cost_per_usable_result_usd === null ? "Not modeled" : promptPriceMoney(result.estimated_cost_per_usable_result_usd);
-      const priceBasis = result.pricing_basis === "user_supplied" ? `user-supplied · effective ${result.pricing_effective_at}` : `official list · checked ${result.pricing_verified_at}${result.promotional_rate_guaranteed_through ? ` · ${result.model_id === "openai/gpt-5.6-sol" ? "promotional rate available at least through" : "rate changes after"} ${result.promotional_rate_guaranteed_through}` : ""}`;
+      const priceBasis = result.pricing_basis === "user_supplied" ? `user-supplied · effective ${result.pricing_effective_at}` : `official list · checked ${result.pricing_verified_at} · rate effective ${result.pricing_effective_at}${result.promotional_rate_guaranteed_through ? ` · ${result.model_id === "openai/gpt-5.6-sol" ? "promotional rate available at least through" : "rate changes after"} ${result.promotional_rate_guaranteed_through}` : ""}`;
       return `<tr>
         <td class="price-route-name"><strong>${escapeHtml(result.label)}</strong><span>${escapeHtml(result.provider)} · ${escapeHtml(modeLabel(result.processing_mode))} · ${escapeHtml(geographyLabel(result.geography, result.geography_multiplier))}${result.pricing_adjustment === "long_context" ? " · long-context rates" : ""}${result.role === "current" ? " · current" : ""}</span><small>${wholeNumber(result.input_tokens)} input · ${result.input_token_method === "openai_o200k_base_exact_raw_text" ? "exact raw-text count" : result.input_token_method === "manual" ? "entered count" : "estimated count"} · ${escapeHtml(priceBasis)}</small></td>
         <td data-label="Per call">${promptPriceMoney(result.estimated_cost_per_call_usd)}</td>
@@ -17377,6 +17739,7 @@ body{min-width:0}
       document.getElementById(id).value = "";
     }
     document.getElementById("simple-hourly-rate").value = "";
+    document.getElementById("simple-example-caveat").textContent = "The tool prices and monthly volume above came from your prompt estimate. Add your own reviewed output counts, usable results, review time, and hourly rate. Estimated prices are not billing evidence or a savings claim.";
     document.getElementById("review-dialog-title").textContent = "Add quality evidence to the price estimate";
     document.getElementById("builder-action-note").textContent = pendingPriceRecord.estimate_basis.rate_source_scope === "official_list_only"
       ? "Official list-price estimates are loaded. Review the same task sample on both routes before making a decision."
@@ -17648,6 +18011,14 @@ body{min-width:0}
         const [spendFile] = document.getElementById("single-spend-file").files;
         const [workFile] = document.getElementById("single-work-file").files;
         const routedUniversal = !spendFile && state.uploadRoute?.kind === "universal";
+        const previousInputs = ["previous-bill-amount", "previous-bill-date", "previous-bill-start", "previous-bill-end"].map((id) => document.getElementById(id).value.trim());
+        const hasPrevious = previousInputs.some(Boolean) || document.getElementById("previous-bill-scope").checked;
+        const budgetAmount = document.getElementById("bill-budget-amount").value.trim();
+        const hasBudget = Boolean(budgetAmount) || document.getElementById("bill-budget-scope").checked;
+        if (hasPrevious && (spendFile || routedUniversal)) throw new Error("Compare two entered bills using the manual bill fields, not the universal spend CSV.");
+        if (hasBudget && (spendFile || routedUniversal)) throw new Error("Check a budget against an entered bill using the manual bill fields, not the universal spend CSV.");
+        if (hasPrevious && (!previousInputs[0] || !previousInputs[1])) throw new Error("Supply the previous bill amount and invoice date, or leave all previous-bill fields blank.");
+        if (hasBudget && !budgetAmount) throw new Error("Supply a budget amount or leave the budget fields blank.");
         let spendText = spendFile ? await readLocalFile(spendFile) : routedUniversal ? state.uploadRoute.text : "";
         if (!spendFile && !routedUniversal) {
           const provider = safeImportedLabel(document.getElementById("invoice-provider").value, "Provider");
@@ -17667,6 +18038,8 @@ body{min-width:0}
           serviceStart: spendFile ? "" : document.getElementById("invoice-period-start").value,
           serviceEnd: spendFile ? "" : document.getElementById("invoice-period-end").value,
           reviewSource: spendFile || routedUniversal ? "universal_template" : state.invoicePdfCandidate ? "invoice_pdf" : "invoice_form",
+          ...(hasPrevious ? { previousBill: { amount: previousInputs[0], invoiceDate: previousInputs[1], serviceStart: previousInputs[2], serviceEnd: previousInputs[3], sameScope: document.getElementById("previous-bill-scope").checked } } : {}),
+          ...(hasBudget ? { billBudget: { amount: budgetAmount, sameScope: document.getElementById("bill-budget-scope").checked } } : {}),
         });
         discardImportedSourceState();
         renderAll();

@@ -5512,6 +5512,7 @@
     // Reset only when beginning a new draft, never on submit or its failure.
     // Native reset restores declared defaults and empties every file input.
     builderForm.reset();
+    document.getElementById("simple-example-caveat").textContent = "The prefilled numbers are a small-business example. Replace them with your own before comparing.";
     document.getElementById("bill-history-input").open = false;
     document.getElementById("bill-budget-input").open = false;
     document.getElementById("review-file").value = "";
@@ -6145,6 +6146,7 @@
       document.getElementById(id).value = "";
     }
     document.getElementById("simple-hourly-rate").value = "";
+    document.getElementById("simple-example-caveat").textContent = "The tool prices and monthly volume above came from your prompt estimate. Add your own reviewed output counts, usable results, review time, and hourly rate. Estimated prices are not billing evidence or a savings claim.";
     document.getElementById("review-dialog-title").textContent = "Add quality evidence to the price estimate";
     document.getElementById("builder-action-note").textContent = pendingPriceRecord.estimate_basis.rate_source_scope === "official_list_only"
       ? "Official list-price estimates are loaded. Review the same task sample on both routes before making a decision."

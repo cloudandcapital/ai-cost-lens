@@ -7,7 +7,7 @@
 
   return Object.freeze({
     schema_version: "ai-cost-lens-pricing-catalog/0.5",
-    catalog_version: "2026-10-11",
+    catalog_version: "2026-10-18",
     effective_at: "2026-09-22",
     review_by: "2026-11-21",
     currency: "USD",
@@ -16,7 +16,7 @@
     sources: [
       { provider: "OpenAI", checked_at: "2026-10-11", url: "https://developers.openai.com/api/docs/pricing" },
       { provider: "Anthropic", checked_at: "2026-10-11", url: "https://platform.claude.com/docs/en/about-claude/pricing" },
-      { provider: "Google", checked_at: "2026-10-11", url: "https://ai.google.dev/gemini-api/docs/pricing" },
+      { provider: "Google", checked_at: "2026-10-18", url: "https://ai.google.dev/gemini-api/docs/pricing" },
     ],
     models: [
       {
@@ -317,6 +317,29 @@
         batch: { input: 0.5, cached_input: 0.05, cache_write_5m: 0.625, cache_write_1h: 1, output: 2.5 },
         geography_multipliers: { global: 1 },
         note: "Direct Claude API. The catalog represents 5-minute and 1-hour cache writes and the 50% Batch discount. This model does not use the Claude 4.6+ US-only inference multiplier; server-side tools remain excluded.",
+      },
+      {
+        id: "google/gemini-4-argon",
+        provider: "Google",
+        label: "Gemini 4 Argon",
+        model: "gemini-4-argon",
+        released_at: "2026-10-13",
+        effective_at: "2026-10-13",
+        release_source_url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-argon/",
+        context_window_tokens: 1048576,
+        max_output_tokens: 65536,
+        source_url: "https://ai.google.dev/gemini-api/docs/pricing",
+        capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-4-argon",
+        workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
+        verified_at: "2026-10-18",
+        standard: { input: 2, cached_input: 0.1, output: 10 },
+        batch: { input: 1, cached_input: 0.05, output: 5 },
+        flex: { input: 1, cached_input: 0.05, output: 5 },
+        priority: { input: 3.6, cached_input: 0.18, output: 18 },
+        geography_multipliers: { global: 1 },
+        minimum_cacheable_prompt_tokens: 4096,
+        scheduled_rate_change: { effective_at: "2026-12-01", multiplier: 2, status: "published_not_active" },
+        note: "Gemini Developer API paid-tier introductory rates through November 30, 2026. Standard, Batch, Flex, Priority, and implicit cache reads are represented; cache hits need a 4,096-token prefix. Output includes thinking tokens and shares a 1,048,576-token window with input. This catalog supports the 65,536-token default synchronous output limit, not background long decode. Explicit cache writes, grounding, invite-only Contributor rates, and the published December price change are excluded pending a fresh review. No geography premium is published for the direct Developer API.",
       },
       {
         id: "google/gemini-3.8-flash",
