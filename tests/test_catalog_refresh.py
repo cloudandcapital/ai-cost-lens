@@ -85,12 +85,15 @@ for (const [model, before, release] of [[sol, "2026-09-28", "2026-09-29"], [sonn
 }
 const prior = require("./docs/pricing-snapshots/pricing-catalog-2026-09-23.js");
 const october5 = require("./docs/pricing-snapshots/pricing-catalog-2026-10-05.js");
+const october11 = require("./docs/pricing-snapshots/pricing-catalog-2026-10-11.js");
 assert.equal(prior.models.length, 17);
 assert.equal(october5.models.length, 19);
-assert.equal(c.models.length, 21);
+assert.equal(october11.models.length, 21);
+assert.equal(c.models.length, 22);
 assert.equal(e.selectCatalog([prior, c], "2026-10-04").catalog_version, "2026-09-23");
 assert.equal(e.selectCatalog([prior, october5, c], "2026-10-05").catalog_version, "2026-10-05");
-assert.equal(e.selectCatalog([prior, october5, c], "2026-10-11").catalog_version, "2026-10-11");
+assert.equal(e.selectCatalog([prior, october5, october11, c], "2026-10-11").catalog_version, "2026-10-11");
+assert.equal(e.selectCatalog([prior, october5, october11, c], "2026-10-18").catalog_version, "2026-10-18");
 e.requireCatalogDateCoverage(c, "2026-11-21");
 assert.throws(() => e.requireCatalogDateCoverage(c, "2026-11-22"), /review date/);
 assert.throws(() => e.requireCatalogDateCoverage(c, "2026-02-30"), /real calendar date/);
@@ -212,4 +215,55 @@ const claudeRow = {...row, provider: "Anthropic", model: "claude-sonnet-5-5",
  cached_input_tokens: 400, cache_storage_token_hours: null};
 assert.equal(price({...claudeRow, timestamp: "2026-10-06T12:00:00Z"}).calculated_cost, .00628);
 assert.equal(price({...claudeRow, timestamp: "2026-10-07T12:00:00Z"}).calculated_cost, .00624);
+""")
+
+
+def test_argon_intro_modes_implicit_cache_window_and_estimate_boundary():
+    run_node(r"""
+const argon = byId["google/gemini-4-argon"];
+assert.equal(argon.released_at, "2026-10-13");
+assert.equal(argon.context_window_tokens, 1048576);
+assert.equal(argon.max_output_tokens, 65536);
+assert.deepEqual(e.availableProcessingModes(argon), ["standard", "batch", "flex", "priority"]);
+const input = {input_tokens: 10000, output_tokens: 1000, calls_per_month: 100,
+ cached_input_share: .5, cache_refreshes_per_month: 0, pricing_date: "2026-10-18"};
+for (const [mode, amount, rates] of [
+ ["standard", 2.05, {input: 2, cached_input: .1, output: 10}],
+ ["batch", 1.025, {input: 1, cached_input: .05, output: 5}],
+ ["flex", 1.025, {input: 1, cached_input: .05, output: 5}],
+ ["priority", 3.69, {input: 3.6, cached_input: .18, output: 18}],
+]) {
+ const result = e.priceModel(argon, input, {processing_mode: mode});
+ assert.equal(result.estimated_monthly_cost_usd, amount);
+ assert.deepEqual(result.rates_per_1m_tokens, rates);
+ assert.equal(result.estimated_annual_cost_usd, null);
+ assert.equal(result.promotional_rate_guaranteed_through, "2026-11-30");
+}
+assert.throws(() => e.priceModel(argon, {...input, pricing_date: "2026-10-12"}), /before/);
+e.priceModel(argon, {...input, pricing_date: "2026-10-13"});
+e.priceModel(argon, {...input, pricing_date: "2026-11-30"});
+assert.throws(() => e.priceModel(argon, {...input, pricing_date: "2026-12-01"}), /freshly verified/);
+assert.throws(() => e.priceModel(argon, {...input, cached_input_share: .4}), /4096/);
+e.priceModel(argon, {...input, input_tokens: 8192});
+assert.throws(() => e.priceModel(argon, {...input, cache_refreshes_per_month: 1}), /cache-write token rate/);
+assert.throws(() => e.priceModel(argon, {...input, output_tokens: 65537}), /65536/);
+assert.throws(() => e.priceModel(argon, {...input, input_tokens: 1000000, output_tokens: 65536,
+ cached_input_share: 0}), /context window/);
+assert.throws(() => e.priceModel(argon, input, {processing_mode: "fast"}), /no published fast/);
+assert.throws(() => e.priceModel(argon, input, {geography: "us"}), /no published us geography/);
+const comparison = e.compareModels(c, [sol.id, argon.id], input);
+const record = e.buildEstimateRecord(c, comparison, input, {tokens: 10000, method: "manual"});
+assert.equal(record.catalog.version, "2026-10-18");
+assert.equal(record.evidence_gate.savings_claim_allowed, false);
+assert.equal(record.estimate_basis.prompt_text_stored, false);
+const usage = require("./web/usage-event-engine.js");
+const row = {provider: "Google", model: "gemini-4-argon", timestamp: "2026-10-18T12:00:00Z",
+ input_tokens: 10000, output_tokens: 1000, cached_input_tokens: 5000,
+ cache_write_tokens: 0, processing_mode: "standard", currency: "USD", tool_charges: 0};
+const price = (changes = {}) => usage.normalizeRows([{...row, ...changes}], {catalog: c})[0];
+assert.equal(price().calculated_cost, .0205);
+assert.equal(price({timestamp: "2026-10-12T23:59:59Z"}).cost_basis, "unpriced");
+assert.equal(price({output_tokens: 65537}).cost_basis, "unpriced");
+assert.equal(price({provider_reported_cost: .03}).cost_basis, "provider_reported");
+assert.equal(usage.buildReview([row], {catalog: c}).evidence_gate.savings_claim_allowed, false);
 """)
