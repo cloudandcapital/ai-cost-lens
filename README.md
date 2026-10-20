@@ -35,6 +35,8 @@ These contracts are deliberately different and are not interchangeable templates
 - Reconciled `ccac/1.0.0` output by default, with explicit `ccac/1.1.0` direct-AI scope output
 - Workload reviews with clearly labeled evidence for current and proposed routes
 - Progressive bill, usage, and outcome reviews for different levels of available evidence
+- A guided **Review my AI tools** path for subscriptions and separately charged usage in one declared service period and currency, with source references and optional owners; billed, estimated, and allocated reviews stay distinct
+- Visible period, cost-source, and record-date summaries, plus direct actions to save a cost baseline or begin a same-task tool comparison
 - Optional model, shared infrastructure, human review, and one-time change cost
 - Usable-result, retry, cache-reuse, and human-review measures when supplied
 - Optional Plan vs Actual for provider cost, shared cost, human work, output, yield, and unit cost

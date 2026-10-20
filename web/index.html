@@ -109,6 +109,14 @@
           </article>
 
           <div class="metric-ledger bill-metrics" id="bill-metric-ledger"></div>
+          <div class="evidence-summary" id="bill-evidence-summary" aria-label="Period and cost source"></div>
+
+          <section class="comparison-section" id="tool-spend-result" aria-labelledby="tool-spend-title" hidden>
+            <div class="section-heading"><div><p class="kicker">YOUR AI TOOLS</p><h2 id="tool-spend-title">Subscriptions and extra usage, together</h2></div><p>Included usage stays inside the subscription. Only separately charged usage is added.</p></div>
+            <div class="metric-ledger bill-metrics" id="tool-spend-metrics"></div>
+            <div class="usage-table-wrap" role="region" aria-label="AI tool charges and owners" tabindex="0"><table class="usage-table"><thead><tr><th>Tool / charge</th><th>Owner</th><th>Source reference</th><th>Period amount</th></tr></thead><tbody id="tool-spend-rows"></tbody></table></div>
+            <p id="tool-spend-boundary"></p>
+          </section>
 
           <section class="comparison-section" id="bill-history-result" aria-labelledby="bill-history-title" hidden>
             <div class="section-heading"><div><p class="kicker">BILL TREND</p><h2 id="bill-history-title">How did the bill change?</h2></div></div>
@@ -122,7 +130,7 @@
             <p id="bill-budget-boundary"></p>
           </section>
 
-          <section class="comparison-section" aria-labelledby="model-mix-title">
+          <section class="comparison-section" id="bill-usage-section" aria-labelledby="model-mix-title">
             <div class="section-heading">
               <div>
                 <p class="kicker">USAGE MIX</p>
@@ -166,6 +174,10 @@
             </div>
             <p id="bill-boundary-copy"></p>
           </section>
+          <div class="review-next-actions" id="bill-next-actions">
+            <button class="build-button" id="bill-save-next" type="button">Save this baseline</button>
+            <button class="text-button" id="bill-compare-next" type="button">Test a different tool or plan</button>
+          </div>
         </section>
 
         <section class="view active" id="view-review" aria-labelledby="review-title">
@@ -185,6 +197,7 @@
             </div>
           </div>
 
+          <div class="evidence-summary" id="review-evidence-summary" aria-label="Period and cost source"></div>
           <div class="example-switcher" id="example-switcher" role="group" aria-label="Illustrative decisions">
             <span>EXPLORE TWO EXAMPLES</span>
             <button type="button" data-example="growth" aria-pressed="false">Growing AI startup</button>
@@ -866,6 +879,11 @@
             <strong>Start with a bill</strong>
             <span>Enter a total and period. Add usage or outcomes when you have them.</span>
           </button>
+          <button class="builder-mode builder-mode-featured" data-builder-mode="tools" type="button" aria-pressed="false">
+            <small>SUBSCRIPTIONS + EXTRA USAGE</small>
+            <strong>Review my AI tools</strong>
+            <span>Put your AI plans and separately billed usage in one period, with a source and an owner for each charge.</span>
+          </button>
           <button class="builder-mode builder-mode-featured" data-builder-mode="usage" type="button" aria-pressed="false">
             <small>CSV OR JSON · LOCAL ANALYSIS</small>
             <strong>Review AI usage</strong>
@@ -906,6 +924,149 @@
         </div>
 
         <p class="builder-path-help" id="builder-path-help">Not sure? Start with one bill. The review becomes more detailed as you add the usage or outcome data you already have.</p>
+
+        <div id="tools-builder-fields" hidden>
+          <section class="builder-step"><div class="step-number">01</div><div>
+            <h3>Choose one period and cost basis</h3>
+            <p>Use amounts for the same service period and currency. Keep annual bills, credit purchases, refunds, and other periods separate. If you allocate part of a bill, choose allocated cost and document the method in its source reference.</p>
+            <div class="field-grid compact-fields">
+              <label><span>Review name</span><input id="tools-name" type="text" placeholder="Our AI tools" maxlength="120" /></label>
+              <label><span>Currency</span><input id="tools-currency" type="text" value="USD" maxlength="3" /></label>
+              <label><span>Service-period start</span><input id="tools-start" type="date" /></label>
+              <label><span>Service-period end / data through</span><input id="tools-end" type="date" /></label>
+              <label class="field-wide"><span>What do these amounts represent?</span><select id="tools-basis"><option value="provider_reported">Billed amounts I checked against my records</option><option value="calculated">Estimates for this period</option><option value="allocated">Allocated costs with a documented method</option></select><small>Use one basis for the whole review. AI Cost Lens does not independently verify your records.</small></label>
+            </div>
+          </div></section>
+          <section class="builder-step"><div class="step-number">02</div><div>
+            <h3>Add the charges you want to review</h3>
+            <p>Enter the full subscription charge once. Add API usage or overage only when it is a separate charge, outside any included allowance. Source references can be short labels; no account numbers or document uploads are needed.</p>
+            <div id="tool-charge-entries">
+              <fieldset class="tool-charge-entry" id="tool-charge-1">
+                <legend>Charge 1</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-1" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-1"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-1" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-1" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-1" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-2">
+                <legend>Charge 2</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-2" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-2"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-2" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-2" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-2" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-3" hidden>
+                <legend>Charge 3</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-3" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-3"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-3" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-3" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-3" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-4" hidden>
+                <legend>Charge 4</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-4" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-4"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-4" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-4" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-4" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-5" hidden>
+                <legend>Charge 5</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-5" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-5"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-5" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-5" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-5" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-6" hidden>
+                <legend>Charge 6</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-6" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-6"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-6" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-6" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-6" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-7" hidden>
+                <legend>Charge 7</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-7" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-7"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-7" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-7" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-7" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-8" hidden>
+                <legend>Charge 8</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-8" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-8"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-8" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-8" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-8" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-9" hidden>
+                <legend>Charge 9</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-9" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-9"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-9" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-9" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-9" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-10" hidden>
+                <legend>Charge 10</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-10" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-10"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-10" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-10" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-10" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-11" hidden>
+                <legend>Charge 11</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-11" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-11"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-11" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-11" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-11" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-12" hidden>
+                <legend>Charge 12</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-12" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-12"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-12" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-12" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-12" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+            </div>
+            <button class="text-button" id="add-tool-charge" type="button">Add another charge</button>
+            <p id="tool-charge-status" role="status"></p>
+            <label class="check-field"><input id="tools-scope" type="checkbox" /><span>I checked that every amount covers the declared service period and currency, with no duplicated charges, included usage counted again, or prepaid credits treated as consumed usage.</span></label>
+          </div></section>
+        </div>
 
         <div id="single-builder-fields" hidden>
           <div class="path-requirements">

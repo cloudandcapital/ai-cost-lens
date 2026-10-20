@@ -38,8 +38,44 @@ const document = { getElementById: element, querySelector: element, querySelecto
 const context = { TextEncoder, crypto: webcrypto, document, window: { scrollTo() {} } };
 runInNewContext(read('web/growth-engine.js'), context);
 runInNewContext(read('web/evidence-tools.js'), context);
-runInNewContext(source.slice(0, boundary) + 'globalThis.api = {parseCsv, validDate, validateResult, buildLocalReview, buildSampledReview, buildOpenAIBillReview, buildSingleBillReview, buildClaudeSpendReview, buildClaudeApiReview, parseFlatStructured, suggestStructuredMapping, buildMappedReview, extractPdfText, extractInvoiceCandidate, inspectUploadedFiles, summarizeSingleBill, failedSavingsGateText, lumenResponse, renderAll, state};})();', context);
+runInNewContext(source.slice(0, boundary) + 'globalThis.api = {parseCsv, validDate, validateResult, buildLocalReview, buildSampledReview, buildOpenAIBillReview, buildSingleBillReview, buildToolSpendReview, buildClaudeSpendReview, buildClaudeApiReview, parseFlatStructured, suggestStructuredMapping, buildMappedReview, extractPdfText, extractInvoiceCandidate, inspectUploadedFiles, summarizeSingleBill, failedSavingsGateText, lumenResponse, renderAll, state};})();', context);
 const api = context.api;
+const toolCharges = [
+  {tool:'Writing plan',kind:'subscription',amount:'20',reference:'October invoice',owner:'Content'},
+  {tool:'Coding plan',kind:'subscription',amount:'45',reference:'October invoice',owner:''},
+  {tool:'Coding plan',kind:'usage',amount:'3.25',reference:'Separate October usage charge',owner:'Engineering'},
+];
+const toolOptions = {name:'Our AI tools',currency:'USD',start:'2026-10-01',end:'2026-10-20',basis:'provider_reported',scopeConfirmed:true};
+const toolReview = await api.buildToolSpendReview(toolCharges,toolOptions);
+assert.equal(api.summarizeSingleBill(toolReview).totals.providerCost,68.25);
+assert.equal(api.summarizeSingleBill(toolReview).totals.requests,null);
+assert.equal(api.summarizeSingleBill(toolReview).fullCost,null);
+assert.equal(api.summarizeSingleBill(toolReview).providerUnit,null);
+api.validateResult(JSON.parse(JSON.stringify(toolReview)));
+api.state.data = toolReview; api.renderAll();
+assert.match(element('bill-finding-title').textContent,/\$68\.25/);
+assert.match(element('bill-metric-ledger').innerHTML,/\$65\.00/);
+assert.match(element('bill-metric-ledger').innerHTML,/\$3\.25/);
+assert.match(element('tool-spend-rows').innerHTML,/Not assigned/);
+assert.match(element('memo-evidence').innerHTML,/Separate October usage charge/);
+assert.equal(element('tool-spend-result').hidden,false);
+assert.match(element('bill-evidence-summary').innerHTML,/no live sync/);
+const tamperedToolReview = JSON.parse(JSON.stringify(toolReview));
+tamperedToolReview.config.toolSpend.items[0].amount = '200';
+assert.throws(()=>api.validateResult(tamperedToolReview),/do not match/);
+const badSourceToolReview = JSON.parse(JSON.stringify(toolReview));
+badSourceToolReview.config.reviewSource = 'invoice_form';
+assert.throws(()=>api.validateResult(badSourceToolReview),/source/);
+await assert.rejects(api.buildToolSpendReview([...toolCharges,toolCharges[0]],toolOptions),/Repeated/);
+await assert.rejects(api.buildToolSpendReview(toolCharges,{...toolOptions,scopeConfirmed:false}),/confirmed/);
+await assert.rejects(api.buildToolSpendReview(toolCharges,{...toolOptions,end:'2026-09-30'}),/before/);
+await assert.rejects(api.buildToolSpendReview(toolCharges,{...toolOptions,basis:'mixed'}),/cost basis/);
+await assert.rejects(api.buildToolSpendReview([{...toolCharges[0],reference:''}],toolOptions),/source reference/);
+await assert.rejects(api.buildToolSpendReview([{...toolCharges[0],amount:'-1'}],toolOptions));
+const estimatedTools = await api.buildToolSpendReview(toolCharges,{...toolOptions,basis:'calculated'});
+api.state.data = estimatedTools; api.renderAll();
+assert.match(element('bill-evidence-summary').innerHTML,/estimates/);
+assert.doesNotMatch(element('bill-mode-tag').textContent,/PROVIDER REPORTED/);
 for (const date of ['2026-02-31', '2026-02-29', '2026-04-31', '2026-13-01', 'not-a-date']) assert.throws(() => api.validDate(date, 'Date'));
 for (const date of ['2024-02-29', '2026-02-28', '2026-12-31']) assert.equal(api.validDate(date, 'Date'), date);
 const demo = JSON.parse(read('web/data/illustrative-review-result.json'));

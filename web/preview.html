@@ -6309,6 +6309,26 @@ body.bill-usage-mode #view-opportunities > :not(.request-review-panel) { display
 }
 body{min-width:0}
 .decision-table th,.bar-label,.evidence-card h2,.anatomy-card h2,.finance-memo th{overflow-wrap:anywhere}
+
+.evidence-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; padding: 18px 0; margin: 12px 0 28px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.evidence-summary > div { min-width: 0; }
+.evidence-summary span { display: block; color: var(--muted); font: 700 10px/1.5 var(--sans); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 5px; }
+.evidence-summary strong { display: block; font: 500 13px/1.6 var(--sans); overflow-wrap: anywhere; }
+.tool-charge-entry { min-width: 0; margin: 20px 0; padding: 18px; border: 1px solid var(--line); }
+.tool-charge-entry legend { padding: 0 8px; font: 700 12px/1.5 var(--sans); }
+.tool-charge-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.tool-charge-grid > label { min-width: 0; }
+.tool-charge-grid > label:last-child { grid-column: 1 / -1; }
+.tool-charge-entry[hidden], #tools-builder-fields[hidden], #tool-spend-result[hidden], #bill-usage-section[hidden] { display: none; }
+.review-next-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin: 22px 0 36px; }
+#story-toggle[hidden] { display: none; }
+#tool-spend-result .usage-table td { overflow-wrap: anywhere; }
+@media (max-width: 620px) {
+  .evidence-summary { grid-template-columns: 1fr; gap: 14px; }
+  .tool-charge-grid { grid-template-columns: 1fr; }
+  .tool-charge-entry { padding: 14px; }
+  .review-next-actions { align-items: stretch; flex-direction: column; }
+}
 </style>
   </head>
   <body>
@@ -6398,6 +6418,14 @@ body{min-width:0}
           </article>
 
           <div class="metric-ledger bill-metrics" id="bill-metric-ledger"></div>
+          <div class="evidence-summary" id="bill-evidence-summary" aria-label="Period and cost source"></div>
+
+          <section class="comparison-section" id="tool-spend-result" aria-labelledby="tool-spend-title" hidden>
+            <div class="section-heading"><div><p class="kicker">YOUR AI TOOLS</p><h2 id="tool-spend-title">Subscriptions and extra usage, together</h2></div><p>Included usage stays inside the subscription. Only separately charged usage is added.</p></div>
+            <div class="metric-ledger bill-metrics" id="tool-spend-metrics"></div>
+            <div class="usage-table-wrap" role="region" aria-label="AI tool charges and owners" tabindex="0"><table class="usage-table"><thead><tr><th>Tool / charge</th><th>Owner</th><th>Source reference</th><th>Period amount</th></tr></thead><tbody id="tool-spend-rows"></tbody></table></div>
+            <p id="tool-spend-boundary"></p>
+          </section>
 
           <section class="comparison-section" id="bill-history-result" aria-labelledby="bill-history-title" hidden>
             <div class="section-heading"><div><p class="kicker">BILL TREND</p><h2 id="bill-history-title">How did the bill change?</h2></div></div>
@@ -6411,7 +6439,7 @@ body{min-width:0}
             <p id="bill-budget-boundary"></p>
           </section>
 
-          <section class="comparison-section" aria-labelledby="model-mix-title">
+          <section class="comparison-section" id="bill-usage-section" aria-labelledby="model-mix-title">
             <div class="section-heading">
               <div>
                 <p class="kicker">USAGE MIX</p>
@@ -6455,6 +6483,10 @@ body{min-width:0}
             </div>
             <p id="bill-boundary-copy"></p>
           </section>
+          <div class="review-next-actions" id="bill-next-actions">
+            <button class="build-button" id="bill-save-next" type="button">Save this baseline</button>
+            <button class="text-button" id="bill-compare-next" type="button">Test a different tool or plan</button>
+          </div>
         </section>
 
         <section class="view active" id="view-review" aria-labelledby="review-title">
@@ -6474,6 +6506,7 @@ body{min-width:0}
             </div>
           </div>
 
+          <div class="evidence-summary" id="review-evidence-summary" aria-label="Period and cost source"></div>
           <div class="example-switcher" id="example-switcher" role="group" aria-label="Illustrative decisions">
             <span>EXPLORE TWO EXAMPLES</span>
             <button type="button" data-example="growth" aria-pressed="false">Growing AI startup</button>
@@ -7155,6 +7188,11 @@ body{min-width:0}
             <strong>Start with a bill</strong>
             <span>Enter a total and period. Add usage or outcomes when you have them.</span>
           </button>
+          <button class="builder-mode builder-mode-featured" data-builder-mode="tools" type="button" aria-pressed="false">
+            <small>SUBSCRIPTIONS + EXTRA USAGE</small>
+            <strong>Review my AI tools</strong>
+            <span>Put your AI plans and separately billed usage in one period, with a source and an owner for each charge.</span>
+          </button>
           <button class="builder-mode builder-mode-featured" data-builder-mode="usage" type="button" aria-pressed="false">
             <small>CSV OR JSON · LOCAL ANALYSIS</small>
             <strong>Review AI usage</strong>
@@ -7195,6 +7233,149 @@ body{min-width:0}
         </div>
 
         <p class="builder-path-help" id="builder-path-help">Not sure? Start with one bill. The review becomes more detailed as you add the usage or outcome data you already have.</p>
+
+        <div id="tools-builder-fields" hidden>
+          <section class="builder-step"><div class="step-number">01</div><div>
+            <h3>Choose one period and cost basis</h3>
+            <p>Use amounts for the same service period and currency. Keep annual bills, credit purchases, refunds, and other periods separate. If you allocate part of a bill, choose allocated cost and document the method in its source reference.</p>
+            <div class="field-grid compact-fields">
+              <label><span>Review name</span><input id="tools-name" type="text" placeholder="Our AI tools" maxlength="120" /></label>
+              <label><span>Currency</span><input id="tools-currency" type="text" value="USD" maxlength="3" /></label>
+              <label><span>Service-period start</span><input id="tools-start" type="date" /></label>
+              <label><span>Service-period end / data through</span><input id="tools-end" type="date" /></label>
+              <label class="field-wide"><span>What do these amounts represent?</span><select id="tools-basis"><option value="provider_reported">Billed amounts I checked against my records</option><option value="calculated">Estimates for this period</option><option value="allocated">Allocated costs with a documented method</option></select><small>Use one basis for the whole review. AI Cost Lens does not independently verify your records.</small></label>
+            </div>
+          </div></section>
+          <section class="builder-step"><div class="step-number">02</div><div>
+            <h3>Add the charges you want to review</h3>
+            <p>Enter the full subscription charge once. Add API usage or overage only when it is a separate charge, outside any included allowance. Source references can be short labels; no account numbers or document uploads are needed.</p>
+            <div id="tool-charge-entries">
+              <fieldset class="tool-charge-entry" id="tool-charge-1">
+                <legend>Charge 1</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-1" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-1"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-1" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-1" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-1" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-2">
+                <legend>Charge 2</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-2" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-2"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-2" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-2" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-2" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-3" hidden>
+                <legend>Charge 3</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-3" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-3"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-3" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-3" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-3" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-4" hidden>
+                <legend>Charge 4</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-4" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-4"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-4" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-4" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-4" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-5" hidden>
+                <legend>Charge 5</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-5" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-5"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-5" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-5" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-5" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-6" hidden>
+                <legend>Charge 6</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-6" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-6"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-6" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-6" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-6" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-7" hidden>
+                <legend>Charge 7</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-7" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-7"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-7" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-7" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-7" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-8" hidden>
+                <legend>Charge 8</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-8" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-8"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-8" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-8" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-8" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-9" hidden>
+                <legend>Charge 9</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-9" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-9"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-9" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-9" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-9" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-10" hidden>
+                <legend>Charge 10</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-10" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-10"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-10" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-10" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-10" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-11" hidden>
+                <legend>Charge 11</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-11" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-11"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-11" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-11" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-11" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+              <fieldset class="tool-charge-entry" id="tool-charge-12" hidden>
+                <legend>Charge 12</legend>
+                <div class="tool-charge-grid">
+                  <label><span>Tool or plan</span><input id="tool-name-12" type="text" maxlength="120" placeholder="Tool or plan name" /></label>
+                  <label><span>Charge type</span><select id="tool-kind-12"><option value="subscription">Subscription</option><option value="usage">Extra usage / API</option></select></label>
+                  <label><span>Amount for this period</span><input id="tool-amount-12" type="number" min="0" step="any" /></label>
+                  <label><span>Source reference</span><input id="tool-source-12" type="text" maxlength="200" placeholder="Invoice label or estimate method" /></label>
+                  <label><span>Owner or team · optional</span><input id="tool-owner-12" type="text" maxlength="120" /></label>
+                </div>
+              </fieldset>
+            </div>
+            <button class="text-button" id="add-tool-charge" type="button">Add another charge</button>
+            <p id="tool-charge-status" role="status"></p>
+            <label class="check-field"><input id="tools-scope" type="checkbox" /><span>I checked that every amount covers the declared service period and currency, with no duplicated charges, included usage counted again, or prepaid credits treated as consumed usage.</span></label>
+          </div></section>
+        </div>
 
         <div id="single-builder-fields" hidden>
           <div class="path-requirements">
@@ -11914,11 +12095,62 @@ body{min-width:0}
   const singleSpendColumns = "period date workload provider model route requests input_tokens cached_input_tokens cache_write_input_tokens output_tokens provider_cost cost_basis currency".split(" ");
   const singleWorkColumns = "period result_id outcome_status model_requests retry_requests human_minutes".split(" ");
 
+  function normalizeToolCharges(items) {
+    if (!Array.isArray(items) || !items.length || items.length > 12) throw new Error("Add between one and twelve AI tool charges.");
+    const seen = new Set();
+    return items.map((item, index) => {
+      const label = `Charge ${index + 1}`;
+      if (!item || typeof item !== "object" || ["tool", "kind", "amount", "reference", "owner"].some((key) => typeof item[key] !== "string")) throw new Error(`${label} has incomplete source fields.`);
+      const tool = safeImportedLabel(item.tool, `${label} tool or plan`);
+      const reference = safeImportedLabel(item.reference, `${label} source reference`);
+      const owner = item.owner.trim() ? safeImportedLabel(item.owner, `${label} owner`) : "";
+      if (tool.length > 120 || reference.length > 200 || owner.length > 120) throw new Error(`${label} labels are too long.`);
+      if (!["subscription", "usage"].includes(item.kind)) throw new Error(`${label} needs a subscription or extra-usage type.`);
+      const amount = costNumber(item.amount, `${label} period amount`);
+      const key = JSON.stringify([tool.toLowerCase(), item.kind]);
+      if (seen.has(key)) throw new Error(`Repeated ${item.kind} charge for ${tool}. Consolidate the amount once, or distinguish separate plans clearly.`);
+      seen.add(key);
+      return { tool, kind: item.kind, amount: String(amount), reference, owner };
+    });
+  }
+
+  function toolChargeRows(items, config) {
+    return items.map((item) => ({ period: "baseline", date: config.serviceEnd, workload: config.toolSpend.name,
+      provider: item.tool, model: "", route: item.kind === "subscription" ? "Subscription" : "Separately charged usage",
+      requests: "", input_tokens: "", cached_input_tokens: "", cache_write_input_tokens: "", output_tokens: "",
+      provider_cost: item.amount, cost_basis: config.toolSpend.basis, currency: config.toolSpend.currency }));
+  }
+
+  function validateToolSpend(data) {
+    const record = data.config.toolSpend;
+    if (data.config.reviewSource !== "tool_spend" || !record || typeof record !== "object" || record.scopeConfirmed !== true ||
+        typeof record.name !== "string" || typeof record.currency !== "string" ||
+        !["provider_reported", "calculated", "allocated"].includes(record.basis)) throw new Error("AI tool review needs its source, cost basis, and confirmed period and charge boundary.");
+    safeImportedLabel(record.name, "Review name");
+    if (record.name.length > 120 || !/^[A-Z]{3}$/.test(record.currency)) throw new Error("Use a short review name and one three-letter currency.");
+    validDate(data.config.serviceStart, "Service-period start");
+    validDate(data.config.serviceEnd, "Service-period end");
+    if (data.config.serviceStart > data.config.serviceEnd) throw new Error("Service-period end cannot be before its start.");
+    const items = normalizeToolCharges(record.items);
+    const expected = toolChargeRows(items, data.config);
+    if (data.source.work.length || data.source.spend.length !== expected.length || expected.some((row, index) => singleSpendColumns.some((key) => row[key] !== data.source.spend[index][key]))) throw new Error("AI tool charges do not match the saved cost rows. Rebuild the review from your records.");
+    return items;
+  }
+
+  async function buildToolSpendReview(items, options) {
+    const normalized = normalizeToolCharges(items);
+    const config = { reviewSource: "tool_spend", serviceStart: options.start, serviceEnd: options.end,
+      toolSpend: { name: safeImportedLabel(options.name, "Review name"), currency: String(options.currency).trim().toUpperCase(),
+        basis: options.basis, scopeConfirmed: options.scopeConfirmed, items: normalized } };
+    return buildSingleBillReview(rowsToCsv(toolChargeRows(normalized, config)), "", config);
+  }
+
   // Saved single-bill reviews retain the supplied rows. Recompute, never trust
   // saved financial claims or derived values when opening them again.
   function summarizeSingleBill(data) {
     const { spend, work } = data.source;
     const { config } = data;
+    if (config.reviewSource === "tool_spend" || config.toolSpend !== undefined) validateToolSpend(data);
     if (!spend.length || spend.length > 20000 || work.length > 20000) throw new Error("Supply 1 to 20,000 spend rows and at most 20,000 outcome rows.");
     const seen = new Set();
     spend.forEach((row) => {
@@ -16197,6 +16429,60 @@ body{min-width:0}
     document.getElementById("memo-planning").hidden = true;
     document.getElementById("memo-next-step").textContent = document.getElementById("bill-next-step").textContent;
     document.getElementById("memo-footer-status").textContent = "Calculated locally from supplied records · no AI API";
+    renderEvidenceSummary("bill-evidence-summary", [
+      ["Service period", state.data.config.serviceStart ? `${period.start} to ${period.end}` : "Not declared; only supplied date buckets"],
+      ["Cost source", basisLabel],
+      ["Records through", `${period.end} · supplied records, no live sync`],
+    ]);
+    if (state.data.config.toolSpend) renderToolSpend(review);
+  }
+
+  function renderEvidenceSummary(id, entries) {
+    document.getElementById(id).innerHTML = entries.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+  }
+
+  function renderToolSpend(review) {
+    const record = state.data.config.toolSpend;
+    const items = normalizeToolCharges(record.items);
+    const subscriptions = items.filter((item) => item.kind === "subscription").reduce((sum, item) => sum + Number(item.amount), 0);
+    const usage = items.filter((item) => item.kind === "usage").reduce((sum, item) => sum + Number(item.amount), 0);
+    const unowned = items.filter((item) => !item.owner);
+    const total = review.totals.providerCost;
+    const basis = record.basis === "provider_reported" ? "User-entered billed amounts · unverified" : record.basis === "allocated" ? "User-allocated costs · unverified" : "User-entered estimates · unverified";
+    const rows = [["Subscriptions", money(subscriptions, 2), "Only subscription charges entered in this review"], ["Extra usage / API", money(usage, 2), "Only separately charged usage entered in this review"], ["Combined period cost", money(total, 2), basis], ["Charges without an owner", String(unowned.length), "A follow-up prompt, not evidence of waste"]];
+    document.getElementById("tool-spend-result").hidden = false;
+    document.getElementById("bill-usage-section").hidden = true;
+    document.getElementById("bill-review-kicker").textContent = "AI TOOL SPEND REVIEW";
+    document.getElementById("bill-review-title").textContent = "What are your AI tools costing together?";
+    document.getElementById("bill-mode-tag").textContent = "ENTERED COST BASELINE · NO SAVINGS CLAIM";
+    document.getElementById("bill-source-title").textContent = record.name;
+    document.getElementById("bill-source-copy").textContent = "Subscriptions and separately charged usage for one declared service period. Amounts and source references were supplied by you.";
+    const headline = `${money(total, 2)} across ${items.length} entered charge${items.length === 1 ? "" : "s"} for ${record.name}.`;
+    document.getElementById("bill-finding-title").textContent = headline;
+    document.getElementById("bill-finding-limit").textContent = "This is the total of the charges you entered. Usage included in a subscription is not added again. Tool value, unused seats, human effort, and unentered costs remain unknown.";
+    document.getElementById("bill-metric-ledger").innerHTML = rows.slice(0, 3).map(([label, value, note]) => `<div class="metric-cell"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`).join("");
+    document.getElementById("tool-spend-metrics").innerHTML = `<div class="metric-cell"><span>Charges without an owner</span><strong>${unowned.length}</strong><small>Missing ownership is a follow-up prompt, not evidence of waste.</small></div>`;
+    document.getElementById("tool-spend-rows").innerHTML = items.map((item) => `<tr><td data-label="Tool / charge"><strong>${escapeHtml(item.tool)}</strong><br>${item.kind === "subscription" ? "Subscription" : "Extra usage / API"}</td><td data-label="Owner">${escapeHtml(item.owner || "Not assigned")}</td><td data-label="Source reference">${escapeHtml(item.reference)}</td><td data-label="Period amount">${money(Number(item.amount), 2)}</td></tr>`).join("");
+    document.getElementById("tool-spend-boundary").textContent = "One declared period and currency; one cost basis. Source references are labels you supplied, not documents verified by AI Cost Lens. Human review, infrastructure, other tools, and unentered charges are excluded. A combined cost does not establish waste or savings.";
+    const largest = [...items].sort((a, b) => Number(b.amount) - Number(a.amount))[0];
+    const guidance = [
+      ["fix", "OWNERSHIP", unowned.length ? `Assign an owner to ${unowned.length} charge${unowned.length === 1 ? "" : "s"}` : "Keep the named owners involved", unowned.length ? "Follow up" : "Assigned", unowned.length ? unowned.map((item) => item.tool).join(", ") : "The owner can confirm who uses the tool and which work depends on it."],
+      ["test", "REVIEW FIRST", `Start the value review with ${largest.tool}`, money(Number(largest.amount), 2), "This is the largest entered charge, not an avoidable-cost estimate. Check its work, usage, and any overlapping plans before changing it."],
+      ["leave", "TEST A CHANGE", "Compare one tool or plan on the same work", "Test first", "Save this baseline, then use Compare two options with that tool's cost and a same-task sample. Keep quality, active review time, and separately billed usage in the comparison."],
+    ];
+    document.getElementById("bill-opportunity-ledger").innerHTML = guidance.map(([kind, label, title, value, note]) => `<article class="opportunity-row state-${kind}"><span class="opportunity-state">${escapeHtml(label)}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(note)}</p></div><em>${escapeHtml(value)}</em></article>`).join("");
+    const next = unowned.length ? "Confirm ownership, then choose one tool or plan to review." : `Check what ${largest.tool} helps you complete, then test one bounded change.`;
+    document.getElementById("bill-next-step").textContent = next;
+    document.getElementById("bill-boundary-copy").textContent = "A cheaper subscription is useful only if the work still gets done. Test comparable outputs before switching; check a later same-scope bill before calling a difference realized savings.";
+    renderEvidenceSummary("bill-evidence-summary", [["Service period", `${review.period.start} to ${review.period.end}`], ["Cost source", basis], ["Data through", `${review.period.end} · declared by you, no live sync`]]);
+    document.getElementById("memo-title").textContent = "AI tool spend review";
+    document.getElementById("memo-decision-code").textContent = "ENTERED COST BASELINE";
+    document.getElementById("memo-decision-title").textContent = headline;
+    document.getElementById("memo-decision-limit").textContent = document.getElementById("tool-spend-boundary").textContent;
+    document.getElementById("memo-table-body").innerHTML = rows.map((cells) => `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("");
+    document.getElementById("memo-rules").innerHTML = memoList([["Cost basis", basis], ["Service period", `${review.period.start} to ${review.period.end}`], ["Charge boundary", "User confirmed matching period and currency, with included usage and prepayments excluded from extra usage"]]);
+    document.getElementById("memo-evidence").innerHTML = memoList(items.map((item) => [item.tool, `${item.kind === "subscription" ? "Subscription" : "Extra usage / API"}: ${money(Number(item.amount), 2)} · ${item.reference} · Owner: ${item.owner || "Not assigned"}`]));
+    document.getElementById("memo-next-step").textContent = next;
   }
 
   function openAIFieldCoverage(usage, field) {
@@ -16250,6 +16536,7 @@ body{min-width:0}
     const costPerRequestLabel = costPerRequest === null ? "Unavailable" : money(costPerRequest, costPerRequest < 1 ? 4 : 2);
     const topRequestShareLabel = topRequestShare === null ? "Unavailable" : pct(topRequestShare, 1);
     document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
+    renderEvidenceSummary("bill-evidence-summary", [["Exported period", `${period.start} to ${period.end} · ${period.aligned ? "aligned UTC buckets" : "alignment needs checking"}`], ["Cost source", "Saved provider cost export · not independently verified"], ["Records through", `${period.end} · imported files, no live sync`]]);
     document.getElementById("bill-mode-tag").textContent = !period.aligned ? "PERIOD MISMATCH" : state.data.mode === "illustrative" ? "ILLUSTRATIVE COST AND USAGE" : "COST AND USAGE · NO SAVINGS CLAIM";
     document.getElementById("bill-finding-title").textContent =
       period.aligned
@@ -16545,6 +16832,8 @@ body{min-width:0}
     document.getElementById("bill-review-screen").classList.toggle("active", isBill);
     document.getElementById("bill-history-result").hidden = true;
     document.getElementById("bill-budget-result").hidden = true;
+    document.getElementById("tool-spend-result").hidden = true;
+    document.getElementById("bill-usage-section").hidden = false;
     document.querySelectorAll(".view").forEach((section) => {
       if (isBill) section.classList.remove("active");
     });
@@ -16571,6 +16860,13 @@ body{min-width:0}
     });
     if (!availableViews.has(state.view)) state.view = "review";
     document.getElementById("story-toggle").hidden = false;
+    const isSimple = state.data.experience === "simple";
+    const isIllustrative = state.data.mode === "illustrative";
+    renderEvidenceSummary("review-evidence-summary", [
+      ["Review period", isSimple ? "Monthly scenario · billing dates not verified" : `${state.data.period.start} to ${state.data.period.end}`],
+      ["Provider cost source", isIllustrative ? "Invented example costs" : [state.data.baseline, state.data.proposed].map((route) => `${route.label}: ${costBasisLabel(route.evidence.cost_basis)}`).join(" · ")],
+      ["Evidence dates", isSimple ? "No dated billing records supplied" : isIllustrative ? "Invented example · no live sync" : `${[state.data.baseline, state.data.proposed].map((route) => `${route.label}: ${route.evidence.observed_at || "not supplied"}`).join(" · ")} · no live sync`],
+    ]);
     renderReview();
     renderAnatomy();
     renderOpportunities();
@@ -17087,7 +17383,7 @@ body{min-width:0}
   );
 
   function syncBuilderControls() {
-    for (const mode of ["single", "workload", "openai", "simple"]) {
+    for (const mode of ["single", "workload", "openai", "simple", "tools"]) {
       document.getElementById(`${mode}-builder-fields`).querySelectorAll("input, select, textarea").forEach((input) => {
         input.disabled = state.builderMode !== mode;
       });
@@ -17105,6 +17401,9 @@ body{min-width:0}
     // Reset only when beginning a new draft, never on submit or its failure.
     // Native reset restores declared defaults and empties every file input.
     builderForm.reset();
+    for (let index = 1; index <= 12; index++) document.getElementById(`tool-charge-${index}`).hidden = index > 2;
+    document.getElementById("add-tool-charge").disabled = false;
+    document.getElementById("tool-charge-status").textContent = "";
     document.getElementById("simple-example-caveat").textContent = "The prefilled numbers are a small-business example. Replace them with your own before comparing.";
     document.getElementById("bill-history-input").open = false;
     document.getElementById("bill-budget-input").open = false;
@@ -17150,6 +17449,7 @@ body{min-width:0}
     document.getElementById("openai-builder-fields").hidden = true;
     document.getElementById("single-builder-fields").hidden = true;
     document.getElementById("simple-builder-fields").hidden = true;
+    document.getElementById("tools-builder-fields").hidden = true;
     document.getElementById("builder-actions").hidden = true;
     document.getElementById("builder-path-help").hidden = false;
     document.getElementById("review-dialog-title").textContent = "What would you like to check?";
@@ -17223,9 +17523,11 @@ body{min-width:0}
     const isOpenAI = mode === "openai";
     const isSingle = mode === "single";
     const isSimple = mode === "simple";
+    const isTools = mode === "tools";
+    document.getElementById("tools-builder-fields").hidden = !isTools;
     document.getElementById("simple-builder-fields").hidden = !isSimple;
     document.getElementById("single-builder-fields").hidden = !isSingle;
-    document.getElementById("workload-builder-fields").hidden = isOpenAI || isSingle || isSimple;
+    document.getElementById("workload-builder-fields").hidden = isOpenAI || isSingle || isSimple || isTools;
     document.getElementById("openai-builder-fields").hidden = !isOpenAI;
     document.getElementById("builder-actions").hidden = false;
     document.getElementById("builder-path-help").hidden = true;
@@ -17233,6 +17535,11 @@ body{min-width:0}
     document.getElementById("builder-action-note").textContent = isSingle ? "Cost is enough to start. Usage and outcomes deepen the review when available; human effort and retries are optional." : isOpenAI ? "The result will show a useful cost and usage baseline without requiring outcome or human-review data." : state.outcomeMode === "sample" ? "The quick path produces a sampled estimate. It never becomes booked savings." : "Use the detailed log when you have one row per completed result.";
     document.getElementById("build-review").textContent = isSingle ? "Understand this bill" : isOpenAI ? "Review the provider export" : "Build the finance review";
     document.getElementById("builder-error").classList.remove("visible");
+    if (isTools) {
+      document.getElementById("review-dialog-title").textContent = "Review your AI tools together";
+      document.getElementById("builder-action-note").textContent = "A baseline for the charges you enter. Missing costs and tool value stay unknown; no savings are claimed.";
+      document.getElementById("build-review").textContent = "Review my AI tools";
+    }
     if (isSimple) {
       document.getElementById("review-dialog-title").textContent = "Compare two AI tools or plans";
       document.getElementById("builder-action-note").textContent = "A monthly estimate including the value of your time. No files needed.";
@@ -17259,6 +17566,26 @@ body{min-width:0}
     reviewDialog.showModal();
   });
   document.getElementById("close-review").addEventListener("click", () => reviewDialog.close());
+  document.getElementById("bill-save-next").addEventListener("click", () => document.getElementById("download-review").click());
+  document.getElementById("bill-compare-next").addEventListener("click", () => {
+    resetBuilderStart();
+    activateBuilderMode("simple");
+    for (const id of ["simple-current-name", "simple-current-cost", "simple-other-name", "simple-other-cost"]) document.getElementById(id).value = "";
+    document.getElementById("simple-example-caveat").textContent = "Enter the monthly costs for the specific tools or plans you want to compare. Your combined baseline is not copied or allocated to one tool. The quality sample below is illustrative until you replace it.";
+    reviewDialog.showModal();
+  });
+  document.getElementById("add-tool-charge").addEventListener("click", () => {
+    for (let index = 1; index <= 12; index++) {
+      const row = document.getElementById(`tool-charge-${index}`);
+      if (row.hidden) {
+        row.hidden = false;
+        document.getElementById(`tool-name-${index}`).focus();
+        document.getElementById("tool-charge-status").textContent = `Charge ${index} added. Leave an unused charge completely blank.`;
+        if (index === 12) document.getElementById("add-tool-charge").disabled = true;
+        break;
+      }
+    }
+  });
   reviewDialog.addEventListener("click", (event) => {
     if (event.target === reviewDialog) reviewDialog.close();
   });
@@ -18007,6 +18334,28 @@ body{min-width:0}
         showToast("Comparison built. Your answers stayed in this browser.");
         return;
       }
+      if (state.builderMode === "tools") {
+        const items = [];
+        for (let index = 1; index <= 12; index++) {
+          if (document.getElementById(`tool-charge-${index}`).hidden) continue;
+          const item = Object.fromEntries([["tool", "name"], ["kind", "kind"], ["amount", "amount"], ["reference", "source"], ["owner", "owner"]].map(([key, field]) => [key, document.getElementById(`tool-${field}-${index}`).value.trim()]));
+          if ([item.tool, item.amount, item.reference, item.owner].some(Boolean)) items.push(item);
+        }
+        state.data = await buildToolSpendReview(items, {
+          name: document.getElementById("tools-name").value,
+          currency: document.getElementById("tools-currency").value,
+          start: document.getElementById("tools-start").value,
+          end: document.getElementById("tools-end").value,
+          basis: document.getElementById("tools-basis").value,
+          scopeConfirmed: document.getElementById("tools-scope").checked,
+        });
+        discardImportedSourceState();
+        renderAll();
+        reviewDialog.close();
+        document.getElementById("bill-review-title").focus();
+        showToast("AI tool costs reviewed locally. Save the baseline before testing a change.");
+        return;
+      }
       if (state.builderMode === "single") {
         const [spendFile] = document.getElementById("single-spend-file").files;
         const [workFile] = document.getElementById("single-work-file").files;
@@ -18191,7 +18540,7 @@ body{min-width:0}
       errorBox.classList.add("visible");
     } finally {
       submit.disabled = false;
-      submit.textContent = state.builderMode === "simple" ? "Compare my options" : state.builderMode === "single" ? "Understand this bill" : state.builderMode === "openai"
+      submit.textContent = state.builderMode === "tools" ? "Review my AI tools" : state.builderMode === "simple" ? "Compare my options" : state.builderMode === "single" ? "Understand this bill" : state.builderMode === "openai"
         ? state.pendingMappedImport ? "Confirm and build mapped review" : state.importProvider === "claude" && state.pendingClaudeImport ? "Confirm and build Claude review" : state.importProvider === "claude" ? "Check the Claude export" : "Review the OpenAI bill"
         : state.builderMode === "workload"
           ? "Build the finance review"
