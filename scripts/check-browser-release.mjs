@@ -233,7 +233,14 @@ async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false } =
   assert((await page.locator("#bill-metric-ledger").innerText()).includes("$65.00"), "Subscriptions were not separated from extra usage.");
   assert((await page.locator("#bill-evidence-summary").innerText()).includes("no live sync"), "AI tool review suggests live data.");
   assert(await page.locator("#story-toggle").isHidden(), "Presentation view must be hidden for bill reviews.");
-  assert(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 1, "AI tool review overflows horizontally.");
+  const layout = await page.evaluate(() => ({
+    viewport: window.innerWidth, page: document.documentElement.scrollWidth, bodyClass: document.body.className,
+    overflowing: [...document.querySelectorAll("body *")].map((element) => ({
+      tag: element.tagName, id: element.id, classes: String(element.className),
+      right: Math.round(element.getBoundingClientRect().right), width: Math.round(element.getBoundingClientRect().width),
+    })).filter((element) => element.width > 0 && element.right > window.innerWidth + 1).slice(0, 16),
+  }));
+  assert(layout.page - layout.viewport <= 1, `${page.context().browser().browserType().name()}: AI tool review overflows horizontally: ${JSON.stringify(layout)}`);
   if (mobile) {
     const a11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
     assert(a11y.violations.length === 0, `AI tool review accessibility violations: ${axeSummary(a11y)}`);
