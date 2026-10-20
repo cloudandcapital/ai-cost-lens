@@ -285,7 +285,8 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#start-review-inline").click();
   assert(await page.locator("#baseline-population").inputValue() === "" && await page.locator("#proposed-ready").inputValue() === "", `${engineName}: example outcomes leaked into a real review.`);
   assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: inline review action did not open.`);
-  assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 4, `${engineName}: start dialog lost a primary path.`);
+  assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 5, `${engineName}: start dialog lost a primary path.`);
+  assert(await page.locator('[data-builder-mode="tools"]').isVisible(), `${engineName}: AI tool review is missing from the primary choices.`);
   await page.locator("#close-review").click();
   await page.locator('[data-example="cost-trap"]').click();
   assert((await page.locator("#workload-name").innerText()) === "Contract risk summaries", `${engineName}: could not return to the original example.`);
