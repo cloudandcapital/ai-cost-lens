@@ -212,6 +212,59 @@ async function verifyFictionalProjectCost(page) {
   assert((await page.locator("#memo-next-step").textContent()).includes("proj_aster_support"), "The memo contradicts the project-cost priority.");
 }
 
+async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false } = {}) {
+  if (mobile && await page.locator("#header-actions").isHidden()) await page.locator("#header-menu-toggle").click();
+  await page.locator("#start-review").click();
+  await page.locator('[data-builder-mode="tools"]').click();
+  for (const [id, value] of Object.entries({
+    "tools-name": "Example team tools", "tools-start": "2026-10-01", "tools-end": "2026-10-20",
+    "tool-name-1": "Writing plan", "tool-amount-1": "20", "tool-source-1": "October invoice", "tool-owner-1": "Content",
+    "tool-name-2": "Coding plan", "tool-amount-2": "45", "tool-source-2": "October invoice",
+  })) await page.locator(`#${id}`).fill(value);
+  await page.locator("#add-tool-charge").click();
+  await page.locator("#tool-name-3").fill("Coding plan");
+  await page.locator("#tool-kind-3").selectOption("usage");
+  await page.locator("#tool-amount-3").fill("3.25");
+  await page.locator("#tool-source-3").fill("Separate usage charge");
+  await page.locator("#tools-scope").check();
+  await page.locator("#build-review").click();
+  await page.locator("#tool-spend-result").waitFor({ state: "visible" });
+  assert((await page.locator("#bill-finding-title").innerText()).includes("$68.25"), "AI tool total did not reconcile.");
+  assert((await page.locator("#bill-metric-ledger").innerText()).includes("$65.00"), "Subscriptions were not separated from extra usage.");
+  assert((await page.locator("#bill-evidence-summary").innerText()).includes("no live sync"), "AI tool review suggests live data.");
+  assert(await page.locator("#story-toggle").isHidden(), "Presentation view must be hidden for bill reviews.");
+  // WebKit updates the root scroll area after closing a top-layer dialog.
+  // Measure the settled page, while still failing a persistent overflow.
+  await page.waitForFunction(() => document.documentElement.scrollWidth - window.innerWidth <= 1, null, { timeout: 3000 }).catch(() => {});
+  const layout = await page.evaluate(() => ({
+    viewport: window.innerWidth, page: document.documentElement.scrollWidth, bodyClass: document.body.className,
+    overflowing: [...document.querySelectorAll("body *")].map((element) => ({
+      tag: element.tagName, id: element.id, classes: String(element.className),
+      right: Math.round(element.getBoundingClientRect().right), width: Math.round(element.getBoundingClientRect().width),
+      scroll: element.scrollWidth, client: element.clientWidth,
+    })).filter((element) => element.width > 0 && (element.right > window.innerWidth + 1 || element.scroll > element.client + 1)).slice(0, 16),
+  }));
+  assert(layout.page - layout.viewport <= 1, `${page.context().browser().browserType().name()}: AI tool review overflows horizontally: ${JSON.stringify(layout)}`);
+  if (mobile) {
+    const a11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+    assert(a11y.violations.length === 0, `AI tool review accessibility violations: ${axeSummary(a11y)}`);
+  }
+  if (roundTrip) {
+    const record = await saveJsonDownload(page, "#bill-save-next", "ai-tool-spend-review.json");
+    assert(record.config.toolSpend.items.length === 3, "Saved review lost source references or charges.");
+    await page.reload({ waitUntil: "networkidle" });
+    const chooser = page.waitForEvent("filechooser");
+    await page.locator("#open-review").click();
+    await (await chooser).setFiles({ name: "ai-tool-spend-review.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(record)) });
+    await page.locator("#tool-spend-result").waitFor({ state: "visible" });
+    assert((await page.locator("#bill-finding-title").innerText()).includes("$68.25"), "Reopening changed the AI tool baseline.");
+  }
+  await page.locator("#bill-compare-next").click();
+  assert(await page.locator("#simple-builder-fields").isVisible(), "AI tool review did not open a tool comparison.");
+  assert(await page.locator("#simple-current-cost").inputValue() === "", "Combined spending was silently allocated to a single tool.");
+  await page.locator("#close-review").click();
+}
+
 async function priceAndUsageFlow(engineName, engine, origin) {
   const browser = await engine.launch({ headless: true });
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
@@ -243,7 +296,8 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#start-review-inline").click();
   assert(await page.locator("#baseline-population").inputValue() === "" && await page.locator("#proposed-ready").inputValue() === "", `${engineName}: example outcomes leaked into a real review.`);
   assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: inline review action did not open.`);
-  assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 4, `${engineName}: start dialog lost a primary path.`);
+  assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 5, `${engineName}: start dialog lost a primary path.`);
+  assert(await page.locator('[data-builder-mode="tools"]').isVisible(), `${engineName}: AI tool review is missing from the primary choices.`);
   await page.locator("#close-review").click();
   await page.locator('[data-example="cost-trap"]').click();
   assert((await page.locator("#workload-name").innerText()) === "Contract risk summaries", `${engineName}: could not return to the original example.`);
@@ -462,6 +516,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const rich_decisions = engineName === "chromium" ? await verifyRichDecisionFlow(page) : null;
   if (engineName === "chromium") await verifyOpenAIPartialBucket(page);
   if (engineName === "chromium") await verifyFictionalProjectCost(page);
+  await verifyToolSpendFlow(page, { roundTrip: engineName === "chromium" });
   await page.locator("#start-review").click();
   await page.locator('[data-builder-mode="single"]').click();
   assert((await page.locator("#single-builder-fields .path-requirements").first().innerText()).includes("no file is required"), `${engineName}: bill-only path incorrectly requires a CSV.`);
@@ -600,6 +655,8 @@ async function mobileAndAccessibility(origin) {
   assert(await page.locator(".price-table-wrap").evaluate((element) => element.scrollWidth <= element.clientWidth + 1), "mobile: prompt costs are still hidden sideways.");
   const priceA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   assert(priceA11y.violations.length === 0, `mobile pricing accessibility violations: ${axeSummary(priceA11y)}`);
+  await page.locator("#close-price-prompt").click();
+  await verifyToolSpendFlow(page, { mobile: true });
 
   assert(observed.egress.length === 0, `mobile: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `mobile: browser errors: ${observed.errors.join(" | ")}`);

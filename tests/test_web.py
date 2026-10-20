@@ -48,7 +48,7 @@ def test_web_assets_and_brand_contract_are_present():
         in html
     )
     assert "Set the decision rules" in html
-    assert html.count("data-builder-mode=") == 8
+    assert html.count("data-builder-mode=") == 9
     assert "Price a prompt" in html
     assert "Review AI usage" in html
     assert 'data-builder-mode="single"' in html

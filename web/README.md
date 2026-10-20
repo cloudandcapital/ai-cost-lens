@@ -36,7 +36,9 @@ For route comparisons, the receipt breaks recurring model, infrastructure, and h
 
 Request-log findings can flag a session with at least 20 steps and at least 20% of comparable priced request cost. This is a trace review prompt, with no avoidable-savings number. A terminal outcome in the same session connects intermediate steps to session-level outcome evidence, without treating every step as independently quality reviewed.
 
-The opening presents seven paths:
+The opening includes the following paths:
+
+**Review my AI tools** also accepts up to twelve manually entered subscription and extra-usage charges, one service period, one currency, and one cost basis. Every charge needs a source reference; an owner is optional. The user confirms that included usage, duplicate charges, and prepaid credits are not added again. Annual bills or other periods must be reviewed separately, or entered on an explicitly allocated basis with a documented method. The resulting record reuses the validated single-bill contract with `config.toolSpend` provenance; reopening recomputes its financial rows and rejects mismatched entries. It never infers utilization, unused seats, full operating cost, or savings. Save the baseline before testing one plan on comparable work.
 
 - **Price a prompt** opens the local direct-API pricing workspace without requiring a bill or review file.
 - **Review AI usage** opens the request-log analysis path for local CSV or JSON records and includes a one-click illustrative walkthrough.

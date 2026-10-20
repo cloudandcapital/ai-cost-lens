@@ -184,12 +184,24 @@ async function assertFresh(nextMode) {
   assert.equal(el('invoice-pdf-status').hidden,true);
   assert.equal(el('invoice-amount-choice-label').hidden,true);
   await mode(nextMode);
-  for (const name of ['single','workload','openai']) {
+  for (const name of ['single','workload','openai','tools']) {
     for (const input of el(name + '-builder-fields').querySelectorAll('input')) {
       if (name !== nextMode) assert.equal(input.disabled,true,input.id);
     }
   }
 }
+await assertFresh('tools');
+for (const [id,value] of Object.entries({'tools-name':'Team tools','tools-currency':'USD','tools-start':'2026-10-01','tools-end':'2026-10-20','tools-basis':'provider_reported','tool-name-1':'Writing plan','tool-kind-1':'subscription','tool-amount-1':'20','tool-source-1':'October invoice','tool-name-2':'Writing plan','tool-kind-2':'usage','tool-amount-2':'5','tool-source-2':'Separate usage charge'})) el(id).value = value;
+el('tools-scope').checked = true;
+await submit();
+assert.equal(api.state.data.config.reviewSource,'tool_spend');
+assert.match(el('bill-finding-title').textContent,/\$25\.00/);
+assert.equal(el('tool-spend-result').hidden,false);
+const savedTools = api.state.data;
+await click('bill-compare-next');
+assert.equal(api.state.builderMode,'simple');
+assert.equal(api.state.data,savedTools,'Opening a comparison keeps the existing baseline until a valid new review is built');
+assert.equal(el('simple-current-cost').value,'','Do not silently allocate the combined baseline to one tool');
 await assertFresh('workload');
 await file('spend-file',spend); await file('work-file',work); await outcome('detailed');
 await submit(); assert.equal(api.state.data.schema_version,'ai-cost-lens-review-result/1.0');
