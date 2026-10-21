@@ -3012,6 +3012,12 @@
     document.getElementById("payback-basis-note").textContent = `This scenario holds output at ${compact(payback.expected_ready_results_per_month)} ready results per month on both routes. The recurring-total difference above compares each route at its own observed yield; the figures answer different questions.`;
   }
 
+  function metricValueMarkup(value) {
+    const parts = String(value).split(" → ");
+    if (parts.length !== 2) return escapeHtml(value);
+    return `<span class="metric-pair"><span class="metric-amount">${escapeHtml(parts[0])}</span><span class="metric-destination"><span class="metric-direction">→</span><span class="metric-amount">${escapeHtml(parts[1])}</span></span></span>`;
+  }
+
   function renderSimpleReview() {
     const { baseline, proposed, comparison, workload, period, mode } = state.data;
     const simple = state.data.experience === "simple";
@@ -3088,7 +3094,8 @@
     if (proposed.costs.one_time_change_cost > 0) {
       bars.push({
         className: "pilot",
-        label: `${proposed.label}, first period`,
+        label: proposed.label,
+        periodLabel: "First period",
         note: "Includes one time change cost",
         value: proposed.measures.all_in_cost_per_usable_result,
       });
@@ -3108,7 +3115,7 @@
         (bar) => `
           <div class="bar-row ${bar.className}">
             <div class="bar-label">
-              <strong>${escapeHtml(bar.label)}</strong>
+              <strong>${escapeHtml(bar.label)}${bar.periodLabel ? ` <span class="bar-period">${escapeHtml(bar.periodLabel)}</span>` : ""}</strong>
               <small>${escapeHtml(bar.note)}</small>
             </div>
             <div class="bar-track" aria-hidden="true">
@@ -3154,7 +3161,7 @@
         (item) => `
           <div class="metric-cell">
             <span>${escapeHtml(item.label)}</span>
-            <strong>${escapeHtml(item.value)}</strong>
+            <strong>${metricValueMarkup(item.value)}</strong>
             <small>${escapeHtml(item.note)}</small>
           </div>`,
       )
@@ -3353,7 +3360,8 @@
     if (proposed.costs.one_time_change_cost > 0) {
       bars.push({
         className: "pilot",
-        label: `${proposed.label}, first period`,
+        label: proposed.label,
+        periodLabel: "First period",
         note: "Includes one time change cost",
         value: proposed.measures.all_in_cost_per_usable_result,
       });
@@ -3373,7 +3381,7 @@
         (bar) => `
           <div class="bar-row ${bar.className}">
             <div class="bar-label">
-              <strong>${escapeHtml(bar.label)}</strong>
+              <strong>${escapeHtml(bar.label)}${bar.periodLabel ? ` <span class="bar-period">${escapeHtml(bar.periodLabel)}</span>` : ""}</strong>
               <small>${escapeHtml(bar.note)}</small>
             </div>
             <div class="bar-track" aria-hidden="true">
@@ -3419,7 +3427,7 @@
         (item) => `
           <div class="metric-cell">
             <span>${escapeHtml(item.label)}</span>
-            <strong>${escapeHtml(item.value)}</strong>
+            <strong>${metricValueMarkup(item.value)}</strong>
             <small>${escapeHtml(item.note)}</small>
           </div>`,
       )
