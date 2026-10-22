@@ -245,6 +245,9 @@ assert.equal(claude.totals.cachedInput, 200);
 assert.equal(claude.totals.cacheWriteInput, 100);
 assert.equal(claude.totals.outputTokens, 400);
 assert.equal(claudeApi.review.config.reviewSource, 'claude_admin_api');
+api.state.data = claudeApi.review; api.renderAll();
+assert.match(element('bill-model-rows').innerHTML,/\$0\.80/);
+assert.doesNotMatch(element('bill-model-rows').innerHTML,/\$0\.8000/);
 assert.doesNotMatch(JSON.stringify(claudeApi.review), /user_synthetic|key_synthetic|workspace_synthetic/);
 await assert.rejects(api.buildClaudeSpendReview(read('tests/fixtures/synthetic-claude-team-spend.csv').replace('1.20', '-1.20'), '2026-08-01', '2026-08-31'), /credits or refunds/);
 await assert.rejects(api.buildClaudeApiReview(read('tests/fixtures/synthetic-claude-usage-api.json').replace('false', 'true'), read('tests/fixtures/synthetic-claude-cost-api.json'), '2026-08-01', '2026-08-01'), /partial API page/);
@@ -567,7 +570,7 @@ assert.equal(allGatesPass.comparison.savings_claim_allowed, true);
 assert.doesNotMatch(allGatesPass.comparison.recommendation, /blocks a savings claim/);
 const stagedReviews = [
   [invoice, 'Start with the bill.', 'CRAWL · UNDERSTAND THE BILL', 'Use this bill as the cost baseline'],
-  [usageOnly, 'Where is the AI cost going?', 'WALK · EXPLAIN THE USAGE', 'blended cost per request'],
+  [usageOnly, 'Where is the AI cost going?', 'EXPLAIN THE USAGE', 'blended cost per request'],
   [completeSingle, 'What did the work actually cost?', 'RUN · CONNECT COST TO OUTCOMES', 'The provider cost per ready result is visible'],
   [noOverheads, 'What did the work actually cost?', 'RUN · CONNECT COST TO OUTCOMES', 'Human and shared cost are optional depth'],
 ];

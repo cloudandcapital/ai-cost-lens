@@ -177,7 +177,7 @@
                 <p class="kicker">THE JUDGMENT</p>
                 <h2 id="bill-ledger-title">What to act on, and what to leave alone</h2>
               </div>
-              <p>This separates what the bill proves from what still needs testing.</p>
+              <p id="bill-ledger-intro">This separates what the bill proves from what still needs testing.</p>
             </div>
             <div class="opportunity-ledger" id="bill-opportunity-ledger"></div>
           </section>
@@ -191,6 +191,7 @@
           </section>
           <div class="review-next-actions" id="bill-next-actions">
             <button class="build-button" id="bill-save-next" type="button">Save this baseline</button>
+            <button class="text-button" id="edit-tool-review" type="button" hidden>Edit these charges</button>
             <button class="text-button" id="bill-compare-next" type="button">Test a different tool or plan</button>
           </div>
         </section>
@@ -826,10 +827,11 @@
         <div class="memo-meta" id="memo-meta"></div>
       </header>
       <section class="memo-decision">
-        <p>FINANCE DECISION</p>
+        <p id="memo-decision-label">FINANCE DECISION</p>
         <strong id="memo-decision-code"></strong>
         <h2 id="memo-decision-title"></h2>
         <p id="memo-decision-limit"></p>
+        <p id="memo-switch-check" hidden></p>
       </section>
       <section class="memo-section">
         <div class="memo-section-heading">
@@ -961,7 +963,7 @@
               <label><span>Currency</span><input id="tools-currency" type="text" value="USD" maxlength="3" /></label>
               <label><span>Service-period start</span><input id="tools-start" type="date" /></label>
               <label><span>Service-period end / data through</span><input id="tools-end" type="date" /></label>
-              <label class="field-wide"><span>What do these amounts represent?</span><select id="tools-basis" required><option value="">Choose the source of these amounts</option><option value="provider_reported">Billed amounts I checked against my records</option><option value="calculated">Estimates for this period</option><option value="allocated">Allocated costs with a documented method</option></select><small>Choose explicitly for each new review. AI Cost Lens does not independently verify your records.</small></label>
+              <label class="field-wide"><span>What do these amounts represent?</span><select id="tools-basis" required aria-describedby="tools-basis-help tools-basis-error"><option value="">Choose the source of these amounts</option><option value="provider_reported">Billed amounts I checked against my records</option><option value="calculated">Estimates for this period</option><option value="allocated">Allocated costs with a documented method</option></select><small id="tools-basis-help">Choose explicitly for each new review. AI Cost Lens does not independently verify your records.</small><small class="field-error" id="tools-basis-error" hidden></small></label>
             </div>
           </div></section>
           <section class="builder-step"><div class="step-number">02</div><div>
@@ -1091,7 +1093,8 @@
             </div>
             <button class="text-button" id="add-tool-charge" type="button">Add another charge</button>
             <p id="tool-charge-status" role="status"></p>
-            <label class="check-field"><input id="tools-scope" type="checkbox" /><span>I checked that every amount covers the declared service period and currency, with no duplicated charges, included usage counted again, or prepaid credits treated as consumed usage.</span></label>
+            <label class="check-field"><input id="tools-scope" type="checkbox" aria-describedby="tools-scope-error" /><span>I checked that every amount covers the declared service period and currency, with no duplicated charges, included usage counted again, or prepaid credits treated as consumed usage.</span></label>
+            <p class="field-error" id="tools-scope-error" hidden></p>
           </div></section>
         </div>
 
@@ -1187,15 +1190,15 @@
                 <fieldset class="sample-route-card">
                   <legend>What you use now</legend>
                   <div class="simple-field-grid">
-                    <label><span>Tool or plan name</span><input id="simple-current-name" type="text" value="Current AI tool" aria-describedby="simple-current-name-error" /><small class="field-error" id="simple-current-name-error" hidden></small></label>
-                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-current-cost" type="number" min="0" step="0.01" value="40" aria-describedby="simple-current-cost-error" /></div><small class="field-error" id="simple-current-cost-error" hidden></small></label>
+                    <label><span>Tool or plan name</span><input id="simple-current-name" type="text" placeholder="The tool or plan you use" aria-describedby="simple-current-name-error" /><small class="field-error" id="simple-current-name-error" hidden></small></label>
+                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-current-cost" type="number" min="0" step="0.01" placeholder="Monthly amount" aria-describedby="simple-current-cost-error" /></div><small class="field-error" id="simple-current-cost-error" hidden></small></label>
                   </div>
                 </fieldset>
                 <fieldset class="sample-route-card">
                   <legend>The other option</legend>
                   <div class="simple-field-grid">
-                    <label><span>Tool or plan name</span><input id="simple-other-name" type="text" value="Lower-cost AI tool" aria-describedby="simple-other-name-error" /><small class="field-error" id="simple-other-name-error" hidden></small></label>
-                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-other-cost" type="number" min="0" step="0.01" value="20" aria-describedby="simple-other-cost-error" /></div><small class="field-error" id="simple-other-cost-error" hidden></small></label>
+                    <label><span>Tool or plan name</span><input id="simple-other-name" type="text" placeholder="The option you want to compare" aria-describedby="simple-other-name-error" /><small class="field-error" id="simple-other-name-error" hidden></small></label>
+                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-other-cost" type="number" min="0" step="0.01" placeholder="Monthly amount" aria-describedby="simple-other-cost-error" /></div><small class="field-error" id="simple-other-cost-error" hidden></small></label>
                   </div>
                 </fieldset>
               </div>
@@ -1206,22 +1209,22 @@
             <div>
               <h3 id="simple-work-title">Check a small sample of your work</h3>
               <p>Use the same kind of task for both tools. Count outputs usable without a significant fix. Successfully repaired outputs are excluded from this first-pass measure; it is not cost per final completed task. A small sample is directional, not proof.</p>
-              <label class="simple-volume-field"><span>About how many of these tasks do you complete per month?</span><input id="simple-monthly-tasks" type="number" min="1" step="1" value="40" aria-describedby="simple-monthly-tasks-error" /><small class="field-error" id="simple-monthly-tasks-error" hidden></small></label>
+              <label class="simple-volume-field"><span>About how many of these tasks do you complete per month?</span><input id="simple-monthly-tasks" type="number" min="1" step="1" placeholder="Your monthly task count" aria-describedby="simple-monthly-tasks-error" /><small class="field-error" id="simple-monthly-tasks-error" hidden></small></label>
               <div class="sample-route-grid">
                 <fieldset class="sample-route-card">
                   <legend>What you use now</legend>
                   <div class="sample-field-grid">
-                    <label><span>Outputs checked</span><input id="simple-current-checked" type="number" min="1" step="1" value="20" aria-describedby="simple-current-checked-error" /><small class="field-error" id="simple-current-checked-error" hidden></small></label>
-                    <label><span>Usable without a big fix</span><input id="simple-current-usable" type="number" min="0" step="1" value="19" aria-describedby="simple-current-usable-error" /><small class="field-error" id="simple-current-usable-error" hidden></small></label>
-                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-current-minutes" type="number" min="0" step="0.1" value="30" aria-describedby="simple-current-minutes-error" /><small class="field-error" id="simple-current-minutes-error" hidden></small></label>
+                    <label><span>Outputs checked</span><input id="simple-current-checked" type="number" min="1" step="1" aria-describedby="simple-current-checked-error" /><small class="field-error" id="simple-current-checked-error" hidden></small></label>
+                    <label><span>Usable without a big fix</span><input id="simple-current-usable" type="number" min="0" step="1" aria-describedby="simple-current-usable-error" /><small class="field-error" id="simple-current-usable-error" hidden></small></label>
+                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-current-minutes" type="number" min="0" step="0.1" aria-describedby="simple-current-minutes-error" /><small class="field-error" id="simple-current-minutes-error" hidden></small></label>
                   </div>
                 </fieldset>
                 <fieldset class="sample-route-card">
                   <legend>The other option</legend>
                   <div class="sample-field-grid">
-                    <label><span>Outputs checked</span><input id="simple-other-checked" type="number" min="1" step="1" value="20" aria-describedby="simple-other-checked-error" /><small class="field-error" id="simple-other-checked-error" hidden></small></label>
-                    <label><span>Usable without a big fix</span><input id="simple-other-usable" type="number" min="0" step="1" value="16" aria-describedby="simple-other-usable-error" /><small class="field-error" id="simple-other-usable-error" hidden></small></label>
-                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-other-minutes" type="number" min="0" step="0.1" value="200" aria-describedby="simple-other-minutes-error" /><small class="field-error" id="simple-other-minutes-error" hidden></small></label>
+                    <label><span>Outputs checked</span><input id="simple-other-checked" type="number" min="1" step="1" aria-describedby="simple-other-checked-error" /><small class="field-error" id="simple-other-checked-error" hidden></small></label>
+                    <label><span>Usable without a big fix</span><input id="simple-other-usable" type="number" min="0" step="1" aria-describedby="simple-other-usable-error" /><small class="field-error" id="simple-other-usable-error" hidden></small></label>
+                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-other-minutes" type="number" min="0" step="0.1" aria-describedby="simple-other-minutes-error" /><small class="field-error" id="simple-other-minutes-error" hidden></small></label>
                   </div>
                 </fieldset>
               </div>
@@ -1233,12 +1236,12 @@
               <h3 id="simple-time-title">Put a value on your time</h3>
               <p>This estimates the value of review and fixing time. It is not necessarily cash paid or money you could recover. Enter zero if you only want to compare tool charges.</p>
               <div class="field-grid compact-fields">
-                <label><span>What is an hour of your time worth?</span><div class="input-prefix"><em>$</em><input id="simple-hourly-rate" type="number" min="0" step="0.01" value="30" aria-describedby="simple-hourly-rate-error" /></div><small class="field-error" id="simple-hourly-rate-error" hidden></small></label>
-                <label><span>Minimum usable rate you would accept</span><div class="input-suffix"><input id="simple-quality-floor" type="number" min="1" max="100" step="0.1" value="80" aria-describedby="simple-quality-floor-error" /><em>%</em></div><small class="field-error" id="simple-quality-floor-error" hidden></small></label>
+                <label><span>What is an hour of your time worth?</span><div class="input-prefix"><em>$</em><input id="simple-hourly-rate" type="number" min="0" step="0.01" placeholder="Your hourly time value" aria-describedby="simple-hourly-rate-error" /></div><small class="field-error" id="simple-hourly-rate-error" hidden></small></label>
+                <label><span>Minimum usable rate you would accept</span><div class="input-suffix"><input id="simple-quality-floor" type="number" min="1" max="100" step="0.1" placeholder="Your minimum" aria-describedby="simple-quality-floor-error" /><em>%</em></div><small class="field-error" id="simple-quality-floor-error" hidden></small></label>
                 <label class="check-field field-wide"><input id="simple-approved" type="checkbox" /><span>I have confirmed both tools are okay to use for this work</span></label>
                 <p class="approval-change-note field-wide" id="simple-approval-note" role="status" hidden></p>
               </div>
-              <p class="sample-caveat" id="simple-example-caveat">The prefilled numbers are a small-business example. Replace them with your own before comparing.</p>
+              <p class="sample-caveat" id="simple-example-caveat">Enter your own costs and sample results. For a worked example, choose Explore an example on the welcome screen.</p>
             </div>
           </section>
         </div>

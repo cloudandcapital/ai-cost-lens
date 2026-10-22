@@ -94,10 +94,12 @@ async function openAdvancedChoices(page) {
   if (!(await choices.evaluate((element) => element.open))) await choices.locator("summary").click();
 }
 
-async function verifyFinanceMemoPdf(page) {
-  await page.locator("#start-review").click();
-  await openAdvancedChoices(page);
-  await page.locator('[data-builder-mode="example"]').click();
+async function verifyFinanceMemoPdf(page, { simple = false } = {}) {
+  if (!simple) {
+    await page.locator("#start-review").click();
+    await openAdvancedChoices(page);
+    await page.locator('[data-builder-mode="example"]').click();
+  }
   await page.waitForFunction(() => document.querySelector("#memo-decision-code")?.textContent?.trim());
   await page.evaluate(() => { window.print = () => {}; });
   await page.locator("#print-memo").click();
@@ -105,7 +107,7 @@ async function verifyFinanceMemoPdf(page) {
 
   const bytes = await page.pdf({ format: "Letter", preferCSSPageSize: true, printBackground: true });
   assert(bytes.subarray(0, 5).toString() === "%PDF-", "print output is not a PDF.");
-  await writeFile(join(output, "finance-memo-example.pdf"), bytes);
+  await writeFile(join(output, simple ? "finance-memo-simple.pdf" : "finance-memo-example.pdf"), bytes);
   const loadingTask = getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
   const document = await loadingTask.promise;
   assert(document.numPages >= 1 && document.numPages <= 3, `finance memo PDF has ${document.numPages} pages.`);
@@ -114,11 +116,20 @@ async function verifyFinanceMemoPdf(page) {
     const content = await (await document.getPage(index)).getTextContent();
     pages.push(content.items.map((item) => item.str).join(" "));
   }
-  const text = pages.join(" ").toLowerCase();
-  for (const expected of ["ai spend decision memo", "the other option does not meet", "provider cost", "cost per ready result", "what finance can rely on", "current cost vs plan", "monthly scenario compares route unit costs", "one time change cost", "month net after change cost", "not booked savings", "not supported"]) {
+  const text = pages.join(" ").toLowerCase().replace(/\s+/g, " ");
+  const required = simple
+    ? ["ai tool cost comparison", "cost finding", "before switching", "approval: you confirmed", "monthly tool cost", "time value at $30/hr", "$150", "$300", "cost per usable result", "not booked savings"]
+    : ["ai spend decision memo", "the other option does not meet", "provider cost", "cost per ready result", "what finance can rely on", "current cost vs plan", "monthly scenario compares route unit costs", "one time change cost", "month net after change cost", "not booked savings", "not supported"];
+  for (const expected of required) {
     assert(text.includes(expected), `finance memo PDF is missing ${expected}.`);
   }
+  if (simple) {
+    for (const forbidden of ["keep current route", "stop change", "cost per ready result", "provider cost"]) {
+      assert(!text.includes(forbidden), `simple memo retained unrelated wording: ${forbidden}.`);
+    }
+  }
   await loadingTask.destroy();
+  if (simple) await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
   return { pages: pages.length, bytes: bytes.length };
 }
 
@@ -229,8 +240,12 @@ async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false } =
   await page.locator("#tool-kind-3").selectOption("usage");
   await page.locator("#tool-amount-3").fill("3.25");
   await page.locator("#tool-source-3").fill("Separate usage charge");
-  await page.locator("#tools-scope").check();
+  await page.locator("#build-review").click();
+  assert(await page.locator("#tools-basis-error").isVisible() && await page.locator("#tools-basis").evaluate((element) => element === document.activeElement), "Missing cost basis was not explained at the focused field.");
   await page.locator("#tools-basis").selectOption("provider_reported");
+  await page.locator("#build-review").click();
+  assert(await page.locator("#tools-scope-error").isVisible() && await page.locator("#tools-scope").evaluate((element) => element === document.activeElement), "Missing charge boundary was not explained at the focused checkbox.");
+  await page.locator("#tools-scope").check();
   await page.locator("#build-review").click();
   await page.locator("#tool-spend-result").waitFor({ state: "visible" });
   assert((await page.locator("#bill-finding-title").innerText()).includes("$68.25"), "AI tool total did not reconcile.");
@@ -263,6 +278,13 @@ async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false } =
     await page.locator("#tool-spend-result").waitFor({ state: "visible" });
     assert((await page.locator("#bill-finding-title").innerText()).includes("$68.25"), "Reopening changed the AI tool baseline.");
   }
+  await page.locator("#edit-tool-review").click();
+  assert(await page.locator("#tool-amount-1").inputValue() === "20" && await page.locator("#tool-source-3").inputValue() === "Separate usage charge", "Editing the tools baseline lost a charge or source reference.");
+  await page.locator("#tool-amount-1").fill("25");
+  assert(!(await page.locator("#tools-scope").isChecked()), "Changed charges retained the old scope confirmation.");
+  await page.locator("#tools-scope").check();
+  await page.locator("#build-review").click();
+  assert((await page.locator("#bill-finding-title").innerText()).includes("$73.25"), "Editing one tool did not retain and recalculate the other charges.");
   await page.locator("#bill-compare-next").click();
   assert(await page.locator("#simple-builder-fields").isVisible(), "AI tool review did not open a tool comparison.");
   assert(await page.locator("#simple-current-cost").inputValue() === "", "Combined spending was silently allocated to a single tool.");
@@ -297,12 +319,15 @@ async function verifyEditableComparison(page, { mobile = false } = {}) {
   await page.locator("#edit-simple-comparison").click();
   assert(await page.locator("#simple-current-cost").inputValue() === "80" && await page.locator("#simple-other-minutes").inputValue() === "120", "Editing replaced entered values.");
   await page.locator("#simple-other-usable").fill("21");
+  const checkedHeight = (await page.locator("#simple-other-checked").boundingBox()).height;
   await page.locator("#build-review").click();
-  assert((await page.locator("#builder-error").innerText()).includes("greater than the number you checked"), "Invalid usable counts were accepted.");
+  assert((await page.locator("#simple-other-usable-error").innerText()).includes("greater than the number you checked"), "Invalid usable counts were accepted.");
   assert((await page.locator("#simple-other-usable-error").innerText()).includes("Plan B"), "The error does not identify the option.");
   assert(await page.locator("#simple-other-usable").getAttribute("aria-invalid") === "true", "The invalid field was not marked.");
   assert(await page.locator("#simple-other-usable").evaluate((element) => element === document.activeElement), "The error did not focus its field.");
+  assert(Math.abs((await page.locator("#simple-other-checked").boundingBox()).height - checkedHeight) <= 1, "A neighboring field stretched when the error appeared.");
   await page.locator("#simple-other-usable").fill("16");
+  assert(!(await page.locator("#simple-other-usable-error").isVisible()) && await page.locator("#simple-other-usable").getAttribute("aria-invalid") === "false", "The corrected field kept a stale error.");
   await page.locator("#build-review").click();
   if (mobile) await page.locator("#header-menu-toggle").click();
   const saved = await saveJsonDownload(page, "#download-review", "editable-comparison.json");
@@ -310,6 +335,19 @@ async function verifyEditableComparison(page, { mobile = false } = {}) {
   assert(saved.comparison.savings_claim_allowed === false, "A sample comparison claimed savings.");
   assert(saved.baseline.outcomes.ready_rate_interval_95 === null && saved.proposed.outcomes.ready_rate_interval_95 === null, "A user-selected sample exported a statistical interval.");
   assert(saved.comparison.finding.includes("Plan A has the lower estimated cost"), "The exported comparison lost its visible cost finding.");
+  assert(saved.comparison.decision_code === "COMPARE ESTIMATES" && saved.comparison.finance_posture === "ESTIMATE ONLY", "The simple export retained a route-change verdict.");
+  assert(saved.comparison.summary.cost_finding === await page.locator("#simple-cost-finding").innerText(), "The file and screen disagree on the cost finding.");
+  assert(saved.comparison.normalized_cost_difference_context.includes("not the monthly cost change, cash savings"), "The normalized diagnostic has no financial boundary.");
+  assert((await page.locator("#unit-economics-card").innerText()).includes("Time value at $30/hr"), "The result hides the time value behind its total.");
+  await page.locator("#edit-simple-comparison").click();
+  await page.locator("#simple-approved").check();
+  await page.locator("#build-review").click();
+  assert((await page.locator("#simple-switch-check").innerText()).includes("Approval: you confirmed"), "Confirmed approval disappeared from the result.");
+  assert(await page.locator("#review-title").evaluate((element) => element === document.activeElement), "A completed comparison did not focus its result heading.");
+  if (!mobile && page.context().browser().browserType().name() === "chromium") {
+    await page.screenshot({ path: join(output, "comparison-followup.png") });
+    await verifyFinanceMemoPdf(page, { simple: true });
+  }
   await page.reload();
   await page.locator("#welcome-title").waitFor({ state: "visible" });
   if (mobile) await page.locator("#header-menu-toggle").click();
@@ -342,6 +380,14 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.goto(origin, { waitUntil: "networkidle" });
   await page.locator("#welcome-title").waitFor({ state: "visible" });
   assert(!(await page.locator("#review-title").isVisible()), `${engineName}: the advanced example displaced the welcome screen.`);
+  await page.locator("#start-review").click();
+  await openAdvancedChoices(page);
+  await page.locator('[data-builder-mode="usage"]').click();
+  assert(await page.locator("#request-log-file").isVisible() && !(await page.locator("#request-analysis-results").isVisible()), `${engineName}: standalone usage did not start with its own empty input.`);
+  for (const selector of ["#opportunity-summary", "#opportunity-workbench-list", "#download-review", ".question-nav", "#back-to-bill"]) {
+    assert(!(await page.locator(selector).isVisible()), `${engineName}: standalone usage exposes an unrelated example or review action: ${selector}.`);
+  }
+  await page.reload({ waitUntil: "networkidle" });
   await page.locator("#welcome-example").click();
   await page.locator('[data-example="growth"]').click();
   assert((await page.locator("#workload-name").innerText()) === "Growing support AI workload", `${engineName}: startup example did not open.`);
@@ -472,8 +518,11 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#close-price-prompt").click();
   await page.locator("#start-review").click();
   await page.locator('[data-builder-mode="simple"]').click();
-  assert((await page.locator("#simple-example-caveat").innerText()).includes("small-business example"),
-    `${engineName}: sample-only Review path retained the prompt-estimate caveat.`);
+  assert((await page.locator("#simple-example-caveat").innerText()).includes("Enter your own costs"),
+    `${engineName}: a fresh comparison retained the prompt-estimate caveat.`);
+  for (const selector of ["#simple-current-cost", "#simple-current-checked", "#simple-other-usable", "#simple-hourly-rate", "#simple-quality-floor"]) {
+    assert(await page.locator(selector).inputValue() === "", `${engineName}: example numbers were prefilled as user inputs.`);
+  }
   await page.locator("#close-review").click();
 
   await page.locator("#review-usage").click();
@@ -576,6 +625,11 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#try-customer-economics").click();
   assert((await page.locator("#customer-revenue-result").innerText()).toLowerCase().includes("allocated operating cost"), `${engineName}: entered human cost was not available for explicit allocation. Error: ${await page.locator("#customer-revenue-error").innerText()}`);
   if (engineName === "chromium") {
+    // Standalone usage intentionally hides the unrelated decision navigation.
+    // Open an explicitly labeled example before checking the advanced archive.
+    await page.locator("#start-review").click();
+    await openAdvancedChoices(page);
+    await page.locator('[data-builder-mode="example"]').click();
     await page.locator('[data-view="evidence"]').click();
     const workspace = await saveJsonDownload(page, "#download-workspace", "workspace-archive.json");
     assert(workspace.schema_version === "ai-cost-lens-workspace/1.0" && workspace.request_review?.event_count === 7 && workspace.customer_cost_to_serve?.analysis?.customers?.length, "Workspace archive lost imported request or customer analysis.");
@@ -687,6 +741,9 @@ async function mobileAndAccessibility(origin) {
   await page.locator("#welcome-title").waitFor({ state: "visible" });
   const welcomeA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   assert(welcomeA11y.violations.length === 0, `mobile welcome accessibility violations: ${axeSummary(welcomeA11y)}`);
+  for (const selector of ["#welcome-compare", "#welcome-spending", "#header-menu-toggle"]) {
+    assert((await page.locator(selector).boundingBox()).height >= 44, `mobile touch target is shorter than 44px: ${selector}.`);
+  }
   await page.locator("#welcome-example").click();
 
   assert(await page.locator("#header-menu-toggle").isVisible(), "mobile: menu toggle is not visible.");
