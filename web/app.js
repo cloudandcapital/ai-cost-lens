@@ -4171,7 +4171,7 @@
       });
       state.usageReview = review;
       state.usageReviewIllustrative = illustrative;
-      state.usageReviewBill = document.body.classList.contains("bill-usage-mode") && !illustrative ? state.data : null;
+      state.usageReviewBill = document.body.classList.contains("bill-usage-mode") && !illustrative && [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version) ? state.data : null;
       renderRequestAnalysis(review);
       document.getElementById("request-analysis-results").scrollIntoView({ behavior: "smooth", block: "start" });
       showToast(illustrative
@@ -5842,6 +5842,12 @@
       state.hasStarted = true;
       document.body.classList.remove("welcome-mode");
       document.getElementById("lens-welcome").hidden = true;
+      if (state.data?.experience === "simple" && state.carriedBillIntoUsage) {
+        document.getElementById("request-billed-total").value = "";
+        document.getElementById("request-billed-currency").value = "";
+        document.getElementById("request-bill-scope-confirmed").checked = false;
+        state.carriedBillIntoUsage = false;
+      }
       const fromBill = [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version) || state.data?.experience === "simple";
       if (fromBill) {
         if (state.data.schema_version === singleBillSchema) {
@@ -5858,6 +5864,7 @@
         }
         document.body.classList.add("bill-usage-mode");
         document.getElementById("back-to-bill").hidden = false;
+        document.getElementById("back-to-bill").textContent = state.data.experience === "simple" ? "Return to comparison" : "Back to bill review";
         document.getElementById("bill-review-screen").classList.remove("active");
         document.getElementById("view-opportunities").classList.add("active");
         reviewDialog.close();

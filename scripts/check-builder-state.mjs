@@ -553,6 +553,17 @@ assert(document.querySelectorAll('.nav-item').filter((item)=>!item.hidden).every
 assert.match(el('finding-title').textContent,/Review plan A has the lower estimated cost/);
 assert.match(el('lumen-panel-copy').textContent,/\$2\.56[\s\S]*\$4\.25[\s\S]*approval/);
 const editableRecord=JSON.stringify(api.state.data);
+// A separate usage review must not inherit a former bill's amount from another workflow.
+api.state.carriedBillIntoUsage=true;
+el('request-billed-total').value='999'; el('request-billed-currency').value='USD';
+el('request-bill-scope-confirmed').checked=true;
+await click('start-review'); await mode('usage');
+assert.equal(el('request-billed-total').value,'');
+assert.equal(el('request-bill-scope-confirmed').checked,false);
+assert.equal(el('back-to-bill').textContent,'Return to comparison');
+await click('back-to-bill');
+assert.equal(api.state.data.baseline.costs.recurring_operating_cost,230);
+assert.equal(api.state.view,'review');
 const olderRanges=JSON.parse(editableRecord);
 for (const side of ['baseline','proposed']) olderRanges[side].outcomes.ready_rate_interval_95=[0.1,0.99];
 await file('review-file',JSON.stringify(olderRanges),'older-user-selected-sample.json');
