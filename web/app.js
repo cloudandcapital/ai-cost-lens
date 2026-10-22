@@ -33,6 +33,7 @@
     growthPlannerRecord: null,
     growthPlannerReview: null,
     breakEvenReady: false,
+    hasStarted: false,
   };
 
   const simpleInputIds = [
@@ -232,6 +233,7 @@
       observed: "observed",
       calculated: "calculated",
       allocated: "allocated",
+      user_entered: "user_entered",
     };
     const declared = new Set(
       spend.map((row, index) => {
@@ -239,7 +241,7 @@
         const basis = aliases[raw];
         if (!basis) {
           throw new Error(
-            `Spend ${period} row ${index + 2} cost_basis must be provider_reported, calculated, or allocated.`,
+            `Spend ${period} row ${index + 2} cost_basis must be provider_reported, calculated, allocated, or user_entered.`,
           );
         }
         return basis;
@@ -252,6 +254,7 @@
   }
 
   function costBasisLabel(basis) {
+    if (basis === "user_entered") return "User-entered cost (unverified)";
     if (basis === "observed") return "Provider reported cost";
     if (basis === "calculated") return "Calculated cost";
     if (basis === "allocated") return "Allocated cost";
@@ -370,6 +373,8 @@
   }
 
   async function buildToolSpendReview(items, options) {
+    if (!["provider_reported", "calculated", "allocated"].includes(options.basis)) throw new Error("Choose what the amounts represent before building your review.");
+    if (!options.scopeConfirmed) throw new Error("Confirm that these charges cover the same period and do not overlap.");
     const normalized = normalizeToolCharges(items);
     const config = { reviewSource: "tool_spend", serviceStart: options.start, serviceEnd: options.end,
       toolSpend: { name: safeImportedLabel(options.name, "Review name"), currency: String(options.currency).trim().toUpperCase(),
@@ -668,7 +673,8 @@
     requireColumns(spend, singleSpendColumns, "Universal spend");
     const work = workText.trim() ? parseCsv(workText, "Outcome log") : [];
     if (work.length) requireColumns(work, singleWorkColumns, "Outcome log");
-    const data = { schema_version: singleBillSchema, mode: "real", source: { spend, work }, config: {
+    const manual = ["invoice_form", "invoice_pdf"].includes(config.reviewSource);
+    const data = { schema_version: singleBillSchema, mode: manual ? "user_entered" : "real", source: { spend, work }, config: {
       acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", ...config,
     } };
     const summary = summarizeSingleBill(data);
@@ -1234,7 +1240,7 @@
           },
           sample_size: sampleSize,
           sample_method: config.sampleRandom ? "declared random or systematic" : "user selected",
-          ready_rate_interval_95: [intervalLow, intervalHigh],
+          ready_rate_interval_95: config.sampleRandom ? [intervalLow, intervalHigh] : null,
           human_review_minutes: round(projectedHumanMinutes),
           sample_human_minutes: round(sampleMinutes),
           review_minutes: round(projectedHumanMinutes),
@@ -1644,7 +1650,7 @@
     const summary = summarizeSingleBill(review);
     return { review, confirmation: {
       provider: "Anthropic", period, products: [...new Set(rows.map((row) => row.route))], models: [...new Set(rows.map((row) => row.model))],
-      providerCost: summary.totals.providerCost, requests: summary.totals.reported.requests, inputTokens: summary.totals.reported.processedInput,
+      providerCost: summary.totals.providerCost, costBasis: "net", requests: summary.totals.reported.requests, inputTokens: summary.totals.reported.processedInput,
       outputTokens: summary.totals.reported.outputTokens, coverage: summary.totals.coverage, missing: ["Cache values", "Retries", "Human effort", "Outcomes"],
       sourceRows: raw.length, identifiersDiscarded: true,
     } };
@@ -1999,6 +2005,8 @@
     if (csvs.length) {
       const item = csvs[0];
       const normalized = new Set(item.parsed.normalized);
+      if (openAICostColumns.every((column) => item.parsed.headers.includes(column))) throw new Error("This is an OpenAI cost export. Add its Usage Dashboard activity CSV too; both files are needed to check the reporting periods.");
+      if (openAIUsageColumns.every((column) => item.parsed.headers.includes(column))) throw new Error("This is an OpenAI activity export. Add its Usage Dashboard cost CSV too; both files are needed to check the reporting periods.");
       if (claudeSpendColumns.every((column) => normalized.has(column))) return { kind: "claude_spend", text: item.text };
       if (singleSpendColumns.every((column) => item.parsed.headers.includes(column))) {
         if (item.parsed.rows.some((row) => String(row.period).toLowerCase() !== "baseline")) {
@@ -2130,7 +2138,7 @@
           },
           sample_size: sampleSize,
           sample_method: config.sampleRandom ? "declared random or systematic" : "user selected",
-          ready_rate_interval_95: [intervalLow, intervalHigh],
+          ready_rate_interval_95: config.sampleRandom ? [intervalLow, intervalHigh] : null,
           human_review_minutes: round(projectedHumanMinutes),
           sample_human_minutes: round(sampleMinutes),
           review_minutes: round(projectedHumanMinutes),
@@ -2287,11 +2295,13 @@
         if (!Number.isSafeInteger(o.sample_size) || !o.sample_size || o.sample_size > o.completed_results) fail();
         const counts = ["ready_to_use", "needs_correction", "needs_escalation"].map(key => o.sample_counts[key]);
         if (counts.some(n => !Number.isSafeInteger(n) || n < 0) || counts.reduce((a,b) => a+b,0) !== o.sample_size || !close(m.usable_result_rate, counts[0] / o.sample_size)) fail();
+        o.ready_rate_interval_95 = o.sample_method === "declared random or systematic" ? wilsonInterval(counts[0], o.sample_size) : null;
       }
     }
     if (data.experience === "simple") {
       for (const scenario of [data.baseline, data.proposed]) {
         if (typeof scenario.model.name === "string" && scenario.model.name.trim()) scenario.label = scenario.model.name.trim();
+        scenario.evidence.cost_basis = data.pricing_estimate ? "calculated" : "user_entered";
       }
       if (data.simple_input_snapshot && !simpleInputSnapshotMatches(data)) fail();
     }
@@ -2314,6 +2324,7 @@
     c.recommendation = decision.reason;
     c.decision_code = decision.code;
     c.finance_posture = decision.posture;
+    if (data.experience === "simple") c.finding = simpleCostRead(data).headline;
   }
 
   function validateResult(data) {
@@ -2365,8 +2376,14 @@
       for (const row of [...data.source.spend, ...data.source.work]) {
         Object.values(row).forEach((value) => shape(value, "string", "source row"));
       }
+      const manual = ["invoice_form", "invoice_pdf"].includes(data.config.reviewSource);
+      // Older manual records used provider_reported. Do not preserve that stronger claim on reopen/export.
+      if (manual) {
+        data.mode = "user_entered";
+        data.source.spend.forEach((row) => { row.cost_basis = "user_entered"; });
+      }
       const summary = summarizeSingleBill(data);
-      if (data.mode !== "real" || data.currency !== summary.currency || data.period.start !== summary.period.start || data.period.end !== summary.period.end) fail("single bill metadata");
+      if (data.mode !== (manual ? "user_entered" : "real") || data.currency !== summary.currency || data.period.start !== summary.period.start || data.period.end !== summary.period.end) fail("single bill metadata");
       return data;
     }
     if (data?.schema_version === "ai-cost-lens-openai-bill-review/0.1") {
@@ -2447,8 +2464,11 @@
       }
       validDate(scenario.evidence.observed_at, `${key} observed date`);
       if (scenario.outcomes.basis === "sampled" || scenario.outcomes.sample_counts !== undefined) {
-        shape(scenario.outcomes, { sample_counts: counts, ...fields("sample_size sample_human_minutes"), sample_method: "string", ready_rate_interval_95: ["number"] }, `${key}.sample`);
-        if (scenario.outcomes.sample_size <= 0 || scenario.outcomes.ready_rate_interval_95.length !== 2) fail(`${key}.sample`);
+        shape(scenario.outcomes, { sample_counts: counts, ...fields("sample_size sample_human_minutes"), sample_method: "string" }, `${key}.sample`);
+        const o = scenario.outcomes;
+        const sampleCounts = Object.values(o.sample_counts);
+        if (!Number.isSafeInteger(o.sample_size) || o.sample_size <= 0 || sampleCounts.some((n) => !Number.isSafeInteger(n) || n < 0) || sampleCounts.reduce((a, b) => a + b, 0) !== o.sample_size) fail(`${key}.sample`);
+        o.ready_rate_interval_95 = o.sample_method === "declared random or systematic" ? wilsonInterval(o.sample_counts.ready_to_use, o.sample_size) : null;
       }
     }
     if (data.mode !== "illustrative") {
@@ -2503,6 +2523,7 @@
 
   function renderYieldRoute(scenario) {
     const counts = outcomeCounts(scenario);
+    const readyLabel = state.data.experience === "simple" ? "usable without a big fix" : "ready to use";
     const shares = [counts.ready, counts.correction, counts.escalation].map(
       (value) => (counts.completed ? (value / counts.completed) * 100 : 0),
     );
@@ -2517,13 +2538,13 @@
           <strong>${escapeHtml(scenario.label)}</strong>
           <span>${compact(counts.completed)} ${counts.sampled ? "reviewed" : "attempts"}</span>
         </div>
-        <div class="yield-bar" role="img" aria-label="${perHundred[0]} ready to use, ${perHundred[1]} need correction, and ${perHundred[2]} need escalation for every 100 ${counts.sampled ? "sampled results" : "attempts"}">
+        <div class="yield-bar" role="img" aria-label="${perHundred[0]} ${readyLabel}, ${perHundred[1]} need correction, and ${perHundred[2]} need escalation for every 100 ${counts.sampled ? "sampled results" : "attempts"}">
           <div class="yield-ready" style="width:${shares[0].toFixed(2)}%"></div>
           <div class="yield-correction" style="width:${shares[1].toFixed(2)}%"></div>
           <div class="yield-escalation" style="width:${shares[2].toFixed(2)}%"></div>
         </div>
         <div class="yield-legend">
-          <div><strong>${perHundred[0]}</strong><span>ready to use</span></div>
+          <div><strong>${perHundred[0]}</strong><span>${readyLabel}</span></div>
           <div><strong>${perHundred[1]}</strong><span>need correction</span></div>
           <div><strong>${perHundred[2]}</strong><span>need escalation</span></div>
         </div>
@@ -2600,7 +2621,7 @@
       </div>
       <div class="decision-table-wrap" role="region" aria-label="Route decision comparison" tabindex="0">
         <table class="decision-table">
-          <thead><tr><th>Metric</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Change</th><th>What it includes</th></tr></thead>
+          <thead><tr><th>Metric</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Change</th></tr></thead>
           <tbody>
             ${metricRows.map((row) => `
               <tr class="${row.emphasis ? "decision-row" : ""}">
@@ -2608,11 +2629,11 @@
                 <td data-label="${escapeHtml(baseline.label)}">${escapeHtml(row.current)}</td>
                 <td data-label="${escapeHtml(proposed.label)}">${escapeHtml(row.proposed)}</td>
                 <td data-label="Change">${escapeHtml(row.change)}</td>
-                <td data-label="What it includes">${escapeHtml(row.meaning)}</td>
               </tr>`).join("")}
           </tbody>
         </table>
       </div>
+      <details class="simple-table-notes"><summary>What these numbers include</summary><dl>${metricRows.map((row) => `<div><dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.meaning)}</dd></div>`).join("")}</dl><p>Time value = sample minutes ÷ checked outputs × monthly tasks ÷ 60 × hourly value. Cost per usable result = (tool charge + time value) ÷ projected usable outputs. The sample is user-selected; no statistical range or realized savings is established.</p></details>
       <p class="table-boundary">${escapeHtml(
         comparison.savings_claim_allowed
           ? "The bill, ready result log, quality floor, policy, and cost basis reconcile."
@@ -2626,7 +2647,7 @@
       )}</p>`;
     document.getElementById("outcome-yield-card").innerHTML = `
       <div class="yield-header">
-        <div><span>OUTCOME YIELD</span><strong>For every 100 attempts</strong></div>
+        <div><span>USABLE WORK</span><strong>For every 100 outputs at these sample rates</strong></div>
         <span>QUALITY FLOOR ${pct(state.data.workload.accepted_quality_threshold)}</span>
       </div>
       ${renderYieldRoute(baseline)}
@@ -4150,7 +4171,7 @@
       });
       state.usageReview = review;
       state.usageReviewIllustrative = illustrative;
-      state.usageReviewBill = document.body.classList.contains("bill-usage-mode") && !illustrative ? state.data : null;
+      state.usageReviewBill = document.body.classList.contains("bill-usage-mode") && !illustrative && [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version) ? state.data : null;
       renderRequestAnalysis(review);
       document.getElementById("request-analysis-results").scrollIntoView({ behavior: "smooth", block: "start" });
       showToast(illustrative
@@ -4620,6 +4641,7 @@
             ["Cache-read share", cacheShare === null ? "Not supplied" : pct(cacheShare, 1), cacheShare === null && ["partial", "missing"].includes(totals.coverage.cachedInput.status) ? reportedCoverageNote(totals, "cachedInput", "Use only the cache fields reported by the source") : "Use only the cache fields reported by the source"],
           ];
     document.getElementById("bill-review-kicker").textContent = stage.kicker;
+    if (manualBill && stage.key === "bill") document.getElementById("bill-review-kicker").textContent = "YOUR COST BASELINE";
     document.getElementById("bill-review-title").textContent = stage.title;
     const sourceTitles = {
       invoice_form: "Amount you entered",
@@ -4649,7 +4671,7 @@
     document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td data-label="Provider / model / route">${escapeHtml(row.label)}</td><td data-label="Requests">${escapeHtml(reportedCoverageValue(row, "requests"))}</td><td data-label="Input / output">${escapeHtml(reportedCoverageValue(row, "processedInput"))} / ${escapeHtml(reportedCoverageValue(row, "outputTokens"))}</td><td data-label="Cache read / write">${escapeHtml(reportedCoverageValue(row, "cachedInput"))} / ${escapeHtml(reportedCoverageValue(row, "cacheWriteInput"))}</td><td data-label="Cost basis">${escapeHtml(basisLabel)}</td><td data-label="Declared cost">${cost(row.providerCost)}</td></tr>`).join("");
     document.getElementById("bill-opportunity-ledger").innerHTML = guidance.map(([kind, label, title, value, note]) => `<article class="opportunity-row state-${kind}"><span class="opportunity-state">${escapeHtml(label)}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(note)}</p></div><em>${escapeHtml(value)}</em></article>`).join("");
     document.getElementById("bill-next-step").textContent = stage.key === "bill"
-      ? "Keep this baseline. Add the next piece of data only when it answers a real decision."
+      ? "Save this baseline. Next period, add the previous bill to compare the change."
       : stage.key === "usage"
         ? "Investigate the largest visible cost driver, then test one bounded change."
         : "Use this as the current benchmark before comparing another model or route.";
@@ -4674,8 +4696,9 @@
     renderEvidenceSummary("bill-evidence-summary", [
       ["Service period", state.data.config.serviceStart ? `${period.start} to ${period.end}` : "Not declared; only supplied date buckets"],
       ["Cost source", basisLabel],
-      ["Records through", `${period.end} · supplied records, no live sync`],
+      [manualBill ? "Invoice date" : "Records through", manualBill ? state.data.source.spend[0].date : `${period.end} · supplied records, no live sync`],
     ]);
+    if (stage.key === "bill") document.getElementById("bill-usage-section").hidden = true;
     if (state.data.config.toolSpend) renderToolSpend(review);
   }
 
@@ -4777,7 +4800,9 @@
     const topProjectShare = topProject ? topProject.amount / bill.total : null;
     const costPerRequestLabel = costPerRequest === null ? "Unavailable" : money(costPerRequest, costPerRequest < 1 ? 4 : 2);
     const topRequestShareLabel = topRequestShare === null ? "Unavailable" : pct(topRequestShare, 1);
-    document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
+    document.getElementById("bill-period-label").textContent = period.aligned
+      ? `${period.start} to ${period.end} · ${period.timezone}`
+      : `Different periods · cost: ${period.cost_dates[0]} to ${period.cost_dates.at(-1)} · usage: ${period.usage_dates[0]} to ${period.usage_dates.at(-1)} · ${period.timezone}`;
     renderEvidenceSummary("bill-evidence-summary", [["Exported period", `${period.start} to ${period.end} · ${period.aligned ? "aligned UTC buckets" : "alignment needs checking"}`], ["Cost source", "Saved provider cost export · not independently verified"], ["Records through", `${period.end} · imported files, no live sync`]]);
     document.getElementById("bill-mode-tag").textContent = !period.aligned ? "PERIOD MISMATCH" : state.data.mode === "illustrative" ? "ILLUSTRATIVE COST AND USAGE" : "COST AND USAGE · NO SAVINGS CLAIM";
     document.getElementById("bill-finding-title").textContent =
@@ -5044,6 +5069,16 @@
 
   function renderAll() {
     validateResult(state.data);
+    if (state.data.mode !== "illustrative") state.hasStarted = true;
+    document.body.classList.toggle("welcome-mode", !state.hasStarted);
+    document.body.classList.toggle("simple-mode", state.data.experience === "simple");
+    if (state.data.experience === "simple") {
+      state.story = false;
+      document.body.classList.remove("story-mode");
+      document.getElementById("story-toggle").textContent = "Presentation view";
+    }
+    document.getElementById("lens-welcome").hidden = state.hasStarted;
+    document.getElementById("simple-decision-block").hidden = state.data.experience !== "simple";
     document.getElementById("simple-edit-actions").hidden = state.data.experience !== "simple" || !state.data.simple_input_snapshot;
     const exampleSwitcher = document.getElementById("example-switcher");
     exampleSwitcher.hidden = state.data.mode !== "illustrative";
@@ -5065,9 +5100,9 @@
     const isBill = isSingle || state.data.schema_version === "ai-cost-lens-openai-bill-review/0.1";
     const reviewNav = document.querySelector(".question-nav");
     const mobileNav = document.querySelector(".mobile-section-picker");
-    reviewNav.hidden = isBill;
-    mobileNav.hidden = isBill;
-    reviewNav.setAttribute("aria-hidden", String(isBill));
+    reviewNav.hidden = isBill || state.data.experience === "simple";
+    mobileNav.hidden = isBill || state.data.experience === "simple";
+    reviewNav.setAttribute("aria-hidden", String(isBill || state.data.experience === "simple"));
     reviewNav.querySelectorAll("button").forEach((button) => {
       button.disabled = isBill;
       button.tabIndex = isBill ? -1 : 0;
@@ -5090,7 +5125,7 @@
       renderOpenAIBill();
       return;
     }
-    const simpleViews = new Set(["review", "opportunities", "verify", "evidence"]);
+    const simpleViews = new Set(["review"]);
     const availableViews = state.data.experience === "simple"
       ? simpleViews
       : new Set([...document.querySelectorAll(".nav-item")].map((item) => item.dataset.view));
@@ -5102,7 +5137,7 @@
       option.disabled = !availableViews.has(option.value);
     });
     if (!availableViews.has(state.view)) state.view = "review";
-    document.getElementById("story-toggle").hidden = false;
+    document.getElementById("story-toggle").hidden = state.data.experience === "simple";
     const isSimple = state.data.experience === "simple";
     const isIllustrative = state.data.mode === "illustrative";
     renderEvidenceSummary("review-evidence-summary", [
@@ -5111,12 +5146,14 @@
       ["Evidence dates", isSimple ? "No dated billing records supplied" : isIllustrative ? "Invented example · no live sync" : `${[state.data.baseline, state.data.proposed].map((route) => `${route.label}: ${route.evidence.observed_at || "not supplied"}`).join(" · ")} · no live sync`],
     ]);
     renderReview();
-    renderAnatomy();
-    renderOpportunities();
-    renderScenarioSetup();
-    renderVerification();
-    renderEvidence();
-    prefillActuals();
+    if (!isSimple) {
+      renderAnatomy();
+      renderOpportunities();
+      renderScenarioSetup();
+      renderVerification();
+      renderEvidence();
+      prefillActuals();
+    }
     renderDecisionConsistency();
     setView(state.view);
   }
@@ -5127,11 +5164,12 @@
     const b = proposed.measures.cost_per_usable_result;
     const equal = Math.abs(b - a) < 0.000001;
     const cheaper = b < a ? proposed : baseline;
+    const format = (value) => value < 1 && data.currency === "USD" ? cents(value) : new Intl.NumberFormat("en-US", { style: "currency", currency: data.currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
     return {
       headline: equal
         ? "The estimated cost per usable result is the same."
         : `${cheaper.label} has the lower estimated cost per usable result.`,
-      detail: `${baseline.label}: ${unitMoney(a)}. ${proposed.label}: ${unitMoney(b)}. Tool charges and estimated time value are included.`,
+      detail: `${baseline.label}: ${format(a)}. ${proposed.label}: ${format(b)}. Tool charges and estimated time value are included.`,
     };
   }
 
@@ -5238,6 +5276,9 @@
     }
     if (state.data.experience === "simple") {
       const costRead = simpleCostRead(state.data);
+      document.getElementById("review-title").textContent = "Your AI cost comparison.";
+      document.getElementById("simple-cost-finding").textContent = `${costRead.headline} ${costRead.detail}`;
+      document.getElementById("simple-switch-check").textContent = decision.reason;
       document.getElementById("period-label").textContent = "Monthly scenario · billing dates not supplied";
       document.getElementById("memo-meta").textContent = "Monthly scenario · billing dates not supplied";
       document.getElementById("finding-title").textContent = costRead.headline;
@@ -5246,6 +5287,10 @@
       document.getElementById("lumen-panel-title").textContent = "What the numbers say";
       document.getElementById("lumen-panel-copy").textContent = `${costRead.detail} ${decision.reason}`;
       document.getElementById("lumen-signals").innerHTML = `<div><span>Current cost per usable result</span><strong>${escapeHtml(unitMoney(state.data.baseline.measures.cost_per_usable_result))}</strong></div><div><span>Other option</span><strong>${escapeHtml(unitMoney(state.data.proposed.measures.cost_per_usable_result))}</strong></div>`;
+      document.getElementById("memo-numbers-title").textContent = costRead.headline;
+      document.getElementById("memo-decision-limit").textContent = `Before switching: ${decision.reason} ${state.data.comparison.limitation}`;
+      document.getElementById("memo-plan-grid").replaceChildren();
+      document.getElementById("memo-plan-basis").textContent = "";
     }
   }
 
@@ -5623,6 +5668,7 @@
     const data = kind === "growth" ? state.growthDemoData : state.demoData;
     if (!data) { showToast("That example is still loading. Try again in a moment."); return; }
     state.data = cloneData(data);
+    state.hasStarted = true;
     state.view = "review";
     state.story = false;
     document.body.classList.remove("story-mode");
@@ -5695,12 +5741,39 @@
     state.priceEstimate = review.pricing_estimate ? cloneData(review.pricing_estimate) : null;
     document.getElementById("simple-example-caveat").textContent = "Your entered values are restored. Update what changed, then compare again. This remains an estimate, not verified savings.";
     reviewDialog.showModal();
+    focusBuilderPath();
+  }
+
+  function focusBuilderPath() {
+    if (!reviewDialog.open) return;
+    const firstIds = { simple: "simple-current-name", tools: "tools-name", single: "invoice-provider", openai: "smart-upload-files", workload: "spend-file" };
+    const fields = document.getElementById(`${state.builderMode}-builder-fields`);
+    fields.scrollIntoView({ block: "start" });
+    document.getElementById(firstIds[state.builderMode]).focus({ preventScroll: true });
+  }
+
+  function simpleInputError(id, message) {
+    const error = new Error(message);
+    error.fieldId = id;
+    return error;
+  }
+
+  function clearSimpleErrors() {
+    for (const id of simpleInputIds) {
+      document.getElementById(id).setAttribute("aria-invalid", "false");
+      const note = document.getElementById(`${id}-error`);
+      note.textContent = "";
+      note.hidden = true;
+    }
   }
 
   function resetBuilderStart() {
     // Reset only when beginning a new draft, never on submit or its failure.
     // Native reset restores declared defaults and empties every file input.
     builderForm.reset();
+    reviewDialog.classList.remove("has-builder-path");
+    clearSimpleErrors();
+    document.getElementById("simple-approval-note").hidden = true;
     for (let index = 1; index <= 12; index++) document.getElementById(`tool-charge-${index}`).hidden = index > 2;
     document.getElementById("add-tool-charge").disabled = false;
     document.getElementById("tool-charge-status").textContent = "";
@@ -5766,7 +5839,16 @@
     }
     if (mode === "usage") {
       state.builderMode = null;
-      const fromBill = [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version);
+      state.hasStarted = true;
+      document.body.classList.remove("welcome-mode");
+      document.getElementById("lens-welcome").hidden = true;
+      if (state.data?.experience === "simple" && state.carriedBillIntoUsage) {
+        document.getElementById("request-billed-total").value = "";
+        document.getElementById("request-billed-currency").value = "";
+        document.getElementById("request-bill-scope-confirmed").checked = false;
+        state.carriedBillIntoUsage = false;
+      }
+      const fromBill = [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version) || state.data?.experience === "simple";
       if (fromBill) {
         if (state.data.schema_version === singleBillSchema) {
           const bill = summarizeSingleBill(state.data);
@@ -5782,6 +5864,7 @@
         }
         document.body.classList.add("bill-usage-mode");
         document.getElementById("back-to-bill").hidden = false;
+        document.getElementById("back-to-bill").textContent = state.data.experience === "simple" ? "Return to comparison" : "Back to bill review";
         document.getElementById("bill-review-screen").classList.remove("active");
         document.getElementById("view-opportunities").classList.add("active");
         reviewDialog.close();
@@ -5845,7 +5928,9 @@
       document.getElementById("builder-action-note").textContent = "A monthly estimate including the value of your time. No files needed.";
       document.getElementById("build-review").textContent = "Compare my options";
     }
+    reviewDialog.classList.add("has-builder-path");
     syncBuilderControls();
+    focusBuilderPath();
   }
 
   document.getElementById("open-review").addEventListener("click", () => document.getElementById("review-file").click());
@@ -5854,6 +5939,11 @@
   document.getElementById("back-to-bill").addEventListener("click", () => {
     document.body.classList.remove("bill-usage-mode");
     document.getElementById("view-opportunities").classList.remove("active");
+    if (state.data?.experience === "simple") {
+      renderAll();
+      document.getElementById("review-title").focus();
+      return;
+    }
     document.getElementById("bill-review-screen").classList.add("active");
     if (state.data?.schema_version === singleBillSchema) renderSingleBill();
     document.getElementById("back-to-bill").hidden = true;
@@ -5869,7 +5959,14 @@
   document.getElementById("edit-simple-comparison").addEventListener("click", editSimpleComparison);
   for (const id of ["simple-current-name", "simple-other-name"]) {
     document.getElementById(id).addEventListener("input", () => {
+      const wasApproved = document.getElementById("simple-approved").checked;
       document.getElementById("simple-approved").checked = false;
+      if (wasApproved) {
+        const note = document.getElementById("simple-approval-note");
+        note.textContent = "The tool name changed, so approval was cleared. Confirm it again for these tools when appropriate.";
+        note.hidden = false;
+        showToast("Tool name changed. Approval needs confirming again.");
+      }
     });
   }
   for (const id of ["simple-current-name", "simple-other-name", "simple-current-cost", "simple-other-cost", "simple-monthly-tasks"]) {
@@ -5886,6 +5983,7 @@
     for (const id of ["simple-current-name", "simple-current-cost", "simple-other-name", "simple-other-cost"]) document.getElementById(id).value = "";
     document.getElementById("simple-example-caveat").textContent = "Enter the monthly costs for the specific tools or plans you want to compare. Your combined baseline is not copied or allocated to one tool. The quality sample below is illustrative until you replace it.";
     reviewDialog.showModal();
+    focusBuilderPath();
   });
   document.getElementById("add-tool-charge").addEventListener("click", () => {
     for (let index = 1; index <= 12; index++) {
@@ -5908,6 +6006,14 @@
   });
 
   document.getElementById("simple-change-path").addEventListener("click", resetBuilderStart);
+  document.getElementById("welcome-compare").addEventListener("click", () => {
+    resetBuilderStart();
+    activateBuilderMode("simple");
+    reviewDialog.showModal();
+    focusBuilderPath();
+  });
+  document.getElementById("welcome-spending").addEventListener("click", () => document.getElementById("start-review").click());
+  document.getElementById("welcome-example").addEventListener("click", () => openIllustrativeExample("cost-trap"));
 
   const pricePromptDialog = document.getElementById("price-prompt-dialog");
   const pricePromptForm = document.getElementById("price-prompt-form");
@@ -6519,7 +6625,7 @@
       }
       if (route.kind === "openai") {
         setImportProvider("openai");
-        status.textContent = "Recognized the matching OpenAI Usage Dashboard activity and cost CSV exports. Review the provider steps, then build.";
+        status.textContent = "Both OpenAI Usage Dashboard activity and cost CSV exports were found. Their reporting periods will be checked when you build the review.";
       } else if (route.kind === "claude_spend") {
         setImportProvider("claude");
         status.textContent = "Recognized a Claude Team/Enterprise spend report. Add its reporting-period dates below, then check the normalized review.";
@@ -6572,18 +6678,26 @@
           fields: Object.fromEntries(simpleInputIds.map((id) => [id, document.getElementById(id).value])),
           approved: document.getElementById("simple-approved").checked,
         };
-        const value = (id, label, options) => finiteNumber(document.getElementById(id).value, label, options);
+        clearSimpleErrors();
+        const value = (id, label, options) => {
+          try { return finiteNumber(document.getElementById(id).value, label, options); }
+          catch (error) { throw simpleInputError(id, error.message); }
+        };
         const currentName = document.getElementById("simple-current-name").value.trim();
         const otherName = document.getElementById("simple-other-name").value.trim();
-        if (!currentName || !otherName) throw new Error("Give both tools or plans a name.");
+        if (!currentName || !otherName) throw simpleInputError(!currentName ? "simple-current-name" : "simple-other-name", "Give this tool or plan a name.");
         const monthlyTasks = value("simple-monthly-tasks", "Monthly tasks", { integer: true });
         const currentChecked = value("simple-current-checked", "Current outputs checked", { integer: true });
         const otherChecked = value("simple-other-checked", "Other outputs checked", { integer: true });
         const currentUsable = value("simple-current-usable", "Current usable outputs", { integer: true });
         const otherUsable = value("simple-other-usable", "Other usable outputs", { integer: true });
-        if (!monthlyTasks || !currentChecked || !otherChecked) throw new Error("Enter at least one monthly task and one checked output for each option.");
-        if (currentUsable > currentChecked || otherUsable > otherChecked) throw new Error("Usable outputs cannot be greater than the number you checked.");
-        if (currentChecked > monthlyTasks || otherChecked > monthlyTasks) throw new Error("The number checked cannot be greater than your monthly tasks.");
+        if (!monthlyTasks) throw simpleInputError("simple-monthly-tasks", "Enter at least one monthly task.");
+        for (const [side, name, checked, usable] of [["current", currentName, currentChecked, currentUsable], ["other", otherName, otherChecked, otherUsable]]) {
+          if (!checked) throw simpleInputError(`simple-${side}-checked`, `${name}: enter at least one checked output.`);
+          if (usable > checked) throw simpleInputError(`simple-${side}-usable`, `${name}: usable outputs cannot be greater than the number you checked.`);
+          if (!usable) throw simpleInputError(`simple-${side}-usable`, `${name}: zero usable outputs were counted. Cost per usable result needs at least one.`);
+          if (checked > monthlyTasks) throw simpleInputError(`simple-${side}-checked`, `${name}: the number checked cannot be greater than your monthly tasks.`);
+        }
         const csvCell = (input) => `"${String(input).replaceAll('"', '""')}"`;
         const header = "period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,cost_basis,currency";
         const today = new Date().toISOString().slice(0, 10);
@@ -6608,7 +6722,7 @@
           outcomeLogComplete: false,
           planning: null,
         };
-        if (config.qualityFloor <= 0 || config.qualityFloor > 1) throw new Error("Minimum usable rate must be between 1% and 100%.");
+        if (config.qualityFloor < 0.01 || config.qualityFloor > 1) throw simpleInputError("simple-quality-floor", "Minimum usable rate must be between 1% and 100%.");
         state.data = await buildSimpleReview(spendText, {
           baseline: { population: monthlyTasks, ready: currentUsable, correction: currentChecked - currentUsable, escalation: 0, humanMinutes: value("simple-current-minutes", "Current review and fixing minutes") },
           proposed: { population: monthlyTasks, ready: otherUsable, correction: otherChecked - otherUsable, escalation: 0, humanMinutes: value("simple-other-minutes", "Other review and fixing minutes") },
@@ -6695,7 +6809,7 @@
           const amount = costNumber(document.getElementById("invoice-amount").value, "Billed amount");
           const currency = document.getElementById("invoice-currency").value.trim().toUpperCase();
           if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a three-letter code.");
-          spendText = rowsToCsv([{ period: "baseline", date: invoiceDate, workload, provider, model: "", route: "Subscription or invoice", requests: "", input_tokens: "", cached_input_tokens: "", cache_write_input_tokens: "", output_tokens: "", provider_cost: String(amount), cost_basis: "provider_reported", currency }]);
+          spendText = rowsToCsv([{ period: "baseline", date: invoiceDate, workload, provider, model: "", route: "Subscription or invoice", requests: "", input_tokens: "", cached_input_tokens: "", cache_write_input_tokens: "", output_tokens: "", provider_cost: String(amount), cost_basis: "user_entered", currency }]);
         }
         state.data = await buildSingleBillReview(spendText, workFile ? await readLocalFile(workFile) : "", {
           acceptanceRule: document.getElementById("single-ready-rule").value.trim(),
@@ -6755,7 +6869,7 @@
             if (coverage.status === "missing") return "unavailable";
             return `${value} reported (${coverage.suppliedRows} of ${coverage.totalRows} rows)`;
           };
-          box.textContent = `Provider: ${summary.provider}. Period: ${summary.period.start} to ${summary.period.end}. Products: ${summary.products.join(", ")}. Models: ${summary.models.join(", ")}. Provider-reported cost: $${summary.providerCost.toFixed(2)}. Requests: ${confirmationMeasure("requests", summary.requests)}. Input tokens: ${confirmationMeasure("processedInput", summary.inputTokens)}. Output tokens: ${confirmationMeasure("outputTokens", summary.outputTokens)}. Not included: ${summary.missing.join(", ")}. Source rows: ${summary.sourceRows}. Personal identifiers were discarded.`;
+          box.textContent = `Provider: ${summary.provider}. Period: ${summary.period.start} to ${summary.period.end}. Products: ${summary.products.join(", ")}. Models: ${summary.models.join(", ")}. Provider-reported ${summary.costBasis === "net" ? "net " : ""}cost: $${summary.providerCost.toFixed(2)}. Requests: ${confirmationMeasure("requests", summary.requests)}. Input tokens: ${confirmationMeasure("processedInput", summary.inputTokens)}. Output tokens: ${confirmationMeasure("outputTokens", summary.outputTokens)}. Not included: ${summary.missing.join(", ")}. Source rows: ${summary.sourceRows}. Personal identifiers were discarded.`;
           box.hidden = false; submit.textContent = "Confirm and build Claude review"; return;
         }
         const [usageFile] = document.getElementById("openai-usage-file").files;
@@ -6857,6 +6971,15 @@
       if (previousData) renderAll();
       errorBox.textContent = error instanceof TypeError || error instanceof RangeError ? "The review could not be built. Check the file structure and numeric values." : error.message || "The review could not be built.";
       errorBox.classList.add("visible");
+      if (error.fieldId && simpleInputIds.includes(error.fieldId)) {
+        const input = document.getElementById(error.fieldId);
+        const note = document.getElementById(`${error.fieldId}-error`);
+        input.setAttribute("aria-invalid", "true");
+        note.textContent = error.message;
+        note.hidden = false;
+        input.focus({ preventScroll: true });
+        input.scrollIntoView({ block: "center" });
+      }
     } finally {
       submit.disabled = false;
       submit.textContent = state.builderMode === "tools" ? "Review my AI tools" : state.builderMode === "simple" ? "Compare my options" : state.builderMode === "single" ? "Understand this bill" : state.builderMode === "openai"
@@ -6943,6 +7066,7 @@
       }
       validateResult(data);
       state.data = data;
+      state.hasStarted = true;
       renderAll();
       setView("review");
       showToast(`${file.name} is open. Nothing was uploaded.`);
@@ -7016,9 +7140,12 @@
     if (!response.ok) {
       throw new Error("The example review could not be loaded.");
     }
-    state.data = await response.json();
-    state.demoData = cloneData(state.data);
-    renderAll();
+    const data = await response.json();
+    state.demoData = cloneData(data);
+    if (!state.hasStarted) {
+      state.data = data;
+      renderAll();
+    }
   }
 
   async function loadGrowthDemo() {

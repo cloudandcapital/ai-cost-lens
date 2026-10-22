@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Start with an AI bill, understand its usage, and add outcomes when you are ready to test the fuller economics."
+      content="Compare AI tools or plans by the cost of usable work, including your review time. Or start with a bill to build a cost baseline. Free, browser-local, no account needed."
     />
     <title>AI Cost Lens | Cloud & Capital</title>
     <link rel="canonical" href="https://lens.cloudandcapital.com/" />
@@ -13,7 +13,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Cloud & Capital" />
     <meta property="og:title" content="AI Cost Lens | Cloud & Capital" />
-    <meta property="og:description" content="Start with your AI bill. See the cost and usage drivers, then add outcomes when you are ready to test cost per ready result. Your files stay in your browser." />
+    <meta property="og:description" content="Compare two AI tools or plans, including the time spent checking their work. Or start with a bill to build a cost baseline. Your files stay in your browser." />
     <meta property="og:url" content="https://lens.cloudandcapital.com/" />
     <meta property="og:image" content="https://lens.cloudandcapital.com/social-preview.png" />
     <meta property="og:image:alt" content="AI Cost Lens cost anatomy comparing model, infrastructure, and human review costs" />
@@ -37,6 +37,7 @@
   --serif: "Times New Roman", Times, serif;
   --sans: Arial, Helvetica, sans-serif;
 }
+
 
 * {
   box-sizing: border-box;
@@ -6365,9 +6366,73 @@ body{min-width:0}
   .tool-charge-entry { padding: 14px; }
   .review-next-actions { align-items: stretch; flex-direction: column; }
 }
+
+/* Keep the everyday review separate from the advanced workbench. */
+.lens-welcome { max-width: 980px; padding: 76px 0 40px; }
+.lens-welcome[hidden], .simple-decision-block[hidden], .field-error[hidden], .approval-change-note[hidden] { display: none; }
+.lens-welcome h1 { max-width: 920px; margin: 22px 0; font-size: clamp(42px, 5.8vw, 82px); line-height: 1.04; letter-spacing: -0.035em; text-wrap: balance; }
+.welcome-copy { max-width: 670px; color: var(--muted); font-size: 19px; line-height: 1.65; }
+.welcome-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 30px; margin-top: 30px; }
+.welcome-actions .build-button { display: inline-flex; align-items: center; gap: 20px; background: var(--clay); border-color: var(--clay); color: white; }
+.welcome-local { margin-top: 20px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.welcome-example { max-width: 670px; border-top: 1px solid var(--line); margin-top: 42px; padding-top: 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 26px; }
+.welcome-example p { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.welcome-example p strong { color: var(--ink); }
+.welcome-example a { font-size: 13px; color: var(--ink); text-underline-offset: 4px; }
+body.welcome-mode .question-nav, body.welcome-mode .mobile-section-picker, body.welcome-mode .view,
+body.welcome-mode .bill-review-screen, body.welcome-mode #header-actions > :not(#start-review):not(#open-review) { display: none; }
+.simple-decision-block { display: grid; gap: 15px; max-width: 920px; padding: 24px 28px; margin: 24px 0; border-left: 3px solid var(--clay); background: var(--paper-light); }
+.simple-decision-block div { display: grid; grid-template-columns: 125px minmax(0, 1fr); gap: 16px; }
+.simple-decision-block dt { font-size: 12px; font-weight: 700; color: var(--sage); }
+.simple-decision-block dd { margin: 0; font-size: 15px; line-height: 1.6; }
+body.simple-mode .title-grid { grid-template-columns: 1fr; gap: 0; }
+body.simple-mode .title-grid .workload-intro, body.simple-mode #period-label, body.simple-mode #review-evidence-summary,
+body.simple-mode .break-even-card, body.simple-mode .lumen-panel, body.simple-mode .methodology-note,
+body.simple-mode #metric-ledger, body.simple-mode #view-review > .finding, body.simple-mode #view-review > .comparison-section,
+body.simple-mode #view-review > .opportunity-section, body.simple-mode #view-review > .decision-note { display: none; }
+body.simple-mode .cockpit-grid { grid-template-columns: minmax(0, 1fr); }
+body.simple-mode #view-review > .title-grid h1 { max-width: 960px; }
+body.simple-mode .truth-section { padding-top: 26px; }
+body.simple-mode .decision-table { min-width: 0; table-layout: fixed; }
+body.simple-mode .decision-table th:first-child { width: 34%; }
+body.simple-mode .decision-table td:last-child, body.simple-mode .decision-table thead th:last-child { text-align: right; }
+body.simple-mode .decision-table td, body.simple-mode .decision-table th { overflow-wrap: anywhere; }
+body.simple-mode .simple-table-notes { padding-top: 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.simple-table-notes summary { cursor: pointer; color: var(--ink); }
+.simple-table-notes dl { display: grid; gap: 12px; }
+.simple-table-notes dt { font-weight: 700; color: var(--ink); }
+.simple-table-notes dd { margin: 0; }
+#edit-simple-comparison, .welcome-example .text-button, #simple-change-path { min-height: 44px; }
+#simple-change-path { display: none; margin: 0 0 16px; }
+.review-dialog.has-builder-path #simple-change-path { display: inline-flex; align-items: center; }
+.review-dialog.has-builder-path .builder-mode-choice, .review-dialog.has-builder-path .builder-choice-label { display: none; }
+.review-dialog.has-builder-path .privacy-note { display: none; }
+.privacy-note summary { cursor: pointer; margin-top: 8px; font-size: 12px; }
+.field-error { display: block; color: #98464e; font-size: 12px; line-height: 1.5; margin: 5px 0 0; }
+input[aria-invalid="true"] { outline: 2px solid #98464e; outline-offset: 2px; }
+.approval-change-note { color: var(--clay); font-size: 13px; line-height: 1.5; }
+@media (min-width: 901px) and (max-width: 1280px) {
+  .cockpit-grid { grid-template-columns: minmax(0, 1fr); }
+  .lumen-panel { position: static; min-height: 0; }
+}
+@media (max-width: 600px) {
+  .lens-welcome { padding-top: 32px; }
+  .lens-welcome h1 { font-size: clamp(38px, 9.8vw, 56px); }
+  .lens-welcome h1 br { display: none; }
+  .welcome-copy { font-size: 16px; }
+  .welcome-actions { align-items: stretch; gap: 12px; }
+  .welcome-actions .build-button { justify-content: center; width: 100%; }
+  .welcome-local { font-size: 12px; }
+  .simple-decision-block { padding: 18px; }
+  .simple-decision-block div { grid-template-columns: 1fr; gap: 4px; }
+  body.simple-mode .decision-table th:first-child { width: auto; }
+  body.simple-mode .decision-table td:last-child { text-align: left; }
+}
+
+body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; }
 </style>
   </head>
-  <body>
+  <body class="welcome-mode">
     <div class="shell">
       <header class="masthead">
         <a class="wordmark" href="https://cloudandcapital.com" aria-label="Cloud and Capital home">
@@ -6427,6 +6492,21 @@ body{min-width:0}
       </label>
 
       <main>
+        <section class="lens-welcome" id="lens-welcome" aria-labelledby="welcome-title">
+          <p class="kicker">AI COST LENS · FREE TOOL</p>
+          <h1 id="welcome-title">Is the cheaper AI<br /> actually costing you more?</h1>
+          <p class="welcome-copy">Compare two tools or plans, including the time you spend checking and fixing their work. Or start with a bill to see the costs you can account for.</p>
+          <div class="welcome-actions">
+            <button class="build-button" id="welcome-compare" type="button">Compare two options <span aria-hidden="true">→</span></button>
+            <button class="text-button" id="welcome-spending" type="button">Review my AI spending <span aria-hidden="true">→</span></button>
+          </div>
+          <p class="welcome-local">No account or connection needed. Your files are read in this browser.</p>
+          <div class="welcome-example">
+            <p><strong>A lower subscription price is only part of the picture.</strong> Extra review time and fewer usable outputs can change which option costs less.</p>
+            <button class="text-button" id="welcome-example" type="button">Explore an example <span aria-hidden="true">→</span></button>
+            <a href="guide.html">Read the guide <span aria-hidden="true">→</span></a>
+          </div>
+        </section>
         <section class="bill-review-screen" id="bill-review-screen" aria-labelledby="bill-review-title">
           <div class="eyebrow-row">
             <p class="eyebrow" id="bill-period-label"></p>
@@ -6534,13 +6614,18 @@ body{min-width:0}
           <div class="title-grid">
             <div>
               <p class="kicker" id="review-kicker">FINANCE FIRST AI SPEND REVIEW</p>
-              <h1 id="review-title">What did one ready result really cost?</h1>
+              <h1 id="review-title" tabindex="-1">What did one ready result really cost?</h1>
             </div>
             <div class="workload-intro">
               <strong id="workload-name"></strong>
               <p id="workload-description"></p>
             </div>
           </div>
+
+          <dl class="simple-decision-block" id="simple-decision-block" hidden>
+            <div><dt>Cost finding</dt><dd id="simple-cost-finding"></dd></div>
+            <div><dt>Before switching</dt><dd id="simple-switch-check"></dd></div>
+          </dl>
 
           <div class="evidence-summary" id="review-evidence-summary" aria-label="Period and cost source"></div>
           <div class="review-next-actions" id="simple-edit-actions" hidden>
@@ -7214,15 +7299,21 @@ body{min-width:0}
           <button class="dialog-close" id="close-review" type="button" aria-label="Close review setup">Close</button>
         </div>
 
+        <button class="simple-change-path" id="simple-change-path" type="button">Choose a different path</button>
+
         <div class="privacy-note">
           <strong>Your files stay in this browser.</strong>
-          <span>AI Cost Lens reads them locally. Nothing is uploaded or stored.</span>
-          <p>File limit: 5 MiB and 20,000 rows. For comparisons, use equally long, complete periods.</p>
-          <p>Use non-negative costs after documented discounts. Reconcile credits and refunds first, and use the same gross or net basis on both sides.</p>
+          <span>AI Cost Lens reads them locally; source files are not uploaded.</span>
+          <details><summary>File limits and comparison boundaries</summary><p>File limit: 5 MiB and 20,000 rows. For comparisons, use equally long, complete periods.</p><p>Use non-negative costs after documented discounts. Reconcile credits and refunds first, and use the same gross or net basis on both sides.</p></details>
         </div>
 
         <p class="builder-choice-label">Choose what you have. You can add more evidence later.</p>
         <div class="builder-mode-choice" role="group" aria-label="Choose how to start">
+          <button class="builder-mode builder-mode-featured" data-builder-mode="simple" type="button" aria-pressed="false">
+            <small>SIMPLE · NO FILES NEEDED</small>
+            <strong>Compare two options</strong>
+            <span>Compare monthly charges, usable work, and the time you spend checking it.</span>
+          </button>
           <button class="builder-mode builder-mode-featured" data-builder-mode="single" type="button" aria-pressed="false">
             <small>BILL OR SUBSCRIPTION</small>
             <strong>Start with a bill</strong>
@@ -7233,23 +7324,20 @@ body{min-width:0}
             <strong>Review my AI tools</strong>
             <span>Put your AI plans and separately billed usage in one period, with a source and an owner for each charge.</span>
           </button>
+          <details class="builder-more-paths"><summary>Other ways to start <span>Upload records, analyze usage, price a prompt, and examples</span></summary><div class="builder-more-grid">
+          <button class="builder-mode builder-mode-featured" data-builder-mode="openai" type="button" aria-pressed="false">
+            <small>OPENAI OR CLAUDE · FILES</small>
+            <strong>Upload what you have</strong>
+            <span>Choose CSV, JSON, or a text-based invoice PDF. The browser checks it locally.</span>
+          </button>
+
           <button class="builder-mode builder-mode-featured" data-builder-mode="usage" type="button" aria-pressed="false">
             <small>CSV OR JSON · LOCAL ANALYSIS</small>
             <strong>Review AI usage</strong>
             <span>Find spend drivers, budget risk, operational patterns, variance, and credible optimization targets.</span>
             <em>BEST FOR REQUEST OR TRACE EXPORTS</em>
           </button>
-          <button class="builder-mode builder-mode-featured" data-builder-mode="simple" type="button" aria-pressed="false">
-            <small>SIMPLE · NO FILES NEEDED</small>
-            <strong>Compare two options</strong>
-            <span>For subscriptions, solo work, and small teams. Enter two monthly costs and check a small sample of work.</span>
-          </button>
-          <button class="builder-mode builder-mode-featured" data-builder-mode="openai" type="button" aria-pressed="false">
-            <small>OPENAI OR CLAUDE · FILES</small>
-            <strong>Upload what you have</strong>
-            <span>Choose CSV, JSON, or a text-based invoice PDF. The browser checks it locally.</span>
-          </button>
-          <details class="builder-more-paths"><summary>Other ways to start <span>Prompt price, detailed comparison, and examples</span></summary><div class="builder-more-grid">
+
           <button class="builder-mode" data-builder-mode="price" type="button" aria-pressed="false">
             <small>NO FILES · LOCAL CALCULATOR</small><strong>Price a prompt</strong><span>Compare API prices, cache, batch, retries, and expected usable results.</span>
           </button>
@@ -7283,7 +7371,7 @@ body{min-width:0}
               <label><span>Currency</span><input id="tools-currency" type="text" value="USD" maxlength="3" /></label>
               <label><span>Service-period start</span><input id="tools-start" type="date" /></label>
               <label><span>Service-period end / data through</span><input id="tools-end" type="date" /></label>
-              <label class="field-wide"><span>What do these amounts represent?</span><select id="tools-basis"><option value="provider_reported">Billed amounts I checked against my records</option><option value="calculated">Estimates for this period</option><option value="allocated">Allocated costs with a documented method</option></select><small>Use one basis for the whole review. AI Cost Lens does not independently verify your records.</small></label>
+              <label class="field-wide"><span>What do these amounts represent?</span><select id="tools-basis" required><option value="">Choose the source of these amounts</option><option value="provider_reported">Billed amounts I checked against my records</option><option value="calculated">Estimates for this period</option><option value="allocated">Allocated costs with a documented method</option></select><small>Choose explicitly for each new review. AI Cost Lens does not independently verify your records.</small></label>
             </div>
           </div></section>
           <section class="builder-step"><div class="step-number">02</div><div>
@@ -7499,7 +7587,6 @@ body{min-width:0}
           <div class="path-requirements simple-requirements">
             <strong>No spreadsheet needed</strong>
             <span>Use estimates if that is all you have. The result will stay clearly labeled as a sample, not guaranteed savings.</span>
-            <button class="simple-change-path" id="simple-change-path" type="button">Choose a different path</button>
           </div>
           <section class="builder-step" aria-labelledby="simple-cost-title">
             <div class="step-number">01</div>
@@ -7510,15 +7597,15 @@ body{min-width:0}
                 <fieldset class="sample-route-card">
                   <legend>What you use now</legend>
                   <div class="simple-field-grid">
-                    <label><span>Tool or plan name</span><input id="simple-current-name" type="text" value="Current AI tool" /></label>
-                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-current-cost" type="number" min="0" step="0.01" value="40" /></div></label>
+                    <label><span>Tool or plan name</span><input id="simple-current-name" type="text" value="Current AI tool" aria-describedby="simple-current-name-error" /><small class="field-error" id="simple-current-name-error" hidden></small></label>
+                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-current-cost" type="number" min="0" step="0.01" value="40" aria-describedby="simple-current-cost-error" /></div><small class="field-error" id="simple-current-cost-error" hidden></small></label>
                   </div>
                 </fieldset>
                 <fieldset class="sample-route-card">
                   <legend>The other option</legend>
                   <div class="simple-field-grid">
-                    <label><span>Tool or plan name</span><input id="simple-other-name" type="text" value="Lower-cost AI tool" /></label>
-                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-other-cost" type="number" min="0" step="0.01" value="20" /></div></label>
+                    <label><span>Tool or plan name</span><input id="simple-other-name" type="text" value="Lower-cost AI tool" aria-describedby="simple-other-name-error" /><small class="field-error" id="simple-other-name-error" hidden></small></label>
+                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-other-cost" type="number" min="0" step="0.01" value="20" aria-describedby="simple-other-cost-error" /></div><small class="field-error" id="simple-other-cost-error" hidden></small></label>
                   </div>
                 </fieldset>
               </div>
@@ -7529,22 +7616,22 @@ body{min-width:0}
             <div>
               <h3 id="simple-work-title">Check a small sample of your work</h3>
               <p>Use the same kind of task for both tools. Count outputs usable without a significant fix. Successfully repaired outputs are excluded from this first-pass measure; it is not cost per final completed task. A small sample is directional, not proof.</p>
-              <label class="simple-volume-field"><span>About how many of these tasks do you complete per month?</span><input id="simple-monthly-tasks" type="number" min="1" step="1" value="40" /></label>
+              <label class="simple-volume-field"><span>About how many of these tasks do you complete per month?</span><input id="simple-monthly-tasks" type="number" min="1" step="1" value="40" aria-describedby="simple-monthly-tasks-error" /><small class="field-error" id="simple-monthly-tasks-error" hidden></small></label>
               <div class="sample-route-grid">
                 <fieldset class="sample-route-card">
                   <legend>What you use now</legend>
                   <div class="sample-field-grid">
-                    <label><span>Outputs checked</span><input id="simple-current-checked" type="number" min="1" step="1" value="20" /></label>
-                    <label><span>Usable without a big fix</span><input id="simple-current-usable" type="number" min="0" step="1" value="19" /></label>
-                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-current-minutes" type="number" min="0" step="0.1" value="30" /></label>
+                    <label><span>Outputs checked</span><input id="simple-current-checked" type="number" min="1" step="1" value="20" aria-describedby="simple-current-checked-error" /><small class="field-error" id="simple-current-checked-error" hidden></small></label>
+                    <label><span>Usable without a big fix</span><input id="simple-current-usable" type="number" min="0" step="1" value="19" aria-describedby="simple-current-usable-error" /><small class="field-error" id="simple-current-usable-error" hidden></small></label>
+                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-current-minutes" type="number" min="0" step="0.1" value="30" aria-describedby="simple-current-minutes-error" /><small class="field-error" id="simple-current-minutes-error" hidden></small></label>
                   </div>
                 </fieldset>
                 <fieldset class="sample-route-card">
                   <legend>The other option</legend>
                   <div class="sample-field-grid">
-                    <label><span>Outputs checked</span><input id="simple-other-checked" type="number" min="1" step="1" value="20" /></label>
-                    <label><span>Usable without a big fix</span><input id="simple-other-usable" type="number" min="0" step="1" value="16" /></label>
-                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-other-minutes" type="number" min="0" step="0.1" value="200" /></label>
+                    <label><span>Outputs checked</span><input id="simple-other-checked" type="number" min="1" step="1" value="20" aria-describedby="simple-other-checked-error" /><small class="field-error" id="simple-other-checked-error" hidden></small></label>
+                    <label><span>Usable without a big fix</span><input id="simple-other-usable" type="number" min="0" step="1" value="16" aria-describedby="simple-other-usable-error" /><small class="field-error" id="simple-other-usable-error" hidden></small></label>
+                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-other-minutes" type="number" min="0" step="0.1" value="200" aria-describedby="simple-other-minutes-error" /><small class="field-error" id="simple-other-minutes-error" hidden></small></label>
                   </div>
                 </fieldset>
               </div>
@@ -7556,9 +7643,10 @@ body{min-width:0}
               <h3 id="simple-time-title">Put a value on your time</h3>
               <p>This estimates the value of review and fixing time. It is not necessarily cash paid or money you could recover. Enter zero if you only want to compare tool charges.</p>
               <div class="field-grid compact-fields">
-                <label><span>What is an hour of your time worth?</span><div class="input-prefix"><em>$</em><input id="simple-hourly-rate" type="number" min="0" step="0.01" value="30" /></div></label>
-                <label><span>Minimum usable rate you would accept</span><div class="input-suffix"><input id="simple-quality-floor" type="number" min="1" max="100" step="0.1" value="80" /><em>%</em></div></label>
+                <label><span>What is an hour of your time worth?</span><div class="input-prefix"><em>$</em><input id="simple-hourly-rate" type="number" min="0" step="0.01" value="30" aria-describedby="simple-hourly-rate-error" /></div><small class="field-error" id="simple-hourly-rate-error" hidden></small></label>
+                <label><span>Minimum usable rate you would accept</span><div class="input-suffix"><input id="simple-quality-floor" type="number" min="1" max="100" step="0.1" value="80" aria-describedby="simple-quality-floor-error" /><em>%</em></div><small class="field-error" id="simple-quality-floor-error" hidden></small></label>
                 <label class="check-field field-wide"><input id="simple-approved" type="checkbox" /><span>I have confirmed both tools are okay to use for this work</span></label>
+                <p class="approval-change-note field-wide" id="simple-approval-note" role="status" hidden></p>
               </div>
               <p class="sample-caveat" id="simple-example-caveat">The prefilled numbers are a small-business example. Replace them with your own before comparing.</p>
             </div>
@@ -11847,6 +11935,7 @@ body{min-width:0}
     growthPlannerRecord: null,
     growthPlannerReview: null,
     breakEvenReady: false,
+    hasStarted: false,
   };
 
   const simpleInputIds = [
@@ -12046,6 +12135,7 @@ body{min-width:0}
       observed: "observed",
       calculated: "calculated",
       allocated: "allocated",
+      user_entered: "user_entered",
     };
     const declared = new Set(
       spend.map((row, index) => {
@@ -12053,7 +12143,7 @@ body{min-width:0}
         const basis = aliases[raw];
         if (!basis) {
           throw new Error(
-            `Spend ${period} row ${index + 2} cost_basis must be provider_reported, calculated, or allocated.`,
+            `Spend ${period} row ${index + 2} cost_basis must be provider_reported, calculated, allocated, or user_entered.`,
           );
         }
         return basis;
@@ -12066,6 +12156,7 @@ body{min-width:0}
   }
 
   function costBasisLabel(basis) {
+    if (basis === "user_entered") return "User-entered cost (unverified)";
     if (basis === "observed") return "Provider reported cost";
     if (basis === "calculated") return "Calculated cost";
     if (basis === "allocated") return "Allocated cost";
@@ -12184,6 +12275,8 @@ body{min-width:0}
   }
 
   async function buildToolSpendReview(items, options) {
+    if (!["provider_reported", "calculated", "allocated"].includes(options.basis)) throw new Error("Choose what the amounts represent before building your review.");
+    if (!options.scopeConfirmed) throw new Error("Confirm that these charges cover the same period and do not overlap.");
     const normalized = normalizeToolCharges(items);
     const config = { reviewSource: "tool_spend", serviceStart: options.start, serviceEnd: options.end,
       toolSpend: { name: safeImportedLabel(options.name, "Review name"), currency: String(options.currency).trim().toUpperCase(),
@@ -12482,7 +12575,8 @@ body{min-width:0}
     requireColumns(spend, singleSpendColumns, "Universal spend");
     const work = workText.trim() ? parseCsv(workText, "Outcome log") : [];
     if (work.length) requireColumns(work, singleWorkColumns, "Outcome log");
-    const data = { schema_version: singleBillSchema, mode: "real", source: { spend, work }, config: {
+    const manual = ["invoice_form", "invoice_pdf"].includes(config.reviewSource);
+    const data = { schema_version: singleBillSchema, mode: manual ? "user_entered" : "real", source: { spend, work }, config: {
       acceptanceRule: "", verifier: "", complete: false, hourlyRate: "", sharedCost: "", ...config,
     } };
     const summary = summarizeSingleBill(data);
@@ -13048,7 +13142,7 @@ body{min-width:0}
           },
           sample_size: sampleSize,
           sample_method: config.sampleRandom ? "declared random or systematic" : "user selected",
-          ready_rate_interval_95: [intervalLow, intervalHigh],
+          ready_rate_interval_95: config.sampleRandom ? [intervalLow, intervalHigh] : null,
           human_review_minutes: round(projectedHumanMinutes),
           sample_human_minutes: round(sampleMinutes),
           review_minutes: round(projectedHumanMinutes),
@@ -13458,7 +13552,7 @@ body{min-width:0}
     const summary = summarizeSingleBill(review);
     return { review, confirmation: {
       provider: "Anthropic", period, products: [...new Set(rows.map((row) => row.route))], models: [...new Set(rows.map((row) => row.model))],
-      providerCost: summary.totals.providerCost, requests: summary.totals.reported.requests, inputTokens: summary.totals.reported.processedInput,
+      providerCost: summary.totals.providerCost, costBasis: "net", requests: summary.totals.reported.requests, inputTokens: summary.totals.reported.processedInput,
       outputTokens: summary.totals.reported.outputTokens, coverage: summary.totals.coverage, missing: ["Cache values", "Retries", "Human effort", "Outcomes"],
       sourceRows: raw.length, identifiersDiscarded: true,
     } };
@@ -13813,6 +13907,8 @@ body{min-width:0}
     if (csvs.length) {
       const item = csvs[0];
       const normalized = new Set(item.parsed.normalized);
+      if (openAICostColumns.every((column) => item.parsed.headers.includes(column))) throw new Error("This is an OpenAI cost export. Add its Usage Dashboard activity CSV too; both files are needed to check the reporting periods.");
+      if (openAIUsageColumns.every((column) => item.parsed.headers.includes(column))) throw new Error("This is an OpenAI activity export. Add its Usage Dashboard cost CSV too; both files are needed to check the reporting periods.");
       if (claudeSpendColumns.every((column) => normalized.has(column))) return { kind: "claude_spend", text: item.text };
       if (singleSpendColumns.every((column) => item.parsed.headers.includes(column))) {
         if (item.parsed.rows.some((row) => String(row.period).toLowerCase() !== "baseline")) {
@@ -13944,7 +14040,7 @@ body{min-width:0}
           },
           sample_size: sampleSize,
           sample_method: config.sampleRandom ? "declared random or systematic" : "user selected",
-          ready_rate_interval_95: [intervalLow, intervalHigh],
+          ready_rate_interval_95: config.sampleRandom ? [intervalLow, intervalHigh] : null,
           human_review_minutes: round(projectedHumanMinutes),
           sample_human_minutes: round(sampleMinutes),
           review_minutes: round(projectedHumanMinutes),
@@ -14101,11 +14197,13 @@ body{min-width:0}
         if (!Number.isSafeInteger(o.sample_size) || !o.sample_size || o.sample_size > o.completed_results) fail();
         const counts = ["ready_to_use", "needs_correction", "needs_escalation"].map(key => o.sample_counts[key]);
         if (counts.some(n => !Number.isSafeInteger(n) || n < 0) || counts.reduce((a,b) => a+b,0) !== o.sample_size || !close(m.usable_result_rate, counts[0] / o.sample_size)) fail();
+        o.ready_rate_interval_95 = o.sample_method === "declared random or systematic" ? wilsonInterval(counts[0], o.sample_size) : null;
       }
     }
     if (data.experience === "simple") {
       for (const scenario of [data.baseline, data.proposed]) {
         if (typeof scenario.model.name === "string" && scenario.model.name.trim()) scenario.label = scenario.model.name.trim();
+        scenario.evidence.cost_basis = data.pricing_estimate ? "calculated" : "user_entered";
       }
       if (data.simple_input_snapshot && !simpleInputSnapshotMatches(data)) fail();
     }
@@ -14128,6 +14226,7 @@ body{min-width:0}
     c.recommendation = decision.reason;
     c.decision_code = decision.code;
     c.finance_posture = decision.posture;
+    if (data.experience === "simple") c.finding = simpleCostRead(data).headline;
   }
 
   function validateResult(data) {
@@ -14179,8 +14278,14 @@ body{min-width:0}
       for (const row of [...data.source.spend, ...data.source.work]) {
         Object.values(row).forEach((value) => shape(value, "string", "source row"));
       }
+      const manual = ["invoice_form", "invoice_pdf"].includes(data.config.reviewSource);
+      // Older manual records used provider_reported. Do not preserve that stronger claim on reopen/export.
+      if (manual) {
+        data.mode = "user_entered";
+        data.source.spend.forEach((row) => { row.cost_basis = "user_entered"; });
+      }
       const summary = summarizeSingleBill(data);
-      if (data.mode !== "real" || data.currency !== summary.currency || data.period.start !== summary.period.start || data.period.end !== summary.period.end) fail("single bill metadata");
+      if (data.mode !== (manual ? "user_entered" : "real") || data.currency !== summary.currency || data.period.start !== summary.period.start || data.period.end !== summary.period.end) fail("single bill metadata");
       return data;
     }
     if (data?.schema_version === "ai-cost-lens-openai-bill-review/0.1") {
@@ -14261,8 +14366,11 @@ body{min-width:0}
       }
       validDate(scenario.evidence.observed_at, `${key} observed date`);
       if (scenario.outcomes.basis === "sampled" || scenario.outcomes.sample_counts !== undefined) {
-        shape(scenario.outcomes, { sample_counts: counts, ...fields("sample_size sample_human_minutes"), sample_method: "string", ready_rate_interval_95: ["number"] }, `${key}.sample`);
-        if (scenario.outcomes.sample_size <= 0 || scenario.outcomes.ready_rate_interval_95.length !== 2) fail(`${key}.sample`);
+        shape(scenario.outcomes, { sample_counts: counts, ...fields("sample_size sample_human_minutes"), sample_method: "string" }, `${key}.sample`);
+        const o = scenario.outcomes;
+        const sampleCounts = Object.values(o.sample_counts);
+        if (!Number.isSafeInteger(o.sample_size) || o.sample_size <= 0 || sampleCounts.some((n) => !Number.isSafeInteger(n) || n < 0) || sampleCounts.reduce((a, b) => a + b, 0) !== o.sample_size) fail(`${key}.sample`);
+        o.ready_rate_interval_95 = o.sample_method === "declared random or systematic" ? wilsonInterval(o.sample_counts.ready_to_use, o.sample_size) : null;
       }
     }
     if (data.mode !== "illustrative") {
@@ -14317,6 +14425,7 @@ body{min-width:0}
 
   function renderYieldRoute(scenario) {
     const counts = outcomeCounts(scenario);
+    const readyLabel = state.data.experience === "simple" ? "usable without a big fix" : "ready to use";
     const shares = [counts.ready, counts.correction, counts.escalation].map(
       (value) => (counts.completed ? (value / counts.completed) * 100 : 0),
     );
@@ -14331,13 +14440,13 @@ body{min-width:0}
           <strong>${escapeHtml(scenario.label)}</strong>
           <span>${compact(counts.completed)} ${counts.sampled ? "reviewed" : "attempts"}</span>
         </div>
-        <div class="yield-bar" role="img" aria-label="${perHundred[0]} ready to use, ${perHundred[1]} need correction, and ${perHundred[2]} need escalation for every 100 ${counts.sampled ? "sampled results" : "attempts"}">
+        <div class="yield-bar" role="img" aria-label="${perHundred[0]} ${readyLabel}, ${perHundred[1]} need correction, and ${perHundred[2]} need escalation for every 100 ${counts.sampled ? "sampled results" : "attempts"}">
           <div class="yield-ready" style="width:${shares[0].toFixed(2)}%"></div>
           <div class="yield-correction" style="width:${shares[1].toFixed(2)}%"></div>
           <div class="yield-escalation" style="width:${shares[2].toFixed(2)}%"></div>
         </div>
         <div class="yield-legend">
-          <div><strong>${perHundred[0]}</strong><span>ready to use</span></div>
+          <div><strong>${perHundred[0]}</strong><span>${readyLabel}</span></div>
           <div><strong>${perHundred[1]}</strong><span>need correction</span></div>
           <div><strong>${perHundred[2]}</strong><span>need escalation</span></div>
         </div>
@@ -14414,7 +14523,7 @@ body{min-width:0}
       </div>
       <div class="decision-table-wrap" role="region" aria-label="Route decision comparison" tabindex="0">
         <table class="decision-table">
-          <thead><tr><th>Metric</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Change</th><th>What it includes</th></tr></thead>
+          <thead><tr><th>Metric</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Change</th></tr></thead>
           <tbody>
             ${metricRows.map((row) => `
               <tr class="${row.emphasis ? "decision-row" : ""}">
@@ -14422,11 +14531,11 @@ body{min-width:0}
                 <td data-label="${escapeHtml(baseline.label)}">${escapeHtml(row.current)}</td>
                 <td data-label="${escapeHtml(proposed.label)}">${escapeHtml(row.proposed)}</td>
                 <td data-label="Change">${escapeHtml(row.change)}</td>
-                <td data-label="What it includes">${escapeHtml(row.meaning)}</td>
               </tr>`).join("")}
           </tbody>
         </table>
       </div>
+      <details class="simple-table-notes"><summary>What these numbers include</summary><dl>${metricRows.map((row) => `<div><dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.meaning)}</dd></div>`).join("")}</dl><p>Time value = sample minutes ÷ checked outputs × monthly tasks ÷ 60 × hourly value. Cost per usable result = (tool charge + time value) ÷ projected usable outputs. The sample is user-selected; no statistical range or realized savings is established.</p></details>
       <p class="table-boundary">${escapeHtml(
         comparison.savings_claim_allowed
           ? "The bill, ready result log, quality floor, policy, and cost basis reconcile."
@@ -14440,7 +14549,7 @@ body{min-width:0}
       )}</p>`;
     document.getElementById("outcome-yield-card").innerHTML = `
       <div class="yield-header">
-        <div><span>OUTCOME YIELD</span><strong>For every 100 attempts</strong></div>
+        <div><span>USABLE WORK</span><strong>For every 100 outputs at these sample rates</strong></div>
         <span>QUALITY FLOOR ${pct(state.data.workload.accepted_quality_threshold)}</span>
       </div>
       ${renderYieldRoute(baseline)}
@@ -15964,7 +16073,7 @@ body{min-width:0}
       });
       state.usageReview = review;
       state.usageReviewIllustrative = illustrative;
-      state.usageReviewBill = document.body.classList.contains("bill-usage-mode") && !illustrative ? state.data : null;
+      state.usageReviewBill = document.body.classList.contains("bill-usage-mode") && !illustrative && [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version) ? state.data : null;
       renderRequestAnalysis(review);
       document.getElementById("request-analysis-results").scrollIntoView({ behavior: "smooth", block: "start" });
       showToast(illustrative
@@ -16434,6 +16543,7 @@ body{min-width:0}
             ["Cache-read share", cacheShare === null ? "Not supplied" : pct(cacheShare, 1), cacheShare === null && ["partial", "missing"].includes(totals.coverage.cachedInput.status) ? reportedCoverageNote(totals, "cachedInput", "Use only the cache fields reported by the source") : "Use only the cache fields reported by the source"],
           ];
     document.getElementById("bill-review-kicker").textContent = stage.kicker;
+    if (manualBill && stage.key === "bill") document.getElementById("bill-review-kicker").textContent = "YOUR COST BASELINE";
     document.getElementById("bill-review-title").textContent = stage.title;
     const sourceTitles = {
       invoice_form: "Amount you entered",
@@ -16463,7 +16573,7 @@ body{min-width:0}
     document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td data-label="Provider / model / route">${escapeHtml(row.label)}</td><td data-label="Requests">${escapeHtml(reportedCoverageValue(row, "requests"))}</td><td data-label="Input / output">${escapeHtml(reportedCoverageValue(row, "processedInput"))} / ${escapeHtml(reportedCoverageValue(row, "outputTokens"))}</td><td data-label="Cache read / write">${escapeHtml(reportedCoverageValue(row, "cachedInput"))} / ${escapeHtml(reportedCoverageValue(row, "cacheWriteInput"))}</td><td data-label="Cost basis">${escapeHtml(basisLabel)}</td><td data-label="Declared cost">${cost(row.providerCost)}</td></tr>`).join("");
     document.getElementById("bill-opportunity-ledger").innerHTML = guidance.map(([kind, label, title, value, note]) => `<article class="opportunity-row state-${kind}"><span class="opportunity-state">${escapeHtml(label)}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(note)}</p></div><em>${escapeHtml(value)}</em></article>`).join("");
     document.getElementById("bill-next-step").textContent = stage.key === "bill"
-      ? "Keep this baseline. Add the next piece of data only when it answers a real decision."
+      ? "Save this baseline. Next period, add the previous bill to compare the change."
       : stage.key === "usage"
         ? "Investigate the largest visible cost driver, then test one bounded change."
         : "Use this as the current benchmark before comparing another model or route.";
@@ -16488,8 +16598,9 @@ body{min-width:0}
     renderEvidenceSummary("bill-evidence-summary", [
       ["Service period", state.data.config.serviceStart ? `${period.start} to ${period.end}` : "Not declared; only supplied date buckets"],
       ["Cost source", basisLabel],
-      ["Records through", `${period.end} · supplied records, no live sync`],
+      [manualBill ? "Invoice date" : "Records through", manualBill ? state.data.source.spend[0].date : `${period.end} · supplied records, no live sync`],
     ]);
+    if (stage.key === "bill") document.getElementById("bill-usage-section").hidden = true;
     if (state.data.config.toolSpend) renderToolSpend(review);
   }
 
@@ -16591,7 +16702,9 @@ body{min-width:0}
     const topProjectShare = topProject ? topProject.amount / bill.total : null;
     const costPerRequestLabel = costPerRequest === null ? "Unavailable" : money(costPerRequest, costPerRequest < 1 ? 4 : 2);
     const topRequestShareLabel = topRequestShare === null ? "Unavailable" : pct(topRequestShare, 1);
-    document.getElementById("bill-period-label").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
+    document.getElementById("bill-period-label").textContent = period.aligned
+      ? `${period.start} to ${period.end} · ${period.timezone}`
+      : `Different periods · cost: ${period.cost_dates[0]} to ${period.cost_dates.at(-1)} · usage: ${period.usage_dates[0]} to ${period.usage_dates.at(-1)} · ${period.timezone}`;
     renderEvidenceSummary("bill-evidence-summary", [["Exported period", `${period.start} to ${period.end} · ${period.aligned ? "aligned UTC buckets" : "alignment needs checking"}`], ["Cost source", "Saved provider cost export · not independently verified"], ["Records through", `${period.end} · imported files, no live sync`]]);
     document.getElementById("bill-mode-tag").textContent = !period.aligned ? "PERIOD MISMATCH" : state.data.mode === "illustrative" ? "ILLUSTRATIVE COST AND USAGE" : "COST AND USAGE · NO SAVINGS CLAIM";
     document.getElementById("bill-finding-title").textContent =
@@ -16858,6 +16971,16 @@ body{min-width:0}
 
   function renderAll() {
     validateResult(state.data);
+    if (state.data.mode !== "illustrative") state.hasStarted = true;
+    document.body.classList.toggle("welcome-mode", !state.hasStarted);
+    document.body.classList.toggle("simple-mode", state.data.experience === "simple");
+    if (state.data.experience === "simple") {
+      state.story = false;
+      document.body.classList.remove("story-mode");
+      document.getElementById("story-toggle").textContent = "Presentation view";
+    }
+    document.getElementById("lens-welcome").hidden = state.hasStarted;
+    document.getElementById("simple-decision-block").hidden = state.data.experience !== "simple";
     document.getElementById("simple-edit-actions").hidden = state.data.experience !== "simple" || !state.data.simple_input_snapshot;
     const exampleSwitcher = document.getElementById("example-switcher");
     exampleSwitcher.hidden = state.data.mode !== "illustrative";
@@ -16879,9 +17002,9 @@ body{min-width:0}
     const isBill = isSingle || state.data.schema_version === "ai-cost-lens-openai-bill-review/0.1";
     const reviewNav = document.querySelector(".question-nav");
     const mobileNav = document.querySelector(".mobile-section-picker");
-    reviewNav.hidden = isBill;
-    mobileNav.hidden = isBill;
-    reviewNav.setAttribute("aria-hidden", String(isBill));
+    reviewNav.hidden = isBill || state.data.experience === "simple";
+    mobileNav.hidden = isBill || state.data.experience === "simple";
+    reviewNav.setAttribute("aria-hidden", String(isBill || state.data.experience === "simple"));
     reviewNav.querySelectorAll("button").forEach((button) => {
       button.disabled = isBill;
       button.tabIndex = isBill ? -1 : 0;
@@ -16904,7 +17027,7 @@ body{min-width:0}
       renderOpenAIBill();
       return;
     }
-    const simpleViews = new Set(["review", "opportunities", "verify", "evidence"]);
+    const simpleViews = new Set(["review"]);
     const availableViews = state.data.experience === "simple"
       ? simpleViews
       : new Set([...document.querySelectorAll(".nav-item")].map((item) => item.dataset.view));
@@ -16916,7 +17039,7 @@ body{min-width:0}
       option.disabled = !availableViews.has(option.value);
     });
     if (!availableViews.has(state.view)) state.view = "review";
-    document.getElementById("story-toggle").hidden = false;
+    document.getElementById("story-toggle").hidden = state.data.experience === "simple";
     const isSimple = state.data.experience === "simple";
     const isIllustrative = state.data.mode === "illustrative";
     renderEvidenceSummary("review-evidence-summary", [
@@ -16925,12 +17048,14 @@ body{min-width:0}
       ["Evidence dates", isSimple ? "No dated billing records supplied" : isIllustrative ? "Invented example · no live sync" : `${[state.data.baseline, state.data.proposed].map((route) => `${route.label}: ${route.evidence.observed_at || "not supplied"}`).join(" · ")} · no live sync`],
     ]);
     renderReview();
-    renderAnatomy();
-    renderOpportunities();
-    renderScenarioSetup();
-    renderVerification();
-    renderEvidence();
-    prefillActuals();
+    if (!isSimple) {
+      renderAnatomy();
+      renderOpportunities();
+      renderScenarioSetup();
+      renderVerification();
+      renderEvidence();
+      prefillActuals();
+    }
     renderDecisionConsistency();
     setView(state.view);
   }
@@ -16941,11 +17066,12 @@ body{min-width:0}
     const b = proposed.measures.cost_per_usable_result;
     const equal = Math.abs(b - a) < 0.000001;
     const cheaper = b < a ? proposed : baseline;
+    const format = (value) => value < 1 && data.currency === "USD" ? cents(value) : new Intl.NumberFormat("en-US", { style: "currency", currency: data.currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
     return {
       headline: equal
         ? "The estimated cost per usable result is the same."
         : `${cheaper.label} has the lower estimated cost per usable result.`,
-      detail: `${baseline.label}: ${unitMoney(a)}. ${proposed.label}: ${unitMoney(b)}. Tool charges and estimated time value are included.`,
+      detail: `${baseline.label}: ${format(a)}. ${proposed.label}: ${format(b)}. Tool charges and estimated time value are included.`,
     };
   }
 
@@ -17052,6 +17178,9 @@ body{min-width:0}
     }
     if (state.data.experience === "simple") {
       const costRead = simpleCostRead(state.data);
+      document.getElementById("review-title").textContent = "Your AI cost comparison.";
+      document.getElementById("simple-cost-finding").textContent = `${costRead.headline} ${costRead.detail}`;
+      document.getElementById("simple-switch-check").textContent = decision.reason;
       document.getElementById("period-label").textContent = "Monthly scenario · billing dates not supplied";
       document.getElementById("memo-meta").textContent = "Monthly scenario · billing dates not supplied";
       document.getElementById("finding-title").textContent = costRead.headline;
@@ -17060,6 +17189,10 @@ body{min-width:0}
       document.getElementById("lumen-panel-title").textContent = "What the numbers say";
       document.getElementById("lumen-panel-copy").textContent = `${costRead.detail} ${decision.reason}`;
       document.getElementById("lumen-signals").innerHTML = `<div><span>Current cost per usable result</span><strong>${escapeHtml(unitMoney(state.data.baseline.measures.cost_per_usable_result))}</strong></div><div><span>Other option</span><strong>${escapeHtml(unitMoney(state.data.proposed.measures.cost_per_usable_result))}</strong></div>`;
+      document.getElementById("memo-numbers-title").textContent = costRead.headline;
+      document.getElementById("memo-decision-limit").textContent = `Before switching: ${decision.reason} ${state.data.comparison.limitation}`;
+      document.getElementById("memo-plan-grid").replaceChildren();
+      document.getElementById("memo-plan-basis").textContent = "";
     }
   }
 
@@ -17437,6 +17570,7 @@ body{min-width:0}
     const data = kind === "growth" ? state.growthDemoData : state.demoData;
     if (!data) { showToast("That example is still loading. Try again in a moment."); return; }
     state.data = cloneData(data);
+    state.hasStarted = true;
     state.view = "review";
     state.story = false;
     document.body.classList.remove("story-mode");
@@ -17509,12 +17643,39 @@ body{min-width:0}
     state.priceEstimate = review.pricing_estimate ? cloneData(review.pricing_estimate) : null;
     document.getElementById("simple-example-caveat").textContent = "Your entered values are restored. Update what changed, then compare again. This remains an estimate, not verified savings.";
     reviewDialog.showModal();
+    focusBuilderPath();
+  }
+
+  function focusBuilderPath() {
+    if (!reviewDialog.open) return;
+    const firstIds = { simple: "simple-current-name", tools: "tools-name", single: "invoice-provider", openai: "smart-upload-files", workload: "spend-file" };
+    const fields = document.getElementById(`${state.builderMode}-builder-fields`);
+    fields.scrollIntoView({ block: "start" });
+    document.getElementById(firstIds[state.builderMode]).focus({ preventScroll: true });
+  }
+
+  function simpleInputError(id, message) {
+    const error = new Error(message);
+    error.fieldId = id;
+    return error;
+  }
+
+  function clearSimpleErrors() {
+    for (const id of simpleInputIds) {
+      document.getElementById(id).setAttribute("aria-invalid", "false");
+      const note = document.getElementById(`${id}-error`);
+      note.textContent = "";
+      note.hidden = true;
+    }
   }
 
   function resetBuilderStart() {
     // Reset only when beginning a new draft, never on submit or its failure.
     // Native reset restores declared defaults and empties every file input.
     builderForm.reset();
+    reviewDialog.classList.remove("has-builder-path");
+    clearSimpleErrors();
+    document.getElementById("simple-approval-note").hidden = true;
     for (let index = 1; index <= 12; index++) document.getElementById(`tool-charge-${index}`).hidden = index > 2;
     document.getElementById("add-tool-charge").disabled = false;
     document.getElementById("tool-charge-status").textContent = "";
@@ -17580,7 +17741,16 @@ body{min-width:0}
     }
     if (mode === "usage") {
       state.builderMode = null;
-      const fromBill = [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version);
+      state.hasStarted = true;
+      document.body.classList.remove("welcome-mode");
+      document.getElementById("lens-welcome").hidden = true;
+      if (state.data?.experience === "simple" && state.carriedBillIntoUsage) {
+        document.getElementById("request-billed-total").value = "";
+        document.getElementById("request-billed-currency").value = "";
+        document.getElementById("request-bill-scope-confirmed").checked = false;
+        state.carriedBillIntoUsage = false;
+      }
+      const fromBill = [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version) || state.data?.experience === "simple";
       if (fromBill) {
         if (state.data.schema_version === singleBillSchema) {
           const bill = summarizeSingleBill(state.data);
@@ -17596,6 +17766,7 @@ body{min-width:0}
         }
         document.body.classList.add("bill-usage-mode");
         document.getElementById("back-to-bill").hidden = false;
+        document.getElementById("back-to-bill").textContent = state.data.experience === "simple" ? "Return to comparison" : "Back to bill review";
         document.getElementById("bill-review-screen").classList.remove("active");
         document.getElementById("view-opportunities").classList.add("active");
         reviewDialog.close();
@@ -17659,7 +17830,9 @@ body{min-width:0}
       document.getElementById("builder-action-note").textContent = "A monthly estimate including the value of your time. No files needed.";
       document.getElementById("build-review").textContent = "Compare my options";
     }
+    reviewDialog.classList.add("has-builder-path");
     syncBuilderControls();
+    focusBuilderPath();
   }
 
   document.getElementById("open-review").addEventListener("click", () => document.getElementById("review-file").click());
@@ -17668,6 +17841,11 @@ body{min-width:0}
   document.getElementById("back-to-bill").addEventListener("click", () => {
     document.body.classList.remove("bill-usage-mode");
     document.getElementById("view-opportunities").classList.remove("active");
+    if (state.data?.experience === "simple") {
+      renderAll();
+      document.getElementById("review-title").focus();
+      return;
+    }
     document.getElementById("bill-review-screen").classList.add("active");
     if (state.data?.schema_version === singleBillSchema) renderSingleBill();
     document.getElementById("back-to-bill").hidden = true;
@@ -17683,7 +17861,14 @@ body{min-width:0}
   document.getElementById("edit-simple-comparison").addEventListener("click", editSimpleComparison);
   for (const id of ["simple-current-name", "simple-other-name"]) {
     document.getElementById(id).addEventListener("input", () => {
+      const wasApproved = document.getElementById("simple-approved").checked;
       document.getElementById("simple-approved").checked = false;
+      if (wasApproved) {
+        const note = document.getElementById("simple-approval-note");
+        note.textContent = "The tool name changed, so approval was cleared. Confirm it again for these tools when appropriate.";
+        note.hidden = false;
+        showToast("Tool name changed. Approval needs confirming again.");
+      }
     });
   }
   for (const id of ["simple-current-name", "simple-other-name", "simple-current-cost", "simple-other-cost", "simple-monthly-tasks"]) {
@@ -17700,6 +17885,7 @@ body{min-width:0}
     for (const id of ["simple-current-name", "simple-current-cost", "simple-other-name", "simple-other-cost"]) document.getElementById(id).value = "";
     document.getElementById("simple-example-caveat").textContent = "Enter the monthly costs for the specific tools or plans you want to compare. Your combined baseline is not copied or allocated to one tool. The quality sample below is illustrative until you replace it.";
     reviewDialog.showModal();
+    focusBuilderPath();
   });
   document.getElementById("add-tool-charge").addEventListener("click", () => {
     for (let index = 1; index <= 12; index++) {
@@ -17722,6 +17908,14 @@ body{min-width:0}
   });
 
   document.getElementById("simple-change-path").addEventListener("click", resetBuilderStart);
+  document.getElementById("welcome-compare").addEventListener("click", () => {
+    resetBuilderStart();
+    activateBuilderMode("simple");
+    reviewDialog.showModal();
+    focusBuilderPath();
+  });
+  document.getElementById("welcome-spending").addEventListener("click", () => document.getElementById("start-review").click());
+  document.getElementById("welcome-example").addEventListener("click", () => openIllustrativeExample("cost-trap"));
 
   const pricePromptDialog = document.getElementById("price-prompt-dialog");
   const pricePromptForm = document.getElementById("price-prompt-form");
@@ -18333,7 +18527,7 @@ body{min-width:0}
       }
       if (route.kind === "openai") {
         setImportProvider("openai");
-        status.textContent = "Recognized the matching OpenAI Usage Dashboard activity and cost CSV exports. Review the provider steps, then build.";
+        status.textContent = "Both OpenAI Usage Dashboard activity and cost CSV exports were found. Their reporting periods will be checked when you build the review.";
       } else if (route.kind === "claude_spend") {
         setImportProvider("claude");
         status.textContent = "Recognized a Claude Team/Enterprise spend report. Add its reporting-period dates below, then check the normalized review.";
@@ -18386,18 +18580,26 @@ body{min-width:0}
           fields: Object.fromEntries(simpleInputIds.map((id) => [id, document.getElementById(id).value])),
           approved: document.getElementById("simple-approved").checked,
         };
-        const value = (id, label, options) => finiteNumber(document.getElementById(id).value, label, options);
+        clearSimpleErrors();
+        const value = (id, label, options) => {
+          try { return finiteNumber(document.getElementById(id).value, label, options); }
+          catch (error) { throw simpleInputError(id, error.message); }
+        };
         const currentName = document.getElementById("simple-current-name").value.trim();
         const otherName = document.getElementById("simple-other-name").value.trim();
-        if (!currentName || !otherName) throw new Error("Give both tools or plans a name.");
+        if (!currentName || !otherName) throw simpleInputError(!currentName ? "simple-current-name" : "simple-other-name", "Give this tool or plan a name.");
         const monthlyTasks = value("simple-monthly-tasks", "Monthly tasks", { integer: true });
         const currentChecked = value("simple-current-checked", "Current outputs checked", { integer: true });
         const otherChecked = value("simple-other-checked", "Other outputs checked", { integer: true });
         const currentUsable = value("simple-current-usable", "Current usable outputs", { integer: true });
         const otherUsable = value("simple-other-usable", "Other usable outputs", { integer: true });
-        if (!monthlyTasks || !currentChecked || !otherChecked) throw new Error("Enter at least one monthly task and one checked output for each option.");
-        if (currentUsable > currentChecked || otherUsable > otherChecked) throw new Error("Usable outputs cannot be greater than the number you checked.");
-        if (currentChecked > monthlyTasks || otherChecked > monthlyTasks) throw new Error("The number checked cannot be greater than your monthly tasks.");
+        if (!monthlyTasks) throw simpleInputError("simple-monthly-tasks", "Enter at least one monthly task.");
+        for (const [side, name, checked, usable] of [["current", currentName, currentChecked, currentUsable], ["other", otherName, otherChecked, otherUsable]]) {
+          if (!checked) throw simpleInputError(`simple-${side}-checked`, `${name}: enter at least one checked output.`);
+          if (usable > checked) throw simpleInputError(`simple-${side}-usable`, `${name}: usable outputs cannot be greater than the number you checked.`);
+          if (!usable) throw simpleInputError(`simple-${side}-usable`, `${name}: zero usable outputs were counted. Cost per usable result needs at least one.`);
+          if (checked > monthlyTasks) throw simpleInputError(`simple-${side}-checked`, `${name}: the number checked cannot be greater than your monthly tasks.`);
+        }
         const csvCell = (input) => `"${String(input).replaceAll('"', '""')}"`;
         const header = "period,date,workload,provider,model,route,requests,input_tokens,cached_input_tokens,cache_write_input_tokens,output_tokens,provider_cost,cost_basis,currency";
         const today = new Date().toISOString().slice(0, 10);
@@ -18422,7 +18624,7 @@ body{min-width:0}
           outcomeLogComplete: false,
           planning: null,
         };
-        if (config.qualityFloor <= 0 || config.qualityFloor > 1) throw new Error("Minimum usable rate must be between 1% and 100%.");
+        if (config.qualityFloor < 0.01 || config.qualityFloor > 1) throw simpleInputError("simple-quality-floor", "Minimum usable rate must be between 1% and 100%.");
         state.data = await buildSimpleReview(spendText, {
           baseline: { population: monthlyTasks, ready: currentUsable, correction: currentChecked - currentUsable, escalation: 0, humanMinutes: value("simple-current-minutes", "Current review and fixing minutes") },
           proposed: { population: monthlyTasks, ready: otherUsable, correction: otherChecked - otherUsable, escalation: 0, humanMinutes: value("simple-other-minutes", "Other review and fixing minutes") },
@@ -18509,7 +18711,7 @@ body{min-width:0}
           const amount = costNumber(document.getElementById("invoice-amount").value, "Billed amount");
           const currency = document.getElementById("invoice-currency").value.trim().toUpperCase();
           if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a three-letter code.");
-          spendText = rowsToCsv([{ period: "baseline", date: invoiceDate, workload, provider, model: "", route: "Subscription or invoice", requests: "", input_tokens: "", cached_input_tokens: "", cache_write_input_tokens: "", output_tokens: "", provider_cost: String(amount), cost_basis: "provider_reported", currency }]);
+          spendText = rowsToCsv([{ period: "baseline", date: invoiceDate, workload, provider, model: "", route: "Subscription or invoice", requests: "", input_tokens: "", cached_input_tokens: "", cache_write_input_tokens: "", output_tokens: "", provider_cost: String(amount), cost_basis: "user_entered", currency }]);
         }
         state.data = await buildSingleBillReview(spendText, workFile ? await readLocalFile(workFile) : "", {
           acceptanceRule: document.getElementById("single-ready-rule").value.trim(),
@@ -18569,7 +18771,7 @@ body{min-width:0}
             if (coverage.status === "missing") return "unavailable";
             return `${value} reported (${coverage.suppliedRows} of ${coverage.totalRows} rows)`;
           };
-          box.textContent = `Provider: ${summary.provider}. Period: ${summary.period.start} to ${summary.period.end}. Products: ${summary.products.join(", ")}. Models: ${summary.models.join(", ")}. Provider-reported cost: $${summary.providerCost.toFixed(2)}. Requests: ${confirmationMeasure("requests", summary.requests)}. Input tokens: ${confirmationMeasure("processedInput", summary.inputTokens)}. Output tokens: ${confirmationMeasure("outputTokens", summary.outputTokens)}. Not included: ${summary.missing.join(", ")}. Source rows: ${summary.sourceRows}. Personal identifiers were discarded.`;
+          box.textContent = `Provider: ${summary.provider}. Period: ${summary.period.start} to ${summary.period.end}. Products: ${summary.products.join(", ")}. Models: ${summary.models.join(", ")}. Provider-reported ${summary.costBasis === "net" ? "net " : ""}cost: $${summary.providerCost.toFixed(2)}. Requests: ${confirmationMeasure("requests", summary.requests)}. Input tokens: ${confirmationMeasure("processedInput", summary.inputTokens)}. Output tokens: ${confirmationMeasure("outputTokens", summary.outputTokens)}. Not included: ${summary.missing.join(", ")}. Source rows: ${summary.sourceRows}. Personal identifiers were discarded.`;
           box.hidden = false; submit.textContent = "Confirm and build Claude review"; return;
         }
         const [usageFile] = document.getElementById("openai-usage-file").files;
@@ -18671,6 +18873,15 @@ body{min-width:0}
       if (previousData) renderAll();
       errorBox.textContent = error instanceof TypeError || error instanceof RangeError ? "The review could not be built. Check the file structure and numeric values." : error.message || "The review could not be built.";
       errorBox.classList.add("visible");
+      if (error.fieldId && simpleInputIds.includes(error.fieldId)) {
+        const input = document.getElementById(error.fieldId);
+        const note = document.getElementById(`${error.fieldId}-error`);
+        input.setAttribute("aria-invalid", "true");
+        note.textContent = error.message;
+        note.hidden = false;
+        input.focus({ preventScroll: true });
+        input.scrollIntoView({ block: "center" });
+      }
     } finally {
       submit.disabled = false;
       submit.textContent = state.builderMode === "tools" ? "Review my AI tools" : state.builderMode === "simple" ? "Compare my options" : state.builderMode === "single" ? "Understand this bill" : state.builderMode === "openai"
@@ -18757,6 +18968,7 @@ body{min-width:0}
       }
       validateResult(data);
       state.data = data;
+      state.hasStarted = true;
       renderAll();
       setView("review");
       showToast(`${file.name} is open. Nothing was uploaded.`);

@@ -2,6 +2,8 @@
 
 Status: first product pass; independent visitor review is the next step. This is not a claim that every import format, real provider export, or physical device has been certified.
 
+Follow-up: the independent review and resulting changes are reconciled in [the second pass](2026-10-22-review-reconciliation.md).
+
 Reviewed baseline: `8ab845dc688bd1cae976f5ff94ebb992f6d7d27a`. The earlier October 20 Claude audit supplied the initial questions. Findings below distinguish fresh browser observations, code checks, automated tests, and product judgment. The approved Cloud & Capital homepage is outside this change.
 
 ## The job worth doing
