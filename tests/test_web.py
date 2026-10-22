@@ -425,10 +425,7 @@ def test_question_navigation_matches_views():
             "actuals",
         }
     )
-    assert (
-        'const simpleViews = new Set(["review"])'
-        in (WEB / "app.js").read_text()
-    )
+    assert 'const simpleViews = new Set(["review"])' in (WEB / "app.js").read_text()
 
 
 def test_release_review_regressions_have_plain_language_and_precise_formatting():
