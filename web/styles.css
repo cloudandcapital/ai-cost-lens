@@ -2881,6 +2881,8 @@ body.story-mode .cockpit-grid {
     grid-template-columns: 1fr;
   }
 
+  .truth-heading { gap: 16px; }
+
   .lumen-panel {
     position: static;
     min-height: 500px;
@@ -6332,6 +6334,7 @@ body{min-width:0}
 .tool-charge-grid > label:last-child { grid-column: 1 / -1; }
 .tool-charge-entry[hidden], #tools-builder-fields[hidden], #tool-spend-result[hidden], #bill-usage-section[hidden] { display: none; }
 .review-next-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin: 22px 0 36px; }
+.review-next-actions[hidden] { display: none; }
 #story-toggle[hidden] { display: none; }
 #tool-spend-result .usage-table td { overflow-wrap: anywhere; }
 @media (max-width: 620px) {

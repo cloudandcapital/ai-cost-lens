@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How to use AI Cost Lens | Cloud &amp; Capital</title>
+    <meta name="description" content="Choose the right starting point, compare two AI options with a worked example, and understand what your result can tell you." />
+    <link rel="canonical" href="https://lens.cloudandcapital.com/guide.html" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/guide.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="masthead guide-header">
+        <a class="wordmark" href="https://cloudandcapital.com/" aria-label="Cloud and Capital home"><span>CLOUD &amp; CAPITAL</span><small>AI COST LENS</small></a>
+        <a class="text-button" href="/">Open the tool <span aria-hidden="true">→</span></a>
+      </header>
+      <main class="guide">
+        <p class="kicker">A GUIDE TO THE TOOL</p>
+        <h1>Understand your AI costs.<br />Start with what you have.</h1>
+        <p class="intro">Use a bill to understand spending, or compare two AI options using their cost and a small sample of your work. You can begin without connecting an account or preparing a spreadsheet.</p>
+        <section aria-labelledby="choose-title">
+          <h2 id="choose-title">Choose your starting point.</h2>
+          <h3>I have a bill or subscription charge.</h3>
+          <p>Choose <strong>Start a review → Start with a bill</strong>. Enter the amount, currency, invoice date, and service period if you know it. A previous bill or same-period budget adds context. Without usage records, this establishes a cost baseline; it cannot tell you which work caused the bill.</p>
+          <h3>I pay for several AI tools.</h3>
+          <p>Choose <strong>Review my AI tools</strong>. Enter subscription charges and separately billed usage for one period. Include a source for each charge and an owner when you know who is responsible. Check for duplicate charges and avoid adding usage already included in a subscription.</p>
+          <h3>I want to compare two options.</h3>
+          <p>Choose <strong>Compare two options</strong>. Enter their monthly costs, how many tasks you complete, and the usable outputs and review time from a sample of the same work. The result estimates cost per usable result, including the value you assign to your time.</p>
+          <h3>I have usage records, or want to price a prompt.</h3>
+          <p><strong>Review AI usage</strong> analyzes supported request or trace exports. <strong>Upload what you have</strong> checks supported CSV, JSON, and text-based invoice PDFs. A scanned PDF may need manual entry. <strong>Price a prompt</strong> models API costs using the tool's dated price catalog and your assumptions; it does not run your prompt or fetch live prices.</p>
+        </section>
+        <section aria-labelledby="example-title">
+          <h2 id="example-title">A cheaper plan can mean more work.</h2>
+          <p>This invented example compares 100 tasks per month. You check 20 outputs from each plan and value your time at $30 an hour.</p>
+          <div class="example">
+            <table>
+              <caption>Illustrative inputs and calculated monthly estimates</caption>
+              <thead><tr><th scope="col">Measure</th><th scope="col">Plan A</th><th scope="col">Plan B</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Monthly tool cost</th><td>$80</td><td>$40</td></tr>
+                <tr><th scope="row">Usable outputs out of 20</th><td>18</td><td>16</td></tr>
+                <tr><th scope="row">Minutes reviewing the sample</th><td>60</td><td>120</td></tr>
+                <tr><th scope="row">Estimated usable outputs per month</th><td>90</td><td>80</td></tr>
+                <tr><th scope="row">Estimated monthly time value</th><td>$150</td><td>$300</td></tr>
+                <tr><th scope="row">Tool cost plus time value</th><td>$230</td><td>$340</td></tr>
+                <tr><th scope="row">Cost per usable result</th><td><strong>$2.56</strong></td><td><strong>$4.25</strong></td></tr>
+              </tbody>
+            </table>
+            <p>Plan A has the lower estimated cost per usable result, even though its subscription costs more. The sample suggests where to investigate; it does not prove what will happen next month.</p>
+            <p class="boundary">The calculation projects sample review time and usable-output rates across the monthly task count. Time value is an estimate, not necessarily cash paid or money you can recover.</p>
+          </div>
+        </section>
+        <section aria-labelledby="result-title">
+          <h2 id="result-title">Read the result in two parts.</h2>
+          <ol>
+            <li><strong>What the numbers say.</strong> Compare the costs on the same basis. In the simple comparison, “usable” means accepted without a significant fix. Repaired outputs are excluded from this first-pass measure.</li>
+            <li><strong>What still needs checking.</strong> A lower estimate does not establish quality, permission to use a tool, or realized savings. Keep the quality and approval checks separate from the cost finding.</li>
+          </ol>
+          <p>Use <strong>Edit this comparison</strong> to change the inputs for a comparison created with the current tool. <strong>Start a review</strong> begins a fresh draft. Older saved results can still be opened; their original editable inputs may not be available.</p>
+        </section>
+        <section aria-labelledby="keep-title">
+          <h2 id="keep-title">Keep a copy you can return to.</h2>
+          <p>Use <strong>Download decision record (JSON)</strong> to save the review, then <strong>Open saved review</strong> to reopen it. <strong>Print finance memo</strong> opens your browser's print dialog so you can print or save a PDF. The tool does not automatically save your review between visits.</p>
+          <p>Source files are read in your browser. No provider account connection or API key is needed. Exported files contain the information in your review, so store and share them deliberately.</p>
+          <p><a href="/">Try it with your numbers <span aria-hidden="true">→</span></a></p>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

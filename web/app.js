@@ -35,6 +35,12 @@
     breakEvenReady: false,
   };
 
+  const simpleInputIds = [
+    "simple-current-name", "simple-current-cost", "simple-other-name", "simple-other-cost",
+    "simple-monthly-tasks", "simple-current-checked", "simple-current-usable", "simple-current-minutes",
+    "simple-other-checked", "simple-other-usable", "simple-other-minutes", "simple-hourly-rate", "simple-quality-floor",
+  ];
+
   const opportunityEngine = globalThis.AICostLensOpportunities;
   const usageEventEngine = globalThis.AICostLensUsageEvents;
   const verificationEngine = globalThis.AICostLensVerification;
@@ -2287,6 +2293,7 @@
       for (const scenario of [data.baseline, data.proposed]) {
         if (typeof scenario.model.name === "string" && scenario.model.name.trim()) scenario.label = scenario.model.name.trim();
       }
+      if (data.simple_input_snapshot && !simpleInputSnapshotMatches(data)) fail();
     }
     const { baseline: a, proposed: b, comparison: c } = data;
     c.quality_holds = b.measures.usable_result_rate >= data.workload.accepted_quality_threshold;
@@ -2883,11 +2890,12 @@
 
   function lumenResponse(kind) {
     if (state.data?.experience === "simple") {
-      const { baseline, proposed, comparison } = state.data;
+      const { comparison } = state.data;
       const decision = decisionFor(state.data);
       if (["evidence", "challenge"].includes(kind)) return `${decision.reason} ${comparison.limitation}`;
       if (kind === "plan" || kind === "payback") return "No budget plan or switching cost was supplied. A monthly scenario alone does not establish payback or realized savings.";
-      return `${decision.reason} Current cost per usable result: ${unitMoney(baseline.measures.cost_per_usable_result)}. Other option: ${unitMoney(proposed.measures.cost_per_usable_result)}. Tool charges and estimated time value are included; usable means accepted without a significant fix.`;
+      const costRead = simpleCostRead(state.data);
+      return `${costRead.headline} ${costRead.detail} ${decision.reason} Usable means accepted without a significant fix.`;
     }
 
 
@@ -5036,6 +5044,7 @@
 
   function renderAll() {
     validateResult(state.data);
+    document.getElementById("simple-edit-actions").hidden = state.data.experience !== "simple" || !state.data.simple_input_snapshot;
     const exampleSwitcher = document.getElementById("example-switcher");
     exampleSwitcher.hidden = state.data.mode !== "illustrative";
     const isGrowthExample = state.data.mode === "illustrative" && state.data.workload?.name === "Growing support AI workload";
@@ -5110,6 +5119,20 @@
     prefillActuals();
     renderDecisionConsistency();
     setView(state.view);
+  }
+
+  function simpleCostRead(data) {
+    const { baseline, proposed } = data;
+    const a = baseline.measures.cost_per_usable_result;
+    const b = proposed.measures.cost_per_usable_result;
+    const equal = Math.abs(b - a) < 0.000001;
+    const cheaper = b < a ? proposed : baseline;
+    return {
+      headline: equal
+        ? "The estimated cost per usable result is the same."
+        : `${cheaper.label} has the lower estimated cost per usable result.`,
+      detail: `${baseline.label}: ${unitMoney(a)}. ${proposed.label}: ${unitMoney(b)}. Tool charges and estimated time value are included.`,
+    };
   }
 
   function decisionFor(data) {
@@ -5214,10 +5237,14 @@
       document.getElementById("finding-limit").textContent = state.data.comparison.limitation;
     }
     if (state.data.experience === "simple") {
+      const costRead = simpleCostRead(state.data);
       document.getElementById("period-label").textContent = "Monthly scenario · billing dates not supplied";
       document.getElementById("memo-meta").textContent = "Monthly scenario · billing dates not supplied";
-      document.getElementById("finding-title").textContent = decision.reason;
+      document.getElementById("finding-title").textContent = costRead.headline;
       document.getElementById("finding-limit").textContent = state.data.comparison.limitation;
+      if (decisionHeading) decisionHeading.textContent = costRead.headline;
+      document.getElementById("lumen-panel-title").textContent = "What the numbers say";
+      document.getElementById("lumen-panel-copy").textContent = `${costRead.detail} ${decision.reason}`;
       document.getElementById("lumen-signals").innerHTML = `<div><span>Current cost per usable result</span><strong>${escapeHtml(unitMoney(state.data.baseline.measures.cost_per_usable_result))}</strong></div><div><span>Other option</span><strong>${escapeHtml(unitMoney(state.data.proposed.measures.cost_per_usable_result))}</strong></div>`;
     }
   }
@@ -5631,6 +5658,45 @@
     }
   }
 
+  function simpleInputSnapshotMatches(data) {
+    const snapshot = data.simple_input_snapshot;
+    if (snapshot?.schema_version !== "ai-cost-lens-simple-inputs/1.0" || !snapshot.fields || typeof snapshot.approved !== "boolean") return false;
+    if (!simpleInputIds.every((id) => typeof snapshot.fields[id] === "string")) return false;
+    const fields = snapshot.fields;
+    const same = (a, b) => Math.abs(a - b) <= Math.max(0.000002, Math.abs(b) * 0.000001);
+    try {
+      const value = (id, integer = false) => finiteNumber(fields[id], id, { integer });
+      const tasks = value("simple-monthly-tasks", true);
+      const hourly = value("simple-hourly-rate");
+      if (!same(value("simple-quality-floor") / 100, data.workload.accepted_quality_threshold)) return false;
+      for (const [prefix, route] of [["current", data.baseline], ["other", data.proposed]]) {
+        const id = (suffix) => `simple-${prefix}-${suffix}`;
+        const checked = value(id("checked"), true);
+        const minutes = value(id("minutes"));
+        if (!checked || fields[id("name")].trim() !== route.model.name || !same(value(id("cost")), route.costs.model_cost)) return false;
+        if (tasks !== route.outcomes.completed_results || checked !== route.outcomes.sample_size || value(id("usable"), true) !== route.outcomes.sample_counts.ready_to_use) return false;
+        if (!same(minutes, route.outcomes.sample_human_minutes) || !same(minutes / checked * tasks / 60 * hourly, route.costs.human_review_cost)) return false;
+        if (snapshot.approved !== route.policy.approved) return false;
+      }
+      return true;
+    } catch { return false; }
+  }
+
+  function editSimpleComparison() {
+    const review = state.data;
+    if (review?.experience !== "simple" || !simpleInputSnapshotMatches(review)) {
+      showToast("The original inputs are not available for this saved comparison. Start a new review; the current result is unchanged.");
+      return;
+    }
+    resetBuilderStart();
+    activateBuilderMode("simple");
+    for (const id of simpleInputIds) document.getElementById(id).value = review.simple_input_snapshot.fields[id];
+    document.getElementById("simple-approved").checked = review.simple_input_snapshot.approved;
+    state.priceEstimate = review.pricing_estimate ? cloneData(review.pricing_estimate) : null;
+    document.getElementById("simple-example-caveat").textContent = "Your entered values are restored. Update what changed, then compare again. This remains an estimate, not verified savings.";
+    reviewDialog.showModal();
+  }
+
   function resetBuilderStart() {
     // Reset only when beginning a new draft, never on submit or its failure.
     // Native reset restores declared defaults and empties every file input.
@@ -5800,6 +5866,19 @@
     reviewDialog.showModal();
   });
   document.getElementById("close-review").addEventListener("click", () => reviewDialog.close());
+  document.getElementById("edit-simple-comparison").addEventListener("click", editSimpleComparison);
+  for (const id of ["simple-current-name", "simple-other-name"]) {
+    document.getElementById(id).addEventListener("input", () => {
+      document.getElementById("simple-approved").checked = false;
+    });
+  }
+  for (const id of ["simple-current-name", "simple-other-name", "simple-current-cost", "simple-other-cost", "simple-monthly-tasks"]) {
+    document.getElementById(id).addEventListener("input", () => {
+      if (!state.priceEstimate) return;
+      state.priceEstimate = null;
+      document.getElementById("simple-example-caveat").textContent = "The tool, cost, or task volume was edited. This comparison now uses your entered costs, rather than the earlier prompt-price estimate.";
+    });
+  }
   document.getElementById("bill-save-next").addEventListener("click", () => document.getElementById("download-review").click());
   document.getElementById("bill-compare-next").addEventListener("click", () => {
     resetBuilderStart();
@@ -6488,6 +6567,11 @@
     const previousData = state.data;
     try {
       if (state.builderMode === "simple") {
+        const inputSnapshot = {
+          schema_version: "ai-cost-lens-simple-inputs/1.0",
+          fields: Object.fromEntries(simpleInputIds.map((id) => [id, document.getElementById(id).value])),
+          approved: document.getElementById("simple-approved").checked,
+        };
         const value = (id, label, options) => finiteNumber(document.getElementById(id).value, label, options);
         const currentName = document.getElementById("simple-current-name").value.trim();
         const otherName = document.getElementById("simple-other-name").value.trim();
@@ -6530,6 +6614,7 @@
           proposed: { population: monthlyTasks, ready: otherUsable, correction: otherChecked - otherUsable, escalation: 0, humanMinutes: value("simple-other-minutes", "Other review and fixing minutes") },
         }, config);
         state.data.experience = "simple";
+        state.data.simple_input_snapshot = inputSnapshot;
         state.data.workload.name = "My monthly AI-assisted work";
         state.data.workload.description = "A plain-language comparison of two AI options using monthly cost, usable work, and the user's review and fixing time.";
         state.data.workload.outcome_unit = "usable result";

@@ -501,6 +501,62 @@ assert.equal(api.state.data.baseline.usage.requests,null);
 const simpleRecord = JSON.stringify(api.state.data);
 await file('review-file',simpleRecord,'comparison.json');
 assert.equal(api.state.data.experience,'simple');
+assert.equal(el('simple-edit-actions').hidden,false);
+await click('edit-simple-comparison');
+assert.equal(el('simple-current-name').value,'Diana current');
+assert.equal(el('simple-other-name').value,'<Diana other>');
+assert.equal(el('simple-approved').checked,true);
+el('simple-other-name').value='A different tool';
+await el('simple-other-name').emit('input');
+assert.equal(el('simple-approved').checked,false,'A changed tool name needs a fresh approval declaration.');
+await click('close-review');
+
+// Reproduce the audited edit/approval problems with independently known totals.
+await click('start-review'); await mode('simple');
+for (const [id,value] of Object.entries({
+  'simple-current-name':'Review plan A','simple-other-name':'Review plan B',
+  'simple-current-cost':'80','simple-other-cost':'40','simple-monthly-tasks':'100',
+  'simple-current-checked':'20','simple-current-usable':'18','simple-current-minutes':'60',
+  'simple-other-checked':'20','simple-other-usable':'16','simple-other-minutes':'120',
+  'simple-hourly-rate':'30','simple-quality-floor':'75',
+})) el(id).value=value;
+await submit();
+assert.equal(api.state.data.baseline.costs.recurring_operating_cost,230);
+assert.equal(api.state.data.proposed.costs.recurring_operating_cost,340);
+assert.equal(el('decision-code').textContent,'CHECK APPROVAL');
+assert.equal(api.state.data.comparison.savings_claim_allowed,false);
+assert.match(el('finding-title').textContent,/Review plan A has the lower estimated cost/);
+assert.match(el('lumen-panel-copy').textContent,/\$2\.56[\s\S]*\$4\.25[\s\S]*approval/);
+const editableRecord=JSON.stringify(api.state.data);
+await click('start-review'); await mode('simple'); // A new review deliberately has fresh defaults.
+assert.equal(el('simple-current-cost').value,'40');
+await click('close-review');
+await file('review-file',editableRecord,'editable-comparison.json');
+await click('edit-simple-comparison');
+assert.equal(el('simple-current-cost').value,'80');
+assert.equal(el('simple-other-minutes').value,'120');
+assert.equal(el('simple-quality-floor').value,'75');
+assert.equal(el('simple-approved').checked,false);
+const unchanged=api.state.data;
+el('simple-other-usable').value='21';
+await submit();
+assert.equal(api.state.data,unchanged,'An invalid edit must leave the prior result intact.');
+assert.match(el('builder-error').textContent,/greater than the number you checked/);
+el('simple-other-usable').value='16'; el('simple-current-cost').value='100';
+await submit();
+assert.equal(api.state.data.baseline.costs.recurring_operating_cost,250);
+assert.equal(api.state.data.proposed.costs.recurring_operating_cost,340);
+assert.equal(api.state.data.comparison.both_policy_approved,false);
+const changed=api.state.data;
+const tampered=JSON.parse(editableRecord);
+tampered.simple_input_snapshot.fields['simple-current-cost']='999';
+await file('review-file',JSON.stringify(tampered),'inconsistent-inputs.json');
+assert.equal(api.state.data,changed,'An inconsistent input snapshot must not replace the displayed result.');
+const legacy=JSON.parse(editableRecord); delete legacy.simple_input_snapshot;
+await file('review-file',JSON.stringify(legacy),'legacy-comparison.json');
+assert.equal(api.state.data.experience,'simple');
+assert.equal(el('simple-edit-actions').hidden,true,'Older results remain readable without guessed editor inputs.');
+console.log('PASS: cost finding remains visible without approval; edit, save/reopen, invalid rollback and legacy reviews');
 await click('start-review'); await mode('simple');
 el('simple-approved').checked = true;
 el('simple-current-cost').value = '0'; el('simple-other-cost').value = '0';
@@ -606,6 +662,15 @@ el('simple-other-minutes').value = '0';
 el('simple-hourly-rate').value = '30';
 await submit();
 assert.equal(api.state.data.pricing_estimate.evidence_gate.savings_claim_allowed,false);
+assert.equal(api.state.data.comparison.savings_claim_allowed,false);
+await click('edit-simple-comparison');
+assert.ok(api.state.priceEstimate,'Editing keeps the unchanged price estimate provenance.');
+el('simple-current-cost').value='123';
+await el('simple-current-cost').emit('input');
+assert.equal(api.state.priceEstimate,null,'A manually edited charge must not inherit the old rate estimate.');
+await submit();
+assert.equal(api.state.data.pricing_estimate,undefined);
+assert.equal(api.state.data.baseline.costs.model_cost,123);
 assert.equal(api.state.data.comparison.savings_claim_allowed,false);
 
 await click('price-prompt');
