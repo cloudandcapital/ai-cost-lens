@@ -162,11 +162,17 @@ async function build(a,b,minutesA=30,minutesB=200,readyB=16,overrides={}) {
 function render(d,code) {
  api.setData(d); api.renderAll();
  assert.equal(elements['decision-code'].textContent,code);
- assert.equal(elements['memo-decision-code'].textContent,code);
+ assert.equal(elements['memo-decision-code'].textContent,'COST FINDING');
  assert.match(elements['finance-posture'].textContent,/Finance recommendation: (FUND CHANGE|FIX EVIDENCE|STOP CHANGE|INSUFFICIENT EVIDENCE)/);
- assert.equal(elements['decision-title'].textContent,elements['memo-decision-title'].textContent);
- assert.equal(elements['decision-explanation'].textContent,elements['memo-next-step'].textContent);
- for (const kind of ['why','changed','cfo']) assert.ok(api.lumenResponse(kind).includes(d.comparison.recommendation));
+ assert.ok(elements['simple-cost-finding'].textContent.startsWith(elements['memo-decision-title'].textContent));
+ assert.equal(elements['memo-switch-check'].textContent,'Before switching: '+elements['simple-switch-check'].textContent);
+ assert.equal(d.comparison.summary.cost_finding,elements['simple-cost-finding'].textContent);
+ assert.equal(d.comparison.summary.before_switching,elements['simple-switch-check'].textContent);
+ assert.equal(d.comparison.finance_posture,'ESTIMATE ONLY');
+ assert.match(d.comparison.normalized_cost_difference_context,/not the monthly cost change, cash savings/);
+ if (d.comparison.both_policy_approved) assert.match(elements['simple-switch-check'].textContent,/Approval: you confirmed/);
+ else assert.match(elements['simple-switch-check'].textContent,/approval.*not been established/);
+ for (const kind of ['why','changed','cfo']) assert.ok(api.lumenResponse(kind).includes(elements['decision-explanation'].textContent));
  for (const [id,e] of Object.entries(elements)) assert.ok(!/NaN|Infinity|>undefined</.test(e.textContent+' '+e.innerHTML), id+': '+e.textContent+' '+e.innerHTML);
 }
 (async()=>{

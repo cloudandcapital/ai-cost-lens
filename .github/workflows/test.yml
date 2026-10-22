@@ -30,6 +30,11 @@ jobs:
     name: Browser workflows and accessibility
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Match the pinned Playwright package; browsers and OS dependencies are preinstalled.
+    # https://playwright.dev/docs/ci#via-containers
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
@@ -37,7 +42,6 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run build
       - run: npm run check:browser
         env:
@@ -46,7 +50,10 @@ jobs:
         if: always()
         with:
           name: finance-memo-example
-          path: browser-artifacts/finance-memo-example.pdf
+          path: |
+            browser-artifacts/finance-memo-example.pdf
+            browser-artifacts/finance-memo-simple.pdf
+            browser-artifacts/comparison-followup.png
           if-no-files-found: ignore
 
   production-network:

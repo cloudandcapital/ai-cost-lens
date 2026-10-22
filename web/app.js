@@ -42,6 +42,12 @@
     "simple-other-checked", "simple-other-usable", "simple-other-minutes", "simple-hourly-rate", "simple-quality-floor",
   ];
 
+  function simpleInputError(id, message) {
+    const error = new Error(message);
+    error.fieldId = id;
+    return error;
+  }
+
   const opportunityEngine = globalThis.AICostLensOpportunities;
   const usageEventEngine = globalThis.AICostLensUsageEvents;
   const verificationEngine = globalThis.AICostLensVerification;
@@ -373,8 +379,8 @@
   }
 
   async function buildToolSpendReview(items, options) {
-    if (!["provider_reported", "calculated", "allocated"].includes(options.basis)) throw new Error("Choose what the amounts represent before building your review.");
-    if (!options.scopeConfirmed) throw new Error("Confirm that these charges cover the same period and do not overlap.");
+    if (!["provider_reported", "calculated", "allocated"].includes(options.basis)) throw simpleInputError("tools-basis", "Choose what the amounts represent before building your review.");
+    if (!options.scopeConfirmed) throw simpleInputError("tools-scope", "Confirm that these charges cover the same period and do not overlap.");
     const normalized = normalizeToolCharges(items);
     const config = { reviewSource: "tool_spend", serviceStart: options.start, serviceEnd: options.end,
       toolSpend: { name: safeImportedLabel(options.name, "Review name"), currency: String(options.currency).trim().toUpperCase(),
@@ -554,7 +560,7 @@
     if (review.level === "Cost and usage") {
       return {
         key: "usage",
-        kicker: "WALK · EXPLAIN THE USAGE",
+        kicker: "EXPLAIN THE USAGE",
         tag: "COST AND USAGE · NO SAVINGS CLAIM",
         title: "Where is the AI cost going?",
       };
@@ -2324,7 +2330,18 @@
     c.recommendation = decision.reason;
     c.decision_code = decision.code;
     c.finance_posture = decision.posture;
-    if (data.experience === "simple") c.finding = simpleCostRead(data).headline;
+    if (data.experience === "simple") {
+      const cost = simpleCostRead(data);
+      const switching = simpleSwitchingCheck(data, decision);
+      c.finding = `${cost.headline} ${cost.detail}`;
+      c.recommendation = switching;
+      c.decision_code = "COMPARE ESTIMATES";
+      c.finance_posture = "ESTIMATE ONLY";
+      c.summary = { cost_finding: c.finding, before_switching: switching, approval_status: c.both_policy_approved ? "confirmed_by_user" : "not_established" };
+      c.switching_check_code = decision.code === "KEEP CURRENT ROUTE" ? "OTHER OPTION COSTS MORE" : decision.code;
+      // Retain the v1 calculation fields for compatibility, with their actual basis.
+      c.normalized_cost_difference_context = `Hypothetical total cost difference at ${a.outcomes.usable_results} usable results, including estimated time value. This is not the monthly cost change, cash savings, or a recommendation to switch. The actual monthly cost difference is recurring_cost_difference.`;
+    }
   }
 
   function validateResult(data) {
@@ -2584,6 +2601,15 @@
           ? "Provider-reported model and API charges"
           : "Model and API cost using the declared basis",
       },
+      ...(simple ? [{
+        label: simpleTimeValueLabel(state.data),
+        current: money(baseline.costs.human_review_cost),
+        proposed: money(proposed.costs.human_review_cost),
+        change: baseline.costs.human_review_cost
+          ? `${proposed.costs.human_review_cost <= baseline.costs.human_review_cost ? "↓" : "↑"} ${Math.abs((proposed.costs.human_review_cost / baseline.costs.human_review_cost - 1) * 100).toFixed(1)}%`
+          : proposed.costs.human_review_cost ? "From zero" : "No change",
+        meaning: "Monthly review and fixing time projected from your sample, valued at your entered hourly rate. This is an estimate, not necessarily cash paid.",
+      }] : []),
       {
         label: simple ? "Monthly cost including your time" : humanIncluded ? "Total recurring cost" : "Measured recurring cost",
         current: money(baseline.costs.recurring_operating_cost),
@@ -4668,7 +4694,7 @@
     document.getElementById("model-mix-title").textContent = "Declared bill drivers and available usage";
     document.getElementById("bill-mix-note").textContent = `Amounts use ${basisLabel.toLowerCase()}. This is the supplied attribution, not an inferred allocation or savings estimate. Cache values are token counts.`;
     document.getElementById("bill-model-head").innerHTML = "<tr><th>Provider / model / route</th><th>Requests</th><th>Input / output</th><th>Cache read / write</th><th>Cost basis</th><th>Declared cost</th></tr>";
-    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td data-label="Provider / model / route">${escapeHtml(row.label)}</td><td data-label="Requests">${escapeHtml(reportedCoverageValue(row, "requests"))}</td><td data-label="Input / output">${escapeHtml(reportedCoverageValue(row, "processedInput"))} / ${escapeHtml(reportedCoverageValue(row, "outputTokens"))}</td><td data-label="Cache read / write">${escapeHtml(reportedCoverageValue(row, "cachedInput"))} / ${escapeHtml(reportedCoverageValue(row, "cacheWriteInput"))}</td><td data-label="Cost basis">${escapeHtml(basisLabel)}</td><td data-label="Declared cost">${cost(row.providerCost)}</td></tr>`).join("");
+    document.getElementById("bill-model-rows").innerHTML = review.mix.map((row) => `<tr><td data-label="Provider / model / route">${escapeHtml(row.label)}</td><td data-label="Requests">${escapeHtml(reportedCoverageValue(row, "requests"))}</td><td data-label="Input / output">${escapeHtml(reportedCoverageValue(row, "processedInput"))} / ${escapeHtml(reportedCoverageValue(row, "outputTokens"))}</td><td data-label="Cache read / write">${escapeHtml(reportedCoverageValue(row, "cachedInput"))} / ${escapeHtml(reportedCoverageValue(row, "cacheWriteInput"))}</td><td data-label="Cost basis">${escapeHtml(basisLabel)}</td><td data-label="Declared cost">${money(row.providerCost, row.providerCost > 0 && row.providerCost < 0.01 ? 4 : 2)}</td></tr>`).join("");
     document.getElementById("bill-opportunity-ledger").innerHTML = guidance.map(([kind, label, title, value, note]) => `<article class="opportunity-row state-${kind}"><span class="opportunity-state">${escapeHtml(label)}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(note)}</p></div><em>${escapeHtml(value)}</em></article>`).join("");
     document.getElementById("bill-next-step").textContent = stage.key === "bill"
       ? "Save this baseline. Next period, add the previous bill to compare the change."
@@ -4716,6 +4742,8 @@
     const basis = record.basis === "provider_reported" ? "User-entered billed amounts · unverified" : record.basis === "allocated" ? "User-allocated costs · unverified" : "User-entered estimates · unverified";
     const rows = [["Subscriptions", money(subscriptions, 2), "Only subscription charges entered in this review"], ["Extra usage / API", money(usage, 2), "Only separately charged usage entered in this review"], ["Combined period cost", money(total, 2), basis], ["Charges without an owner", String(unowned.length), "A follow-up prompt, not evidence of waste"]];
     document.getElementById("tool-spend-result").hidden = false;
+    document.getElementById("edit-tool-review").hidden = false;
+    document.getElementById("bill-ledger-intro").textContent = "Follow up on the charges you entered. Usage, tool value, and savings still need evidence.";
     document.getElementById("bill-usage-section").hidden = true;
     document.getElementById("bill-review-kicker").textContent = "AI TOOL SPEND REVIEW";
     document.getElementById("bill-review-title").textContent = "What are your AI tools costing together?";
@@ -4758,6 +4786,11 @@
     };
   }
 
+  function openAIPeriodDescription(period) {
+    return period.aligned ? `${period.start} to ${period.end}`
+      : `Cost: ${period.cost_dates[0]} to ${period.cost_dates.at(-1)} · Usage: ${period.usage_dates[0]} to ${period.usage_dates.at(-1)}`;
+  }
+
   function openAIReportedValue(usage, field) {
     const coverage = openAIFieldCoverage(usage, field);
     if (coverage.status === "missing") return "Not supplied";
@@ -4773,7 +4806,7 @@
   }
 
   function renderOpenAIBill() {
-    document.getElementById("bill-review-kicker").textContent = "WALK · EXPLAIN THE USAGE";
+    document.getElementById("bill-review-kicker").textContent = "EXPLAIN THE USAGE";
     document.getElementById("bill-review-title").textContent = "Where is the AI cost going?";
     document.getElementById("bill-source-title").textContent = "Saved dashboard exports";
     document.getElementById("bill-source-copy").textContent = state.data.period.aligned
@@ -4803,7 +4836,7 @@
     document.getElementById("bill-period-label").textContent = period.aligned
       ? `${period.start} to ${period.end} · ${period.timezone}`
       : `Different periods · cost: ${period.cost_dates[0]} to ${period.cost_dates.at(-1)} · usage: ${period.usage_dates[0]} to ${period.usage_dates.at(-1)} · ${period.timezone}`;
-    renderEvidenceSummary("bill-evidence-summary", [["Exported period", `${period.start} to ${period.end} · ${period.aligned ? "aligned UTC buckets" : "alignment needs checking"}`], ["Cost source", "Saved provider cost export · not independently verified"], ["Records through", `${period.end} · imported files, no live sync`]]);
+    renderEvidenceSummary("bill-evidence-summary", [["Exported period", `${openAIPeriodDescription(period)} · ${period.aligned ? "aligned UTC buckets" : "separate periods; do not combine"}`], ["Cost source", "Saved provider cost export · not independently verified"], ["Records through", `${period.aligned ? period.end : `Cost: ${period.cost_dates.at(-1)} · Usage: ${period.usage_dates.at(-1)}`} · imported files, no live sync`]]);
     document.getElementById("bill-mode-tag").textContent = !period.aligned ? "PERIOD MISMATCH" : state.data.mode === "illustrative" ? "ILLUSTRATIVE COST AND USAGE" : "COST AND USAGE · NO SAVINGS CLAIM";
     document.getElementById("bill-finding-title").textContent =
       period.aligned
@@ -4895,6 +4928,8 @@
   }
 
   function renderFinanceMemo() {
+    document.getElementById("memo-decision-label").textContent = "FINANCE DECISION";
+    document.getElementById("memo-switch-check").hidden = true;
     if (!state.data) return;
     if (state.data.schema_version === singleBillSchema) return;
     const isBill = state.data.schema_version === "ai-cost-lens-openai-bill-review/0.1";
@@ -4914,7 +4949,7 @@
       const cacheShare = inputTokens && cachedInput !== null ? cachedInput / inputTokens : null;
       const topProject = period.aligned && reconciliation.project_cost_join_supported && total > 0 && bill.by_project?.length ? bill.by_project[0] : null;
       document.getElementById("memo-title").textContent = "OpenAI bill review";
-      document.getElementById("memo-meta").textContent = `${period.start} to ${period.end} · ${period.timezone}`;
+      document.getElementById("memo-meta").textContent = `${openAIPeriodDescription(period)} · ${period.timezone}`;
       document.getElementById("memo-decision-code").textContent = period.aligned ? "COST AND USAGE" : "PERIOD MISMATCH";
       document.getElementById("memo-decision-title").textContent = period.aligned
         ? costPerRequest === null
@@ -4974,20 +5009,21 @@
     document.getElementById("memo-decision-limit").textContent = comparison.limitation;
     document.getElementById("memo-numbers-title").textContent = "Current route versus proposed route";
     document.getElementById("memo-table-head").innerHTML = `<tr><th>Measure</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Change (proposed vs current)</th></tr>`;
+    const simple = state.data.experience === "simple";
     const routeRows = [
-      [state.data.pricing_estimate ? "Estimated API cost" : "Provider cost", money(baseline.costs.model_cost), money(proposed.costs.model_cost), percentChange(baseline.costs.model_cost, proposed.costs.model_cost)],
-      ["Shared infrastructure", state.data.pricing_estimate ? "Not supplied" : money(baseline.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Not supplied" : money(proposed.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Excluded" : signedMoney(proposed.costs.shared_infrastructure_cost - baseline.costs.shared_infrastructure_cost)],
-      ["Human review and correction", money(baseline.costs.human_review_cost), money(proposed.costs.human_review_cost), percentChange(baseline.costs.human_review_cost, proposed.costs.human_review_cost)],
-      ["Total recurring cost", money(baseline.costs.recurring_operating_cost), money(proposed.costs.recurring_operating_cost), percentChange(baseline.costs.recurring_operating_cost, proposed.costs.recurring_operating_cost)],
-      ["Ready result rate", pct(baseline.measures.usable_result_rate, 1), pct(proposed.measures.usable_result_rate, 1), `${comparison.usable_result_rate_change_points >= 0 ? "+" : "−"}${Math.abs(comparison.usable_result_rate_change_points).toFixed(1)} points`],
-      ["Ready results", compact(baseline.outcomes.usable_results), compact(proposed.outcomes.usable_results), `${proposed.outcomes.usable_results >= baseline.outcomes.usable_results ? "+" : "−"}${compact(Math.abs(proposed.outcomes.usable_results - baseline.outcomes.usable_results))}`],
-      ["Cost per ready result", unitMoney(baselineUnit), unitMoney(proposedUnit), percentChange(baselineUnit, proposedUnit)],
+      [state.data.pricing_estimate ? "Estimated API cost" : simple ? "Monthly tool cost" : "Provider cost", money(baseline.costs.model_cost), money(proposed.costs.model_cost), percentChange(baseline.costs.model_cost, proposed.costs.model_cost)],
+      ...(!simple ? [["Shared infrastructure", state.data.pricing_estimate ? "Not supplied" : money(baseline.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Not supplied" : money(proposed.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Excluded" : signedMoney(proposed.costs.shared_infrastructure_cost - baseline.costs.shared_infrastructure_cost)]] : []),
+      [simple ? simpleTimeValueLabel(state.data) : "Human review and correction", money(baseline.costs.human_review_cost), money(proposed.costs.human_review_cost), percentChange(baseline.costs.human_review_cost, proposed.costs.human_review_cost)],
+      [simple ? "Monthly cost including your time" : "Total recurring cost", money(baseline.costs.recurring_operating_cost), money(proposed.costs.recurring_operating_cost), percentChange(baseline.costs.recurring_operating_cost, proposed.costs.recurring_operating_cost)],
+      [simple ? "Usable result rate" : "Ready result rate", pct(baseline.measures.usable_result_rate, 1), pct(proposed.measures.usable_result_rate, 1), `${comparison.usable_result_rate_change_points >= 0 ? "+" : "−"}${Math.abs(comparison.usable_result_rate_change_points).toFixed(1)} points`],
+      [simple ? "Usable results" : "Ready results", compact(baseline.outcomes.usable_results), compact(proposed.outcomes.usable_results), `${proposed.outcomes.usable_results >= baseline.outcomes.usable_results ? "+" : "−"}${compact(Math.abs(proposed.outcomes.usable_results - baseline.outcomes.usable_results))}`],
+      [simple ? "Cost per usable result" : "Cost per ready result", unitMoney(baselineUnit), unitMoney(proposedUnit), percentChange(baselineUnit, proposedUnit)],
     ];
     document.getElementById("memo-table-body").innerHTML = routeRows.map(([label, current, next, difference]) =>
       `<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(current)}</td><td>${escapeHtml(next)}</td><td>${escapeHtml(difference)}</td></tr>`,
     ).join("");
     document.getElementById("memo-rules").innerHTML = memoList([
-      ["Ready means", baseline.outcomes.acceptance_rule],
+      [simple ? "Usable means" : "Ready means", baseline.outcomes.acceptance_rule],
       ["Checked by", baseline.outcomes.verifier],
       ["Quality floor", pct(workload.accepted_quality_threshold, 1)],
       ["Policy", mode === "illustrative" ? "Assumed approved for this invented comparison; no real reviewer approval" : `Current: ${baseline.policy.approved ? "approved by reviewer" : "approval not established"}; proposed: ${proposed.policy.approved ? "approved by reviewer" : "approval not established"}`],
@@ -4995,8 +5031,8 @@
       ...(sampleIntervalAvailable(proposed) ? [["Proposed ready-rate 95% sample range", `${pct(proposed.outcomes.ready_rate_interval_95[0], 1)}–${pct(proposed.outcomes.ready_rate_interval_95[1], 1)}; ${sampleQualityStatus(proposed, workload.accepted_quality_threshold) === "inconclusive" ? "crosses the quality minimum; inconclusive" : sampleQualityStatus(proposed, workload.accepted_quality_threshold) === "below" ? "entirely below the quality minimum" : "above the quality minimum in this sample"}`]] : proposed.outcomes.basis === "sampled" ? [["Statistical range", "Not shown: sample not declared random or systematic"]] : []),
     ]);
     document.getElementById("memo-evidence").innerHTML = memoList([
-      ["Current route", `${baseline.evidence.coverage_status}: ${baseline.evidence.coverage}`],
-      ["Proposed route", `${proposed.evidence.coverage_status}: ${proposed.evidence.coverage}`],
+      [simple ? baseline.label : "Current route", `${baseline.evidence.coverage_status}: ${baseline.evidence.coverage}`],
+      [simple ? proposed.label : "Proposed route", `${proposed.evidence.coverage_status}: ${proposed.evidence.coverage}`],
       ["Cost basis", mode === "illustrative" ? "Invented model costs; no provider bill" : state.data.pricing_estimate ? "AI Cost Lens list-price estimate; no provider bill" : state.data.experience === "simple" ? "User-entered monthly cost; no provider bill" : comparison.same_cost_basis ? costBasisLabel(proposed.evidence.cost_basis) : "Mixed cost basis"],
       ["Savings claim", comparison.savings_claim_allowed ? "Supported for this workload and period" : "Not supported"],
     ]);
@@ -5094,7 +5130,11 @@
       renderGrowthPlanner();
     }
     document.body.classList.remove("bill-usage-mode");
+    document.getElementById("view-opportunities").setAttribute("aria-labelledby", "opportunities-workbench-title");
+    document.getElementById("request-review-title").textContent = "Find the calls behind the pattern";
     document.getElementById("back-to-bill").hidden = true;
+    document.getElementById("edit-tool-review").hidden = true;
+    document.getElementById("bill-ledger-intro").textContent = "This separates what the bill proves from what still needs testing.";
     document.getElementById("lumen-conversation").replaceChildren();
     const isSingle = state.data.schema_version === singleBillSchema;
     const isBill = isSingle || state.data.schema_version === "ai-cost-lens-openai-bill-review/0.1";
@@ -5171,6 +5211,17 @@
         : `${cheaper.label} has the lower estimated cost per usable result.`,
       detail: `${baseline.label}: ${format(a)}. ${proposed.label}: ${format(b)}. Tool charges and estimated time value are included.`,
     };
+  }
+
+  function simpleTimeValueLabel(data) {
+    const rate = data.simple_input_snapshot?.fields?.["simple-hourly-rate"];
+    return rate !== undefined && rate !== "" ? `Time value at ${money(Number(rate), Number.isInteger(Number(rate)) ? 0 : 2)}/hr` : "Estimated time value";
+  }
+
+  function simpleSwitchingCheck(data, decision = decisionFor(data)) {
+    return data.comparison.both_policy_approved
+      ? `Approval: you confirmed both tools are okay to use for this work. ${decision.reason}`
+      : decision.reason;
   }
 
   function decisionFor(data) {
@@ -5256,7 +5307,7 @@
   function renderDecisionConsistency() {
     if ([singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version)) return;
     const decision = decisionFor(state.data);
-    state.data.comparison.finance_posture = decision.posture;
+    state.data.comparison.finance_posture = state.data.experience === "simple" ? "ESTIMATE ONLY" : decision.posture;
     for (const id of ["decision-code", "memo-decision-code"]) document.getElementById(id).textContent = decision.code;
     document.getElementById("finance-posture").textContent = `Finance recommendation: ${decision.posture}`;
     for (const id of ["decision-title", "memo-decision-title"]) document.getElementById(id).textContent = decisionHeadline(decision.code);
@@ -5278,7 +5329,8 @@
       const costRead = simpleCostRead(state.data);
       document.getElementById("review-title").textContent = "Your AI cost comparison.";
       document.getElementById("simple-cost-finding").textContent = `${costRead.headline} ${costRead.detail}`;
-      document.getElementById("simple-switch-check").textContent = decision.reason;
+      const switching = simpleSwitchingCheck(state.data, decision);
+      document.getElementById("simple-switch-check").textContent = switching;
       document.getElementById("period-label").textContent = "Monthly scenario · billing dates not supplied";
       document.getElementById("memo-meta").textContent = "Monthly scenario · billing dates not supplied";
       document.getElementById("finding-title").textContent = costRead.headline;
@@ -5288,7 +5340,15 @@
       document.getElementById("lumen-panel-copy").textContent = `${costRead.detail} ${decision.reason}`;
       document.getElementById("lumen-signals").innerHTML = `<div><span>Current cost per usable result</span><strong>${escapeHtml(unitMoney(state.data.baseline.measures.cost_per_usable_result))}</strong></div><div><span>Other option</span><strong>${escapeHtml(unitMoney(state.data.proposed.measures.cost_per_usable_result))}</strong></div>`;
       document.getElementById("memo-numbers-title").textContent = costRead.headline;
-      document.getElementById("memo-decision-limit").textContent = `Before switching: ${decision.reason} ${state.data.comparison.limitation}`;
+      document.getElementById("memo-title").textContent = "AI tool cost comparison";
+      document.getElementById("memo-decision-label").textContent = "COMPARISON SUMMARY";
+      document.getElementById("memo-decision-code").textContent = "COST FINDING";
+      document.getElementById("memo-decision-title").textContent = costRead.headline;
+      document.getElementById("memo-decision-limit").textContent = costRead.detail;
+      document.getElementById("memo-switch-check").textContent = `Before switching: ${switching}`;
+      document.getElementById("memo-switch-check").hidden = false;
+      document.getElementById("memo-numbers-title").textContent = "The same monthly scenario";
+      document.getElementById("memo-next-step").textContent = "Keep your sample and assumptions with this estimate. Repeat the comparison before making a change.";
       document.getElementById("memo-plan-grid").replaceChildren();
       document.getElementById("memo-plan-basis").textContent = "";
     }
@@ -5744,6 +5804,31 @@
     focusBuilderPath();
   }
 
+  function editToolReview() {
+    const review = state.data;
+    if (review?.schema_version !== singleBillSchema || review.config.reviewSource !== "tool_spend") return;
+    const items = validateToolSpend(review);
+    const record = review.config.toolSpend;
+    resetBuilderStart();
+    activateBuilderMode("tools");
+    for (const [id, value] of Object.entries({ "tools-name": record.name, "tools-currency": record.currency,
+      "tools-start": review.config.serviceStart, "tools-end": review.config.serviceEnd, "tools-basis": record.basis })) {
+      document.getElementById(id).value = value;
+    }
+    items.forEach((item, offset) => {
+      const index = offset + 1;
+      document.getElementById(`tool-charge-${index}`).hidden = false;
+      for (const [field, key] of [["name", "tool"], ["kind", "kind"], ["amount", "amount"], ["source", "reference"], ["owner", "owner"]]) {
+        document.getElementById(`tool-${field}-${index}`).value = item[key];
+      }
+    });
+    document.getElementById("tools-scope").checked = record.scopeConfirmed;
+    document.getElementById("add-tool-charge").disabled = items.length === 12;
+    document.getElementById("tool-charge-status").textContent = "Your saved charges are restored. Update what changed and review again.";
+    reviewDialog.showModal();
+    focusBuilderPath();
+  }
+
   function focusBuilderPath() {
     if (!reviewDialog.open) return;
     const firstIds = { simple: "simple-current-name", tools: "tools-name", single: "invoice-provider", openai: "smart-upload-files", workload: "spend-file" };
@@ -5752,19 +5837,19 @@
     document.getElementById(firstIds[state.builderMode]).focus({ preventScroll: true });
   }
 
-  function simpleInputError(id, message) {
-    const error = new Error(message);
-    error.fieldId = id;
-    return error;
+  function clearSimpleErrors() {
+    for (const id of [...simpleInputIds, "tools-basis", "tools-scope"]) clearBuilderFieldError(id);
   }
 
-  function clearSimpleErrors() {
-    for (const id of simpleInputIds) {
-      document.getElementById(id).setAttribute("aria-invalid", "false");
-      const note = document.getElementById(`${id}-error`);
-      note.textContent = "";
-      note.hidden = true;
-    }
+  function clearBuilderFieldError(id) {
+    const input = document.getElementById(id);
+    const note = document.getElementById(`${id}-error`);
+    if (!note) return;
+    const error = document.getElementById("builder-error");
+    if (note.textContent && error.textContent === note.textContent) error.classList.remove("visible");
+    input.setAttribute("aria-invalid", "false");
+    note.textContent = "";
+    note.hidden = true;
   }
 
   function resetBuilderStart() {
@@ -5777,7 +5862,7 @@
     for (let index = 1; index <= 12; index++) document.getElementById(`tool-charge-${index}`).hidden = index > 2;
     document.getElementById("add-tool-charge").disabled = false;
     document.getElementById("tool-charge-status").textContent = "";
-    document.getElementById("simple-example-caveat").textContent = "The prefilled numbers are a small-business example. Replace them with your own before comparing.";
+    document.getElementById("simple-example-caveat").textContent = "Enter your own costs and sample results. For a worked example, choose Explore an example on the welcome screen.";
     document.getElementById("bill-history-input").open = false;
     document.getElementById("bill-budget-input").open = false;
     document.getElementById("review-file").value = "";
@@ -5842,55 +5927,52 @@
       state.hasStarted = true;
       document.body.classList.remove("welcome-mode");
       document.getElementById("lens-welcome").hidden = true;
-      if (state.data?.experience === "simple" && state.carriedBillIntoUsage) {
+      if (state.data?.schema_version !== singleBillSchema && state.carriedBillIntoUsage) {
         document.getElementById("request-billed-total").value = "";
         document.getElementById("request-billed-currency").value = "";
         document.getElementById("request-bill-scope-confirmed").checked = false;
         state.carriedBillIntoUsage = false;
       }
-      const fromBill = [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version) || state.data?.experience === "simple";
-      if (fromBill) {
-        if (state.data.schema_version === singleBillSchema) {
-          const bill = summarizeSingleBill(state.data);
-          document.getElementById("request-billed-total").value = bill.totals.providerCost;
-          document.getElementById("request-billed-currency").value = bill.currency;
-          document.getElementById("request-bill-scope-confirmed").checked = false;
-          state.carriedBillIntoUsage = true;
-          if (state.usageReviewBill !== state.data) {
-            state.usageReview = null;
-            state.usageReviewBill = null;
-            document.getElementById("request-analysis-results").hidden = true;
-          }
+      const hasReviewToReturnTo = Boolean(state.data && state.data.mode !== "illustrative");
+        if (state.data?.schema_version === singleBillSchema) {
+        const bill = summarizeSingleBill(state.data);
+        document.getElementById("request-billed-total").value = bill.totals.providerCost;
+        document.getElementById("request-billed-currency").value = bill.currency;
+        document.getElementById("request-bill-scope-confirmed").checked = false;
+        state.carriedBillIntoUsage = true;
+        if (state.usageReviewBill !== state.data) {
+          state.usageReview = null;
+          state.usageReviewBill = null;
+          document.getElementById("request-analysis-results").hidden = true;
         }
-        document.body.classList.add("bill-usage-mode");
-        document.getElementById("back-to-bill").hidden = false;
-        document.getElementById("back-to-bill").textContent = state.data.experience === "simple" ? "Return to comparison" : "Back to bill review";
-        document.getElementById("bill-review-screen").classList.remove("active");
-        document.getElementById("view-opportunities").classList.add("active");
-        reviewDialog.close();
-        document.querySelector(".request-review-panel").scrollIntoView({ behavior: "smooth", block: "start" });
-        document.getElementById("request-log-file").focus();
-        return;
       }
-      if (state.carriedBillIntoUsage) {
-        document.getElementById("request-billed-total").value = "";
-        document.getElementById("request-billed-currency").value = "";
-        document.getElementById("request-bill-scope-confirmed").checked = false;
-        state.carriedBillIntoUsage = false;
-      }
-      state.view = "opportunities";
-      state.story = false;
+      document.body.classList.add("bill-usage-mode");
       document.body.classList.remove("story-mode");
+      state.story = false;
       document.getElementById("story-toggle").textContent = "Presentation view";
-      const navigation = document.querySelector(".question-nav");
-      navigation.hidden = false;
-      navigation.setAttribute("aria-hidden", "false");
-      navigation.querySelectorAll("button").forEach((item) => { item.disabled = false; item.tabIndex = 0; item.hidden = false; });
+      document.getElementById("back-to-bill").hidden = !hasReviewToReturnTo;
+      document.getElementById("back-to-bill").textContent = state.data?.experience === "simple" ? "Return to comparison" : [singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version) ? "Back to bill review" : "Return to review";
+      document.getElementById("view-opportunities").setAttribute("aria-labelledby", "request-review-title");
+      document.getElementById("request-review-title").textContent = "Review your AI usage";
+      if (!hasReviewToReturnTo) {
+        for (const input of document.querySelectorAll(".request-review-panel input")) {
+          input.value = input.type === "file" ? "" : input.defaultValue;
+          input.checked = input.defaultChecked;
+        }
+        state.usageReview = null;
+        state.usageReviewBill = null;
+        state.usageReviewIllustrative = false;
+        state.requestSourceIllustrative = false;
+        document.getElementById("request-analysis-results").hidden = true;
+        document.getElementById("request-import-issues").hidden = true;
+        document.getElementById("request-log-error").classList.remove("visible");
+        document.getElementById("request-log-file-status").textContent = "Choose your CSV or JSON request log. Your file stays in this browser.";
+      }
       document.getElementById("bill-review-screen").classList.remove("active");
+      document.querySelectorAll(".view").forEach((section) => section.classList.remove("active"));
+      document.getElementById("view-opportunities").classList.add("active");
       reviewDialog.close();
-      setView("opportunities");
-      const requestPanel = document.querySelector(".request-review-panel");
-      requestPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.scrollTo({ top: 0, behavior: "instant" });
       document.getElementById("request-log-file").focus();
       showToast("Usage review ready. Your file will stay in this browser.");
       return;
@@ -5939,7 +6021,7 @@
   document.getElementById("back-to-bill").addEventListener("click", () => {
     document.body.classList.remove("bill-usage-mode");
     document.getElementById("view-opportunities").classList.remove("active");
-    if (state.data?.experience === "simple") {
+    if (![singleBillSchema, "ai-cost-lens-openai-bill-review/0.1"].includes(state.data?.schema_version)) {
       renderAll();
       document.getElementById("review-title").focus();
       return;
@@ -5957,6 +6039,20 @@
   });
   document.getElementById("close-review").addEventListener("click", () => reviewDialog.close());
   document.getElementById("edit-simple-comparison").addEventListener("click", editSimpleComparison);
+  document.getElementById("edit-tool-review").addEventListener("click", editToolReview);
+  const clearEditedError = (event) => {
+    const id = event.target.id;
+    if ([...simpleInputIds, "tools-basis", "tools-scope"].includes(id)) clearBuilderFieldError(id);
+    if (/^simple-(current|other)-checked$/.test(id)) clearBuilderFieldError(id.replace("-checked", "-usable"));
+    if (state.builderMode === "tools" && (["tools-start", "tools-end", "tools-currency"].includes(id) || /^tool-(name|kind|amount)-\d+$/.test(id))) {
+      if (document.getElementById("tools-scope").checked) {
+        document.getElementById("tools-scope").checked = false;
+        document.getElementById("tool-charge-status").textContent = "The charges or period changed. Check the charge boundary again before reviewing.";
+      }
+    }
+  };
+  builderForm.addEventListener("input", clearEditedError);
+  builderForm.addEventListener("change", clearEditedError);
   for (const id of ["simple-current-name", "simple-other-name"]) {
     document.getElementById(id).addEventListener("input", () => {
       const wasApproved = document.getElementById("simple-approved").checked;
@@ -5981,11 +6077,12 @@
     resetBuilderStart();
     activateBuilderMode("simple");
     for (const id of ["simple-current-name", "simple-current-cost", "simple-other-name", "simple-other-cost"]) document.getElementById(id).value = "";
-    document.getElementById("simple-example-caveat").textContent = "Enter the monthly costs for the specific tools or plans you want to compare. Your combined baseline is not copied or allocated to one tool. The quality sample below is illustrative until you replace it.";
+    document.getElementById("simple-example-caveat").textContent = "Enter costs and a sample for the specific tools or plans you want to compare. Your combined baseline is not copied or allocated to one tool.";
     reviewDialog.showModal();
     focusBuilderPath();
   });
   document.getElementById("add-tool-charge").addEventListener("click", () => {
+    document.getElementById("tools-scope").checked = false;
     for (let index = 1; index <= 12; index++) {
       const row = document.getElementById(`tool-charge-${index}`);
       if (row.hidden) {
@@ -6643,11 +6740,14 @@
       }
     } catch (caught) {
       state.uploadRoute = null;
-      status.textContent = caught.message || "The file could not be inspected. Use manual invoice entry or the universal template.";
-      error.textContent = status.textContent; error.classList.add("visible");
+      status.textContent = "";
+      status.hidden = true;
+      const message = caught.message || "The file could not be inspected. Use manual invoice entry or the universal template.";
+      error.textContent = message; error.classList.add("visible");
       if ([...event.target.files].some((file) => /\.pdf$/i.test(file.name))) {
         activateBuilderMode("single");
-        const pdfStatus = document.getElementById("invoice-pdf-status"); pdfStatus.hidden = false; pdfStatus.textContent = status.textContent;
+        error.classList.remove("visible"); error.textContent = "";
+        const pdfStatus = document.getElementById("invoice-pdf-status"); pdfStatus.hidden = false; pdfStatus.textContent = message;
       }
     }
   });
@@ -6667,6 +6767,7 @@
     event.preventDefault();
     const errorBox = document.getElementById("builder-error");
     errorBox.classList.remove("visible");
+    clearSimpleErrors();
     const submit = document.getElementById("build-review");
     submit.disabled = true;
     submit.textContent = "Checking the evidence…";
@@ -6764,6 +6865,7 @@
         renderAll();
         setView("review");
         reviewDialog.close();
+        document.getElementById("review-title").focus({ preventScroll: true });
         showToast("Comparison built. Your answers stayed in this browser.");
         return;
       }
@@ -6826,6 +6928,7 @@
         discardImportedSourceState();
         renderAll();
         reviewDialog.close();
+        document.getElementById("bill-review-title").focus({ preventScroll: true });
         showToast("Single bill reviewed locally. No savings claimed.");
         return;
       }
@@ -6835,7 +6938,7 @@
             state.data = state.pendingMappedImport.review;
             validateResult(state.data);
             discardImportedSourceState();
-            renderAll(); reviewDialog.close(); showToast("Mapped bill reviewed locally. Only the fields you confirmed were included. Unmapped source fields were discarded."); return;
+            renderAll(); reviewDialog.close(); document.getElementById("bill-review-title").focus({ preventScroll: true }); showToast("Mapped bill reviewed locally. Only the fields you confirmed were included. Unmapped source fields were discarded."); return;
           }
           state.pendingMappedImport = await buildMappedReview(state.uploadRoute.text, state.uploadRoute.filename, selectedMapping());
           const summary = state.pendingMappedImport.confirmation;
@@ -6848,7 +6951,7 @@
             state.data = state.pendingClaudeImport.review;
             validateResult(state.data);
             discardImportedSourceState();
-            renderAll(); reviewDialog.close(); showToast("Claude bill reviewed locally. Personal identifiers were discarded."); return;
+            renderAll(); reviewDialog.close(); document.getElementById("bill-review-title").focus({ preventScroll: true }); showToast("Claude bill reviewed locally. Personal identifiers were discarded."); return;
           }
           const [spendFile] = document.getElementById("claude-spend-file").files;
           const [usageFile] = document.getElementById("claude-usage-file").files;
@@ -6880,6 +6983,7 @@
         discardImportedSourceState();
         renderAll();
         reviewDialog.close();
+        document.getElementById("bill-review-title").focus({ preventScroll: true });
         showToast("OpenAI bill reviewed locally. Your files never left the browser.");
         return;
       }
@@ -6965,18 +7069,21 @@
       renderAll();
       setView("review");
       reviewDialog.close();
+      document.getElementById("review-title").focus({ preventScroll: true });
       showToast("Finance review built locally. Your files never left the browser.");
     } catch (error) {
       state.data = previousData;
       if (previousData) renderAll();
       errorBox.textContent = error instanceof TypeError || error instanceof RangeError ? "The review could not be built. Check the file structure and numeric values." : error.message || "The review could not be built.";
       errorBox.classList.add("visible");
-      if (error.fieldId && simpleInputIds.includes(error.fieldId)) {
+      if (error.fieldId && [...simpleInputIds, "tools-basis", "tools-scope"].includes(error.fieldId)) {
         const input = document.getElementById(error.fieldId);
         const note = document.getElementById(`${error.fieldId}-error`);
         input.setAttribute("aria-invalid", "true");
         note.textContent = error.message;
         note.hidden = false;
+        errorBox.classList.remove("visible");
+        errorBox.textContent = "";
         input.focus({ preventScroll: true });
         input.scrollIntoView({ block: "center" });
       }

@@ -38,7 +38,7 @@ class Element {
   setAttribute(k,v) { this.attrs[k] = String(v); }
   getAttribute(k) { return this.attrs[k] ?? null; }
   addEventListener(k,fn) { (this.listeners[k] ||= []).push(fn); }
-  async emit(k) { for (const fn of this.listeners[k] || []) await fn({target:this,currentTarget:this,preventDefault(){}}); }
+  async emit(k, target = this) { for (const fn of this.listeners[k] || []) await fn({target,currentTarget:this,preventDefault(){}}); }
   click() { return this.emit('click'); }
   matches(selector) {
     if (selector.startsWith('.')) return this.classList.contains(selector.slice(1));
@@ -55,7 +55,7 @@ class Element {
   reset() { for (const field of this.querySelectorAll('input, select, textarea')) { field.value = field.defaultValue; field.checked = field.defaultChecked; } }
   showModal() { this.open = true; }
   close() { this.open = false; }
-  focus() {}
+  focus() { document.activeElement = this; }
   scrollIntoView() {}
   replaceChildren() { this.children = []; this.innerHTML = ''; }
 }
@@ -197,15 +197,33 @@ el('tools-basis').value = '';
 const beforeMissingBasis = api.state.data;
 await submit();
 assert.equal(api.state.data,beforeMissingBasis);
-assert.match(el('builder-error').textContent,/Choose what the amounts represent/);
+assert.match(el('tools-basis-error').textContent,/Choose what the amounts represent/);
+assert.equal(el('tools-basis').getAttribute('aria-invalid'),'true');
+assert.equal(document.activeElement,el('tools-basis'));
 el('tools-basis').value = 'provider_reported';
 await submit();
-assert.match(el('builder-error').textContent,/Confirm that these charges/);
+assert.match(el('tools-scope-error').textContent,/Confirm that these charges/);
+assert.equal(document.activeElement,el('tools-scope'));
 el('tools-scope').checked = true;
 await submit();
 assert.equal(api.state.data.config.reviewSource,'tool_spend');
 assert.match(el('bill-finding-title').textContent,/\$25\.00/);
 assert.equal(el('tool-spend-result').hidden,false);
+const toolsRoundTrip = JSON.stringify(api.state.data);
+await click('edit-tool-review');
+assert.equal(el('tool-amount-1').value,'20');
+assert.equal(el('tool-source-2').value,'Separate usage charge');
+assert.equal(el('tools-start').value,'2026-10-01');
+el('tool-amount-1').value='21';
+await el('review-builder').emit('input',el('tool-amount-1'));
+assert.equal(el('tools-scope').checked,false,'Edited charges need the boundary checked again.');
+el('tools-scope').checked=true;
+await submit();
+assert.match(el('bill-finding-title').textContent,/\$26\.00/);
+await file('review-file',toolsRoundTrip,'tools-baseline.json');
+await click('edit-tool-review');
+assert.equal(el('tool-amount-1').value,'20','Reopened tools keep the original editable charges.');
+await click('close-review');
 const savedTools = api.state.data;
 await click('bill-compare-next');
 assert.equal(api.state.builderMode,'simple');
@@ -498,19 +516,40 @@ await click('print-memo');
 assert.equal(document.body.classList.contains('printing-memo'),false,'Failed print does not strand print-only UI');
 console.log('PASS: seven-path entry, builder transition/correction sequences and non-blocking print lifecycle');
 
-// Integrated no-file comparison: real HTML defaults and registered submit handler.
+// Integrated no-file comparison: a fresh form cannot silently submit sample data.
+const sampleInputs = {
+  'simple-current-name':'Diana current','simple-other-name':'<Diana other>',
+  'simple-current-cost':'40','simple-other-cost':'20','simple-monthly-tasks':'40',
+  'simple-current-checked':'20','simple-current-usable':'19','simple-current-minutes':'30',
+  'simple-other-checked':'20','simple-other-usable':'16','simple-other-minutes':'200',
+  'simple-hourly-rate':'30','simple-quality-floor':'80',
+};
+const enterSample = (overrides = {}) => { for (const [id,value] of Object.entries({...sampleInputs,...overrides})) el(id).value=value; };
 await click('start-review'); await mode('simple');
+for (const id of Object.keys(sampleInputs)) assert.equal(el(id).value,'','Fresh comparisons require the visitor\'s inputs.');
+const beforeBlankComparison=api.state.data;
+await submit();
+assert.equal(api.state.data,beforeBlankComparison,'A blank comparison cannot replace the prior result.');
+assert.equal(document.activeElement,el('simple-current-name'));
 assert.equal(el('simple-approved').checked,false,'Policy must require an explicit reviewer action.');
 assert.equal(el('simple-current-cost').disabled,false);
 assert.equal(el('spend-file').disabled,true);
-el('simple-current-name').value = 'Diana current';
-el('simple-other-name').value = '<Diana other>';
+enterSample();
 el('simple-approved').checked = true;
 await submit();
 assert.equal(api.state.data.experience,'simple');
 assert.equal(api.state.data.baseline.costs.recurring_operating_cost,70);
 assert.equal(api.state.data.proposed.costs.recurring_operating_cost,220);
 assert.equal(el('decision-code').textContent,'KEEP CURRENT ROUTE');
+assert.equal(api.state.data.comparison.decision_code,'COMPARE ESTIMATES');
+assert.equal(api.state.data.comparison.finance_posture,'ESTIMATE ONLY');
+assert.equal(api.state.data.comparison.summary.cost_finding,el('simple-cost-finding').textContent);
+assert.match(api.state.data.comparison.summary.before_switching,/Approval: you confirmed/);
+assert.match(api.state.data.comparison.normalized_cost_difference_context,/not the monthly cost change, cash savings/);
+assert.equal(el('memo-decision-code').textContent,'COST FINDING');
+assert.match(el('memo-table-body').innerHTML,/Monthly tool cost/);
+assert.doesNotMatch(el('memo-table-body').innerHTML,/Provider cost|ready result/);
+assert.match(el('memo-switch-check').textContent,/Approval: you confirmed/);
 assert.match(el('memo-table-head').innerHTML,/Diana current/);
 assert.match(el('memo-table-head').innerHTML,/&lt;Diana other&gt;/);
 assert.equal(api.state.data.period.start,null);
@@ -570,7 +609,7 @@ await file('review-file',JSON.stringify(olderRanges),'older-user-selected-sample
 assert.equal(api.state.data.baseline.outcomes.ready_rate_interval_95,null,'Unsupported historical intervals must not survive reopening and re-export.');
 assert.equal(api.state.data.proposed.outcomes.ready_rate_interval_95,null);
 await click('start-review'); await mode('simple'); // A new review deliberately has fresh defaults.
-assert.equal(el('simple-current-cost').value,'40');
+assert.equal(el('simple-current-cost').value,'');
 await click('close-review');
 await file('review-file',editableRecord,'editable-comparison.json');
 await click('edit-simple-comparison');
@@ -582,10 +621,14 @@ const unchanged=api.state.data;
 el('simple-other-usable').value='21';
 await submit();
 assert.equal(api.state.data,unchanged,'An invalid edit must leave the prior result intact.');
-assert.match(el('builder-error').textContent,/greater than the number you checked/);
+assert.match(el('simple-other-usable-error').textContent,/greater than the number you checked/);
 assert.match(el('simple-other-usable-error').textContent,/Review plan B/);
 assert.equal(el('simple-other-usable').getAttribute('aria-invalid'),'true');
-el('simple-other-usable').value='16'; el('simple-current-cost').value='100';
+el('simple-other-usable').value='16';
+await el('review-builder').emit('input',el('simple-other-usable'));
+assert.equal(el('simple-other-usable-error').hidden,true,'Editing the field clears its stale error.');
+assert.equal(el('simple-other-usable').getAttribute('aria-invalid'),'false');
+el('simple-current-cost').value='100';
 await submit();
 assert.equal(api.state.data.baseline.costs.recurring_operating_cost,250);
 assert.equal(api.state.data.proposed.costs.recurring_operating_cost,340);
@@ -603,17 +646,19 @@ assert.equal(api.state.data.experience,'simple');
 assert.equal(el('simple-edit-actions').hidden,true,'Older results remain readable without guessed editor inputs.');
 console.log('PASS: cost finding remains visible without approval; edit, save/reopen, invalid rollback and legacy reviews');
 await click('start-review'); await mode('simple');
+enterSample();
 el('simple-approved').checked = true;
 el('simple-current-cost').value = '0'; el('simple-other-cost').value = '0';
 el('simple-hourly-rate').value = '0';
 await submit();
 assert.equal(el('decision-code').textContent,'NO COST ADVANTAGE');
 await click('start-review'); await mode('simple');
+enterSample();
 el('simple-other-usable').value = '0';
 const prior = api.state.data;
 await submit();
 assert.equal(api.state.data,prior);
-assert.match(el('builder-error').textContent,/zero usable outputs/);
+assert.match(el('simple-other-usable-error').textContent,/zero usable outputs/);
 await click('start-review'); await mode('example');
 assert.equal(el('review-title').textContent,'Provider cost down 65%. Cost per ready result up 5%.');
 await click('start-review'); await mode('openai');
@@ -705,6 +750,7 @@ el('simple-other-checked').value = '100';
 el('simple-other-usable').value = '92';
 el('simple-other-minutes').value = '0';
 el('simple-hourly-rate').value = '30';
+el('simple-quality-floor').value = '80';
 await submit();
 assert.equal(api.state.data.pricing_estimate.evidence_gate.savings_claim_allowed,false);
 assert.equal(api.state.data.comparison.savings_claim_allowed,false);
