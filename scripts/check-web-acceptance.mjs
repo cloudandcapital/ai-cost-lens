@@ -40,6 +40,12 @@ runInNewContext(read('web/growth-engine.js'), context);
 runInNewContext(read('web/evidence-tools.js'), context);
 runInNewContext(source.slice(0, boundary) + 'globalThis.api = {parseCsv, validDate, validateResult, buildLocalReview, buildSampledReview, buildOpenAIBillReview, buildSingleBillReview, buildToolSpendReview, buildClaudeSpendReview, buildClaudeApiReview, parseFlatStructured, suggestStructuredMapping, buildMappedReview, extractPdfText, extractInvoiceCandidate, inspectUploadedFiles, summarizeSingleBill, failedSavingsGateText, lumenResponse, renderAll, state};})();', context);
 const api = context.api;
+const providerFixture = (name) => {
+  const text = read('tests/fixtures/' + name);
+  return { name, size: Buffer.byteLength(text), text: async () => text };
+};
+await assert.rejects(api.inspectUploadedFiles([providerFixture('openai-dashboard-cost.csv')]), /OpenAI cost export.*activity CSV/);
+await assert.rejects(api.inspectUploadedFiles([providerFixture('openai-dashboard-usage.csv')]), /OpenAI activity export.*cost CSV/);
 const toolCharges = [
   {tool:'Writing plan',kind:'subscription',amount:'20',reference:'October invoice',owner:'Content'},
   {tool:'Coding plan',kind:'subscription',amount:'45',reference:'October invoice',owner:''},
@@ -67,9 +73,9 @@ const badSourceToolReview = JSON.parse(JSON.stringify(toolReview));
 badSourceToolReview.config.reviewSource = 'invoice_form';
 assert.throws(()=>api.validateResult(badSourceToolReview),/source/);
 await assert.rejects(api.buildToolSpendReview([...toolCharges,toolCharges[0]],toolOptions),/Repeated/);
-await assert.rejects(api.buildToolSpendReview(toolCharges,{...toolOptions,scopeConfirmed:false}),/confirmed/);
+await assert.rejects(api.buildToolSpendReview(toolCharges,{...toolOptions,scopeConfirmed:false}),/Confirm that/);
 await assert.rejects(api.buildToolSpendReview(toolCharges,{...toolOptions,end:'2026-09-30'}),/before/);
-await assert.rejects(api.buildToolSpendReview(toolCharges,{...toolOptions,basis:'mixed'}),/cost basis/);
+await assert.rejects(api.buildToolSpendReview(toolCharges,{...toolOptions,basis:'mixed'}),/Choose what the amounts represent/);
 await assert.rejects(api.buildToolSpendReview([{...toolCharges[0],reference:''}],toolOptions),/source reference/);
 await assert.rejects(api.buildToolSpendReview([{...toolCharges[0],amount:'-1'}],toolOptions));
 const estimatedTools = await api.buildToolSpendReview(toolCharges,{...toolOptions,basis:'calculated'});

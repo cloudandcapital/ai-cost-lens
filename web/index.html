@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Start with an AI bill, understand its usage, and add outcomes when you are ready to test the fuller economics."
+      content="Compare AI tools or plans by the cost of usable work, including your review time. Or start with a bill to build a cost baseline. Free, browser-local, no account needed."
     />
     <title>AI Cost Lens | Cloud & Capital</title>
     <link rel="canonical" href="https://lens.cloudandcapital.com/" />
@@ -13,7 +13,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Cloud & Capital" />
     <meta property="og:title" content="AI Cost Lens | Cloud & Capital" />
-    <meta property="og:description" content="Start with your AI bill. See the cost and usage drivers, then add outcomes when you are ready to test cost per ready result. Your files stay in your browser." />
+    <meta property="og:description" content="Compare two AI tools or plans, including the time spent checking their work. Or start with a bill to build a cost baseline. Your files stay in your browser." />
     <meta property="og:url" content="https://lens.cloudandcapital.com/" />
     <meta property="og:image" content="https://lens.cloudandcapital.com/social-preview.png" />
     <meta property="og:image:alt" content="AI Cost Lens cost anatomy comparing model, infrastructure, and human review costs" />
@@ -22,7 +22,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="welcome-mode">
     <div class="shell">
       <header class="masthead">
         <a class="wordmark" href="https://cloudandcapital.com" aria-label="Cloud and Capital home">
@@ -82,6 +82,21 @@
       </label>
 
       <main>
+        <section class="lens-welcome" id="lens-welcome" aria-labelledby="welcome-title">
+          <p class="kicker">AI COST LENS · FREE TOOL</p>
+          <h1 id="welcome-title">Is the cheaper AI<br /> actually costing you more?</h1>
+          <p class="welcome-copy">Compare two tools or plans, including the time you spend checking and fixing their work. Or start with a bill to see the costs you can account for.</p>
+          <div class="welcome-actions">
+            <button class="build-button" id="welcome-compare" type="button">Compare two options <span aria-hidden="true">→</span></button>
+            <button class="text-button" id="welcome-spending" type="button">Review my AI spending <span aria-hidden="true">→</span></button>
+          </div>
+          <p class="welcome-local">No account or connection needed. Your files are read in this browser.</p>
+          <div class="welcome-example">
+            <p><strong>A lower subscription price is only part of the picture.</strong> Extra review time and fewer usable outputs can change which option costs less.</p>
+            <button class="text-button" id="welcome-example" type="button">Explore an example <span aria-hidden="true">→</span></button>
+            <a href="guide.html">Read the guide <span aria-hidden="true">→</span></a>
+          </div>
+        </section>
         <section class="bill-review-screen" id="bill-review-screen" aria-labelledby="bill-review-title">
           <div class="eyebrow-row">
             <p class="eyebrow" id="bill-period-label"></p>
@@ -189,13 +204,18 @@
           <div class="title-grid">
             <div>
               <p class="kicker" id="review-kicker">FINANCE FIRST AI SPEND REVIEW</p>
-              <h1 id="review-title">What did one ready result really cost?</h1>
+              <h1 id="review-title" tabindex="-1">What did one ready result really cost?</h1>
             </div>
             <div class="workload-intro">
               <strong id="workload-name"></strong>
               <p id="workload-description"></p>
             </div>
           </div>
+
+          <dl class="simple-decision-block" id="simple-decision-block" hidden>
+            <div><dt>Cost finding</dt><dd id="simple-cost-finding"></dd></div>
+            <div><dt>Before switching</dt><dd id="simple-switch-check"></dd></div>
+          </dl>
 
           <div class="evidence-summary" id="review-evidence-summary" aria-label="Period and cost source"></div>
           <div class="review-next-actions" id="simple-edit-actions" hidden>
@@ -869,15 +889,21 @@
           <button class="dialog-close" id="close-review" type="button" aria-label="Close review setup">Close</button>
         </div>
 
+        <button class="simple-change-path" id="simple-change-path" type="button">Choose a different path</button>
+
         <div class="privacy-note">
           <strong>Your files stay in this browser.</strong>
-          <span>AI Cost Lens reads them locally. Nothing is uploaded or stored.</span>
-          <p>File limit: 5 MiB and 20,000 rows. For comparisons, use equally long, complete periods.</p>
-          <p>Use non-negative costs after documented discounts. Reconcile credits and refunds first, and use the same gross or net basis on both sides.</p>
+          <span>AI Cost Lens reads them locally; source files are not uploaded.</span>
+          <details><summary>File limits and comparison boundaries</summary><p>File limit: 5 MiB and 20,000 rows. For comparisons, use equally long, complete periods.</p><p>Use non-negative costs after documented discounts. Reconcile credits and refunds first, and use the same gross or net basis on both sides.</p></details>
         </div>
 
         <p class="builder-choice-label">Choose what you have. You can add more evidence later.</p>
         <div class="builder-mode-choice" role="group" aria-label="Choose how to start">
+          <button class="builder-mode builder-mode-featured" data-builder-mode="simple" type="button" aria-pressed="false">
+            <small>SIMPLE · NO FILES NEEDED</small>
+            <strong>Compare two options</strong>
+            <span>Compare monthly charges, usable work, and the time you spend checking it.</span>
+          </button>
           <button class="builder-mode builder-mode-featured" data-builder-mode="single" type="button" aria-pressed="false">
             <small>BILL OR SUBSCRIPTION</small>
             <strong>Start with a bill</strong>
@@ -888,23 +914,20 @@
             <strong>Review my AI tools</strong>
             <span>Put your AI plans and separately billed usage in one period, with a source and an owner for each charge.</span>
           </button>
+          <details class="builder-more-paths"><summary>Other ways to start <span>Upload records, analyze usage, price a prompt, and examples</span></summary><div class="builder-more-grid">
+          <button class="builder-mode builder-mode-featured" data-builder-mode="openai" type="button" aria-pressed="false">
+            <small>OPENAI OR CLAUDE · FILES</small>
+            <strong>Upload what you have</strong>
+            <span>Choose CSV, JSON, or a text-based invoice PDF. The browser checks it locally.</span>
+          </button>
+
           <button class="builder-mode builder-mode-featured" data-builder-mode="usage" type="button" aria-pressed="false">
             <small>CSV OR JSON · LOCAL ANALYSIS</small>
             <strong>Review AI usage</strong>
             <span>Find spend drivers, budget risk, operational patterns, variance, and credible optimization targets.</span>
             <em>BEST FOR REQUEST OR TRACE EXPORTS</em>
           </button>
-          <button class="builder-mode builder-mode-featured" data-builder-mode="simple" type="button" aria-pressed="false">
-            <small>SIMPLE · NO FILES NEEDED</small>
-            <strong>Compare two options</strong>
-            <span>For subscriptions, solo work, and small teams. Enter two monthly costs and check a small sample of work.</span>
-          </button>
-          <button class="builder-mode builder-mode-featured" data-builder-mode="openai" type="button" aria-pressed="false">
-            <small>OPENAI OR CLAUDE · FILES</small>
-            <strong>Upload what you have</strong>
-            <span>Choose CSV, JSON, or a text-based invoice PDF. The browser checks it locally.</span>
-          </button>
-          <details class="builder-more-paths"><summary>Other ways to start <span>Prompt price, detailed comparison, and examples</span></summary><div class="builder-more-grid">
+
           <button class="builder-mode" data-builder-mode="price" type="button" aria-pressed="false">
             <small>NO FILES · LOCAL CALCULATOR</small><strong>Price a prompt</strong><span>Compare API prices, cache, batch, retries, and expected usable results.</span>
           </button>
@@ -938,7 +961,7 @@
               <label><span>Currency</span><input id="tools-currency" type="text" value="USD" maxlength="3" /></label>
               <label><span>Service-period start</span><input id="tools-start" type="date" /></label>
               <label><span>Service-period end / data through</span><input id="tools-end" type="date" /></label>
-              <label class="field-wide"><span>What do these amounts represent?</span><select id="tools-basis"><option value="provider_reported">Billed amounts I checked against my records</option><option value="calculated">Estimates for this period</option><option value="allocated">Allocated costs with a documented method</option></select><small>Use one basis for the whole review. AI Cost Lens does not independently verify your records.</small></label>
+              <label class="field-wide"><span>What do these amounts represent?</span><select id="tools-basis" required><option value="">Choose the source of these amounts</option><option value="provider_reported">Billed amounts I checked against my records</option><option value="calculated">Estimates for this period</option><option value="allocated">Allocated costs with a documented method</option></select><small>Choose explicitly for each new review. AI Cost Lens does not independently verify your records.</small></label>
             </div>
           </div></section>
           <section class="builder-step"><div class="step-number">02</div><div>
@@ -1154,7 +1177,6 @@
           <div class="path-requirements simple-requirements">
             <strong>No spreadsheet needed</strong>
             <span>Use estimates if that is all you have. The result will stay clearly labeled as a sample, not guaranteed savings.</span>
-            <button class="simple-change-path" id="simple-change-path" type="button">Choose a different path</button>
           </div>
           <section class="builder-step" aria-labelledby="simple-cost-title">
             <div class="step-number">01</div>
@@ -1165,15 +1187,15 @@
                 <fieldset class="sample-route-card">
                   <legend>What you use now</legend>
                   <div class="simple-field-grid">
-                    <label><span>Tool or plan name</span><input id="simple-current-name" type="text" value="Current AI tool" /></label>
-                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-current-cost" type="number" min="0" step="0.01" value="40" /></div></label>
+                    <label><span>Tool or plan name</span><input id="simple-current-name" type="text" value="Current AI tool" aria-describedby="simple-current-name-error" /><small class="field-error" id="simple-current-name-error" hidden></small></label>
+                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-current-cost" type="number" min="0" step="0.01" value="40" aria-describedby="simple-current-cost-error" /></div><small class="field-error" id="simple-current-cost-error" hidden></small></label>
                   </div>
                 </fieldset>
                 <fieldset class="sample-route-card">
                   <legend>The other option</legend>
                   <div class="simple-field-grid">
-                    <label><span>Tool or plan name</span><input id="simple-other-name" type="text" value="Lower-cost AI tool" /></label>
-                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-other-cost" type="number" min="0" step="0.01" value="20" /></div></label>
+                    <label><span>Tool or plan name</span><input id="simple-other-name" type="text" value="Lower-cost AI tool" aria-describedby="simple-other-name-error" /><small class="field-error" id="simple-other-name-error" hidden></small></label>
+                    <label><span>Cost per month</span><div class="input-prefix"><em>$</em><input id="simple-other-cost" type="number" min="0" step="0.01" value="20" aria-describedby="simple-other-cost-error" /></div><small class="field-error" id="simple-other-cost-error" hidden></small></label>
                   </div>
                 </fieldset>
               </div>
@@ -1184,22 +1206,22 @@
             <div>
               <h3 id="simple-work-title">Check a small sample of your work</h3>
               <p>Use the same kind of task for both tools. Count outputs usable without a significant fix. Successfully repaired outputs are excluded from this first-pass measure; it is not cost per final completed task. A small sample is directional, not proof.</p>
-              <label class="simple-volume-field"><span>About how many of these tasks do you complete per month?</span><input id="simple-monthly-tasks" type="number" min="1" step="1" value="40" /></label>
+              <label class="simple-volume-field"><span>About how many of these tasks do you complete per month?</span><input id="simple-monthly-tasks" type="number" min="1" step="1" value="40" aria-describedby="simple-monthly-tasks-error" /><small class="field-error" id="simple-monthly-tasks-error" hidden></small></label>
               <div class="sample-route-grid">
                 <fieldset class="sample-route-card">
                   <legend>What you use now</legend>
                   <div class="sample-field-grid">
-                    <label><span>Outputs checked</span><input id="simple-current-checked" type="number" min="1" step="1" value="20" /></label>
-                    <label><span>Usable without a big fix</span><input id="simple-current-usable" type="number" min="0" step="1" value="19" /></label>
-                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-current-minutes" type="number" min="0" step="0.1" value="30" /></label>
+                    <label><span>Outputs checked</span><input id="simple-current-checked" type="number" min="1" step="1" value="20" aria-describedby="simple-current-checked-error" /><small class="field-error" id="simple-current-checked-error" hidden></small></label>
+                    <label><span>Usable without a big fix</span><input id="simple-current-usable" type="number" min="0" step="1" value="19" aria-describedby="simple-current-usable-error" /><small class="field-error" id="simple-current-usable-error" hidden></small></label>
+                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-current-minutes" type="number" min="0" step="0.1" value="30" aria-describedby="simple-current-minutes-error" /><small class="field-error" id="simple-current-minutes-error" hidden></small></label>
                   </div>
                 </fieldset>
                 <fieldset class="sample-route-card">
                   <legend>The other option</legend>
                   <div class="sample-field-grid">
-                    <label><span>Outputs checked</span><input id="simple-other-checked" type="number" min="1" step="1" value="20" /></label>
-                    <label><span>Usable without a big fix</span><input id="simple-other-usable" type="number" min="0" step="1" value="16" /></label>
-                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-other-minutes" type="number" min="0" step="0.1" value="200" /></label>
+                    <label><span>Outputs checked</span><input id="simple-other-checked" type="number" min="1" step="1" value="20" aria-describedby="simple-other-checked-error" /><small class="field-error" id="simple-other-checked-error" hidden></small></label>
+                    <label><span>Usable without a big fix</span><input id="simple-other-usable" type="number" min="0" step="1" value="16" aria-describedby="simple-other-usable-error" /><small class="field-error" id="simple-other-usable-error" hidden></small></label>
+                    <label class="field-wide"><span>Total minutes spent reviewing or fixing them</span><input id="simple-other-minutes" type="number" min="0" step="0.1" value="200" aria-describedby="simple-other-minutes-error" /><small class="field-error" id="simple-other-minutes-error" hidden></small></label>
                   </div>
                 </fieldset>
               </div>
@@ -1211,9 +1233,10 @@
               <h3 id="simple-time-title">Put a value on your time</h3>
               <p>This estimates the value of review and fixing time. It is not necessarily cash paid or money you could recover. Enter zero if you only want to compare tool charges.</p>
               <div class="field-grid compact-fields">
-                <label><span>What is an hour of your time worth?</span><div class="input-prefix"><em>$</em><input id="simple-hourly-rate" type="number" min="0" step="0.01" value="30" /></div></label>
-                <label><span>Minimum usable rate you would accept</span><div class="input-suffix"><input id="simple-quality-floor" type="number" min="1" max="100" step="0.1" value="80" /><em>%</em></div></label>
+                <label><span>What is an hour of your time worth?</span><div class="input-prefix"><em>$</em><input id="simple-hourly-rate" type="number" min="0" step="0.01" value="30" aria-describedby="simple-hourly-rate-error" /></div><small class="field-error" id="simple-hourly-rate-error" hidden></small></label>
+                <label><span>Minimum usable rate you would accept</span><div class="input-suffix"><input id="simple-quality-floor" type="number" min="1" max="100" step="0.1" value="80" aria-describedby="simple-quality-floor-error" /><em>%</em></div><small class="field-error" id="simple-quality-floor-error" hidden></small></label>
                 <label class="check-field field-wide"><input id="simple-approved" type="checkbox" /><span>I have confirmed both tools are okay to use for this work</span></label>
+                <p class="approval-change-note field-wide" id="simple-approval-note" role="status" hidden></p>
               </div>
               <p class="sample-caveat" id="simple-example-caveat">The prefilled numbers are a small-business example. Replace them with your own before comparing.</p>
             </div>

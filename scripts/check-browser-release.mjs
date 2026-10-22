@@ -185,6 +185,7 @@ async function verifyOpenAIPartialBucket(page) {
     .replaceAll("1788307200,1788393600", "1788310800,1788393600");
   await page.locator("#start-review").click();
   await openAdvancedChoices(page);
+  await openAdvancedChoices(page);
   await page.locator('[data-builder-mode="openai"]').click();
   await page.locator("#openai-usage-file").setInputFiles({ name: "partial-usage.csv", mimeType: "text/csv", buffer: Buffer.from(usage) });
   await page.locator("#openai-cost-file").setInputFiles(join(fixtureDir, "openai-dashboard-cost.csv"));
@@ -200,7 +201,8 @@ async function verifyOpenAIPartialBucket(page) {
 async function verifyFictionalProjectCost(page) {
   const fixtureDir = join(root, "tests", "fixtures");
   await page.locator("#start-review").click();
-  assert(await page.locator('.builder-mode-choice [data-builder-mode="openai"]').isVisible(), "Provider upload is hidden in the first choice screen.");
+  await openAdvancedChoices(page);
+  assert(await page.locator('.builder-mode-choice [data-builder-mode="openai"]').isVisible(), "Provider upload is missing from the other starting options.");
   await page.locator('.builder-mode-choice [data-builder-mode="openai"]').click();
   await page.locator("#openai-usage-file").setInputFiles(join(fixtureDir, "fictional-asterdesk-openai-activity.csv"));
   await page.locator("#openai-cost-file").setInputFiles(join(fixtureDir, "fictional-asterdesk-openai-cost.csv"));
@@ -216,6 +218,7 @@ async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false } =
   if (mobile && await page.locator("#header-actions").isHidden()) await page.locator("#header-menu-toggle").click();
   await page.locator("#start-review").click();
   await page.locator('[data-builder-mode="tools"]').click();
+  assert(await page.locator("#tools-basis").inputValue() === "", "The tools review preselected a verification claim.");
   for (const [id, value] of Object.entries({
     "tools-name": "Example team tools", "tools-start": "2026-10-01", "tools-end": "2026-10-20",
     "tool-name-1": "Writing plan", "tool-amount-1": "20", "tool-source-1": "October invoice", "tool-owner-1": "Content",
@@ -227,6 +230,7 @@ async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false } =
   await page.locator("#tool-amount-3").fill("3.25");
   await page.locator("#tool-source-3").fill("Separate usage charge");
   await page.locator("#tools-scope").check();
+  await page.locator("#tools-basis").selectOption("provider_reported");
   await page.locator("#build-review").click();
   await page.locator("#tool-spend-result").waitFor({ state: "visible" });
   assert((await page.locator("#bill-finding-title").innerText()).includes("$68.25"), "AI tool total did not reconcile.");
@@ -278,20 +282,36 @@ async function verifyEditableComparison(page, { mobile = false } = {}) {
   })) await page.locator(`#${id}`).fill(value);
   await page.locator("#build-review").click();
   assert((await page.locator("#finding-title").innerText()).includes("Plan A has the lower estimated cost"), "The approval gate hid the cost finding.");
+  assert((await page.locator("#simple-cost-finding").innerText()).includes("Plan A: $2.56. Plan B: $4.25."), "The result hero lost the calculated cost finding.");
+  assert((await page.locator("#simple-switch-check").innerText()).includes("approval"), "The cost finding bypassed approval.");
+  assert(!(await page.locator(".question-nav").isVisible()) && !(await page.locator(".mobile-section-picker").isVisible()), "Simple mode exposes unrelated opportunity or verification views.");
+  if (!mobile) {
+    for (const width of [1024, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      assert(await page.locator(".decision-table-wrap").first().evaluate((element) => element.scrollWidth <= element.clientWidth + 1), `The simple comparison table clips at ${width}px.`);
+      assert(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 1, `The comparison overflows at ${width}px.`);
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  }
   assert((await page.locator("#decision-title").innerText()).includes("Confirm policy approval first"), "The cost finding bypassed approval.");
   await page.locator("#edit-simple-comparison").click();
   assert(await page.locator("#simple-current-cost").inputValue() === "80" && await page.locator("#simple-other-minutes").inputValue() === "120", "Editing replaced entered values.");
   await page.locator("#simple-other-usable").fill("21");
   await page.locator("#build-review").click();
   assert((await page.locator("#builder-error").innerText()).includes("greater than the number you checked"), "Invalid usable counts were accepted.");
+  assert((await page.locator("#simple-other-usable-error").innerText()).includes("Plan B"), "The error does not identify the option.");
+  assert(await page.locator("#simple-other-usable").getAttribute("aria-invalid") === "true", "The invalid field was not marked.");
+  assert(await page.locator("#simple-other-usable").evaluate((element) => element === document.activeElement), "The error did not focus its field.");
   await page.locator("#simple-other-usable").fill("16");
   await page.locator("#build-review").click();
   if (mobile) await page.locator("#header-menu-toggle").click();
   const saved = await saveJsonDownload(page, "#download-review", "editable-comparison.json");
   assert(saved.baseline.costs.recurring_operating_cost === 230 && saved.proposed.costs.recurring_operating_cost === 340, "The saved comparison differs from independent arithmetic.");
   assert(saved.comparison.savings_claim_allowed === false, "A sample comparison claimed savings.");
+  assert(saved.baseline.outcomes.ready_rate_interval_95 === null && saved.proposed.outcomes.ready_rate_interval_95 === null, "A user-selected sample exported a statistical interval.");
+  assert(saved.comparison.finding.includes("Plan A has the lower estimated cost"), "The exported comparison lost its visible cost finding.");
   await page.reload();
-  await page.getByRole("heading", { name: "Provider cost down 65%. Cost per ready result up 5%.", exact: true }).waitFor({ state: "visible" });
+  await page.locator("#welcome-title").waitFor({ state: "visible" });
   if (mobile) await page.locator("#header-menu-toggle").click();
   const chooserPromise = page.waitForEvent("filechooser");
   await page.locator("#open-review").click();
@@ -311,7 +331,7 @@ async function verifyGuide(page, origin) {
   const a11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   assert(a11y.violations.length === 0, `Guide accessibility violations: ${axeSummary(a11y)}`);
   await page.getByRole("link", { name: "Open the tool", exact: true }).click();
-  await page.locator("#review-title").waitFor({ state: "visible" });
+  await page.locator("#welcome-title").waitFor({ state: "visible" });
 }
 
 async function priceAndUsageFlow(engineName, engine, origin) {
@@ -320,8 +340,9 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const page = await context.newPage();
   const observed = watchPage(page, origin);
   await page.goto(origin, { waitUntil: "networkidle" });
-  await page.locator("#review-title").waitFor({ state: "visible" });
-
+  await page.locator("#welcome-title").waitFor({ state: "visible" });
+  assert(!(await page.locator("#review-title").isVisible()), `${engineName}: the advanced example displaced the welcome screen.`);
+  await page.locator("#welcome-example").click();
   await page.locator('[data-example="growth"]').click();
   assert((await page.locator("#workload-name").innerText()) === "Growing support AI workload", `${engineName}: startup example did not open.`);
   assert((await page.locator("#mode-tag").innerText()) === "ILLUSTRATIVE DATA", `${engineName}: invented example lacks its evidence label.`);
@@ -345,7 +366,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#start-review-inline").click();
   assert(await page.locator("#baseline-population").inputValue() === "" && await page.locator("#proposed-ready").inputValue() === "", `${engineName}: example outcomes leaked into a real review.`);
   assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), `${engineName}: inline review action did not open.`);
-  assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 5, `${engineName}: start dialog lost a primary path.`);
+  assert(await page.locator(".builder-mode-choice > .builder-mode").count() === 3, `${engineName}: start dialog should show three everyday paths.`);
   assert(await page.locator('[data-builder-mode="tools"]').isVisible(), `${engineName}: AI tool review is missing from the primary choices.`);
   await page.locator("#close-review").click();
   await page.locator('[data-example="cost-trap"]').click();
@@ -663,7 +684,10 @@ async function mobileAndAccessibility(origin) {
   const page = await context.newPage();
   const observed = watchPage(page, origin);
   await page.goto(origin, { waitUntil: "networkidle" });
-  await page.locator("#review-title").waitFor({ state: "visible" });
+  await page.locator("#welcome-title").waitFor({ state: "visible" });
+  const welcomeA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  assert(welcomeA11y.violations.length === 0, `mobile welcome accessibility violations: ${axeSummary(welcomeA11y)}`);
+  await page.locator("#welcome-example").click();
 
   assert(await page.locator("#header-menu-toggle").isVisible(), "mobile: menu toggle is not visible.");
   assert(await page.locator("#header-actions").isHidden(), "mobile: action stack is visible before opening the menu.");

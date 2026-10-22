@@ -111,7 +111,7 @@ def test_web_assets_and_brand_contract_are_present():
     assert "DECISION CHECK" in app
     assert "builderMode: null" in app
     assert "retryRequests > Math.max(modelRequests - 1, 0)" in app
-    assert "state.demoData = cloneData(state.data)" in app
+    assert "state.demoData = cloneData(data)" in app
     assert 'mode === "example"' in app
     assert "activateBuilderMode" in app
     assert "renderFinanceMemo" in app
@@ -426,7 +426,7 @@ def test_question_navigation_matches_views():
         }
     )
     assert (
-        'const simpleViews = new Set(["review", "opportunities", "verify", "evidence"])'
+        'const simpleViews = new Set(["review"])'
         in (WEB / "app.js").read_text()
     )
 

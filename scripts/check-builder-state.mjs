@@ -191,7 +191,16 @@ async function assertFresh(nextMode) {
   }
 }
 await assertFresh('tools');
+assert.equal(el('tools-basis').value,'','A new tools review must not certify checked bills by default.');
 for (const [id,value] of Object.entries({'tools-name':'Team tools','tools-currency':'USD','tools-start':'2026-10-01','tools-end':'2026-10-20','tools-basis':'provider_reported','tool-name-1':'Writing plan','tool-kind-1':'subscription','tool-amount-1':'20','tool-source-1':'October invoice','tool-name-2':'Writing plan','tool-kind-2':'usage','tool-amount-2':'5','tool-source-2':'Separate usage charge'})) el(id).value = value;
+el('tools-basis').value = '';
+const beforeMissingBasis = api.state.data;
+await submit();
+assert.equal(api.state.data,beforeMissingBasis);
+assert.match(el('builder-error').textContent,/Choose what the amounts represent/);
+el('tools-basis').value = 'provider_reported';
+await submit();
+assert.match(el('builder-error').textContent,/Confirm that these charges/);
 el('tools-scope').checked = true;
 await submit();
 assert.equal(api.state.data.config.reviewSource,'tool_spend');
@@ -349,6 +358,14 @@ for (const [id,value] of Object.entries({
 el('previous-bill-scope').checked=true;
 await submit();
 assert.equal(api.state.data.config.previousBill.amount,'100');
+assert.equal(api.state.data.mode,'user_entered');
+assert.equal(api.state.data.source.spend[0].cost_basis,'user_entered');
+assert.equal(el('bill-usage-section').hidden,true,'A bill with no usage should not show an empty usage table.');
+const oldManual=JSON.parse(JSON.stringify(api.state.data));
+oldManual.mode='real'; oldManual.source.spend[0].cost_basis='provider_reported';
+await file('review-file',JSON.stringify(oldManual),'older-manual-bill.json');
+assert.equal(api.state.data.mode,'user_entered','Reopened older manual bills must lose overstated provider provenance.');
+assert.equal(api.state.data.source.spend[0].cost_basis,'user_entered');
 assert.match(el('bill-period-label').textContent,/declared service period, not independently verified/);
 assert.match(el('bill-history-metrics').innerHTML,/−\$10\.00/);
 assert.match(el('bill-history-metrics').innerHTML,/10\.0% lower/);
@@ -509,6 +526,7 @@ assert.equal(el('simple-approved').checked,true);
 el('simple-other-name').value='A different tool';
 await el('simple-other-name').emit('input');
 assert.equal(el('simple-approved').checked,false,'A changed tool name needs a fresh approval declaration.');
+assert.equal(el('simple-approval-note').hidden,false,'Explain when a rename clears approval.');
 await click('close-review');
 
 // Reproduce the audited edit/approval problems with independently known totals.
@@ -525,9 +543,21 @@ assert.equal(api.state.data.baseline.costs.recurring_operating_cost,230);
 assert.equal(api.state.data.proposed.costs.recurring_operating_cost,340);
 assert.equal(el('decision-code').textContent,'CHECK APPROVAL');
 assert.equal(api.state.data.comparison.savings_claim_allowed,false);
+assert.equal(api.state.data.baseline.outcomes.ready_rate_interval_95,null);
+assert.equal(api.state.data.proposed.outcomes.ready_rate_interval_95,null);
+assert.equal(api.state.data.baseline.evidence.cost_basis,'user_entered');
+assert.match(api.state.data.comparison.finding,/Review plan A has the lower estimated cost/);
+assert.equal(document.querySelector('.question-nav').hidden,true);
+assert.equal(document.querySelector('.mobile-section-picker').hidden,true);
+assert(document.querySelectorAll('.nav-item').filter((item)=>!item.hidden).every((item)=>item.dataset.view==='review'),'Simple comparisons must not expose a second opportunity amount.');
 assert.match(el('finding-title').textContent,/Review plan A has the lower estimated cost/);
 assert.match(el('lumen-panel-copy').textContent,/\$2\.56[\s\S]*\$4\.25[\s\S]*approval/);
 const editableRecord=JSON.stringify(api.state.data);
+const olderRanges=JSON.parse(editableRecord);
+for (const side of ['baseline','proposed']) olderRanges[side].outcomes.ready_rate_interval_95=[0.1,0.99];
+await file('review-file',JSON.stringify(olderRanges),'older-user-selected-sample.json');
+assert.equal(api.state.data.baseline.outcomes.ready_rate_interval_95,null,'Unsupported historical intervals must not survive reopening and re-export.');
+assert.equal(api.state.data.proposed.outcomes.ready_rate_interval_95,null);
 await click('start-review'); await mode('simple'); // A new review deliberately has fresh defaults.
 assert.equal(el('simple-current-cost').value,'40');
 await click('close-review');
@@ -542,11 +572,15 @@ el('simple-other-usable').value='21';
 await submit();
 assert.equal(api.state.data,unchanged,'An invalid edit must leave the prior result intact.');
 assert.match(el('builder-error').textContent,/greater than the number you checked/);
+assert.match(el('simple-other-usable-error').textContent,/Review plan B/);
+assert.equal(el('simple-other-usable').getAttribute('aria-invalid'),'true');
 el('simple-other-usable').value='16'; el('simple-current-cost').value='100';
 await submit();
 assert.equal(api.state.data.baseline.costs.recurring_operating_cost,250);
 assert.equal(api.state.data.proposed.costs.recurring_operating_cost,340);
 assert.equal(api.state.data.comparison.both_policy_approved,false);
+assert.equal(el('simple-other-usable-error').hidden,true);
+assert.equal(el('simple-other-usable').getAttribute('aria-invalid'),'false');
 const changed=api.state.data;
 const tampered=JSON.parse(editableRecord);
 tampered.simple_input_snapshot.fields['simple-current-cost']='999';

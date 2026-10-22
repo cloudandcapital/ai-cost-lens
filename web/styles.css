@@ -16,6 +16,7 @@
   --sans: Arial, Helvetica, sans-serif;
 }
 
+
 * {
   box-sizing: border-box;
 }
@@ -6343,3 +6344,67 @@ body{min-width:0}
   .tool-charge-entry { padding: 14px; }
   .review-next-actions { align-items: stretch; flex-direction: column; }
 }
+
+/* Keep the everyday review separate from the advanced workbench. */
+.lens-welcome { max-width: 980px; padding: 76px 0 40px; }
+.lens-welcome[hidden], .simple-decision-block[hidden], .field-error[hidden], .approval-change-note[hidden] { display: none; }
+.lens-welcome h1 { max-width: 920px; margin: 22px 0; font-size: clamp(42px, 5.8vw, 82px); line-height: 1.04; letter-spacing: -0.035em; text-wrap: balance; }
+.welcome-copy { max-width: 670px; color: var(--muted); font-size: 19px; line-height: 1.65; }
+.welcome-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 30px; margin-top: 30px; }
+.welcome-actions .build-button { display: inline-flex; align-items: center; gap: 20px; background: var(--clay); border-color: var(--clay); color: white; }
+.welcome-local { margin-top: 20px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.welcome-example { max-width: 670px; border-top: 1px solid var(--line); margin-top: 42px; padding-top: 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 26px; }
+.welcome-example p { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.welcome-example p strong { color: var(--ink); }
+.welcome-example a { font-size: 13px; color: var(--ink); text-underline-offset: 4px; }
+body.welcome-mode .question-nav, body.welcome-mode .mobile-section-picker, body.welcome-mode .view,
+body.welcome-mode .bill-review-screen, body.welcome-mode #header-actions > :not(#start-review):not(#open-review) { display: none; }
+.simple-decision-block { display: grid; gap: 15px; max-width: 920px; padding: 24px 28px; margin: 24px 0; border-left: 3px solid var(--clay); background: var(--paper-light); }
+.simple-decision-block div { display: grid; grid-template-columns: 125px minmax(0, 1fr); gap: 16px; }
+.simple-decision-block dt { font-size: 12px; font-weight: 700; color: var(--sage); }
+.simple-decision-block dd { margin: 0; font-size: 15px; line-height: 1.6; }
+body.simple-mode .title-grid { grid-template-columns: 1fr; gap: 0; }
+body.simple-mode .title-grid .workload-intro, body.simple-mode #period-label, body.simple-mode #review-evidence-summary,
+body.simple-mode .break-even-card, body.simple-mode .lumen-panel, body.simple-mode .methodology-note,
+body.simple-mode #metric-ledger, body.simple-mode #view-review > .finding, body.simple-mode #view-review > .comparison-section,
+body.simple-mode #view-review > .opportunity-section, body.simple-mode #view-review > .decision-note { display: none; }
+body.simple-mode .cockpit-grid { grid-template-columns: minmax(0, 1fr); }
+body.simple-mode #view-review > .title-grid h1 { max-width: 960px; }
+body.simple-mode .truth-section { padding-top: 26px; }
+body.simple-mode .decision-table { min-width: 0; table-layout: fixed; }
+body.simple-mode .decision-table th:first-child { width: 34%; }
+body.simple-mode .decision-table td:last-child, body.simple-mode .decision-table thead th:last-child { text-align: right; }
+body.simple-mode .decision-table td, body.simple-mode .decision-table th { overflow-wrap: anywhere; }
+body.simple-mode .simple-table-notes { padding-top: 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.simple-table-notes summary { cursor: pointer; color: var(--ink); }
+.simple-table-notes dl { display: grid; gap: 12px; }
+.simple-table-notes dt { font-weight: 700; color: var(--ink); }
+.simple-table-notes dd { margin: 0; }
+#edit-simple-comparison, .welcome-example .text-button, #simple-change-path { min-height: 44px; }
+#simple-change-path { display: none; margin: 0 0 16px; }
+.review-dialog.has-builder-path #simple-change-path { display: inline-flex; align-items: center; }
+.review-dialog.has-builder-path .builder-mode-choice, .review-dialog.has-builder-path .builder-choice-label { display: none; }
+.review-dialog.has-builder-path .privacy-note { display: none; }
+.privacy-note summary { cursor: pointer; margin-top: 8px; font-size: 12px; }
+.field-error { display: block; color: #98464e; font-size: 12px; line-height: 1.5; margin: 5px 0 0; }
+input[aria-invalid="true"] { outline: 2px solid #98464e; outline-offset: 2px; }
+.approval-change-note { color: var(--clay); font-size: 13px; line-height: 1.5; }
+@media (min-width: 901px) and (max-width: 1280px) {
+  .cockpit-grid { grid-template-columns: minmax(0, 1fr); }
+  .lumen-panel { position: static; min-height: 0; }
+}
+@media (max-width: 600px) {
+  .lens-welcome { padding-top: 32px; }
+  .lens-welcome h1 { font-size: clamp(38px, 9.8vw, 56px); }
+  .lens-welcome h1 br { display: none; }
+  .welcome-copy { font-size: 16px; }
+  .welcome-actions { align-items: stretch; gap: 12px; }
+  .welcome-actions .build-button { justify-content: center; width: 100%; }
+  .welcome-local { font-size: 12px; }
+  .simple-decision-block { padding: 18px; }
+  .simple-decision-block div { grid-template-columns: 1fr; gap: 4px; }
+  body.simple-mode .decision-table th:first-child { width: auto; }
+  body.simple-mode .decision-table td:last-child { text-align: left; }
+}
+
+body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; }
