@@ -46,7 +46,10 @@ jobs:
         if: always()
         with:
           name: finance-memo-example
-          path: browser-artifacts/finance-memo-example.pdf
+          path: |
+            browser-artifacts/finance-memo-example.pdf
+            browser-artifacts/finance-memo-simple.pdf
+            browser-artifacts/comparison-followup.png
           if-no-files-found: ignore
 
   production-network:

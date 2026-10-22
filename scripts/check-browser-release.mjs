@@ -117,15 +117,17 @@ async function verifyFinanceMemoPdf(page, { simple = false } = {}) {
     pages.push(content.items.map((item) => item.str).join(" "));
   }
   const text = pages.join(" ").toLowerCase().replace(/\s+/g, " ");
+  // PDF text runs can insert spaces between the letters of tracked headings.
+  const compactText = text.replace(/\s/g, "");
   const required = simple
     ? ["ai tool cost comparison", "cost finding", "before switching", "approval: you confirmed", "monthly tool cost", "time value at $30/hr", "$150", "$300", "cost per usable result", "not booked savings"]
     : ["ai spend decision memo", "the other option does not meet", "provider cost", "cost per ready result", "what finance can rely on", "current cost vs plan", "monthly scenario compares route unit costs", "one time change cost", "month net after change cost", "not booked savings", "not supported"];
   for (const expected of required) {
-    assert(text.includes(expected), `finance memo PDF is missing ${expected}.`);
+    assert(compactText.includes(expected.replace(/\s/g, "")), `finance memo PDF is missing ${expected}. Extracted text: ${text.slice(0, 1800)}`);
   }
   if (simple) {
     for (const forbidden of ["keep current route", "stop change", "cost per ready result", "provider cost"]) {
-      assert(!text.includes(forbidden), `simple memo retained unrelated wording: ${forbidden}.`);
+      assert(!compactText.includes(forbidden.replace(/\s/g, "")), `simple memo retained unrelated wording: ${forbidden}.`);
     }
   }
   await loadingTask.destroy();
