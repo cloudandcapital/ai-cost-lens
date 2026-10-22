@@ -265,6 +265,55 @@ async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false } =
   await page.locator("#close-review").click();
 }
 
+async function verifyEditableComparison(page, { mobile = false } = {}) {
+  if (mobile) await page.locator("#header-menu-toggle").click();
+  await page.locator("#start-review").click();
+  await page.locator('[data-builder-mode="simple"]').click();
+  for (const [id, value] of Object.entries({
+    "simple-current-name": "Plan A", "simple-other-name": "Plan B",
+    "simple-current-cost": "80", "simple-other-cost": "40", "simple-monthly-tasks": "100",
+    "simple-current-checked": "20", "simple-current-usable": "18", "simple-current-minutes": "60",
+    "simple-other-checked": "20", "simple-other-usable": "16", "simple-other-minutes": "120",
+    "simple-hourly-rate": "30", "simple-quality-floor": "75",
+  })) await page.locator(`#${id}`).fill(value);
+  await page.locator("#build-review").click();
+  assert((await page.locator("#finding-title").innerText()).includes("Plan A has the lower estimated cost"), "The approval gate hid the cost finding.");
+  assert((await page.locator("#decision-title").innerText()).includes("Confirm policy approval first"), "The cost finding bypassed approval.");
+  await page.locator("#edit-simple-comparison").click();
+  assert(await page.locator("#simple-current-cost").inputValue() === "80" && await page.locator("#simple-other-minutes").inputValue() === "120", "Editing replaced entered values.");
+  await page.locator("#simple-other-usable").fill("21");
+  await page.locator("#build-review").click();
+  assert((await page.locator("#builder-error").innerText()).includes("greater than the number you checked"), "Invalid usable counts were accepted.");
+  await page.locator("#simple-other-usable").fill("16");
+  await page.locator("#build-review").click();
+  if (mobile) await page.locator("#header-menu-toggle").click();
+  const saved = await saveJsonDownload(page, "#download-review", "editable-comparison.json");
+  assert(saved.baseline.costs.recurring_operating_cost === 230 && saved.proposed.costs.recurring_operating_cost === 340, "The saved comparison differs from independent arithmetic.");
+  assert(saved.comparison.savings_claim_allowed === false, "A sample comparison claimed savings.");
+  await page.reload();
+  await page.getByRole("heading", { name: "Provider cost down 65%. Cost per ready result up 5%.", exact: true }).waitFor({ state: "visible" });
+  if (mobile) await page.locator("#header-menu-toggle").click();
+  const chooserPromise = page.waitForEvent("filechooser");
+  await page.locator("#open-review").click();
+  await (await chooserPromise).setFiles({ name: "editable-comparison.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(saved)) });
+  await page.locator("#edit-simple-comparison").click();
+  assert(await page.locator("#simple-monthly-tasks").inputValue() === "100" && !(await page.locator("#simple-approved").isChecked()), "Saved editor values or approval changed on reopen.");
+  await page.locator("#close-review").click();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 1, "Editable comparison caused horizontal overflow.");
+}
+
+async function verifyGuide(page, origin) {
+  await page.goto(`${origin}/guide.html`);
+  await page.getByRole("heading", { name: "Understand your AI costs. Start with what you have.", exact: true }).waitFor({ state: "visible" });
+  assert((await page.locator(".guide table").innerText()).includes("$4.25"), "The worked example did not load.");
+  assert(await page.locator(".guide").evaluate((element) => getComputedStyle(element).maxWidth !== "none"), "The guide stylesheet did not load.");
+  assert(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 1, "The guide caused horizontal overflow.");
+  const a11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  assert(a11y.violations.length === 0, `Guide accessibility violations: ${axeSummary(a11y)}`);
+  await page.getByRole("link", { name: "Open the tool", exact: true }).click();
+  await page.locator("#review-title").waitFor({ state: "visible" });
+}
+
 async function priceAndUsageFlow(engineName, engine, origin) {
   const browser = await engine.launch({ headless: true });
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
@@ -600,6 +649,8 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     const unequalLabels = await page.locator("#bill-history-metrics .metric-cell span").allTextContents();
     assert(/different lengths/i.test(unequalTrend) && /calendar-day reference/i.test(unequalTrend) && /fixed monthly plans/i.test(unequalTrend) && !unequalLabels.some((label) => label.trim().toLowerCase() === "bill change"), `Unequal service periods were presented as a like-for-like change or lacked the daily caveat: ${unequalTrend}`);
   }
+  await verifyEditableComparison(page);
+  await verifyGuide(page, origin);
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `${engineName}: browser errors: ${observed.errors.join(" | ")}`);
   await browser.close();
@@ -657,6 +708,8 @@ async function mobileAndAccessibility(origin) {
   assert(priceA11y.violations.length === 0, `mobile pricing accessibility violations: ${axeSummary(priceA11y)}`);
   await page.locator("#close-price-prompt").click();
   await verifyToolSpendFlow(page, { mobile: true });
+  await verifyEditableComparison(page, { mobile: true });
+  await verifyGuide(page, origin);
 
   assert(observed.egress.length === 0, `mobile: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `mobile: browser errors: ${observed.errors.join(" | ")}`);
