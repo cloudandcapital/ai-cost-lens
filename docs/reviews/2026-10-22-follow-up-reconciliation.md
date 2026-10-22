@@ -18,6 +18,8 @@ The independent follow-up review confirmed the comparison arithmetic and simpler
 
 The existing web acceptance and builder-state checks cover arithmetic, evidence gates, edited charges, reopening records, blank inputs, approval declarations, validation rollback and source provenance. Browser regressions additionally check standalone usage isolation, keyboard focus, error-field geometry, the tools editor and a rendered simple-comparison PDF. The existing release gate also runs Python tests, dependency audits, three browser engines, mobile accessibility, package installation and production privacy checks.
 
+The browser job uses the official Playwright 1.62.1 Noble image, matching the pinned npm package. Two host-based runs stalled during browser/OS dependency installation. The image removes that repeated install step without removing tests or changing their assertions. Generated example/comparison PDFs and the comparison screenshot are retained as review artifacts. PDF wording checks ignore extraction whitespace, including spacing inserted between letters of tracked headings.
+
 Manual browser QA confirmed blank comparison fields, Plan A/B arithmetic ($230/$340 total and $2.56/$4.25 per usable result), 41px input heights with a neighboring error, immediate removal of stale feedback, visible approval and the time-value row. The actual downloaded JSON was read from disk and matched the screen. Cloud automation stalled during the native chooser reopen attempt; that attempt is not counted as a manual pass. The release browser suite exercises the chooser and round trip separately.
 
 ## Scope
