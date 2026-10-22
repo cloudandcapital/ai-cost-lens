@@ -33,6 +33,8 @@ async function settle() {
 
 try {
   await page.goto(origin, { waitUntil: "networkidle" });
+  await page.locator("#welcome-title").waitFor({ state: "visible" });
+  await page.locator("#welcome-example").click();
   await page.locator("#review-title").waitFor({ state: "visible" });
   await page.locator("#price-prompt").click();
   assert((await page.locator("#prompt-catalog-stamp").innerText()).includes("Catalog 2026-10-18"),
