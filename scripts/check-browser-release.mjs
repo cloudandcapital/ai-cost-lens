@@ -350,6 +350,16 @@ async function verifyEditableComparison(page, { mobile = false } = {}) {
     await page.screenshot({ path: join(output, "comparison-followup.png") });
     await verifyFinanceMemoPdf(page, { simple: true });
   }
+  await page.locator("#edit-simple-comparison").click();
+  for (const [id, value] of Object.entries({
+    "simple-current-cost": "0.24", "simple-other-cost": "0.16", "simple-monthly-tasks": "20",
+    "simple-current-minutes": "0", "simple-other-minutes": "0", "simple-hourly-rate": "0",
+  })) await page.locator(`#${id}`).fill(value);
+  await page.locator("#build-review").click();
+  for (const selector of ["#unit-economics-card", "#memo-table-body"]) {
+    const text = await page.locator(selector).textContent();
+    assert(text.includes("$0.24") && text.includes("$0.16"), `${selector} rounded a nonzero charge to zero.`);
+  }
   await page.reload();
   await page.locator("#welcome-title").waitFor({ state: "visible" });
   if (mobile) await page.locator("#header-menu-toggle").click();

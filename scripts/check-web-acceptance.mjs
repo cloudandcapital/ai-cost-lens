@@ -206,6 +206,30 @@ assert.equal(onePositiveRequest.usage.totals.requests, 7);
 assert.equal(onePositiveRequest.usage.field_coverage.requests.status, 'complete');
 assert.equal(bill.usage.totals.requests, 30);
 assert.equal(bill.usage.field_coverage.requests.status, 'complete');
+// Spreadsheet round trips must retain cents and request counts without inventing model costs.
+const decimalOpenAICost = rewriteCsv(openAICost, (rows) => {
+  rows[0].amount_value = '0.10'; rows[0].amount_currency = 'usd';
+  rows[1].amount_value = '0.20';
+});
+const reverseQuotedCsv = (text) => {
+  const headers = text.trim().split('\n')[0].split(',').reverse();
+  const rows = api.parseCsv(text, 'Synthetic spreadsheet export');
+  const cell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+  return '\uFEFF' + [headers.map(cell).join(','), ...rows.map((row) => headers.map((name) => cell(row[name])).join(','))].join('\r\n') + '\r\n';
+};
+for (const [usageText, costText] of [
+  [openAIUsage, decimalOpenAICost],
+  [quoted(openAIUsage), '\uFEFF' + decimalOpenAICost.replaceAll('\n', '\r\n')],
+  [reverseQuotedCsv(openAIUsage), reverseQuotedCsv(decimalOpenAICost)],
+]) {
+  const imported = await api.buildOpenAIBillReview(usageText, costText);
+  assert.equal(Number(imported.bill.total), 0.30, 'Ten cents plus twenty cents must remain thirty cents.');
+  assert.equal(imported.usage.totals.requests, 30);
+  assert.equal(imported.period.aligned, true);
+  assert.equal(imported.reconciliation.model_cost_allocation_supported, false);
+  assert.equal(imported.reconciliation.savings_claim_allowed, false);
+  api.validateResult(JSON.parse(JSON.stringify(imported)));
+}
 const partialOpenAIRequests = await openAIRequests(['', '20']);
 assert.equal(partialOpenAIRequests.usage.totals.requests, null);
 assert.equal(partialOpenAIRequests.usage.reported_subtotals.requests, 20);
