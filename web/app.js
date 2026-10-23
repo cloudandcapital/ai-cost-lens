@@ -88,6 +88,7 @@
   const cents = (value) => `${(value * 100).toFixed(1)}¢`;
   const unitMoney = (value) => (value < 1 && (!state.data?.currency || state.data.currency === "USD") ? cents(value) : money(value, 2));
   const signedMoney = (value) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${money(Math.abs(value), 2)}`;
+  const comparisonMoney = (value) => money(value, Number.isInteger(value) ? 0 : Math.abs(value) < 0.01 ? 6 : 2);
 
   const escapeHtml = (value) =>
     String(value)
@@ -2591,8 +2592,8 @@
     const metricRows = [
       {
         label: simple ? state.data.pricing_estimate ? "Estimated monthly API cost" : "Monthly tool cost" : sentenceCase(providerTerm),
-        current: money(baseline.costs.model_cost),
-        proposed: money(proposed.costs.model_cost),
+        current: comparisonMoney(baseline.costs.model_cost),
+        proposed: comparisonMoney(proposed.costs.model_cost),
         change: baseline.costs.model_cost
           ? `${proposed.costs.model_cost <= baseline.costs.model_cost ? "↓" : "↑"} ${Math.abs(((proposed.costs.model_cost - baseline.costs.model_cost) / baseline.costs.model_cost) * 100).toFixed(1)}%`
           : "Not comparable",
@@ -2603,8 +2604,8 @@
       },
       ...(simple ? [{
         label: simpleTimeValueLabel(state.data),
-        current: money(baseline.costs.human_review_cost),
-        proposed: money(proposed.costs.human_review_cost),
+        current: comparisonMoney(baseline.costs.human_review_cost),
+        proposed: comparisonMoney(proposed.costs.human_review_cost),
         change: baseline.costs.human_review_cost
           ? `${proposed.costs.human_review_cost <= baseline.costs.human_review_cost ? "↓" : "↑"} ${Math.abs((proposed.costs.human_review_cost / baseline.costs.human_review_cost - 1) * 100).toFixed(1)}%`
           : proposed.costs.human_review_cost ? "From zero" : "No change",
@@ -2612,8 +2613,8 @@
       }] : []),
       {
         label: simple ? "Monthly cost including your time" : humanIncluded ? "Total recurring cost" : "Measured recurring cost",
-        current: money(baseline.costs.recurring_operating_cost),
-        proposed: money(proposed.costs.recurring_operating_cost),
+        current: comparisonMoney(baseline.costs.recurring_operating_cost),
+        proposed: comparisonMoney(proposed.costs.recurring_operating_cost),
         change: baseline.costs.recurring_operating_cost
           ? `${proposed.costs.recurring_operating_cost <= baseline.costs.recurring_operating_cost ? "↓" : "↑"} ${Math.abs(((proposed.costs.recurring_operating_cost - baseline.costs.recurring_operating_cost) / baseline.costs.recurring_operating_cost) * 100).toFixed(1)}%`
           : "Not comparable",
@@ -2703,8 +2704,8 @@
     const metricRows = [
       {
         label: sentenceCase(providerTerm),
-        current: money(baseline.costs.model_cost),
-        proposed: money(proposed.costs.model_cost),
+        current: comparisonMoney(baseline.costs.model_cost),
+        proposed: comparisonMoney(proposed.costs.model_cost),
         change: baseline.costs.model_cost
           ? `${proposed.costs.model_cost <= baseline.costs.model_cost ? "↓" : "↑"} ${Math.abs(((proposed.costs.model_cost - baseline.costs.model_cost) / baseline.costs.model_cost) * 100).toFixed(1)}%`
           : "Not comparable",
@@ -2714,8 +2715,8 @@
       },
       {
         label: "Total recurring cost",
-        current: money(baseline.costs.recurring_operating_cost),
-        proposed: money(proposed.costs.recurring_operating_cost),
+        current: comparisonMoney(baseline.costs.recurring_operating_cost),
+        proposed: comparisonMoney(proposed.costs.recurring_operating_cost),
         change: baseline.costs.recurring_operating_cost
           ? `${proposed.costs.recurring_operating_cost <= baseline.costs.recurring_operating_cost ? "↓" : "↑"} ${Math.abs(((proposed.costs.recurring_operating_cost - baseline.costs.recurring_operating_cost) / baseline.costs.recurring_operating_cost) * 100).toFixed(1)}%`
           : "Not comparable",
@@ -5011,10 +5012,10 @@
     document.getElementById("memo-table-head").innerHTML = `<tr><th>Measure</th><th>${escapeHtml(baseline.label)}</th><th>${escapeHtml(proposed.label)}</th><th>Change (proposed vs current)</th></tr>`;
     const simple = state.data.experience === "simple";
     const routeRows = [
-      [state.data.pricing_estimate ? "Estimated API cost" : simple ? "Monthly tool cost" : "Provider cost", money(baseline.costs.model_cost), money(proposed.costs.model_cost), percentChange(baseline.costs.model_cost, proposed.costs.model_cost)],
-      ...(!simple ? [["Shared infrastructure", state.data.pricing_estimate ? "Not supplied" : money(baseline.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Not supplied" : money(proposed.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Excluded" : signedMoney(proposed.costs.shared_infrastructure_cost - baseline.costs.shared_infrastructure_cost)]] : []),
-      [simple ? simpleTimeValueLabel(state.data) : "Human review and correction", money(baseline.costs.human_review_cost), money(proposed.costs.human_review_cost), percentChange(baseline.costs.human_review_cost, proposed.costs.human_review_cost)],
-      [simple ? "Monthly cost including your time" : "Total recurring cost", money(baseline.costs.recurring_operating_cost), money(proposed.costs.recurring_operating_cost), percentChange(baseline.costs.recurring_operating_cost, proposed.costs.recurring_operating_cost)],
+      [state.data.pricing_estimate ? "Estimated API cost" : simple ? "Monthly tool cost" : "Provider cost", comparisonMoney(baseline.costs.model_cost), comparisonMoney(proposed.costs.model_cost), percentChange(baseline.costs.model_cost, proposed.costs.model_cost)],
+      ...(!simple ? [["Shared infrastructure", state.data.pricing_estimate ? "Not supplied" : comparisonMoney(baseline.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Not supplied" : comparisonMoney(proposed.costs.shared_infrastructure_cost), state.data.pricing_estimate ? "Excluded" : signedMoney(proposed.costs.shared_infrastructure_cost - baseline.costs.shared_infrastructure_cost)]] : []),
+      [simple ? simpleTimeValueLabel(state.data) : "Human review and correction", comparisonMoney(baseline.costs.human_review_cost), comparisonMoney(proposed.costs.human_review_cost), percentChange(baseline.costs.human_review_cost, proposed.costs.human_review_cost)],
+      [simple ? "Monthly cost including your time" : "Total recurring cost", comparisonMoney(baseline.costs.recurring_operating_cost), comparisonMoney(proposed.costs.recurring_operating_cost), percentChange(baseline.costs.recurring_operating_cost, proposed.costs.recurring_operating_cost)],
       [simple ? "Usable result rate" : "Ready result rate", pct(baseline.measures.usable_result_rate, 1), pct(proposed.measures.usable_result_rate, 1), `${comparison.usable_result_rate_change_points >= 0 ? "+" : "−"}${Math.abs(comparison.usable_result_rate_change_points).toFixed(1)} points`],
       [simple ? "Usable results" : "Ready results", compact(baseline.outcomes.usable_results), compact(proposed.outcomes.usable_results), `${proposed.outcomes.usable_results >= baseline.outcomes.usable_results ? "+" : "−"}${compact(Math.abs(proposed.outcomes.usable_results - baseline.outcomes.usable_results))}`],
       [simple ? "Cost per usable result" : "Cost per ready result", unitMoney(baselineUnit), unitMoney(proposedUnit), percentChange(baselineUnit, proposedUnit)],

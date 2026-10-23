@@ -645,6 +645,34 @@ await file('review-file',JSON.stringify(legacy),'legacy-comparison.json');
 assert.equal(api.state.data.experience,'simple');
 assert.equal(el('simple-edit-actions').hidden,true,'Older results remain readable without guessed editor inputs.');
 console.log('PASS: cost finding remains visible without approval; edit, save/reopen, invalid rollback and legacy reviews');
+// A nonzero small bill must not look free, and cents must survive the screen and memo.
+for (const test of [
+  { costs: ['0.24', '0.16'], minutes: ['0', '0'], rate: '0', totals: [0.24, 0.16], shown: ['$0.24', '$0.16'] },
+  { costs: ['80.25', '40.75'], minutes: ['1', '2'], rate: '15', totals: [80.50, 41.25], shown: ['$80.25', '$40.75', '$0.25', '$0.50', '$80.50', '$41.25'] },
+  { costs: ['0.004', '0.006'], minutes: ['0', '0'], rate: '0', totals: [0.004, 0.006], shown: ['$0.004000', '$0.006000'] },
+  { costs: ['12345.67', '9876.54'], minutes: ['0', '0'], rate: '0', totals: [12345.67, 9876.54], shown: ['$12,345.67', '$9,876.54'] },
+]) {
+  await click('start-review'); await mode('simple');
+  enterSample();
+  for (const [id, value] of Object.entries({
+    'simple-current-cost': test.costs[0], 'simple-other-cost': test.costs[1],
+    'simple-monthly-tasks': '20', 'simple-current-checked': '20', 'simple-current-usable': '18',
+    'simple-other-checked': '20', 'simple-other-usable': '16',
+    'simple-current-minutes': test.minutes[0], 'simple-other-minutes': test.minutes[1],
+    'simple-hourly-rate': test.rate,
+  })) el(id).value = value;
+  await submit();
+  assert.equal(api.state.data.baseline.costs.recurring_operating_cost, test.totals[0]);
+  assert.equal(api.state.data.proposed.costs.recurring_operating_cost, test.totals[1]);
+  for (const id of ['unit-economics-card', 'memo-table-body']) {
+    for (const amount of test.shown) assert(el(id).innerHTML.includes(`>${amount}<`), `${id} lost ${amount}`);
+  }
+  await file('review-file', JSON.stringify(api.state.data), 'fractional-cost-comparison.json');
+  assert.equal(api.state.data.baseline.costs.recurring_operating_cost, test.totals[0]);
+  assert.equal(api.state.data.proposed.costs.recurring_operating_cost, test.totals[1]);
+  assert.equal(api.state.data.comparison.savings_claim_allowed, false);
+}
+console.log('PASS: cents, fractional time value, sub-cent estimates, and large totals agree on screen, in the memo, and in JSON');
 await click('start-review'); await mode('simple');
 enterSample();
 el('simple-approved').checked = true;
