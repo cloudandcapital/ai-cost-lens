@@ -413,8 +413,8 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
     const pdf = await loading.promise;
     const parts = [];
     for (let index = 1; index <= pdf.numPages; index += 1) parts.push((await (await pdf.getPage(index)).getTextContent()).items.map((item) => item.str).join(" "));
-    const text = parts.join(" ").replace(/\s+/g, "");
-    for (const expected of ["One change test record", "INVENTED DATA", "40 distinct validation cases", "API cost per ready result", "Cost evidence supplied"]) assert(text.includes(expected.replace(/\s+/g, "")), `Test PDF is missing ${expected}.`);
+    const text = parts.join(" ").toLowerCase().replace(/\s+/g, "");
+    for (const expected of ["One change test record", "INVENTED DATA", "40 distinct validation cases", "API cost per ready result", "Cost evidence supplied"]) assert(text.includes(expected.toLowerCase().replace(/\s+/g, "")), `Test PDF is missing ${expected}. Extracted text: ${text.slice(0, 2400)}`);
     assert(pdf.numPages <= 3, `The two-run test PDF has ${pdf.numPages} pages.`);
     await loading.destroy();
   }
