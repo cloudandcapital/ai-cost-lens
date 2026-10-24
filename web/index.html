@@ -615,6 +615,7 @@
             <h1 id="simulate-title">What if the workload changed?</h1>
             <p>Reprice the observed token shape under one proposed model or operating change. Quality, latency, tools, and model behavior remain unproven until you test them.</p>
           </div>
+          <p class="experiment-launch"><button class="text-button" id="start-controlled-test" type="button">Test one change with measured runs <span aria-hidden="true">→</span></button> Keep the starting setup and quality rule fixed while you test caching, batch, prompts, effort, or a model.</p>
           <form class="workbench-form" id="scenario-form" novalidate>
             <div class="workbench-form-grid">
               <label><span>Observed route</span><select id="scenario-route"><option value="baseline">Current route</option><option value="proposed">Proposed route</option></select></label>
@@ -655,6 +656,64 @@
             <p>Price can nominate a candidate. A comparable output sample determines whether it belongs in the decision.</p>
           </div>
           <div class="verification-status" id="verification-status"></div>
+          <section class="experiment-panel" id="experiment-panel" aria-labelledby="experiment-title">
+            <div class="section-heading"><div><p class="kicker">ONE CHANGE AT A TIME</p><h2 id="experiment-title" tabindex="-1">Did this change earn its place?</h2></div></div>
+            <p>Lock a starting point, run both setups on the same tasks, and record the quality and API cost. Repeated tests stay separate from production savings.</p>
+            <div class="paired-verification-actions experiment-tools"><button class="text-button" id="experiment-example" type="button">Explore a caching example</button><button class="text-button" id="experiment-open" type="button">Open saved test</button><input id="experiment-file" type="file" accept=".json,application/json" hidden aria-label="Saved test record" /></div>
+            <form id="experiment-plan" class="workbench-form" novalidate>
+              <div class="workbench-form-grid">
+                <label><span>Workload</span><input id="experiment-workload" type="text" maxlength="240" placeholder="Invoice extraction" /></label>
+                <label><span>Change to test</span><select id="experiment-change"><option value="caching">Caching</option><option value="batch">Batch processing</option><option value="prompt">Prompt version</option><option value="effort">Reasoning effort</option><option value="model">Model</option></select></label>
+                <label><span>Currency for run costs</span><input id="experiment-currency" type="text" maxlength="3" value="USD" /></label>
+              </div>
+              <label class="experiment-rule"><span>What makes a result ready?</span><textarea id="experiment-quality-rule" rows="2" maxlength="1000" placeholder="The required invoice fields match the checked answer, with no material correction remaining."></textarea></label>
+              <details class="experiment-settings" open><summary>Starting and changed settings</summary>
+                <p>Record the setting you will change on both sides. Leave other settings blank if unknown, and confirm they stayed unchanged. The record locks these values for every run.</p>
+                <div class="experiment-setting experiment-setting-head"><span>Setting</span><strong>Starting setup</strong><strong>Changed setup</strong></div>
+                <div class="experiment-setting"><span>Name</span><label><span class="sr-only">Starting setup name</span><input id="experiment-baseline-label" type="text" value="Starting setup" maxlength="240" /></label><label><span class="sr-only">Changed setup name</span><input id="experiment-candidate-label" type="text" value="Changed setup" maxlength="240" /></label></div>
+                <div id="experiment-config-fields">
+                  <div class="experiment-setting"><span>Model</span><label><span class="sr-only">Starting model</span><input id="experiment-baseline-model" type="text" maxlength="160" placeholder="Record if known" /></label><label><span class="sr-only">Changed model</span><input id="experiment-candidate-model" type="text" maxlength="160" placeholder="Same, unless this is the change" /></label></div>
+                  <div class="experiment-setting"><span>Effort</span><label><span class="sr-only">Starting effort</span><input id="experiment-baseline-effort" type="text" maxlength="160" placeholder="Record if known" /></label><label><span class="sr-only">Changed effort</span><input id="experiment-candidate-effort" type="text" maxlength="160" placeholder="Same, unless this is the change" /></label></div>
+                  <div class="experiment-setting"><span>Prompt version</span><label><span class="sr-only">Starting prompt version</span><input id="experiment-baseline-prompt_version" type="text" maxlength="160" placeholder="Version or hash, if known" /></label><label><span class="sr-only">Changed prompt version</span><input id="experiment-candidate-prompt_version" type="text" maxlength="160" placeholder="Same, unless this is the change" /></label></div>
+                  <div class="experiment-setting"><span>Caching</span><label><span class="sr-only">Starting caching</span><input id="experiment-baseline-caching" type="text" maxlength="160" placeholder="For example: off" /></label><label><span class="sr-only">Changed caching</span><input id="experiment-candidate-caching" type="text" maxlength="160" placeholder="For example: stable prefix cached" /></label></div>
+                  <div class="experiment-setting"><span>Processing mode</span><label><span class="sr-only">Starting processing mode</span><input id="experiment-baseline-processing" type="text" maxlength="160" placeholder="For example: standard" /></label><label><span class="sr-only">Changed processing mode</span><input id="experiment-candidate-processing" type="text" maxlength="160" placeholder="Same, unless this is the change" /></label></div>
+                </div>
+              </details>
+              <div class="verification-control-grid">
+                <label><span>Minimum check pass rate</span><div class="input-suffix"><input id="experiment-check-floor" type="number" min="0" max="100" value="100" step="0.1" /><em>%</em></div></label>
+                <label><span>Minimum ready-result rate</span><div class="input-suffix"><input id="experiment-ready-floor" type="number" min="0" max="100" value="90" step="0.1" /><em>%</em></div></label>
+                <label><span>Maximum ready-rate regression</span><div class="input-suffix"><input id="experiment-regression" type="number" min="0" max="100" value="0" step="0.1" /><em>pts</em></div></label>
+              </div>
+              <label class="experiment-check"><input id="experiment-unchanged" type="checkbox" /><span>Only the selected setting changes. Other settings, task requirements, and the ready-result rule stay the same.</span></label>
+              <div class="workbench-form-action"><p>For model or effort changes, collect fresh outputs and usage. Old token counts do not predict the new behavior.</p><button class="build-button" type="submit">Lock the test plan</button></div>
+            </form>
+            <section id="experiment-locked" class="experiment-locked" hidden aria-labelledby="experiment-locked-title">
+              <h3 id="experiment-locked-title" tabindex="-1">Starting point locked</h3><p id="experiment-plan-summary"></p><p id="experiment-config-summary"></p>
+              <details class="experiment-settings"><summary>View all locked settings</summary><div id="experiment-config-details" class="usage-table-wrap" role="region" aria-label="Locked test settings" tabindex="0"></div></details>
+              <form id="experiment-run-form" novalidate>
+                <div class="workbench-form-grid">
+                  <label><span>Run ID</span><input id="experiment-run-id" type="text" maxlength="80" value="run-1" /></label>
+                  <label><span>Case set</span><select id="experiment-partition"><option value="validation">Reserved validation cases</option><option value="tuning">Tuning cases</option></select></label>
+                  <label><span>Saved paired verification JSON (optional)</span><input id="experiment-verification-file" type="file" accept=".json,application/json" /><small>Leave blank to use the completed paired-output check below. Raw outputs are not saved.</small></label>
+                  <label><span>Starting API cost for this run</span><input id="experiment-baseline-cost" type="number" min="0" step="any" /></label>
+                  <label><span>Changed API cost for this run</span><input id="experiment-candidate-cost" type="number" min="0" step="any" /></label>
+                  <label><span>Cost source reference</span><input id="experiment-cost-source" type="text" maxlength="500" placeholder="Usage record for these cases and this execution" /></label>
+                </div>
+                <p>Include every API call and retry needed for these cases. Both costs must cover the same cases, execution scope, and currency. Keep full-period bills separate.</p>
+                <label class="experiment-check"><input id="experiment-independent" type="checkbox" /><span>The outputs and costs come from a new execution of the locked setups, using the stated quality rule and currency.</span></label>
+                <label class="experiment-check"><input id="experiment-reserved" type="checkbox" /><span>These validation cases were reserved before tuning and were not used to change either setup.</span></label>
+                <button id="experiment-add-run" class="build-button" type="submit">Record this run</button>
+              </form>
+            </section>
+            <div id="experiment-error" class="builder-error" role="alert"></div>
+            <section id="experiment-result" class="experiment-result" hidden aria-label="Controlled test results">
+              <div id="experiment-summary" aria-live="polite"></div>
+              <div id="experiment-runs" class="usage-table-wrap" role="region" aria-label="Repeated test runs" tabindex="0"></div>
+              <div class="paired-verification-actions experiment-tools"><button id="experiment-download" class="build-button" type="button">Download test record</button><button id="experiment-print" class="text-button" type="button">Print test record</button><button id="experiment-attach" class="text-button" type="button">Attach summary to this review</button><button id="experiment-to-actuals" class="text-button" type="button">Check production actuals <span aria-hidden="true">→</span></button></div>
+              <p id="experiment-attachment"></p>
+              <details class="experiment-reset"><summary>Start another test</summary><label class="experiment-check"><input id="experiment-reset-confirm" type="checkbox" /><span>I downloaded the open test if needed and am ready to clear it from this page.</span></label><button id="experiment-new" class="text-button" type="button">Start another test</button></details>
+            </section>
+          </section>
           <section class="verification-method" aria-labelledby="verification-method-title">
             <div class="section-heading"><div><p class="kicker">THE TEST</p><h2 id="verification-method-title">Use one decision rule for both routes</h2></div><p>Review model names only after scoring when practical.</p></div>
             <ol class="verification-steps">
@@ -767,6 +826,7 @@
             <h1 id="actuals-title">Did the savings appear after the change?</h1>
             <p>Enter the post-change period from your records. Compare recurring costs at the same ready-result volume, then show any one-time implementation cost separately. Amounts stay in the review currency.</p>
           </div>
+          <aside class="experiment-actuals-note" id="experiment-actuals-note" hidden><strong>From test to production</strong><p id="experiment-actuals-copy"></p></aside>
           <form class="workbench-form actuals-form" id="actuals-form" novalidate>
             <div class="actuals-period-grid">
               <fieldset>
@@ -869,6 +929,7 @@
         <div class="memo-plan-grid" id="memo-plan-grid"></div>
         <p class="memo-plan-basis" id="memo-plan-basis"></p>
       </section>
+      <section class="memo-section" id="memo-experiment" hidden></section>
       <section class="memo-next">
         <p>NEXT STEP</p>
         <h2 id="memo-next-step"></h2>
@@ -878,6 +939,7 @@
         <p id="memo-footer-status"></p>
       </footer>
     </article>
+    <article id="experiment-printout" class="experiment-printout" aria-label="AI Cost Lens test record"></article>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -1771,6 +1833,8 @@
     <script src="usage-event-engine.js"></script>
     <script src="scenario-engine.js"></script>
     <script src="verification-engine.js"></script>
+    <script src="experiment-engine.js"></script>
+    <script src="experiment-ui.js"></script>
     <script src="actuals-engine.js"></script>
     <script src="growth-engine.js"></script>
     <script src="evidence-tools.js"></script>

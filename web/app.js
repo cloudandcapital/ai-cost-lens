@@ -51,6 +51,7 @@
   const opportunityEngine = globalThis.AICostLensOpportunities;
   const usageEventEngine = globalThis.AICostLensUsageEvents;
   const verificationEngine = globalThis.AICostLensVerification;
+  const experimentUI = globalThis.AICostLensExperimentUI;
   const scenarioEngine = globalThis.AICostLensScenarios;
   const actualsEngine = globalThis.AICostLensActuals;
   const growthEngine = globalThis.AICostLensGrowth;
@@ -4134,7 +4135,7 @@
       const idCopy = ids.length ? `${wholeNumber(ids.length)} row${ids.length === 1 ? "" : "s"}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ` + ${ids.length - 3} more` : ""}` : "No individual row IDs";
       return `<article class="workbench-finding request-finding">
         <span>${String(index + 1).padStart(2, "0")}</span>
-        <div><p class="kicker">${escapeHtml(item.category || "Investigation")}</p><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.explanation)}</p><details><summary>Calculation and limitation</summary><p><strong>Calculation:</strong> ${escapeHtml(item.calculation)}</p><p><strong>Limitation:</strong> ${escapeHtml(item.limitations)}</p></details></div>
+        <div><p class="kicker">${escapeHtml(item.category || "Investigation")}</p><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.explanation)}</p><details><summary>Calculation and limitation</summary><p><strong>Calculation:</strong> ${escapeHtml(item.calculation)}</p><p><strong>Limitation:</strong> ${escapeHtml(item.limitations)}</p></details>${cacheInvestigationHtml(review, item)}</div>
         <dl class="finding-meta">
           <div><dt>Affected requests</dt><dd>${escapeHtml(idCopy)}</dd></div>
           <div><dt>Potential amount</dt><dd>${requestReviewMoney(amount, comparable?.currency || currency)}</dd></div>
@@ -4154,6 +4155,22 @@
       : "";
     document.getElementById("request-import-coverage").innerHTML = `<p><strong>Detected adapter:</strong> ${escapeHtml(review.source.adapter)}. AI Cost Lens accepts universal flat files, LiteLLM spend logs, and flat OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone fields. It does not send credentials or query those services.</p><dl>${coverage}</dl><p>Source SHA-256: ${escapeHtml(review.source.sha256 || "Unavailable in this browser")}. Prompt contents and unknown source fields were not copied.${liteLLMNote} Automatic catalog pricing requires a timestamp inside the catalog validity window, matching USD currency, a supported processing mode or batch flag, cached-input tokens, and tool charges. Routes with separate cache-write or storage charges also require explicit write tokens, duration where applicable, and storage token-hours. Missing inputs leave the row unpriced. ${review.reconciliation.duplicate_rows_flagged ? `${wholeNumber(review.reconciliation.duplicate_rows_flagged)} rows share a repeated event ID and remain in the export with a duplicate-group flag. The duplicate-excluded total is a reconciliation reference only: AI Cost Lens does not delete, allocate, or presume any row is invalid.` : "No repeated provider/event-ID group was detected."}</p>`;
     result.hidden = false;
+  }
+
+  function cacheInvestigationHtml(review, item) {
+    if (item.category !== "Caching") return "";
+    const ids = new Set(item.affected_event_ids || []);
+    const rows = review.events.filter((event) => ids.has(event.record_id));
+    const models = new Set(rows.filter((event) => event.model).map((event) => `${event.provider || "Unknown provider"}/${event.model}`));
+    const writesKnown = rows.filter((event) => event.cache_write_tokens !== null).length;
+    return `<details class="cache-investigation"><summary>What to check before changing caching</summary>
+      <p><strong>In the imported rows:</strong> ${wholeNumber(rows.length)} affected requests report zero cache reads; ${wholeNumber(writesKnown)} supply cache-write counts. ${wholeNumber(models.size)} provider/model combinations are visible. A repeated fingerprint does not establish how much context is reusable.</p>
+      <ol><li><strong>Stable content first.</strong> Check whether timestamps, request IDs, or changing tool definitions appear before otherwise reusable content.</li>
+      <li><strong>Check the timing.</strong> Compare request timestamps with the configured cache lifetime. Claude defaults to five minutes and offers a one-hour option with a different write price. The log alone does not establish expiration.</li>
+      <li><strong>Keep model boundaries visible.</strong> Check the provider’s model-specific cache rules before assuming reuse across a model switch. A return to the original model may still reuse an entry if it remains valid.</li>
+      <li><strong>Measure reads and writes together.</strong> Check provider eligibility, minimum prefix size, write premiums, and any storage charges before estimating a saving.</li></ol>
+      <p>These are possible explanations to investigate. This prompt-free log cannot identify which content changed or prove a root cause. Record one caching change in Verify, then compare fresh usage and quality. <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching" target="_blank" rel="noopener noreferrer">Claude caching rules and pricing</a> (checked October 24, 2026).</p>
+    </details>`;
   }
 
   function initializeRequestLogAnalysis() {
@@ -4929,6 +4946,9 @@
   }
 
   function renderFinanceMemo() {
+    const experimentMemo = experimentUI?.memoHtml() || "";
+    document.getElementById("memo-experiment").innerHTML = experimentMemo;
+    document.getElementById("memo-experiment").hidden = !experimentMemo;
     document.getElementById("memo-decision-label").textContent = "FINANCE DECISION";
     document.getElementById("memo-switch-check").hidden = true;
     if (!state.data) return;
@@ -5106,6 +5126,7 @@
 
   function renderAll() {
     validateResult(state.data);
+    experimentUI?.setContext();
     if (state.data.mode !== "illustrative") state.hasStarted = true;
     document.body.classList.toggle("welcome-mode", !state.hasStarted);
     document.body.classList.toggle("simple-mode", state.data.experience === "simple");
@@ -5385,6 +5406,14 @@
   });
 
   initializeRequestLogAnalysis();
+  experimentUI?.init({
+    getReview: () => state.data,
+    getVerification: () => state.verificationRecord,
+    readFile: readLocalFile,
+    setView,
+    toast: showToast,
+    verifier: verificationEngine,
+  });
 
   document.getElementById("scenario-route").addEventListener("change", syncScenarioRoute);
 
@@ -7122,6 +7151,7 @@
       customer_cost_to_serve: state.customerEconomicsReview === state.usageReview ? state.customerEconomicsRecord : null,
       growth_scenario: state.growthPlannerReview === state.data ? state.growthPlannerRecord : null,
       verification_record: state.verificationRecord,
+      experiment_record: experimentUI?.getRecord() || null,
       actuals_ledger: state.actualsLedger,
       limitations: "Local archive of completed sections. Null means that section has no current result. The Open saved review control accepts the decision record, not this archive. Provider bills and savings are not verified by packaging the records together.",
     };

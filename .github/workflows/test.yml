@@ -54,6 +54,9 @@ jobs:
             browser-artifacts/finance-memo-example.pdf
             browser-artifacts/finance-memo-simple.pdf
             browser-artifacts/comparison-followup.png
+            browser-artifacts/controlled-test-record.pdf
+            browser-artifacts/controlled-test-desktop.png
+            browser-artifacts/controlled-test-mobile.png
           if-no-files-found: ignore
 
   production-network:
