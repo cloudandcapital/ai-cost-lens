@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>How to use AI Cost Lens | Cloud &amp; Capital</title>
-    <meta name="description" content="Choose the right starting point, compare two AI options with a worked example, and understand what your result can tell you." />
+    <meta name="description" content="Understand AI spending, compare two options, test one API change in Verify, and save the evidence behind your decision." />
     <link rel="canonical" href="https://lens.cloudandcapital.com/guide.html" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
@@ -20,6 +20,7 @@
         <p class="kicker">A GUIDE TO THE TOOL</p>
         <h1>Understand your AI costs.<br />Start with what you have.</h1>
         <p class="intro">Use a bill to understand spending, or compare two AI options using their cost and a small sample of your work. You can begin without connecting an account or preparing a spreadsheet.</p>
+        <p>Testing a model, prompt, effort, caching, or batch-processing change? <a href="#test-one-change">Jump to the Verify walkthrough</a>.</p>
         <section aria-labelledby="choose-title">
           <h2 id="choose-title">Choose your starting point.</h2>
           <h3>I have a bill or subscription charge.</h3>
@@ -60,6 +61,28 @@
             <li><strong>What still needs checking.</strong> A lower estimate does not establish quality, permission to use a tool, or realized savings. Keep the quality and approval checks separate from the cost finding.</li>
           </ol>
           <p>Approval stays visible in the result as your own confirmation, separate from the cost finding. If you rename a tool, its approval is cleared and must be confirmed again. Use <strong>Edit this comparison</strong> to change a comparison, or <strong>Edit these charges</strong> to update a combined-tool baseline. Changed charges or service-period details require checking the charge boundary again. <strong>Start a review</strong> begins a fresh draft. Older saved comparisons remain readable; their original editable inputs may not be available.</p>
+        </section>
+        <section id="test-one-change" aria-labelledby="test-change-title">
+          <h2 id="test-change-title">Test one API change before adopting it.</h2>
+          <p>Find <strong>Verify</strong> inside a review. For a walkthrough, choose <strong>Explore an example</strong> on the welcome screen, then <strong>Verify</strong> in the navigation across the top, between Simulate and Evidence. On a small screen, use the section dropdown. Choose <strong>Explore a caching example</strong> to see a completed test with invented data.</p>
+          <p>To test your own setup, use the form headed <strong>Did this change earn its place?</strong> The tool records the results you supply; it does not run either setup or call a provider for you.</p>
+          <ol>
+            <li><strong>Lock the starting point.</strong> Name the workload, define what makes a result ready, and enter the currency. Record before and after values for one change to model, effort, prompt version, caching, or processing mode, along with other settings you know. Confirm the others stay the same and lock your quality thresholds.</li>
+            <li><strong>Keep validation cases separate.</strong> Reserve cases before tuning either setup. Choose tuning or reserved validation when recording a run, and keep the same case IDs and checks within each set. Further tuning after validation starts needs a new test record.</li>
+            <li><strong>Check both setups on the same work.</strong> Use the paired-output review below the test form, or select its saved verification JSON. Each case needs checks and a human outcome for both setups. Record review or correction minutes when available.</li>
+            <li><strong>Add the matching API costs.</strong> Include every call and retry needed for those cases, enter a cost-source reference, and confirm this was a fresh execution of the locked setups. Repeat with fresh outputs and costs. Adding the same saved results again does not create another run.</li>
+          </ol>
+          <h3>Read quality and cost together.</h3>
+          <p>Each run shows ready-result rates, check results, review minutes when supplied, and API cost per ready result. Forty cases tested twice remain <strong>40 distinct cases</strong>, with 80 paired observations across repeats.</p>
+          <p>A validation run that fails your locked quality rule or does not lower API cost per ready result returns <strong>Keep the starting setup</strong>. At least two fresh validation runs on the same 30 or more reserved cases, with a declared random or systematic sample, blind review, randomized order, preserved quality, and lower API unit cost in every run can return <strong>Candidate worth a finance review</strong>. These are minimum workflow checks, not statistical proof or permission to adopt the change.</p>
+          <div class="example">
+            <p><strong>The caching walkthrough is entirely illustrative.</strong> Its first run uses invented API costs of $0.40 before and $0.22 after; its second uses $0.42 before and $0.23 after. Both reuse the same 40 invented cases. The example demonstrates the workflow; it is not a measured provider experiment.</p>
+          </div>
+          <h3>Save the test and carry its evidence forward.</h3>
+          <p>Choose <strong>Download test record</strong> before leaving the page. Use <strong>Open saved test</strong> in Verify to reopen it; the tool rebuilds its calculations. <strong>Print test record</strong> creates a separate printable handoff. Raw outputs are excluded from the saved test, but case IDs, rules, settings, and source references remain, so keep secrets out of those fields.</p>
+          <p><strong>Attach summary to this review</strong> adds the test results to the current review’s finance memo when the workload name, currency, and illustrative status match. The workspace archive also keeps the separate test record. Test costs cover API calls only; human work, full operating costs, and production outcomes still need their own evidence. The test does not fill production Actuals or approve savings.</p>
+          <h3>Investigate caching with your usage records.</h3>
+          <p>When a request-log finding flags repeated prefixes with no cache reuse, open <strong>What to check before changing caching</strong>. It shows the affected requests and available cache-write evidence, then suggests checks for prefix changes, timing, model boundaries, and charges. Those are possible explanations to investigate; a low cache-read count alone does not establish the cause.</p>
         </section>
         <section aria-labelledby="keep-title">
           <h2 id="keep-title">Keep a copy you can return to.</h2>
