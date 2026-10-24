@@ -72,6 +72,7 @@ These contracts are deliberately different and are not interchangeable templates
 - A searchable model catalog with provider and workload-signal filters, official price sources, published token limits, and an explicit warning that list price is not workload quality
 - Exact local OpenAI `o200k_base` raw-text token counting, with disclosed estimates or manual overrides for other providers
 - A local paired-output verifier with deterministic rules, randomized blinded A/B scoring, human outcomes, review time, and output-free evidence records
+- Locked one-change test plans with repeated paired runs, matching API costs, separate tuning and validation cases, and printable finance handoffs; [workflow and limits](docs/controlled-cost-experiments.md)
 - Verification-to-Review provenance that carries the output-free paired record into the finance decision
 
 The public demo needs no credentials and uses entirely illustrative data.

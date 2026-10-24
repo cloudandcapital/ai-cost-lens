@@ -16,6 +16,63 @@
   --sans: Arial, Helvetica, sans-serif;
 }
 
+/* Controlled experiments use the same working-paper surfaces as Verify. */
+.experiment-panel { margin: 32px 0; padding: 28px; border: 1px solid var(--line-strong); background: var(--paper-light); }
+.experiment-panel > p, .experiment-launch { max-width: 80ch; line-height: 1.6; color: var(--muted); }
+.experiment-panel .section-heading { margin-bottom: 12px; }
+.experiment-panel h2 { font-family: var(--serif); font-size: clamp(27px, 3vw, 38px); font-weight: 400; }
+.experiment-panel h3 { font-family: var(--serif); font-size: 28px; font-weight: 400; }
+.experiment-panel .workbench-form { margin-top: 20px; }
+.experiment-tools { margin: 16px 0; flex-wrap: wrap; }
+.experiment-rule { margin: 20px 0; display: grid; gap: 8px; }
+.experiment-rule textarea { width: 100%; padding: 12px; resize: vertical; font: 14px/1.5 var(--sans); color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 0; }
+.experiment-settings { margin: 20px 0; }
+.experiment-settings summary, .experiment-reset summary, .cache-investigation summary { cursor: pointer; font-weight: 700; padding-block: 12px; }
+.experiment-settings > p, .experiment-locked > p, .experiment-result p, .cache-investigation p, .cache-investigation li { font-size: 14px; line-height: 1.65; }
+.experiment-setting { display: grid; grid-template-columns: minmax(100px, .7fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.experiment-setting label { min-width: 0; }
+.experiment-setting input { width: 100%; min-width: 0; }
+.experiment-setting-head { font-size: 12px; color: var(--muted); }
+.experiment-check { display: flex !important; align-items: flex-start; gap: 10px; margin: 16px 0; font-size: 14px; line-height: 1.6; }
+.experiment-check input { flex: 0 0 auto; width: 18px !important; min-height: 18px; height: 18px; margin-top: 3px; }
+.experiment-locked, .experiment-result { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 20px; }
+.experiment-locked form { display: grid; gap: 12px; }
+.experiment-locked label > span { display: block; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+.experiment-locked input, .experiment-locked select { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--line-strong); border-radius: 0; background: var(--surface); color: var(--ink); font: 14px var(--sans); }
+.experiment-locked small { font-size: 12px; line-height: 1.5; display: block; margin-top: 8px; }
+.experiment-locked .experiment-check span { font-weight: 400; font-size: 14px; }
+.experiment-locked .build-button { justify-self: start; }
+.experiment-run-table { width: 100%; min-width: 780px; }
+.experiment-run-table th small { display: block; font-weight: 400; margin-top: 6px; }
+.experiment-actuals-note { padding: 20px; border-left: 3px solid var(--sage); margin: 24px 0; background: var(--surface-soft); }
+.experiment-actuals-note p { font-size: 14px; line-height: 1.6; margin-bottom: 0; }
+.cache-investigation { margin-top: 12px; border-top: 1px solid var(--line); }
+.cache-investigation ol { padding-left: 22px; }
+.cache-investigation li { margin-bottom: 10px; }
+.experiment-printout { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (max-width: 620px) {
+  .experiment-panel { padding: 18px; }
+  .experiment-setting { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .experiment-setting > span { grid-column: 1 / -1; font-size: 12px; font-weight: 700; }
+  .experiment-setting-head > span { display: none; }
+  .experiment-panel .workbench-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .experiment-tools { align-items: stretch; }
+  .experiment-tools button { text-align: left; }
+}
+@media print {
+  body.printing-experiment > :not(#experiment-printout) { display: none !important; }
+  body.printing-experiment #experiment-printout { display: block; padding: 0; font: 11pt/1.5 var(--sans); background: white; color: black; }
+  .experiment-printout h1, .experiment-printout h2, .experiment-printout h3 { font-family: var(--serif); font-weight: 400; }
+  .experiment-printout h1 { font-size: 25pt; }
+  .experiment-printout table { min-width: 0; width: 100%; border-collapse: collapse; }
+  .experiment-printout td, .experiment-printout th { border-bottom: 1px solid #bbb; padding: 8px; text-align: left; font-size: 9pt; }
+  .experiment-printout tr { break-inside: avoid; }
+  #memo-experiment { break-before: page; }
+  #memo-experiment table { min-width: 0; width: 100%; font-size: 9pt; }
+  #memo-experiment tr { break-inside: avoid; }
+}
+
 
 * {
   box-sizing: border-box;

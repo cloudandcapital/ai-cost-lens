@@ -12,6 +12,7 @@ const opportunityEngine = require('../web/opportunity-engine.js');
 const usageEventEngine = require('../web/usage-event-engine.js');
 const scenarioEngine = require('../web/scenario-engine.js');
 const verificationEngine = require('../web/verification-engine.js');
+const experimentEngine = require('../web/experiment-engine.js');
 const actualsEngine = require('../web/actuals-engine.js');
 const evidenceTools = require('../web/evidence-tools.js');
 
@@ -94,9 +95,11 @@ const context = {
   AICostLensUsageEvents:usageEventEngine,
   AICostLensScenarios:scenarioEngine,
   AICostLensVerification:verificationEngine,
+  AICostLensExperiments:experimentEngine,
   AICostLensActuals:actualsEngine,
   AICostLensEvidenceTools:evidenceTools,
 };
+runInNewContext(read('web/experiment-ui.js'), context);
 runInNewContext(source, context);
 const {api} = context;
 const el = id => document.getElementById(id);
@@ -858,3 +861,84 @@ assert.equal(el('actuals-result').hidden,false);
 assert.match(el('actuals-conclusion').textContent,/not a realized savings claim/);
 assert.match(el('actuals-open-gates').innerHTML,/illustrative or sampled/);
 console.log('PASS: prompt pricing, opportunity, scenario-to-verification and actuals event flows');
+
+// Exercise the real experiment form handlers and their handoffs to the memo.
+const experimentUI = context.AICostLensExperimentUI;
+window.print = () => {};
+await click('experiment-example');
+assert.equal(experimentUI.getRecord().summary.unique_validation_cases,40);
+assert.equal(experimentUI.getRecord().summary.validation_observations,80);
+assert.match(el('experiment-summary').innerHTML,/ILLUSTRATIVE TEST/);
+await click('experiment-attach');
+assert.match(el('experiment-error').textContent,/same workload/);
+await click('experiment-new');
+assert.ok(experimentUI.getRecord(),'Clearing a test requires the explicit reset checkbox.');
+el('experiment-reset-confirm').checked = true;
+await click('experiment-new');
+
+api.state.data = JSON.parse(read('web/data/illustrative-review-result.json'));
+api.state.data.mode = 'real';
+for (const route of ['baseline','proposed']) api.state.data[route].period = {start:'2026-09-01',end:'2026-09-30'};
+api.renderAll();
+const gatesBeforeExperiment = JSON.stringify(api.state.data.comparison);
+assert.equal(el('experiment-workload').value,api.state.data.workload.name);
+assert.equal(el('experiment-quality-rule').value,api.state.data.baseline.outcomes.acceptance_rule);
+el('experiment-change').value = 'caching';
+el('experiment-baseline-caching').value = 'Off';
+el('experiment-candidate-caching').value = 'On';
+el('experiment-unchanged').checked = true;
+await el('experiment-plan').emit('submit');
+assert.ok(experimentUI.getRecord(),el('experiment-error').textContent);
+assert.equal(el('experiment-plan').hidden,true);
+assert.equal(el('experiment-locked').hidden,false);
+const illustrativeRuns = experimentEngine.illustrativeExample(verificationEngine).runs;
+async function enterExperimentRun(index, evidence = illustrativeRuns[index].verification) {
+  await file('experiment-verification-file',JSON.stringify(evidence),'paired-run.json');
+  el('experiment-partition').value = 'validation';
+  el('experiment-baseline-cost').value = '.40';
+  el('experiment-candidate-cost').value = '.22';
+  el('experiment-cost-source').value = 'Declared cost for this execution';
+  el('experiment-independent').checked = true;
+  el('experiment-reserved').checked = true;
+  await el('experiment-run-form').emit('submit');
+}
+await enterExperimentRun(0);
+assert.equal(experimentUI.getRecord().summary.decision,'NEEDS_MORE_EVIDENCE');
+assert.equal(el('experiment-independent').checked,false,'A new run needs fresh attestations.');
+assert.equal(el('experiment-baseline-cost').value,'','A new run cannot reuse a previous cost by accident.');
+await enterExperimentRun(0);
+assert.equal(experimentUI.getRecord().runs.length,1);
+assert.match(el('experiment-error').textContent,/already been recorded/);
+await enterExperimentRun(1);
+assert.equal(experimentUI.getRecord().summary.decision,'REVIEW_CANDIDATE');
+assert.match(el('experiment-runs').innerHTML,/0\.0055/);
+await click('print-memo');
+assert.match(el('memo-experiment').innerHTML,/40 distinct validation cases/);
+assert.match(el('memo-experiment').innerHTML,/API cost per ready result/);
+await window.emit('afterprint');
+assert.equal(JSON.stringify(api.state.data.comparison),gatesBeforeExperiment,'Experiments must not approve savings or change finance gates.');
+await click('experiment-print');
+assert.equal(document.body.classList.contains('printing-experiment'),true);
+assert.match(el('experiment-printout').innerHTML,/Cost evidence supplied/);
+assert.match(el('experiment-printout').innerHTML,/Locked setting/);
+await window.emit('afterprint');
+assert.equal(document.body.classList.contains('printing-experiment'),false);
+const savedExperiment = experimentUI.getRecord();
+savedExperiment.summary.decision = 'REJECT_CHANGE';
+savedExperiment.evidence_gate.savings_claim_allowed = true;
+await file('experiment-file',JSON.stringify(savedExperiment),'saved-test.json');
+assert.equal(experimentUI.getRecord().summary.decision,'REVIEW_CANDIDATE','Reopening recomputes the decision.');
+assert.equal(experimentUI.getRecord().evidence_gate.savings_claim_allowed,false);
+await click('experiment-attach');
+api.renderAll();
+assert.equal(el('memo-experiment').hidden,false);
+assert.equal(el('experiment-actuals-note').hidden,false);
+await click('experiment-to-actuals');
+assert.equal(api.state.view,'actuals');
+api.state.data = JSON.parse(read('web/data/illustrative-review-result.json'));
+api.renderAll();
+assert.equal(el('memo-experiment').hidden,true,'An unrelated review must not inherit the prior test summary.');
+const beforeInvalidOpen = JSON.stringify(experimentUI.getRecord());
+await file('experiment-file','{}','invalid-test.json');
+assert.equal(JSON.stringify(experimentUI.getRecord()),beforeInvalidOpen,'An invalid file must not replace the open test.');
+console.log('PASS: controlled test lock, fresh runs, duplicate rejection, recomputed reopening, print and finance handoffs');

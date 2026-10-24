@@ -38,6 +38,63 @@
   --sans: Arial, Helvetica, sans-serif;
 }
 
+/* Controlled experiments use the same working-paper surfaces as Verify. */
+.experiment-panel { margin: 32px 0; padding: 28px; border: 1px solid var(--line-strong); background: var(--paper-light); }
+.experiment-panel > p, .experiment-launch { max-width: 80ch; line-height: 1.6; color: var(--muted); }
+.experiment-panel .section-heading { margin-bottom: 12px; }
+.experiment-panel h2 { font-family: var(--serif); font-size: clamp(27px, 3vw, 38px); font-weight: 400; }
+.experiment-panel h3 { font-family: var(--serif); font-size: 28px; font-weight: 400; }
+.experiment-panel .workbench-form { margin-top: 20px; }
+.experiment-tools { margin: 16px 0; flex-wrap: wrap; }
+.experiment-rule { margin: 20px 0; display: grid; gap: 8px; }
+.experiment-rule textarea { width: 100%; padding: 12px; resize: vertical; font: 14px/1.5 var(--sans); color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 0; }
+.experiment-settings { margin: 20px 0; }
+.experiment-settings summary, .experiment-reset summary, .cache-investigation summary { cursor: pointer; font-weight: 700; padding-block: 12px; }
+.experiment-settings > p, .experiment-locked > p, .experiment-result p, .cache-investigation p, .cache-investigation li { font-size: 14px; line-height: 1.65; }
+.experiment-setting { display: grid; grid-template-columns: minmax(100px, .7fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.experiment-setting label { min-width: 0; }
+.experiment-setting input { width: 100%; min-width: 0; }
+.experiment-setting-head { font-size: 12px; color: var(--muted); }
+.experiment-check { display: flex !important; align-items: flex-start; gap: 10px; margin: 16px 0; font-size: 14px; line-height: 1.6; }
+.experiment-check input { flex: 0 0 auto; width: 18px !important; min-height: 18px; height: 18px; margin-top: 3px; }
+.experiment-locked, .experiment-result { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 20px; }
+.experiment-locked form { display: grid; gap: 12px; }
+.experiment-locked label > span { display: block; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+.experiment-locked input, .experiment-locked select { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--line-strong); border-radius: 0; background: var(--surface); color: var(--ink); font: 14px var(--sans); }
+.experiment-locked small { font-size: 12px; line-height: 1.5; display: block; margin-top: 8px; }
+.experiment-locked .experiment-check span { font-weight: 400; font-size: 14px; }
+.experiment-locked .build-button { justify-self: start; }
+.experiment-run-table { width: 100%; min-width: 780px; }
+.experiment-run-table th small { display: block; font-weight: 400; margin-top: 6px; }
+.experiment-actuals-note { padding: 20px; border-left: 3px solid var(--sage); margin: 24px 0; background: var(--surface-soft); }
+.experiment-actuals-note p { font-size: 14px; line-height: 1.6; margin-bottom: 0; }
+.cache-investigation { margin-top: 12px; border-top: 1px solid var(--line); }
+.cache-investigation ol { padding-left: 22px; }
+.cache-investigation li { margin-bottom: 10px; }
+.experiment-printout { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (max-width: 620px) {
+  .experiment-panel { padding: 18px; }
+  .experiment-setting { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .experiment-setting > span { grid-column: 1 / -1; font-size: 12px; font-weight: 700; }
+  .experiment-setting-head > span { display: none; }
+  .experiment-panel .workbench-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .experiment-tools { align-items: stretch; }
+  .experiment-tools button { text-align: left; }
+}
+@media print {
+  body.printing-experiment > :not(#experiment-printout) { display: none !important; }
+  body.printing-experiment #experiment-printout { display: block; padding: 0; font: 11pt/1.5 var(--sans); background: white; color: black; }
+  .experiment-printout h1, .experiment-printout h2, .experiment-printout h3 { font-family: var(--serif); font-weight: 400; }
+  .experiment-printout h1 { font-size: 25pt; }
+  .experiment-printout table { min-width: 0; width: 100%; border-collapse: collapse; }
+  .experiment-printout td, .experiment-printout th { border-bottom: 1px solid #bbb; padding: 8px; text-align: left; font-size: 9pt; }
+  .experiment-printout tr { break-inside: avoid; }
+  #memo-experiment { break-before: page; }
+  #memo-experiment table { min-width: 0; width: 100%; font-size: 9pt; }
+  #memo-experiment tr { break-inside: avoid; }
+}
+
 
 * {
   box-sizing: border-box;
@@ -7033,6 +7090,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
             <h1 id="simulate-title">What if the workload changed?</h1>
             <p>Reprice the observed token shape under one proposed model or operating change. Quality, latency, tools, and model behavior remain unproven until you test them.</p>
           </div>
+          <p class="experiment-launch"><button class="text-button" id="start-controlled-test" type="button">Test one change with measured runs <span aria-hidden="true">→</span></button> Keep the starting setup and quality rule fixed while you test caching, batch, prompts, effort, or a model.</p>
           <form class="workbench-form" id="scenario-form" novalidate>
             <div class="workbench-form-grid">
               <label><span>Observed route</span><select id="scenario-route"><option value="baseline">Current route</option><option value="proposed">Proposed route</option></select></label>
@@ -7073,6 +7131,64 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
             <p>Price can nominate a candidate. A comparable output sample determines whether it belongs in the decision.</p>
           </div>
           <div class="verification-status" id="verification-status"></div>
+          <section class="experiment-panel" id="experiment-panel" aria-labelledby="experiment-title">
+            <div class="section-heading"><div><p class="kicker">ONE CHANGE AT A TIME</p><h2 id="experiment-title" tabindex="-1">Did this change earn its place?</h2></div></div>
+            <p>Lock a starting point, run both setups on the same tasks, and record the quality and API cost. Repeated tests stay separate from production savings.</p>
+            <div class="paired-verification-actions experiment-tools"><button class="text-button" id="experiment-example" type="button">Explore a caching example</button><button class="text-button" id="experiment-open" type="button">Open saved test</button><input id="experiment-file" type="file" accept=".json,application/json" hidden aria-label="Saved test record" /></div>
+            <form id="experiment-plan" class="workbench-form" novalidate>
+              <div class="workbench-form-grid">
+                <label><span>Workload</span><input id="experiment-workload" type="text" maxlength="240" placeholder="Invoice extraction" /></label>
+                <label><span>Change to test</span><select id="experiment-change"><option value="caching">Caching</option><option value="batch">Batch processing</option><option value="prompt">Prompt version</option><option value="effort">Reasoning effort</option><option value="model">Model</option></select></label>
+                <label><span>Currency for run costs</span><input id="experiment-currency" type="text" maxlength="3" value="USD" /></label>
+              </div>
+              <label class="experiment-rule"><span>What makes a result ready?</span><textarea id="experiment-quality-rule" rows="2" maxlength="1000" placeholder="The required invoice fields match the checked answer, with no material correction remaining."></textarea></label>
+              <details class="experiment-settings" open><summary>Starting and changed settings</summary>
+                <p>Record the setting you will change on both sides. Leave other settings blank if unknown, and confirm they stayed unchanged. The record locks these values for every run.</p>
+                <div class="experiment-setting experiment-setting-head"><span>Setting</span><strong>Starting setup</strong><strong>Changed setup</strong></div>
+                <div class="experiment-setting"><span>Name</span><label><span class="sr-only">Starting setup name</span><input id="experiment-baseline-label" type="text" value="Starting setup" maxlength="240" /></label><label><span class="sr-only">Changed setup name</span><input id="experiment-candidate-label" type="text" value="Changed setup" maxlength="240" /></label></div>
+                <div id="experiment-config-fields">
+                  <div class="experiment-setting"><span>Model</span><label><span class="sr-only">Starting model</span><input id="experiment-baseline-model" type="text" maxlength="160" placeholder="Record if known" /></label><label><span class="sr-only">Changed model</span><input id="experiment-candidate-model" type="text" maxlength="160" placeholder="Same, unless this is the change" /></label></div>
+                  <div class="experiment-setting"><span>Effort</span><label><span class="sr-only">Starting effort</span><input id="experiment-baseline-effort" type="text" maxlength="160" placeholder="Record if known" /></label><label><span class="sr-only">Changed effort</span><input id="experiment-candidate-effort" type="text" maxlength="160" placeholder="Same, unless this is the change" /></label></div>
+                  <div class="experiment-setting"><span>Prompt version</span><label><span class="sr-only">Starting prompt version</span><input id="experiment-baseline-prompt_version" type="text" maxlength="160" placeholder="Version or hash, if known" /></label><label><span class="sr-only">Changed prompt version</span><input id="experiment-candidate-prompt_version" type="text" maxlength="160" placeholder="Same, unless this is the change" /></label></div>
+                  <div class="experiment-setting"><span>Caching</span><label><span class="sr-only">Starting caching</span><input id="experiment-baseline-caching" type="text" maxlength="160" placeholder="For example: off" /></label><label><span class="sr-only">Changed caching</span><input id="experiment-candidate-caching" type="text" maxlength="160" placeholder="For example: stable prefix cached" /></label></div>
+                  <div class="experiment-setting"><span>Processing mode</span><label><span class="sr-only">Starting processing mode</span><input id="experiment-baseline-processing" type="text" maxlength="160" placeholder="For example: standard" /></label><label><span class="sr-only">Changed processing mode</span><input id="experiment-candidate-processing" type="text" maxlength="160" placeholder="Same, unless this is the change" /></label></div>
+                </div>
+              </details>
+              <div class="verification-control-grid">
+                <label><span>Minimum check pass rate</span><div class="input-suffix"><input id="experiment-check-floor" type="number" min="0" max="100" value="100" step="0.1" /><em>%</em></div></label>
+                <label><span>Minimum ready-result rate</span><div class="input-suffix"><input id="experiment-ready-floor" type="number" min="0" max="100" value="90" step="0.1" /><em>%</em></div></label>
+                <label><span>Maximum ready-rate regression</span><div class="input-suffix"><input id="experiment-regression" type="number" min="0" max="100" value="0" step="0.1" /><em>pts</em></div></label>
+              </div>
+              <label class="experiment-check"><input id="experiment-unchanged" type="checkbox" /><span>Only the selected setting changes. Other settings, task requirements, and the ready-result rule stay the same.</span></label>
+              <div class="workbench-form-action"><p>For model or effort changes, collect fresh outputs and usage. Old token counts do not predict the new behavior.</p><button class="build-button" type="submit">Lock the test plan</button></div>
+            </form>
+            <section id="experiment-locked" class="experiment-locked" hidden aria-labelledby="experiment-locked-title">
+              <h3 id="experiment-locked-title" tabindex="-1">Starting point locked</h3><p id="experiment-plan-summary"></p><p id="experiment-config-summary"></p>
+              <details class="experiment-settings"><summary>View all locked settings</summary><div id="experiment-config-details" class="usage-table-wrap" role="region" aria-label="Locked test settings" tabindex="0"></div></details>
+              <form id="experiment-run-form" novalidate>
+                <div class="workbench-form-grid">
+                  <label><span>Run ID</span><input id="experiment-run-id" type="text" maxlength="80" value="run-1" /></label>
+                  <label><span>Case set</span><select id="experiment-partition"><option value="validation">Reserved validation cases</option><option value="tuning">Tuning cases</option></select></label>
+                  <label><span>Saved paired verification JSON (optional)</span><input id="experiment-verification-file" type="file" accept=".json,application/json" /><small>Leave blank to use the completed paired-output check below. Raw outputs are not saved.</small></label>
+                  <label><span>Starting API cost for this run</span><input id="experiment-baseline-cost" type="number" min="0" step="any" /></label>
+                  <label><span>Changed API cost for this run</span><input id="experiment-candidate-cost" type="number" min="0" step="any" /></label>
+                  <label><span>Cost source reference</span><input id="experiment-cost-source" type="text" maxlength="500" placeholder="Usage record for these cases and this execution" /></label>
+                </div>
+                <p>Include every API call and retry needed for these cases. Both costs must cover the same cases, execution scope, and currency. Keep full-period bills separate.</p>
+                <label class="experiment-check"><input id="experiment-independent" type="checkbox" /><span>The outputs and costs come from a new execution of the locked setups, using the stated quality rule and currency.</span></label>
+                <label class="experiment-check"><input id="experiment-reserved" type="checkbox" /><span>These validation cases were reserved before tuning and were not used to change either setup.</span></label>
+                <button id="experiment-add-run" class="build-button" type="submit">Record this run</button>
+              </form>
+            </section>
+            <div id="experiment-error" class="builder-error" role="alert"></div>
+            <section id="experiment-result" class="experiment-result" hidden aria-label="Controlled test results">
+              <div id="experiment-summary" aria-live="polite"></div>
+              <div id="experiment-runs" class="usage-table-wrap" role="region" aria-label="Repeated test runs" tabindex="0"></div>
+              <div class="paired-verification-actions experiment-tools"><button id="experiment-download" class="build-button" type="button">Download test record</button><button id="experiment-print" class="text-button" type="button">Print test record</button><button id="experiment-attach" class="text-button" type="button">Attach summary to this review</button><button id="experiment-to-actuals" class="text-button" type="button">Check production actuals <span aria-hidden="true">→</span></button></div>
+              <p id="experiment-attachment"></p>
+              <details class="experiment-reset"><summary>Start another test</summary><label class="experiment-check"><input id="experiment-reset-confirm" type="checkbox" /><span>I downloaded the open test if needed and am ready to clear it from this page.</span></label><button id="experiment-new" class="text-button" type="button">Start another test</button></details>
+            </section>
+          </section>
           <section class="verification-method" aria-labelledby="verification-method-title">
             <div class="section-heading"><div><p class="kicker">THE TEST</p><h2 id="verification-method-title">Use one decision rule for both routes</h2></div><p>Review model names only after scoring when practical.</p></div>
             <ol class="verification-steps">
@@ -7185,6 +7301,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
             <h1 id="actuals-title">Did the savings appear after the change?</h1>
             <p>Enter the post-change period from your records. Compare recurring costs at the same ready-result volume, then show any one-time implementation cost separately. Amounts stay in the review currency.</p>
           </div>
+          <aside class="experiment-actuals-note" id="experiment-actuals-note" hidden><strong>From test to production</strong><p id="experiment-actuals-copy"></p></aside>
           <form class="workbench-form actuals-form" id="actuals-form" novalidate>
             <div class="actuals-period-grid">
               <fieldset>
@@ -7287,6 +7404,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         <div class="memo-plan-grid" id="memo-plan-grid"></div>
         <p class="memo-plan-basis" id="memo-plan-basis"></p>
       </section>
+      <section class="memo-section" id="memo-experiment" hidden></section>
       <section class="memo-next">
         <p>NEXT STEP</p>
         <h2 id="memo-next-step"></h2>
@@ -7296,6 +7414,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         <p id="memo-footer-status"></p>
       </footer>
     </article>
+    <article id="experiment-printout" class="experiment-printout" aria-label="AI Cost Lens test record"></article>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -11533,6 +11652,462 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
   return Object.freeze({ SCHEMA, aliases, buildVerification, prepareBlindReview, completeBlindReview, wilsonInterval });
 });
 </script>
+    <script>(function (root, factory) {
+  const api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  else root.AICostLensExperiments = api;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  const SCHEMA = "ai-cost-lens-experiment/1.0";
+  const fields = ["model", "effort", "prompt_version", "caching", "processing"];
+  const changes = { model: "model", effort: "effort", prompt: "prompt_version", caching: "caching", batch: "processing" };
+  const round = (n) => Number(n.toFixed(8));
+
+  function text(value, label, max = 240, optional = false) {
+    if (value === null || value === undefined || String(value).trim() === "") {
+      if (optional) return null;
+      throw new Error(`${label} is required.`);
+    }
+    if (typeof value !== "string" || value.trim().length > max) throw new Error(`${label} must be text of at most ${max} characters.`);
+    return value.trim();
+  }
+
+  function number(value, label, max = Infinity) {
+    if (value === null || value === undefined || typeof value === "boolean" || String(value).trim() === "") throw new Error(`${label} is required; enter zero only when confirmed.`);
+    if (!["string", "number"].includes(typeof value)) throw new Error(`${label} must be a number.`);
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0 || n > max) throw new Error(`${label} must be a non-negative number${Number.isFinite(max) ? ` no greater than ${max}` : ""}.`);
+    return n;
+  }
+
+  function setup(raw, label) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`${label} settings are required.`);
+    const result = { label: text(raw.label, `${label} label`) };
+    fields.forEach((field) => { result[field] = text(raw[field], `${label} ${field.replaceAll("_", " ")}`, 160, true); });
+    return result;
+  }
+
+  function createExperiment(raw) {
+    if (!raw || typeof raw !== "object") throw new Error("A test plan is required.");
+    if (!Object.hasOwn(changes, raw.change_kind)) throw new Error("Choose one supported change: caching, batch, prompt, effort, or model.");
+    const baseline = setup(raw.baseline, "Starting setup");
+    const candidate = setup(raw.candidate, "Changed setup");
+    const different = fields.filter((field) => baseline[field] !== candidate[field]);
+    if (different.length !== 1 || different[0] !== changes[raw.change_kind] || !baseline[different[0]] || !candidate[different[0]]) {
+      throw new Error("Record exactly one changed setting, matching the selected change. Supply both its before and after values.");
+    }
+    if (raw.other_settings_unchanged !== true) throw new Error("Confirm that the other settings and task requirements stayed the same.");
+    const currency = text(raw.currency, "Currency", 3).toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a three-letter code.");
+    const mode = raw.mode || "user_supplied";
+    if (!["user_supplied", "illustrative"].includes(mode)) throw new Error("Unsupported test evidence mode.");
+    return recompute({
+      schema_version: SCHEMA,
+      generated_at: text(raw.generated_at || new Date().toISOString(), "Created at", 40),
+      mode,
+      plan: {
+        workload: text(raw.workload, "Workload"),
+        quality_rule: text(raw.quality_rule, "Ready-result rule", 1000),
+        change_kind: raw.change_kind,
+        currency,
+        baseline,
+        candidate,
+        other_settings_unchanged: true,
+        thresholds: {
+          minimum_deterministic_pass_rate: number(raw.minimum_deterministic_pass_rate, "Minimum check pass rate", 1),
+          minimum_ready_rate: number(raw.minimum_ready_rate, "Minimum ready-result rate", 1),
+          maximum_ready_rate_regression: number(raw.maximum_ready_rate_regression, "Maximum ready-rate regression", 1),
+        },
+      },
+      runs: [],
+    });
+  }
+
+  // Recompute quality from output-free per-case evidence, never from an imported headline.
+  function qualityEvidence(raw) {
+    if (!raw || raw.schema_version !== "ai-cost-lens-verification/1.0" || !Array.isArray(raw.cases) || !raw.cases.length || raw.cases.length > 1000) {
+      throw new Error("Use a completed AI Cost Lens paired verification record with at most 1,000 cases.");
+    }
+    const ids = new Set();
+    const cases = raw.cases.map((item) => {
+      const caseId = text(item.case_id, "Case ID", 160);
+      if (ids.has(caseId)) throw new Error(`Case ${caseId} appears more than once in the verification record.`);
+      ids.add(caseId);
+      const result = { case_id: caseId };
+      for (const route of ["baseline", "candidate"]) {
+        const source = item[route];
+        if (!source || !Array.isArray(source.checks) || !source.checks.length || source.checks.length > 128) throw new Error(`Case ${caseId} needs a bounded set of checks on both setups.`);
+        const checks = source.checks.map((check) => {
+          if (typeof check.passed !== "boolean") throw new Error(`Case ${caseId} has an invalid check result.`);
+          return { id: text(check.id, "Check ID", 240), passed: check.passed };
+        }).sort((a, b) => a.id.localeCompare(b.id));
+        if (new Set(checks.map((check) => check.id)).size !== checks.length) throw new Error(`Case ${caseId} has duplicate checks.`);
+        if (!["ready_to_use", "needs_correction", "needs_escalation"].includes(source.outcome_status)) throw new Error(`Case ${caseId} needs human outcomes on both setups.`);
+        result[route] = {
+          checks,
+          outcome_status: source.outcome_status,
+          human_minutes: source.human_minutes === null || source.human_minutes === undefined ? null : number(source.human_minutes, "Review minutes", 1000000),
+        };
+      }
+      if (JSON.stringify(result.baseline.checks.map((c) => c.id)) !== JSON.stringify(result.candidate.checks.map((c) => c.id))) throw new Error(`Case ${caseId} uses different checks across setups.`);
+      // The verifier already requires identical rules on the two setups. Keep a stable,
+      // bounded rule signature to prevent changing the rubric between repeated runs.
+      const rule = item.rule;
+      if (!rule || typeof rule !== "object") throw new Error(`Case ${caseId} is missing its deterministic rule.`);
+      result.rule = {
+        expected_format: text(rule.expected_format, "Expected format", 20),
+        required_terms: list(rule.required_terms), forbidden_terms: list(rule.forbidden_terms),
+        required_json_fields: list(rule.required_json_fields),
+        exact_label: text(rule.exact_label, "Exact label", 500, true),
+        max_characters: rule.max_characters === null ? null : number(rule.max_characters, "Maximum length", 200000),
+      };
+      return result;
+    }).sort((a, b) => a.case_id.localeCompare(b.case_id));
+    return {
+      schema_version: "ai-cost-lens-verification/1.0",
+      source: { name: text(raw.source?.name, "Verification source", 240), sha256: text(raw.source?.sha256, "Source hash", 128, true) },
+      method: {
+        sample_method: raw.method?.sample_method === "random_or_systematic" ? "random_or_systematic" : "user_selected",
+        blinded: raw.method?.blinded === true,
+        randomized_order: raw.method?.randomized_order === true,
+      },
+      cases,
+    };
+  }
+
+  function list(values) {
+    if (!Array.isArray(values) || values.length > 30) throw new Error("Invalid verification rule list.");
+    return values.map((v) => text(v, "Rule value", 200)).sort();
+  }
+
+  function signature(evidence) {
+    return JSON.stringify(evidence.cases.map((item) => [item.case_id, item.rule, item.baseline.checks.map((c) => c.id)]));
+  }
+
+  function routeSummary(evidence, route) {
+    const cases = evidence.cases.map((item) => item[route]);
+    const ready = cases.filter((item) => item.outcome_status === "ready_to_use").length;
+    return {
+      cases: cases.length, ready,
+      ready_rate: ready / cases.length,
+      deterministic_pass_rate: cases.filter((item) => item.checks.every((check) => check.passed)).length / cases.length,
+      human_minutes: cases.some((item) => item.human_minutes === null) ? null : round(cases.reduce((sum, item) => sum + item.human_minutes, 0)),
+    };
+  }
+
+  function addRun(current, raw, suppliedEvidence) {
+    if (!current || current.schema_version !== SCHEMA) throw new Error("Lock a starting point before recording a run.");
+    if (current.runs.length >= 50) throw new Error("A test record supports at most 50 runs.");
+    const id = text(raw.id, "Run ID", 80);
+    if (current.runs.some((run) => run.id === id)) throw new Error("That run ID is already recorded.");
+    if (!["tuning", "validation"].includes(raw.partition)) throw new Error("Choose tuning or reserved validation cases.");
+    if (raw.independent_execution !== true) throw new Error("Confirm that these outputs and costs came from a new execution of the locked setups.");
+    if (raw.partition === "validation" && raw.reserved_before_tuning !== true) throw new Error("Confirm that validation cases were reserved before tuning.");
+    if (raw.partition === "tuning" && current.runs.some((run) => run.partition === "validation")) throw new Error("Validation has started. Use a new test record for further tuning.");
+    const evidence = qualityEvidence(suppliedEvidence);
+    const samePartition = current.runs.filter((run) => run.partition === raw.partition);
+    if (samePartition.length && signature(samePartition[0].verification) !== signature(evidence)) throw new Error("Repeat the same cases and deterministic rules within this test partition.");
+    const otherIds = new Set(current.runs.filter((run) => run.partition !== raw.partition).flatMap((run) => run.verification.cases.map((item) => item.case_id)));
+    if (evidence.cases.some((item) => otherIds.has(item.case_id))) throw new Error("Tuning and validation must use different case IDs. Keep reserved cases out of tuning.");
+    if (evidence.source.sha256 && current.runs.some((run) => run.verification.source.sha256 === evidence.source.sha256)) throw new Error("This source file has already been recorded. Import results from a new execution before adding another run.");
+    const run = {
+      id, partition: raw.partition,
+      independent_execution: true,
+      reserved_before_tuning: raw.partition === "validation",
+      baseline_cost: number(raw.baseline_cost, "Starting API cost"),
+      candidate_cost: number(raw.candidate_cost, "Changed API cost"),
+      cost_source: text(raw.cost_source, "Run cost source", 500),
+      verification: evidence,
+    };
+    const trial = { ...current, runs: [...current.runs, run] };
+    // Bound aggregate arithmetic, including restored records.
+    for (const route of ["baseline", "candidate"]) {
+      if (!Number.isFinite(trial.runs.reduce((sum, item) => sum + item[`${route}_cost`], 0))) throw new Error("Combined test costs exceed the supported numeric range.");
+    }
+    const result = recompute(trial);
+    if (new TextEncoder().encode(JSON.stringify(result)).length > 5 * 1024 * 1024) throw new Error("This test exceeds the 5 MiB saved-record limit. Start a separate test for additional runs.");
+    return result;
+  }
+
+  function recompute(record) {
+    const validation = record.runs.filter((run) => run.partition === "validation");
+    const thresholds = record.plan.thresholds;
+    const runs = record.runs.map((run) => {
+      const baseline = routeSummary(run.verification, "baseline");
+      const candidate = routeSummary(run.verification, "candidate");
+      const qualityHeld = candidate.deterministic_pass_rate >= thresholds.minimum_deterministic_pass_rate
+        && candidate.ready_rate >= thresholds.minimum_ready_rate
+        && candidate.ready_rate >= baseline.ready_rate - thresholds.maximum_ready_rate_regression - 1e-12;
+      const baselineUnit = baseline.ready ? run.baseline_cost / baseline.ready : null;
+      const candidateUnit = candidate.ready ? run.candidate_cost / candidate.ready : null;
+      return { id: run.id, partition: run.partition, baseline, candidate, quality_held: qualityHeld,
+        baseline_api_cost_per_ready: baselineUnit,
+        candidate_api_cost_per_ready: candidateUnit,
+        lower_api_unit_cost: baselineUnit !== null && candidateUnit !== null && candidateUnit < baselineUnit };
+    });
+    const checked = runs.filter((run) => run.partition === "validation");
+    const uniqueCases = new Set(validation.flatMap((run) => run.verification.cases.map((item) => item.case_id))).size;
+    const strongMethod = validation.every((run) => run.verification.method.sample_method === "random_or_systematic" && run.verification.method.blinded && run.verification.method.randomized_order);
+    const rejected = checked.some((run) => !run.quality_held || (run.baseline_api_cost_per_ready !== null && run.candidate_api_cost_per_ready !== null && !run.lower_api_unit_cost));
+    const enough = validation.length >= 2 && uniqueCases >= 30 && strongMethod && checked.every((run) => run.quality_held && run.lower_api_unit_cost);
+    const decision = rejected ? "REJECT_CHANGE" : enough ? "REVIEW_CANDIDATE" : "NEEDS_MORE_EVIDENCE";
+    const reason = rejected
+      ? "A validation run failed the locked quality rule or did not lower API cost per ready result. Keep the starting setup and investigate."
+      : enough
+        ? "Repeated reserved-case tests support a finance review of this candidate. Check human work, full operating cost, policy, and production actuals before adopting it."
+        : "Collect at least two new runs on the same 30 or more reserved cases, with complete human outcomes, consistent checks, and a declared blind, randomized review. These are minimum workflow checks, not statistical proof.";
+    return { ...record,
+      summary: {
+        decision, reason, validation_runs: validation.length, unique_validation_cases: uniqueCases,
+        validation_observations: checked.reduce((sum, run) => sum + run.baseline.cases, 0),
+        runs,
+        candidate_ready_rate_range: checked.length ? [Math.min(...checked.map((run) => run.candidate.ready_rate)), Math.max(...checked.map((run) => run.candidate.ready_rate))] : null,
+        statistical_note: "Repeated runs reuse cases. They are not additional independent tasks; no pooled confidence interval is calculated. Case content, source authenticity, and independence are user declarations.",
+      },
+      evidence_gate: { savings_claim_allowed: false, route_change_approved: false,
+        reason: "This record covers declared test runs and API cost only. It does not verify invoices, total workflow savings, or production results." },
+      privacy: { parsed_locally: true, outputs_stored: false, provider_credentials_required: false },
+    };
+  }
+
+  function restoreExperiment(raw) {
+    if (!raw || raw.schema_version !== SCHEMA || !raw.plan || !Array.isArray(raw.runs)) throw new Error("Choose a saved AI Cost Lens test record.");
+    const plan = raw.plan;
+    let record = createExperiment({ ...plan, ...plan.thresholds, generated_at: raw.generated_at, mode: raw.mode });
+    raw.runs.forEach((run) => { record = addRun(record, run, run.verification); });
+    return record;
+  }
+
+  function illustrativeExample(verifier) {
+    let record = createExperiment({
+      mode: "illustrative", generated_at: "2026-10-24T00:00:00.000Z", workload: "Illustrative invoice extraction test",
+      quality_rule: "All required invoice fields match the checked answer; no material correction remains.", change_kind: "caching", currency: "USD",
+      baseline: { label: "Starting setup", model: "Same example model", effort: "Same effort", prompt_version: "v1", caching: "Off", processing: "Standard" },
+      candidate: { label: "Stable prefix cached", model: "Same example model", effort: "Same effort", prompt_version: "v1", caching: "On", processing: "Standard" },
+      other_settings_unchanged: true, minimum_deterministic_pass_rate: 1, minimum_ready_rate: .9, maximum_ready_rate_regression: 0,
+    });
+    for (let trial = 1; trial <= 2; trial += 1) {
+      const rows = Array.from({ length: 40 }, (_, index) => ["baseline", "candidate"].map((route) => ({
+        case_id: `invoice-${String(index + 1).padStart(2, "0")}`, route,
+        output_text: `checked-${index + 1}`, exact_label: `checked-${index + 1}`,
+        outcome_status: "ready_to_use", human_minutes: .25,
+      }))).flat();
+      const evidence = verifier.buildVerification(rows, { sample_method: "random_or_systematic", blinded: true, randomized_order: true,
+        source_name: `Invented example run ${trial}`, source_file_hash: `illustrative-run-${trial}` });
+      record = addRun(record, { id: `example-${trial}`, partition: "validation", independent_execution: true, reserved_before_tuning: true,
+        baseline_cost: trial === 1 ? .40 : .42, candidate_cost: trial === 1 ? .22 : .23, cost_source: "Invented API costs for teaching; no provider requests or bills" }, evidence);
+    }
+    return record;
+  }
+
+  return Object.freeze({ SCHEMA, createExperiment, addRun, restoreExperiment, illustrativeExample });
+});
+</script>
+    <script>(function (root) {
+  "use strict";
+  const engine = root.AICostLensExperiments;
+  const labels = { model: "Model", effort: "Effort", prompt_version: "Prompt version", caching: "Caching", processing: "Processing mode" };
+  const decisions = { REVIEW_CANDIDATE: "Candidate worth a finance review", REJECT_CHANGE: "Keep the starting setup", NEEDS_MORE_EVIDENCE: "More test evidence needed" };
+  const $ = (id) => document.getElementById(id);
+  const escape = (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+  const percent = (n) => `${(n * 100).toFixed(1)}%`;
+  let context;
+  let record = null;
+  let linkedReview = null;
+
+  function error(message) {
+    $("experiment-error").textContent = message;
+    $("experiment-error").classList.toggle("visible", Boolean(message));
+  }
+
+  function money(value) {
+    if (value === null) return "Unavailable";
+    const format = new Intl.NumberFormat("en-US", { style: "currency", currency: record.plan.currency, maximumFractionDigits: 8 });
+    return value > 0 && value < 1e-8 ? `Less than ${format.format(1e-8)}` : format.format(value);
+  }
+
+  function summaryHtml() {
+    if (!record) return "";
+    const s = record.summary;
+    return `<p class="kicker">${record.mode === "illustrative" ? "ILLUSTRATIVE TEST · INVENTED DATA" : "USER-SUPPLIED TEST EVIDENCE · API COST ONLY"}</p>
+      <h3>${escape(decisions[s.decision])}</h3><p>${escape(record.plan.workload)} · ${escape(record.plan.change_kind)} change</p>
+      <p>${escape(s.reason)}</p>
+      <p><strong>${s.validation_runs} validation runs · ${s.unique_validation_cases} distinct validation cases</strong> · ${s.validation_observations} paired observations across repeats.</p>
+      <p>${escape(s.statistical_note)}</p><p>${escape(record.evidence_gate.reason)}</p>`;
+  }
+
+  function tableHtml() {
+    return `<table class="usage-table experiment-run-table"><thead><tr><th>Run</th><th>Cases</th><th>Ready rate</th><th>API cost per ready result</th><th>Review minutes</th><th>Quality</th></tr></thead><tbody>${record.summary.runs.map((run) => `<tr>
+      <th>${escape(run.id)}<small>${escape(run.partition)}</small></th><td>${run.baseline.cases}</td>
+      <td>${percent(run.baseline.ready_rate)} → ${percent(run.candidate.ready_rate)}</td>
+      <td>${money(run.baseline_api_cost_per_ready)} → ${money(run.candidate_api_cost_per_ready)}</td>
+      <td>${run.baseline.human_minutes ?? "Not recorded"} → ${run.candidate.human_minutes ?? "Not recorded"}</td>
+      <td>${run.quality_held ? "Held in this run" : "Failed locked rule"}<small>Checks: ${percent(run.baseline.deterministic_pass_rate)} → ${percent(run.candidate.deterministic_pass_rate)}</small></td></tr>`).join("")}</tbody></table>`;
+  }
+
+  function settingsHtml() {
+    return `<table class="usage-table"><thead><tr><th>Locked setting</th><th>${escape(record.plan.baseline.label)}</th><th>${escape(record.plan.candidate.label)}</th></tr></thead><tbody>${Object.entries(labels).map(([field, label]) => `<tr><th>${label}</th><td>${escape(record.plan.baseline[field] ?? "Not recorded")}</td><td>${escape(record.plan.candidate[field] ?? "Not recorded")}</td></tr>`).join("")}</tbody></table>`;
+  }
+
+  function render() {
+    $("experiment-plan").hidden = Boolean(record);
+    $("experiment-locked").hidden = !record;
+    $("experiment-result").hidden = !record;
+    if (!record) {
+      $("experiment-summary").replaceChildren();
+      $("experiment-actuals-note").hidden = true;
+      return;
+    }
+    $("experiment-plan-summary").textContent = `${record.plan.workload} · ${record.plan.change_kind} only · ${record.plan.quality_rule}`;
+    const field = { prompt: "prompt_version", batch: "processing" }[record.plan.change_kind] || record.plan.change_kind;
+    $("experiment-config-summary").textContent = `${labels[field]}: ${record.plan.baseline[field]} → ${record.plan.candidate[field]}. Check pass minimum: ${percent(record.plan.thresholds.minimum_deterministic_pass_rate)}; ready-result minimum: ${percent(record.plan.thresholds.minimum_ready_rate)}; permitted regression: ${(record.plan.thresholds.maximum_ready_rate_regression * 100).toFixed(1)} points.`;
+    $("experiment-config-details").innerHTML = settingsHtml();
+    $("experiment-summary").innerHTML = summaryHtml();
+    $("experiment-runs").innerHTML = record.runs.length ? tableHtml() : "<p>No runs recorded. Complete a paired output check below or open its saved record, then add the matching API cost for that execution.</p>";
+    const canViewActuals = context.getReview()?.baseline && context.getReview()?.proposed && context.getReview()?.experience !== "simple";
+    $("experiment-to-actuals").hidden = !canViewActuals;
+    const attached = linkedReview === context.getReview();
+    $("experiment-attachment").textContent = attached ? "The test summary will accompany this review’s finance memo and workspace archive. Its test costs do not replace production costs." : "This is a separate test record. Open or build a review for the same workload before attaching its summary.";
+    $("experiment-actuals-note").hidden = !attached;
+    if (attached) $("experiment-actuals-copy").textContent = `${record.plan.workload}: ${decisions[record.summary.decision]}. Use full post-change cost and outcome records below; small test-run costs are not production actuals. No approval or evidence box is filled automatically.`;
+    $("experiment-run-id").value = `run-${record.runs.length + 1}`;
+  }
+
+  function attach() {
+    const review = context.getReview();
+    if (!record || !review || record.plan.workload !== review.workload?.name || record.plan.currency !== review.currency
+        || (record.mode === "illustrative") !== (review.mode === "illustrative")) {
+      throw new Error("The test and review must name the same workload, currency, and evidence mode. Keep unrelated or illustrative tests separate.");
+    }
+    linkedReview = review;
+  }
+
+  function config() {
+    const route = (name) => Object.fromEntries(["label", ...Object.keys(labels)].map((field) => [field, $(`experiment-${name}-${field}`).value.trim()]));
+    return {
+      workload: $("experiment-workload").value, quality_rule: $("experiment-quality-rule").value,
+      currency: $("experiment-currency").value, change_kind: $("experiment-change").value,
+      baseline: route("baseline"), candidate: route("candidate"),
+      other_settings_unchanged: $("experiment-unchanged").checked,
+      minimum_deterministic_pass_rate: requiredPercent("experiment-check-floor"),
+      minimum_ready_rate: requiredPercent("experiment-ready-floor"),
+      maximum_ready_rate_regression: requiredPercent("experiment-regression"),
+    };
+  }
+
+  function requiredPercent(id) {
+    const input = $(id);
+    if (!input.value.trim()) throw new Error("Fill in all three quality thresholds before locking the test.");
+    const n = Number(input.value);
+    if (!Number.isFinite(n) || n < 0 || n > 100) throw new Error("Quality thresholds must be between 0 and 100.");
+    return n / 100;
+  }
+
+  function clearRunInputs() {
+    ["experiment-baseline-cost", "experiment-candidate-cost", "experiment-cost-source"].forEach((id) => { $(id).value = ""; });
+    $("experiment-verification-file").value = "";
+    $("experiment-independent").checked = false;
+    $("experiment-reserved").checked = false;
+  }
+
+  function download() {
+    if (!record) return;
+    const safe = engine.restoreExperiment(record);
+    const url = URL.createObjectURL(new Blob([`${JSON.stringify(safe, null, 2)}\n`], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "ai-cost-lens-test-record.json"; document.body.appendChild(a); a.click(); a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function init(api) {
+    context = api;
+    $("experiment-plan").addEventListener("submit", (event) => {
+      event.preventDefault(); error("");
+      try {
+        const next = engine.createExperiment(config());
+        record = next; linkedReview = null;
+        try { attach(); } catch (_ignored) { /* Standalone tests remain separate. */ }
+        clearRunInputs(); render(); $("experiment-locked-title").focus();
+      } catch (caught) { error(caught.message); }
+    });
+    $("experiment-run-form").addEventListener("submit", async (event) => {
+      event.preventDefault(); error("");
+      const submit = $("experiment-add-run"); submit.disabled = true;
+      try {
+        const file = $("experiment-verification-file").files[0];
+        const evidence = file ? JSON.parse(await context.readFile(file)) : context.getVerification();
+        if (!evidence) throw new Error("Complete a paired output check below, or choose its saved verification JSON.");
+        record = engine.addRun(record, {
+          id: $("experiment-run-id").value,
+          partition: $("experiment-partition").value,
+          baseline_cost: $("experiment-baseline-cost").value,
+          candidate_cost: $("experiment-candidate-cost").value,
+          cost_source: $("experiment-cost-source").value,
+          independent_execution: $("experiment-independent").checked,
+          reserved_before_tuning: $("experiment-reserved").checked,
+        }, evidence);
+        clearRunInputs(); render(); context.toast("Run recorded locally. Test evidence stays separate from savings.");
+      } catch (caught) { error(caught instanceof SyntaxError ? "Choose a valid saved paired verification JSON file." : caught.message); }
+      finally { submit.disabled = false; }
+    });
+    $("experiment-download").addEventListener("click", download);
+    $("experiment-open").addEventListener("click", () => $("experiment-file").click());
+    $("experiment-file").addEventListener("change", async (event) => {
+      error(""); const file = event.target.files[0]; if (!file) return;
+      try {
+        const restored = engine.restoreExperiment(JSON.parse(await context.readFile(file)));
+        record = restored; linkedReview = null;
+        clearRunInputs(); render(); context.toast("Saved test reopened. Its calculations were rebuilt locally.");
+      } catch (caught) { error(caught instanceof SyntaxError ? "Choose a valid saved test JSON file." : caught.message); }
+      finally { event.target.value = ""; }
+    });
+    $("experiment-example").addEventListener("click", () => {
+      error("");
+      if (record) { error("A test is already open. Download it, then choose Start another test before opening the example."); return; }
+      record = engine.illustrativeExample(context.verifier); linkedReview = null; render();
+      context.toast("Illustrative caching example open. All costs, outputs, and review declarations are invented.");
+    });
+    $("experiment-new").addEventListener("click", () => {
+      error("");
+      if (!$("experiment-reset-confirm").checked) { error("Download the open test if you need it, then confirm you are ready to clear it."); return; }
+      record = null; linkedReview = null; $("experiment-reset-confirm").checked = false; clearRunInputs(); render();
+      $("experiment-workload").focus();
+    });
+    $("experiment-attach").addEventListener("click", () => { error(""); try { attach(); render(); context.toast("Test summary attached to this review’s memo. Savings gates are unchanged."); } catch (caught) { error(caught.message); } });
+    $("experiment-to-actuals").addEventListener("click", () => context.setView("actuals"));
+    $("start-controlled-test").addEventListener("click", () => { context.setView("verify"); $("experiment-title").focus(); $("experiment-panel").scrollIntoView({ block: "start", behavior: "smooth" }); });
+    $("experiment-print").addEventListener("click", () => {
+      if (!record) return;
+      $("experiment-printout").innerHTML = `<p class="memo-brand">CLOUD &amp; CAPITAL · AI COST LENS</p><h1>One change test record</h1>${summaryHtml()}<h2>The locked change</h2><p>${escape(record.plan.quality_rule)}</p><p>${escape($("experiment-config-summary").textContent)}</p>${settingsHtml()}<h2>Results by run</h2>${tableHtml()}<h2>Cost evidence supplied</h2><ul>${record.runs.map((run) => `<li>${escape(run.id)}: ${escape(run.cost_source)}</li>`).join("")}</ul>`;
+      document.body.classList.add("printing-experiment");
+      try { window.print(); } catch (_caught) { document.body.classList.remove("printing-experiment"); error("Printing could not start. Download the test record instead."); }
+    });
+    const cleanup = () => document.body.classList.remove("printing-experiment");
+    window.addEventListener("afterprint", cleanup);
+    const media = window.matchMedia?.("print");
+    media?.addEventListener?.("change", () => { if (!media.matches) cleanup(); });
+    render();
+  }
+
+  function setContext() {
+    if (record) { render(); return; }
+    const review = context.getReview();
+    if (review?.mode !== "illustrative" && review?.workload?.name) {
+      $("experiment-workload").value = review.workload.name;
+      $("experiment-currency").value = review.currency || "";
+      $("experiment-quality-rule").value = review.baseline?.outcomes?.acceptance_rule || review.config?.acceptanceRule || "";
+      $("experiment-baseline-label").value = review.baseline?.label || "Starting setup";
+      $("experiment-candidate-label").value = review.proposed?.label || "Changed setup";
+    }
+  }
+
+  root.AICostLensExperimentUI = Object.freeze({ init, setContext,
+    getRecord: () => record ? engine.restoreExperiment(record) : null,
+    memoHtml: () => record && linkedReview === context.getReview() ? `<h2>Controlled test evidence</h2>${summaryHtml()}<p>${escape($("experiment-config-summary").textContent)}</p>${tableHtml()}` : "",
+  });
+})(globalThis);
+</script>
     <script>(function attachActualsEngine(root, factory) {
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;
@@ -11964,6 +12539,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
   const opportunityEngine = globalThis.AICostLensOpportunities;
   const usageEventEngine = globalThis.AICostLensUsageEvents;
   const verificationEngine = globalThis.AICostLensVerification;
+  const experimentUI = globalThis.AICostLensExperimentUI;
   const scenarioEngine = globalThis.AICostLensScenarios;
   const actualsEngine = globalThis.AICostLensActuals;
   const growthEngine = globalThis.AICostLensGrowth;
@@ -16047,7 +16623,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       const idCopy = ids.length ? `${wholeNumber(ids.length)} row${ids.length === 1 ? "" : "s"}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ` + ${ids.length - 3} more` : ""}` : "No individual row IDs";
       return `<article class="workbench-finding request-finding">
         <span>${String(index + 1).padStart(2, "0")}</span>
-        <div><p class="kicker">${escapeHtml(item.category || "Investigation")}</p><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.explanation)}</p><details><summary>Calculation and limitation</summary><p><strong>Calculation:</strong> ${escapeHtml(item.calculation)}</p><p><strong>Limitation:</strong> ${escapeHtml(item.limitations)}</p></details></div>
+        <div><p class="kicker">${escapeHtml(item.category || "Investigation")}</p><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.explanation)}</p><details><summary>Calculation and limitation</summary><p><strong>Calculation:</strong> ${escapeHtml(item.calculation)}</p><p><strong>Limitation:</strong> ${escapeHtml(item.limitations)}</p></details>${cacheInvestigationHtml(review, item)}</div>
         <dl class="finding-meta">
           <div><dt>Affected requests</dt><dd>${escapeHtml(idCopy)}</dd></div>
           <div><dt>Potential amount</dt><dd>${requestReviewMoney(amount, comparable?.currency || currency)}</dd></div>
@@ -16067,6 +16643,22 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       : "";
     document.getElementById("request-import-coverage").innerHTML = `<p><strong>Detected adapter:</strong> ${escapeHtml(review.source.adapter)}. AI Cost Lens accepts universal flat files, LiteLLM spend logs, and flat OpenAI-compatible, Anthropic-compatible, OpenRouter, Langfuse, and Helicone fields. It does not send credentials or query those services.</p><dl>${coverage}</dl><p>Source SHA-256: ${escapeHtml(review.source.sha256 || "Unavailable in this browser")}. Prompt contents and unknown source fields were not copied.${liteLLMNote} Automatic catalog pricing requires a timestamp inside the catalog validity window, matching USD currency, a supported processing mode or batch flag, cached-input tokens, and tool charges. Routes with separate cache-write or storage charges also require explicit write tokens, duration where applicable, and storage token-hours. Missing inputs leave the row unpriced. ${review.reconciliation.duplicate_rows_flagged ? `${wholeNumber(review.reconciliation.duplicate_rows_flagged)} rows share a repeated event ID and remain in the export with a duplicate-group flag. The duplicate-excluded total is a reconciliation reference only: AI Cost Lens does not delete, allocate, or presume any row is invalid.` : "No repeated provider/event-ID group was detected."}</p>`;
     result.hidden = false;
+  }
+
+  function cacheInvestigationHtml(review, item) {
+    if (item.category !== "Caching") return "";
+    const ids = new Set(item.affected_event_ids || []);
+    const rows = review.events.filter((event) => ids.has(event.record_id));
+    const models = new Set(rows.filter((event) => event.model).map((event) => `${event.provider || "Unknown provider"}/${event.model}`));
+    const writesKnown = rows.filter((event) => event.cache_write_tokens !== null).length;
+    return `<details class="cache-investigation"><summary>What to check before changing caching</summary>
+      <p><strong>In the imported rows:</strong> ${wholeNumber(rows.length)} affected requests report zero cache reads; ${wholeNumber(writesKnown)} supply cache-write counts. ${wholeNumber(models.size)} provider/model combinations are visible. A repeated fingerprint does not establish how much context is reusable.</p>
+      <ol><li><strong>Stable content first.</strong> Check whether timestamps, request IDs, or changing tool definitions appear before otherwise reusable content.</li>
+      <li><strong>Check the timing.</strong> Compare request timestamps with the configured cache lifetime. Claude defaults to five minutes and offers a one-hour option with a different write price. The log alone does not establish expiration.</li>
+      <li><strong>Keep model boundaries visible.</strong> Check the provider’s model-specific cache rules before assuming reuse across a model switch. A return to the original model may still reuse an entry if it remains valid.</li>
+      <li><strong>Measure reads and writes together.</strong> Check provider eligibility, minimum prefix size, write premiums, and any storage charges before estimating a saving.</li></ol>
+      <p>These are possible explanations to investigate. This prompt-free log cannot identify which content changed or prove a root cause. Record one caching change in Verify, then compare fresh usage and quality. <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching" target="_blank" rel="noopener noreferrer">Claude caching rules and pricing</a> (checked October 24, 2026).</p>
+    </details>`;
   }
 
   function initializeRequestLogAnalysis() {
@@ -16842,6 +17434,9 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
   }
 
   function renderFinanceMemo() {
+    const experimentMemo = experimentUI?.memoHtml() || "";
+    document.getElementById("memo-experiment").innerHTML = experimentMemo;
+    document.getElementById("memo-experiment").hidden = !experimentMemo;
     document.getElementById("memo-decision-label").textContent = "FINANCE DECISION";
     document.getElementById("memo-switch-check").hidden = true;
     if (!state.data) return;
@@ -17019,6 +17614,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
 
   function renderAll() {
     validateResult(state.data);
+    experimentUI?.setContext();
     if (state.data.mode !== "illustrative") state.hasStarted = true;
     document.body.classList.toggle("welcome-mode", !state.hasStarted);
     document.body.classList.toggle("simple-mode", state.data.experience === "simple");
@@ -17298,6 +17894,14 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
   });
 
   initializeRequestLogAnalysis();
+  experimentUI?.init({
+    getReview: () => state.data,
+    getVerification: () => state.verificationRecord,
+    readFile: readLocalFile,
+    setView,
+    toast: showToast,
+    verifier: verificationEngine,
+  });
 
   document.getElementById("scenario-route").addEventListener("change", syncScenarioRoute);
 
@@ -19035,6 +19639,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       customer_cost_to_serve: state.customerEconomicsReview === state.usageReview ? state.customerEconomicsRecord : null,
       growth_scenario: state.growthPlannerReview === state.data ? state.growthPlannerRecord : null,
       verification_record: state.verificationRecord,
+      experiment_record: experimentUI?.getRecord() || null,
       actuals_ledger: state.actualsLedger,
       limitations: "Local archive of completed sections. Null means that section has no current result. The Open saved review control accepts the decision record, not this archive. Provider bills and savings are not verified by packaging the records together.",
     };

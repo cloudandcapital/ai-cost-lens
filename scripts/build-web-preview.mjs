@@ -40,6 +40,8 @@ const pricingEngine = await readFile(resolve(web, "pricing-engine.js"), "utf8");
 const opportunityEngine = await readFile(resolve(web, "opportunity-engine.js"), "utf8");
 const usageEventEngine = await readFile(resolve(web, "usage-event-engine.js"), "utf8");
 const verificationEngine = await readFile(resolve(web, "verification-engine.js"), "utf8");
+const experimentEngine = await readFile(resolve(web, "experiment-engine.js"), "utf8");
+const experimentUI = await readFile(resolve(web, "experiment-ui.js"), "utf8");
 const scenarioEngine = await readFile(resolve(web, "scenario-engine.js"), "utf8");
 const actualsEngine = await readFile(resolve(web, "actuals-engine.js"), "utf8");
 const growthEngine = await readFile(resolve(web, "growth-engine.js"), "utf8");
@@ -82,6 +84,8 @@ html = html
   .replace('<script src="opportunity-engine.js"></script>', () => `<script>${opportunityEngine}</script>`)
   .replace('<script src="usage-event-engine.js"></script>', () => `<script>${usageEventEngine}</script>`)
   .replace('<script src="verification-engine.js"></script>', () => `<script>${verificationEngine}</script>`)
+  .replace('<script src="experiment-engine.js"></script>', () => `<script>${experimentEngine}</script>`)
+  .replace('<script src="experiment-ui.js"></script>', () => `<script>${experimentUI}</script>`)
   .replace('<script src="scenario-engine.js"></script>', () => `<script>${scenarioEngine}</script>`)
   .replace('<script src="actuals-engine.js"></script>', () => `<script>${actualsEngine}</script>`)
   .replace('<script src="growth-engine.js"></script>', () => `<script>${growthEngine}</script>`)
