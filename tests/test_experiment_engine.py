@@ -47,6 +47,16 @@ def test_repeated_examples_count_distinct_tasks_and_never_authorize_savings():
     assert "confidence_interval" not in json.dumps(result)
 
 
+def test_small_nonzero_api_unit_costs_keep_precision():
+    result = run_node(
+        "const r=e.addRun(empty(),trial('tiny',{baseline_cost:1e-7,candidate_cost:4e-8}),evidence());"
+        "console.log(JSON.stringify(r.summary.runs[0]));"
+    )
+    assert result["baseline_api_cost_per_ready"] == 2.5e-9
+    assert result["candidate_api_cost_per_ready"] == 1e-9
+    assert result["lower_api_unit_cost"] is True
+
+
 def test_plan_rejects_multiple_changes_and_wrong_change_kind():
     result = run_node(r"""
 const raw={...example.plan,...example.plan.thresholds};

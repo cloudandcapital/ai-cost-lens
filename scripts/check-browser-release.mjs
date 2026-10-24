@@ -389,6 +389,10 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
   await page.locator("#welcome-example").click();
   if (mobile) await page.locator("#mobile-section-nav").selectOption("verify");
   else await page.locator('.nav-item[data-view="verify"]').click();
+  // Contrast is meaningful after the section's reveal animation has finished.
+  await page.locator("#view-verify").evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
   const planA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   assert(planA11y.violations.length === 0, `${engineName}: test-plan accessibility violations: ${axeSummary(planA11y)}`);
   await page.locator("#experiment-example").click();
@@ -409,8 +413,8 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
     const pdf = await loading.promise;
     const parts = [];
     for (let index = 1; index <= pdf.numPages; index += 1) parts.push((await (await pdf.getPage(index)).getTextContent()).items.map((item) => item.str).join(" "));
-    const text = parts.join(" ").replace(/\s+/g, " ");
-    for (const expected of ["One change test record", "INVENTED DATA", "40 distinct validation cases", "API cost per ready result", "Cost evidence supplied"]) assert(text.includes(expected), `Test PDF is missing ${expected}.`);
+    const text = parts.join(" ").replace(/\s+/g, "");
+    for (const expected of ["One change test record", "INVENTED DATA", "40 distinct validation cases", "API cost per ready result", "Cost evidence supplied"]) assert(text.includes(expected.replace(/\s+/g, "")), `Test PDF is missing ${expected}.`);
     assert(pdf.numPages <= 3, `The two-run test PDF has ${pdf.numPages} pages.`);
     await loading.destroy();
   }
@@ -419,6 +423,7 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
   reopen.summary.decision = "REJECT_CHANGE";
   reopen.evidence_gate.savings_claim_allowed = true;
   await page.locator("#experiment-file").setInputFiles({ name: "saved-test.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(reopen)) });
+  await page.waitForFunction(() => document.querySelector("#toast")?.textContent?.includes("Saved test reopened"));
   assert((await page.locator("#experiment-summary").innerText()).includes("Candidate worth a finance review"), `${engineName}: reopening trusted a saved headline instead of rebuilding it.`);
   await page.locator("#experiment-attach").click();
   assert((await page.locator("#experiment-error").innerText()).includes("same workload"), `${engineName}: an unrelated test attached to this review.`);
@@ -431,6 +436,7 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
   review.mode = "real";
   for (const route of ["baseline", "proposed"]) review[route].period = { start: "2026-09-01", end: "2026-09-30" };
   await page.locator("#review-file").setInputFiles({ name: "synthetic-test-review.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(review)) });
+  await page.waitForFunction(() => document.querySelector("#toast")?.textContent?.includes("synthetic-test-review.json is open"));
   if (mobile) await page.locator("#mobile-section-nav").selectOption("verify");
   else await page.locator('.nav-item[data-view="verify"]').click();
   await page.locator("#experiment-baseline-caching").fill("Off");
@@ -438,7 +444,7 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
   await page.locator("#experiment-unchanged").check();
   await page.locator('#experiment-plan button[type="submit"]').click();
   assert(await page.locator("#experiment-locked").isVisible(), `${engineName}: the test did not lock: ${await page.locator("#experiment-error").innerText()}`);
-  for (const run of example.runs) {
+  for (const [index, run] of example.runs.entries()) {
     await page.locator("#experiment-verification-file").setInputFiles({ name: "paired-run.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(run.verification)) });
     await page.locator("#experiment-baseline-cost").fill(String(run.baseline_cost));
     await page.locator("#experiment-candidate-cost").fill(String(run.candidate_cost));
@@ -446,6 +452,7 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
     await page.locator("#experiment-independent").check();
     await page.locator("#experiment-reserved").check();
     await page.locator("#experiment-add-run").click();
+    await page.locator("#experiment-runs tbody tr").nth(index).waitFor({ state: "visible" });
     assert((await page.locator("#experiment-error").innerText()) === "", `${engineName}: a new test run failed.`);
     assert(!(await page.locator("#experiment-independent").isChecked()), `${engineName}: execution attestation carried into another run.`);
   }

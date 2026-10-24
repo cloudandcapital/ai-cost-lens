@@ -16,7 +16,9 @@
   }
 
   function money(value) {
-    return value === null ? "Unavailable" : new Intl.NumberFormat("en-US", { style: "currency", currency: record.plan.currency, maximumFractionDigits: 5 }).format(value);
+    if (value === null) return "Unavailable";
+    const format = new Intl.NumberFormat("en-US", { style: "currency", currency: record.plan.currency, maximumFractionDigits: 8 });
+    return value > 0 && value < 1e-8 ? `Less than ${format.format(1e-8)}` : format.format(value);
   }
 
   function summaryHtml() {

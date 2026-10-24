@@ -188,8 +188,8 @@
       const baselineUnit = baseline.ready ? run.baseline_cost / baseline.ready : null;
       const candidateUnit = candidate.ready ? run.candidate_cost / candidate.ready : null;
       return { id: run.id, partition: run.partition, baseline, candidate, quality_held: qualityHeld,
-        baseline_api_cost_per_ready: baselineUnit === null ? null : round(baselineUnit),
-        candidate_api_cost_per_ready: candidateUnit === null ? null : round(candidateUnit),
+        baseline_api_cost_per_ready: baselineUnit,
+        candidate_api_cost_per_ready: candidateUnit,
         lower_api_unit_cost: baselineUnit !== null && candidateUnit !== null && candidateUnit < baselineUnit };
     });
     const checked = runs.filter((run) => run.partition === "validation");
