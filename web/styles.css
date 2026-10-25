@@ -61,6 +61,7 @@
   .experiment-tools button { text-align: left; }
 }
 @media print {
+  .print-brand-wordmark { display:block; width:42mm; height:auto; margin:0 0 4mm; }
   body.printing-experiment > :not(#experiment-printout) { display: none !important; }
   body.printing-experiment #experiment-printout { display: block; padding: 0; font: 11pt/1.5 var(--sans); background: white; color: black; }
   .experiment-printout h1, .experiment-printout h2, .experiment-printout h3 { font-family: var(--serif); font-weight: 400; }

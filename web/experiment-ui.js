@@ -173,7 +173,7 @@
     $("start-controlled-test").addEventListener("click", () => { context.setView("verify"); $("experiment-title").focus(); $("experiment-panel").scrollIntoView({ block: "start", behavior: "smooth" }); });
     $("experiment-print").addEventListener("click", () => {
       if (!record) return;
-      $("experiment-printout").innerHTML = `<p class="memo-brand">CLOUD &amp; CAPITAL · AI COST LENS</p><h1>One change test record</h1>${summaryHtml()}<h2>The locked change</h2><p>${escape(record.plan.quality_rule)}</p><p>${escape($("experiment-config-summary").textContent)}</p>${settingsHtml()}<h2>Results by run</h2>${tableHtml()}<h2>Cost evidence supplied</h2><ul>${record.runs.map((run) => `<li>${escape(run.id)}: ${escape(run.cost_source)}</li>`).join("")}</ul>`;
+      $("experiment-printout").innerHTML = `<img class="print-brand-wordmark" src="brand/cloud-and-capital-wordmark.png" alt="Cloud &amp; Capital" width="1551" height="174" /><p class="memo-brand">AI COST LENS</p><h1>One change test record</h1>${summaryHtml()}<h2>The locked change</h2><p>${escape(record.plan.quality_rule)}</p><p>${escape($("experiment-config-summary").textContent)}</p>${settingsHtml()}<h2>Results by run</h2>${tableHtml()}<h2>Cost evidence supplied</h2><ul>${record.runs.map((run) => `<li>${escape(run.id)}: ${escape(run.cost_source)}</li>`).join("")}</ul>`;
       document.body.classList.add("printing-experiment");
       try { window.print(); } catch (_caught) { document.body.classList.remove("printing-experiment"); error("Printing could not start. Download the test record instead."); }
     });
