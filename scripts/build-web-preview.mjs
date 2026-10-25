@@ -10,6 +10,7 @@ await buildOpenAITokenizer();
 
 let html = await readFile(resolve(web, "index.html"), "utf8");
 const css = await readFile(resolve(web, "styles.css"), "utf8");
+const brandWordmark = await readFile(resolve(web, "brand/cloud-and-capital-wordmark.png"));
 const data = await readFile(
   resolve(web, "data", "illustrative-review-result.json"),
   "utf8",
@@ -91,7 +92,8 @@ html = html
   .replace('<script src="growth-engine.js"></script>', () => `<script>${growthEngine}</script>`)
   .replace('<script src="evidence-tools.js"></script>', () => `<script>${evidenceTools}</script>`)
   .replace('<script src="customer-economics-engine.js"></script>', () => `<script>${customerEconomics}</script>`)
-  .replace('<script src="app.js"></script>', () => `<script>${app}</script>`);
+  .replace('<script src="app.js"></script>', () => `<script>${app}</script>`)
+  .replaceAll('src="brand/cloud-and-capital-wordmark.png"', `src="data:image/png;base64,${brandWordmark.toString("base64")}"`);
 
 if (!html.includes(`<script>${app}</script>`)) {
   throw new Error("The browser application was not embedded byte-for-byte.");
