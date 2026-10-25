@@ -12,3 +12,12 @@ sanitized-openai-evidence/
 artifacts/
 node_modules/
 web/vendor/
+
+# Local working records
+/internal/
+/private/
+/notes/
+/docs/reviews/
+/docs/*-review-brief-*.md
+/docs/*-review-native-checks-*.md
+/docs/website-integration-*.md
