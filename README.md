@@ -359,3 +359,8 @@ uv run --extra dev pytest
 ## License
 
 MIT © 2025–2026 Diana Molski, Cloud & Capital
+
+
+### Development Python versions
+
+The tool and its tests support Python 3.10 and newer. Run dependency auditing with Python 3.11 or newer; the audit tooling is included in the development extra on those versions.
