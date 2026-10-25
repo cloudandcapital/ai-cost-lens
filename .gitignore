@@ -21,3 +21,8 @@ web/vendor/
 /docs/*-review-brief-*.md
 /docs/*-review-native-checks-*.md
 /docs/website-integration-*.md
+
+# Local environment files may contain credentials.
+.env
+.env.*
+!.env.example
