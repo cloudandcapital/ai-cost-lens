@@ -7,13 +7,13 @@
 .guide p, .guide li { font-size: 1rem; line-height: 1.75; }
 .guide p { margin: 12px 0; }
 .guide li { margin-bottom: 12px; }
-.guide a { color: #315e4c; text-underline-offset: 4px; }
-.guide .example { background: #fffdfb; padding: clamp(18px, 4vw, 32px); border-radius: 20px; }
+.guide a { color: var(--theme-green, #315e4c); text-underline-offset: 4px; }
+.guide .example { background: var(--theme-panel, #fffdfb); padding: clamp(18px, 4vw, 32px); border-radius: 20px; }
 .guide table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; margin: 24px 0; }
-.guide th, .guide td { border-bottom: 1px solid #ddd8d0; padding: 12px 8px; text-align: right; }
+.guide th, .guide td { border-bottom: 1px solid var(--theme-line, #ddd8d0); padding: 12px 8px; text-align: right; }
 .guide th:first-child, .guide td:first-child { text-align: left; width: 50%; }
 .guide thead { font-size: .875rem; }
-.guide .boundary { color: #575b54; font-size: .9375rem; }
+.guide .boundary { color: var(--theme-muted, #575b54); font-size: .9375rem; }
 @media (max-width: 600px) {
   .guide-header { flex-wrap: wrap; gap: 16px; }
   .guide-header .wordmark span { white-space: nowrap; }
