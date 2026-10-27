@@ -59,6 +59,8 @@ class Element {
   focus() { document.activeElement = this; }
   scrollIntoView() {}
   replaceChildren() { this.children = []; this.innerHTML = ''; }
+  appendChild(child) { this.children.push(child); child.parentNode = this; return child; }
+  remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(child => child !== this); }
 }
 const document = new Element('document');
 const stack = [document];
@@ -73,12 +75,19 @@ for (const token of read('web/index.html').match(/<[^>]+>|[^<]+/g)) {
   if (!voidTags.has(tag) && !token.endsWith('/>')) stack.push(el);
 }
 document.getElementById = (id) => { assert.ok(nodes.has(id), id); return nodes.get(id); };
+document.createElement = (tag) => new Element(tag);
 document.body = document.querySelector('body');
 const window = new Element('window');
 const timers = [];
 window.setTimeout = (fn) => timers.push(fn);
 window.scrollTo = () => {};
 window.print = () => {}; // Intentionally returns BEFORE printing has finished.
+window.confirm = () => true; // These existing cases intentionally replace the current review.
+let downloadedBlob;
+class DownloadURL extends URL {
+  static createObjectURL(blob) { downloadedBlob = blob; return 'blob:local-test-download'; }
+  static revokeObjectURL() {}
+}
 const media = new Element('media'); media.matches = false;
 window.matchMedia = () => media;
 const source = read('web/app.js').replace(/  \/\* AI_COST_LENS_DEMO_LOADER_START \*\/[\s\S]*?  \/\* AI_COST_LENS_DEMO_LOADER_END \*\//,
@@ -87,6 +96,8 @@ const context = {
   document,
   window,
   TextEncoder,
+  Blob,
+  URL: DownloadURL,
   crypto:webcrypto,
   AI_COST_LENS_PRICING_CATALOG:pricingCatalog,
   AICostLensOpenAITokenizer:openAITokenizer,
@@ -223,6 +234,14 @@ assert.equal(el('tools-scope').checked,false,'Edited charges need the boundary c
 el('tools-scope').checked=true;
 await submit();
 assert.match(el('bill-finding-title').textContent,/\$26\.00/);
+const beforeCancelledOpen = api.state.data;
+window.confirm = () => false;
+api.state.demoData=JSON.parse(read('web/data/illustrative-review-result.json'));
+await document.querySelectorAll('[data-example]').find(node=>node.dataset.example==='cost-trap').emit('click');
+assert.equal(api.state.data,beforeCancelledOpen,'Cancelling an example preserves the visitor’s own comparison.');
+await file('review-file',toolsRoundTrip,'tools-baseline.json');
+assert.equal(api.state.data,beforeCancelledOpen,'Cancelling replacement preserves the open comparison.');
+window.confirm = () => true;
 await file('review-file',toolsRoundTrip,'tools-baseline.json');
 await click('edit-tool-review');
 assert.equal(el('tool-amount-1').value,'20','Reopened tools keep the original editable charges.');
@@ -869,8 +888,13 @@ await click('experiment-example');
 assert.equal(experimentUI.getRecord().summary.unique_validation_cases,40);
 assert.equal(experimentUI.getRecord().summary.validation_observations,80);
 assert.match(el('experiment-summary').innerHTML,/ILLUSTRATIVE TEST/);
+assert.equal(el('experiment-run-form').hidden,true,'Invented example runs are read-only.');
 await click('experiment-attach');
 assert.match(el('experiment-error').textContent,/same workload/);
+await click('download-workspace');
+const unattachedArchive=JSON.parse(await downloadedBlob.text());
+assert.equal(unattachedArchive.experiment_attachment.attached,false);
+assert.equal(unattachedArchive.experiment_record.mode,'illustrative');
 await click('experiment-new');
 assert.ok(experimentUI.getRecord(),'Clearing a test requires the explicit reset checkbox.');
 el('experiment-reset-confirm').checked = true;
@@ -883,6 +907,8 @@ api.renderAll();
 const gatesBeforeExperiment = JSON.stringify(api.state.data.comparison);
 assert.equal(el('experiment-workload').value,api.state.data.workload.name);
 assert.equal(el('experiment-quality-rule').value,api.state.data.baseline.outcomes.acceptance_rule);
+assert.equal(el('experiment-baseline-label').value,'Starting test setup');
+assert.equal(el('experiment-candidate-label').value,'Changed test setup');
 el('experiment-change').value = 'caching';
 el('experiment-baseline-caching').value = 'Off';
 el('experiment-candidate-caching').value = 'On';
@@ -891,6 +917,10 @@ await el('experiment-plan').emit('submit');
 assert.ok(experimentUI.getRecord(),el('experiment-error').textContent);
 assert.equal(el('experiment-plan').hidden,true);
 assert.equal(el('experiment-locked').hidden,false);
+assert.equal(experimentUI.getAttachment().attached,false,'Locking a test does not attach it automatically.');
+assert.equal(el('experiment-run-form').hidden,false);
+assert.equal(el('experiment-paired-threshold-note').hidden,false);
+assert.match(el('experiment-paired-threshold-note').textContent,/paired-check pass does not establish/);
 const illustrativeRuns = experimentEngine.illustrativeExample(verificationEngine).runs;
 async function enterExperimentRun(index, evidence = illustrativeRuns[index].verification) {
   await file('experiment-verification-file',JSON.stringify(evidence),'paired-run.json');
@@ -910,9 +940,18 @@ await enterExperimentRun(0);
 assert.equal(experimentUI.getRecord().runs.length,1);
 assert.match(el('experiment-error').textContent,/already been recorded/);
 await enterExperimentRun(1);
+assert.equal(experimentUI.getRecord().runs.length,1,'A re-saved matching result needs its own confirmation.');
+assert.equal(el('experiment-matching-wrap').hidden,false);
+el('experiment-matching-confirm').checked=true;
+await el('experiment-run-form').emit('submit');
 assert.equal(experimentUI.getRecord().summary.decision,'REVIEW_CANDIDATE');
 assert.match(el('experiment-runs').innerHTML,/0\.0055/);
+assert.match(el('experiment-runs').innerHTML,/Total API cost/);
+assert.match(el('experiment-runs').innerHTML,/Unit-cost change/);
+await click('experiment-attach');
+assert.equal(experimentUI.getAttachment().attached,true);
 await click('print-memo');
+assert.match(el('memo-experiment').innerHTML,/not a validation of the review’s proposed route/);
 assert.match(el('memo-experiment').innerHTML,/40 distinct validation cases/);
 assert.match(el('memo-experiment').innerHTML,/API cost per ready result/);
 await window.emit('afterprint');
@@ -926,6 +965,11 @@ assert.equal(document.body.classList.contains('printing-experiment'),false);
 const savedExperiment = experimentUI.getRecord();
 savedExperiment.summary.decision = 'REJECT_CHANGE';
 savedExperiment.evidence_gate.savings_claim_allowed = true;
+const beforeTestReplacement=JSON.stringify(experimentUI.getRecord());
+await file('experiment-file',JSON.stringify(savedExperiment),'saved-test.json');
+assert.equal(JSON.stringify(experimentUI.getRecord()),beforeTestReplacement,'Opening a saved test cannot silently overwrite the open one.');
+assert.match(el('experiment-error').textContent,/test is already open/);
+el('experiment-reset-confirm').checked=true;
 await file('experiment-file',JSON.stringify(savedExperiment),'saved-test.json');
 assert.equal(experimentUI.getRecord().summary.decision,'REVIEW_CANDIDATE','Reopening recomputes the decision.');
 assert.equal(experimentUI.getRecord().evidence_gate.savings_claim_allowed,false);
@@ -939,6 +983,7 @@ api.state.data = JSON.parse(read('web/data/illustrative-review-result.json'));
 api.renderAll();
 assert.equal(el('memo-experiment').hidden,true,'An unrelated review must not inherit the prior test summary.');
 const beforeInvalidOpen = JSON.stringify(experimentUI.getRecord());
+el('experiment-reset-confirm').checked=true;
 await file('experiment-file','{}','invalid-test.json');
 assert.equal(JSON.stringify(experimentUI.getRecord()),beforeInvalidOpen,'An invalid file must not replace the open test.');
 console.log('PASS: controlled test lock, fresh runs, duplicate rejection, recomputed reopening, print and finance handoffs');

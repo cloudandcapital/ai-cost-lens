@@ -62,3 +62,15 @@ separates observed cache-read and cache-write coverage from possible causes.
 Prefix changes, expiry, model boundaries, minimum sizes, and cache-write or
 storage charges require provider-specific evidence; they are not inferred as
 proven causes from a low hit rate alone.
+
+## Repeated evidence, imports and the finance handoff
+
+Matching parsed checks, human outcomes and review minutes require a separate, recorded fresh-execution confirmation. Re-saving a CSV with CRLF line endings, renaming a source or deleting its optional byte hash does not bypass this comparison. A user can still misdeclare execution or rename the same case IDs; this local workflow cannot independently establish provenance or independent execution. Older imported matching runs without the confirmation remain readable but do not earn the candidate verdict.
+
+The invented caching example is read-only. Own results belong in a separate user-supplied test. Opening a saved test requires confirmation before replacing an open test; failed imports preserve it. Exported test records include a bounded noncryptographic edit checksum over the plan, mode and normalized runs. Missing or changed checksums are disclosed on reopen. This is accidental-edit detection, not a signature, authentication, or a security boundary. Imported evidence and example status remain user supplied even when the checksum matches. Required terms and exact-label rules can contain the checked answer itself; no raw output field does not mean every rule is nonsensitive.
+
+A candidate with zero ready results is rejected when the starting setup has ready results, regardless of a permissive floor. A 0% floor is explicitly warned about. A baseline with no ready results instead gets an explanation of the missing unit-cost comparison. Rejection text distinguishes failed locked quality thresholds from non-decreasing API unit cost. The paired check has independent thresholds, stated beside its verdict when a controlled test is open.
+
+Run tables include the supplied total API costs, unit costs and percentage change in unit cost. Very small amounts use scientific notation rather than identical less-than labels. Percentages describe these test API unit costs only, not realized workflow savings.
+
+Attachment is explicit, never automatic at plan creation. A matching workload/currency/mode permits a supplemental test, not validation of the proposed route. The finance memo names the tested setups and change and states this boundary. Workspace archives include an explicit attached flag for the separate experiment, including unattached or illustrative records.

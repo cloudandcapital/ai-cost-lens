@@ -9,6 +9,7 @@
   const fields = ["model", "effort", "prompt_version", "caching", "processing"];
   const changes = { model: "model", effort: "effort", prompt: "prompt_version", caching: "caching", batch: "processing" };
   const round = (n) => Number(n.toFixed(8));
+  const stableOrder = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 
   function text(value, label, max = 240, optional = false) {
     if (value === null || value === undefined || String(value).trim() === "") {
@@ -39,9 +40,12 @@
     if (!Object.hasOwn(changes, raw.change_kind)) throw new Error("Choose one supported change: caching, batch, prompt, effort, or model.");
     const baseline = setup(raw.baseline, "Starting setup");
     const candidate = setup(raw.candidate, "Changed setup");
+    const changedField = changes[raw.change_kind];
+    fields.forEach((field) => { if (field !== changedField && candidate[field] === null) candidate[field] = baseline[field]; });
     const different = fields.filter((field) => baseline[field] !== candidate[field]);
     if (different.length !== 1 || different[0] !== changes[raw.change_kind] || !baseline[different[0]] || !candidate[different[0]]) {
-      throw new Error("Record exactly one changed setting, matching the selected change. Supply both its before and after values.");
+      const names = { model: "Model", effort: "Effort", prompt_version: "Prompt version", caching: "Caching", processing: "Processing mode" };
+      throw new Error(`Record exactly one changed setting: ${names[changedField]} needs different before and after values. Keep the other settings unchanged; blank unchanged fields keep their starting value.`);
     }
     if (raw.other_settings_unchanged !== true) throw new Error("Confirm that the other settings and task requirements stayed the same.");
     const currency = text(raw.currency, "Currency", 3).toUpperCase();
@@ -87,7 +91,7 @@
         const checks = source.checks.map((check) => {
           if (typeof check.passed !== "boolean") throw new Error(`Case ${caseId} has an invalid check result.`);
           return { id: text(check.id, "Check ID", 240), passed: check.passed };
-        }).sort((a, b) => a.id.localeCompare(b.id));
+        }).sort((a, b) => stableOrder(a.id, b.id));
         if (new Set(checks.map((check) => check.id)).size !== checks.length) throw new Error(`Case ${caseId} has duplicate checks.`);
         if (!["ready_to_use", "needs_correction", "needs_escalation"].includes(source.outcome_status)) throw new Error(`Case ${caseId} needs human outcomes on both setups.`);
         result[route] = {
@@ -109,7 +113,7 @@
         max_characters: rule.max_characters === null ? null : number(rule.max_characters, "Maximum length", 200000),
       };
       return result;
-    }).sort((a, b) => a.case_id.localeCompare(b.case_id));
+    }).sort((a, b) => stableOrder(a.case_id, b.case_id));
     return {
       schema_version: "ai-cost-lens-verification/1.0",
       source: { name: text(raw.source?.name, "Verification source", 240), sha256: text(raw.source?.sha256, "Source hash", 128, true) },
@@ -131,6 +135,20 @@
     return JSON.stringify(evidence.cases.map((item) => [item.case_id, item.rule, item.baseline.checks.map((c) => c.id)]));
   }
 
+  // Compare parsed, output-free evidence, independent of filename, byte layout,
+  // optional source hashes, or imported headline calculations.
+  function sameEvidence(left, right) {
+    return JSON.stringify(left.cases) === JSON.stringify(right.cases);
+  }
+
+  function editFingerprint(record) {
+    const value = JSON.stringify({ schema_version: record.schema_version, generated_at: record.generated_at,
+      mode: record.mode, plan: record.plan, runs: record.runs });
+    let hash = 0xcbf29ce484222325n;
+    for (const byte of new TextEncoder().encode(value)) hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+    return hash.toString(16).padStart(16, "0");
+  }
+
   function routeSummary(evidence, route) {
     const cases = evidence.cases.map((item) => item[route]);
     const ready = cases.filter((item) => item.outcome_status === "ready_to_use").length;
@@ -143,6 +161,11 @@
   }
 
   function addRun(current, raw, suppliedEvidence) {
+    if (current?.mode === "illustrative") throw new Error("The invented example is read-only. Start a separate test for your own results.");
+    return appendRun(current, raw, suppliedEvidence);
+  }
+
+  function appendRun(current, raw, suppliedEvidence, restoring = false) {
     if (!current || current.schema_version !== SCHEMA) throw new Error("Lock a starting point before recording a run.");
     if (current.runs.length >= 50) throw new Error("A test record supports at most 50 runs.");
     const id = text(raw.id, "Run ID", 80);
@@ -157,10 +180,17 @@
     const otherIds = new Set(current.runs.filter((run) => run.partition !== raw.partition).flatMap((run) => run.verification.cases.map((item) => item.case_id)));
     if (evidence.cases.some((item) => otherIds.has(item.case_id))) throw new Error("Tuning and validation must use different case IDs. Keep reserved cases out of tuning.");
     if (evidence.source.sha256 && current.runs.some((run) => run.verification.source.sha256 === evidence.source.sha256)) throw new Error("This source file has already been recorded. Import results from a new execution before adding another run.");
+    const matching = current.runs.find((run) => sameEvidence(run.verification, evidence));
+    if (matching && raw.matching_evidence_confirmed !== true && !restoring) {
+      const error = new Error(`The parsed checks, outcomes and review minutes match ${matching.id}. A re-saved file is not another execution. Confirm separately only if you ran both locked setups again and obtained these same results.`);
+      error.code = "MATCHING_RUN_EVIDENCE";
+      throw error;
+    }
     const run = {
       id, partition: raw.partition,
       independent_execution: true,
       reserved_before_tuning: raw.partition === "validation",
+      matching_evidence_confirmed: Boolean(matching && raw.matching_evidence_confirmed === true),
       baseline_cost: number(raw.baseline_cost, "Starting API cost"),
       candidate_cost: number(raw.candidate_cost, "Changed API cost"),
       cost_source: text(raw.cost_source, "Run cost source", 500),
@@ -184,30 +214,48 @@
       const candidate = routeSummary(run.verification, "candidate");
       const qualityHeld = candidate.deterministic_pass_rate >= thresholds.minimum_deterministic_pass_rate
         && candidate.ready_rate >= thresholds.minimum_ready_rate
-        && candidate.ready_rate >= baseline.ready_rate - thresholds.maximum_ready_rate_regression - 1e-12;
+        && candidate.ready_rate >= baseline.ready_rate - thresholds.maximum_ready_rate_regression - 1e-12
+        && !(baseline.ready > 0 && candidate.ready === 0);
       const baselineUnit = baseline.ready ? run.baseline_cost / baseline.ready : null;
       const candidateUnit = candidate.ready ? run.candidate_cost / candidate.ready : null;
+      const relativeChange = baselineUnit > 0 && candidateUnit !== null ? (candidateUnit - baselineUnit) / baselineUnit : null;
       return { id: run.id, partition: run.partition, baseline, candidate, quality_held: qualityHeld,
+        baseline_api_cost: run.baseline_cost, candidate_api_cost: run.candidate_cost,
         baseline_api_cost_per_ready: baselineUnit,
         candidate_api_cost_per_ready: candidateUnit,
+        api_unit_cost_change_fraction: Number.isFinite(relativeChange) ? relativeChange : null,
         lower_api_unit_cost: baselineUnit !== null && candidateUnit !== null && candidateUnit < baselineUnit };
     });
     const checked = runs.filter((run) => run.partition === "validation");
     const uniqueCases = new Set(validation.flatMap((run) => run.verification.cases.map((item) => item.case_id))).size;
     const strongMethod = validation.every((run) => run.verification.method.sample_method === "random_or_systematic" && run.verification.method.blinded && run.verification.method.randomized_order);
-    const rejected = checked.some((run) => !run.quality_held || (run.baseline_api_cost_per_ready !== null && run.candidate_api_cost_per_ready !== null && !run.lower_api_unit_cost));
-    const enough = validation.length >= 2 && uniqueCases >= 30 && strongMethod && checked.every((run) => run.quality_held && run.lower_api_unit_cost);
+    const unconfirmedRepeats = record.runs.filter((run, index) => record.runs.slice(0, index).some((earlier) => sameEvidence(earlier.verification, run.verification)) && !run.matching_evidence_confirmed);
+    const failures = checked.flatMap((run) => {
+      const reasons = [];
+      if (run.candidate.ready === 0 && run.baseline.ready > 0) reasons.push(`${run.id}: the changed setup produced zero ready results, so it cannot establish a lower API cost per ready result.`);
+      else if (!run.quality_held) reasons.push(`${run.id}: the changed setup failed the locked quality thresholds.`);
+      if (run.baseline_api_cost_per_ready !== null && run.candidate_api_cost_per_ready !== null && !run.lower_api_unit_cost) reasons.push(`${run.id}: API cost per ready result did not decrease.`);
+      return reasons;
+    });
+    const rejected = failures.length > 0;
+    const enough = validation.length >= 2 && uniqueCases >= 30 && strongMethod && !unconfirmedRepeats.length && checked.every((run) => run.quality_held && run.lower_api_unit_cost);
     const decision = rejected ? "REJECT_CHANGE" : enough ? "REVIEW_CANDIDATE" : "NEEDS_MORE_EVIDENCE";
     const reason = rejected
-      ? "A validation run failed the locked quality rule or did not lower API cost per ready result. Keep the starting setup and investigate."
+      ? `${failures.join(" ")} Keep the starting setup and investigate.`
       : enough
         ? "Repeated reserved-case tests support a finance review of this candidate. Check human work, full operating cost, policy, and production actuals before adopting it."
-        : "Collect at least two new runs on the same 30 or more reserved cases, with complete human outcomes, consistent checks, and a declared blind, randomized review. These are minimum workflow checks, not statistical proof.";
+        : unconfirmedRepeats.length
+          ? "Matching case results in this record do not have the separate fresh-execution confirmation. Re-saving or renaming evidence does not establish a second run. Start a new test with fresh executions and keep the declarations visible."
+          : checked.some((run) => run.baseline.ready === 0)
+            ? "The starting setup has no ready results in a validation run, so its API cost per ready result cannot be compared. Check the baseline cases and outcomes before drawing a cost conclusion."
+            : "Collect at least two new runs on the same 30 or more reserved cases, with complete human outcomes, consistent checks, and a declared blind, randomized review. These are minimum workflow checks, not statistical proof.";
     return { ...record,
       summary: {
         decision, reason, validation_runs: validation.length, unique_validation_cases: uniqueCases,
         validation_observations: checked.reduce((sum, run) => sum + run.baseline.cases, 0),
         runs,
+        warnings: [thresholds.minimum_ready_rate === 0 ? "The locked ready-result floor is 0%. This permits unusable outcomes under that threshold; zero ready results cannot establish an improvement." : null,
+          record.runs.some((run) => run.matching_evidence_confirmed) ? "Some runs have identical parsed case results. Their separate execution is explicitly declared by the user, not independently verified." : null].filter(Boolean),
         candidate_ready_rate_range: checked.length ? [Math.min(...checked.map((run) => run.candidate.ready_rate)), Math.max(...checked.map((run) => run.candidate.ready_rate))] : null,
         statistical_note: "Repeated runs reuse cases. They are not additional independent tasks; no pooled confidence interval is calculated. Case content, source authenticity, and independence are user declarations.",
       },
@@ -221,8 +269,20 @@
     if (!raw || raw.schema_version !== SCHEMA || !raw.plan || !Array.isArray(raw.runs)) throw new Error("Choose a saved AI Cost Lens test record.");
     const plan = raw.plan;
     let record = createExperiment({ ...plan, ...plan.thresholds, generated_at: raw.generated_at, mode: raw.mode });
-    raw.runs.forEach((run) => { record = addRun(record, run, run.verification); });
-    return record;
+    raw.runs.forEach((run) => { record = appendRun(record, run, run.verification, true); });
+    const matches = raw.integrity?.algorithm === "fnv1a64-edit-check-v1" && raw.integrity.fingerprint === editFingerprint(record);
+    return { ...record, integrity_check: {
+      status: !raw.integrity ? "unavailable" : matches ? "matches" : "changed",
+      note: !raw.integrity ? "This imported file has no edit check. Its evidence and example status are user supplied, not authenticated."
+        : matches ? "The file’s edit check matches. This is not a signature: it does not authenticate the source, evidence, execution or example status."
+          : "This file changed after its edit check was saved, or its edit check is invalid. Calculations were rebuilt; the supplied evidence and example status are not authenticated.",
+    } };
+  }
+
+  function exportExperiment(record) {
+    const safe = restoreExperiment(record);
+    return { ...safe, integrity: { algorithm: "fnv1a64-edit-check-v1", fingerprint: editFingerprint(safe),
+      purpose: "Accidental edit detection only; not authentication or proof of an independent execution." } };
   }
 
   function illustrativeExample(verifier) {
@@ -241,11 +301,11 @@
       }))).flat();
       const evidence = verifier.buildVerification(rows, { sample_method: "random_or_systematic", blinded: true, randomized_order: true,
         source_name: `Invented example run ${trial}`, source_file_hash: `illustrative-run-${trial}` });
-      record = addRun(record, { id: `example-${trial}`, partition: "validation", independent_execution: true, reserved_before_tuning: true,
+      record = appendRun(record, { id: `example-${trial}`, partition: "validation", independent_execution: true, reserved_before_tuning: true, matching_evidence_confirmed: trial > 1,
         baseline_cost: trial === 1 ? .40 : .42, candidate_cost: trial === 1 ? .22 : .23, cost_source: "Invented API costs for teaching; no provider requests or bills" }, evidence);
     }
     return record;
   }
 
-  return Object.freeze({ SCHEMA, createExperiment, addRun, restoreExperiment, illustrativeExample });
+  return Object.freeze({ SCHEMA, createExperiment, addRun, restoreExperiment, exportExperiment, illustrativeExample });
 });
