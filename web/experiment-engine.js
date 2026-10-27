@@ -43,8 +43,12 @@
     const changedField = changes[raw.change_kind];
     fields.forEach((field) => { if (field !== changedField && candidate[field] === null) candidate[field] = baseline[field]; });
     const different = fields.filter((field) => baseline[field] !== candidate[field]);
-    if (different.length !== 1 || different[0] !== changes[raw.change_kind] || !baseline[different[0]] || !candidate[different[0]]) {
-      const names = { model: "Model", effort: "Effort", prompt_version: "Prompt version", caching: "Caching", processing: "Processing mode" };
+    const names = { model: "Model", effort: "Effort", prompt_version: "Prompt version", caching: "Caching", processing: "Processing mode" };
+    const extraChanges = different.filter((field) => field !== changedField);
+    if (extraChanges.length) {
+      throw new Error(`Record exactly one changed setting: ${extraChanges.map((field) => names[field]).join(", ")} ${extraChanges.length === 1 ? "also differs" : "also differ"}. Keep ${extraChanges.map((field) => names[field]).join(", ")} unchanged for a ${names[changedField]} test. Settings are compared exactly, including capitalization; blank unchanged fields keep their starting value.`);
+    }
+    if (!different.length || !baseline[changedField] || !candidate[changedField]) {
       throw new Error(`Record exactly one changed setting: ${names[changedField]} needs different before and after values. Keep the other settings unchanged; blank unchanged fields keep their starting value.`);
     }
     if (raw.other_settings_unchanged !== true) throw new Error("Confirm that the other settings and task requirements stayed the same.");
@@ -141,9 +145,12 @@
     return JSON.stringify(left.cases) === JSON.stringify(right.cases);
   }
 
-  function editFingerprint(record) {
-    const value = JSON.stringify({ schema_version: record.schema_version, generated_at: record.generated_at,
-      mode: record.mode, plan: record.plan, runs: record.runs });
+  function editFingerprint(record, reopenedFrom = null) {
+    const payload = { schema_version: record.schema_version, generated_at: record.generated_at,
+      mode: record.mode, plan: record.plan, runs: record.runs };
+    // Preserve the original fingerprint format for files without import history.
+    if (reopenedFrom) payload.reopened_from = reopenedFrom;
+    const value = JSON.stringify(payload);
     let hash = 0xcbf29ce484222325n;
     for (const byte of new TextEncoder().encode(value)) hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
     return hash.toString(16).padStart(16, "0");
@@ -219,7 +226,7 @@
       const baselineUnit = baseline.ready ? run.baseline_cost / baseline.ready : null;
       const candidateUnit = candidate.ready ? run.candidate_cost / candidate.ready : null;
       const relativeChange = baselineUnit > 0 && candidateUnit !== null ? (candidateUnit - baselineUnit) / baselineUnit : null;
-      return { id: run.id, partition: run.partition, baseline, candidate, quality_held: qualityHeld,
+      return { id: run.id, partition: run.partition, matching_evidence_confirmed: run.matching_evidence_confirmed === true, baseline, candidate, quality_held: qualityHeld,
         baseline_api_cost: run.baseline_cost, candidate_api_cost: run.candidate_cost,
         baseline_api_cost_per_ready: baselineUnit,
         candidate_api_cost_per_ready: candidateUnit,
@@ -255,9 +262,11 @@
         validation_observations: checked.reduce((sum, run) => sum + run.baseline.cases, 0),
         runs,
         warnings: [thresholds.minimum_ready_rate === 0 ? "The locked ready-result floor is 0%. This permits unusable outcomes under that threshold; zero ready results cannot establish an improvement." : null,
-          record.runs.some((run) => run.matching_evidence_confirmed) ? "Some runs have identical parsed case results. Their separate execution is explicitly declared by the user, not independently verified." : null].filter(Boolean),
+          record.runs.some((run) => run.matching_evidence_confirmed) ? record.mode === "illustrative"
+            ? "This invented example repeats identical scored results to show the separate-execution declaration. Its runs and declarations are made up; no user executed or declared these example runs."
+            : "Some runs have identical parsed case results. Their separate execution is explicitly declared by the user, not independently verified." : null].filter(Boolean),
         candidate_ready_rate_range: checked.length ? [Math.min(...checked.map((run) => run.candidate.ready_rate)), Math.max(...checked.map((run) => run.candidate.ready_rate))] : null,
-        statistical_note: "Repeated runs reuse cases. They are not additional independent tasks; no pooled confidence interval is calculated. Case content, source authenticity, and independence are user declarations.",
+        statistical_note: `Repeated runs reuse cases. They are not additional independent tasks; no pooled confidence interval is calculated. ${record.mode === "illustrative" ? "The case results, review method and executions in this example are invented." : "Case content, source authenticity, and independence are user declarations."}`,
       },
       evidence_gate: { savings_claim_allowed: false, route_change_approved: false,
         reason: "This record covers declared test runs and API cost only. It does not verify invoices, total workflow savings, or production results." },
@@ -265,23 +274,46 @@
     };
   }
 
-  function restoreExperiment(raw) {
+  function rebuildExperiment(raw) {
     if (!raw || raw.schema_version !== SCHEMA || !raw.plan || !Array.isArray(raw.runs)) throw new Error("Choose a saved AI Cost Lens test record.");
     const plan = raw.plan;
     let record = createExperiment({ ...plan, ...plan.thresholds, generated_at: raw.generated_at, mode: raw.mode });
     raw.runs.forEach((run) => { record = appendRun(record, run, run.verification, true); });
-    const matches = raw.integrity?.algorithm === "fnv1a64-edit-check-v1" && raw.integrity.fingerprint === editFingerprint(record);
-    return { ...record, integrity_check: {
-      status: !raw.integrity ? "unavailable" : matches ? "matches" : "changed",
-      note: !raw.integrity ? "This imported file has no edit check. Its evidence and example status are user supplied, not authenticated."
+    return record;
+  }
+
+  function importOrigin(...values) {
+    return values.includes("changed") ? "changed" : values.includes("unavailable") ? "unavailable" : null;
+  }
+
+  function assessIntegrity(raw, record) {
+    const origin = importOrigin(raw.integrity?.reopened_from);
+    const invalidOrigin = raw.integrity && Object.hasOwn(raw.integrity, "reopened_from") && !origin;
+    const matches = !invalidOrigin && raw.integrity?.algorithm === "fnv1a64-edit-check-v1" && raw.integrity.fingerprint === editFingerprint(record, origin);
+    const status = !raw.integrity ? "unavailable" : matches ? "matches" : "changed";
+    const reopenedFrom = importOrigin(status, origin);
+    const currentNote = status === "unavailable" ? "This imported file has no edit check. Its evidence and example status are user supplied, not authenticated."
         : matches ? "The file’s edit check matches. This is not a signature: it does not authenticate the source, evidence, execution or example status."
-          : "This file changed after its edit check was saved, or its edit check is invalid. Calculations were rebuilt; the supplied evidence and example status are not authenticated.",
-    } };
+          : "This file changed after its edit check was saved, or its edit check is invalid. Calculations were rebuilt; the supplied evidence and example status are not authenticated.";
+    const historyNote = reopenedFrom && reopenedFrom !== status
+      ? reopenedFrom === "changed"
+        ? " An earlier import had a changed or invalid edit check. Saving and reopening does not clear that warning or authenticate the earlier evidence."
+        : " An earlier import had no edit check. Saving and reopening does not clear that warning or authenticate the earlier evidence."
+      : "";
+    return { status, reopened_from: reopenedFrom, note: currentNote + historyNote };
+  }
+
+  function restoreExperiment(raw) {
+    const record = rebuildExperiment(raw);
+    return { ...record, integrity_check: assessIntegrity(raw, record) };
   }
 
   function exportExperiment(record) {
-    const safe = restoreExperiment(record);
-    return { ...safe, integrity: { algorithm: "fnv1a64-edit-check-v1", fingerprint: editFingerprint(safe),
+    const safe = rebuildExperiment(record);
+    const check = record.integrity ? assessIntegrity(record, safe) : record.integrity_check;
+    const origin = importOrigin(check?.status, check?.reopened_from);
+    return { ...safe, integrity: { algorithm: "fnv1a64-edit-check-v1", fingerprint: editFingerprint(safe, origin),
+      ...(origin ? { reopened_from: origin } : {}),
       purpose: "Accidental edit detection only; not authentication or proof of an independent execution." } };
   }
 

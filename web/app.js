@@ -6810,6 +6810,11 @@
     submit.textContent = "Checking the evidence…";
     const previousData = state.data;
     try {
+      const importPreviewOnly = state.builderMode === "openai" && (
+        (state.uploadRoute?.kind === "mapping" && !state.pendingMappedImport)
+        || (state.importProvider === "claude" && !state.pendingClaudeImport)
+      );
+      if (!importPreviewOnly && !confirmReviewReplacement()) return;
       if (state.builderMode === "simple") {
         const inputSnapshot = {
           schema_version: "ai-cost-lens-simple-inputs/1.0",

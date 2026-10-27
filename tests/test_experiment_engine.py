@@ -317,3 +317,96 @@ console.log(JSON.stringify({model:ok.plan.candidate.model,error:caught(()=>e.cre
 """)
     assert result["model"] == "Same example model"
     assert "Model needs different before and after" in result["error"]
+
+
+def test_changed_and_unchecked_import_history_survives_downloads_and_new_runs():
+    result = run_node(r"""
+const native=e.createExperiment({...example.plan,...example.plan.thresholds,mode:'user_supplied'});
+const clean=e.exportExperiment(e.addRun(native,trial('first'),evidence('first')));
+const scenarios={};
+for (const kind of ['changed','unavailable','relabelled']) {
+  const raw=copy(kind==='relabelled' ? e.exportExperiment(example) : clean);
+  if (kind==='changed') raw.runs[0].candidate_cost=.21;
+  if (kind==='unavailable') delete raw.integrity;
+  if (kind==='relabelled') raw.mode='user_supplied';
+  raw.integrity_check={status:'matches',reopened_from:null,note:'Forged clean notice'};
+  let record=e.restoreExperiment(raw);
+  const first=record.integrity_check;
+  const rounds=[];
+  for (let index=0;index<4;index++) {
+    const saved=e.exportExperiment(record);
+    record=e.restoreExperiment(saved);
+    rounds.push({origin:saved.integrity.reopened_from,stale:Object.hasOwn(saved,'integrity_check'),check:record.integrity_check});
+  }
+  record=e.addRun(record,trial('additional'),evidence('additional-'+kind));
+  const final=e.restoreExperiment(e.exportExperiment(record));
+  scenarios[kind]={first,rounds,afterNewRun:final.integrity_check};
+}
+console.log(JSON.stringify(scenarios));
+""")
+    for kind, scenario in result.items():
+        origin = "unavailable" if kind == "unavailable" else "changed"
+        assert scenario["first"]["status"] == origin
+        for saved in scenario["rounds"]:
+            assert saved["origin"] == origin
+            assert saved["stale"] is False
+            assert saved["check"]["status"] == "matches"
+            assert saved["check"]["reopened_from"] == origin
+            assert "An earlier import" in saved["check"]["note"]
+            assert "does not clear that warning" in saved["check"]["note"]
+        assert scenario["afterNewRun"]["reopened_from"] == origin
+        assert "An earlier import" in scenario["afterNewRun"]["note"]
+
+
+def test_fresh_exports_do_not_claim_an_import_or_include_runtime_notices():
+    result = run_node(r"""
+const saved=e.exportExperiment(example);
+const again=e.exportExperiment(e.restoreExperiment(saved));
+console.log(JSON.stringify({saved,again,check:e.restoreExperiment(again).integrity_check}));
+""")
+    for key in ["saved", "again"]:
+        assert "integrity_check" not in result[key]
+        assert "reopened_from" not in result[key]["integrity"]
+    assert result["check"]["status"] == "matches"
+    assert result["check"]["reopened_from"] is None
+    assert "earlier import" not in result["check"]["note"]
+
+
+def test_removing_or_invalidating_import_history_does_not_match_its_edit_check():
+    result = run_node(r"""
+const raw=e.exportExperiment(example);delete raw.integrity;
+const saved=e.exportExperiment(e.restoreExperiment(raw));
+const removed=copy(saved);delete removed.integrity.reopened_from;
+const forged=copy(saved);forged.integrity.reopened_from='matches';
+console.log(JSON.stringify({removed:e.restoreExperiment(removed).integrity_check,
+ forged:e.restoreExperiment(forged).integrity_check}));
+""")
+    for check in result.values():
+        assert check["status"] == "changed"
+        assert check["reopened_from"] == "changed"
+
+
+def test_setup_errors_name_extra_fields_and_preserve_exact_model_names():
+    result = run_node(r"""
+const raw={...example.plan,...example.plan.thresholds};
+raw.baseline={...raw.baseline,model:'example-model-a'};
+raw.candidate={...raw.candidate,model:'Example-Model-A'};
+const multiple=copy(raw);multiple.candidate.effort='Changed effort';
+const unchanged=copy(raw);unchanged.candidate.model=unchanged.baseline.model;unchanged.candidate.caching=unchanged.baseline.caching;
+console.log(JSON.stringify({casing:caught(()=>e.createExperiment(raw)),
+ multiple:caught(()=>e.createExperiment(multiple)),unchanged:caught(()=>e.createExperiment(unchanged))}));
+""")
+    assert "Model also differs" in result["casing"]
+    assert "capitalization" in result["casing"]
+    assert "Caching needs different" not in result["casing"]
+    assert "Model, Effort also differ" in result["multiple"]
+    assert "Caching needs different" in result["unchanged"]
+
+
+def test_invented_repeats_have_own_wording_and_per_run_markers():
+    result = run_node("console.log(JSON.stringify(example));")
+    notice = " ".join(result["summary"]["warnings"])
+    assert "runs and declarations are made up" in notice
+    assert "declared by the user" not in notice
+    assert result["summary"]["runs"][0]["matching_evidence_confirmed"] is False
+    assert result["summary"]["runs"][1]["matching_evidence_confirmed"] is True

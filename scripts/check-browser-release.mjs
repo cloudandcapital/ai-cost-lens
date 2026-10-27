@@ -27,6 +27,17 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function watchReviewReplacements(page) {
+  const policy = { accept: true, messages: [] };
+  page.on("dialog", async (dialog) => {
+    assert(dialog.type() === "confirm" && dialog.message().startsWith("This will replace your open review or comparison."), `Unexpected browser dialog: ${dialog.type()}`);
+    policy.messages.push(dialog.message());
+    if (policy.accept) await dialog.accept();
+    else await dialog.dismiss();
+  });
+  return policy;
+}
+
 function axeSummary(result) {
   return result.violations.map((violation) => {
     const targets = violation.nodes.flatMap((node) => node.target).join(", ");
@@ -227,7 +238,7 @@ async function verifyFictionalProjectCost(page) {
   assert((await page.locator("#memo-next-step").textContent()).includes("proj_aster_support"), "The memo contradicts the project-cost priority.");
 }
 
-async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false } = {}) {
+async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false, replacementPrompts } = {}) {
   if (mobile && await page.locator("#header-actions").isHidden()) await page.locator("#header-menu-toggle").click();
   await page.locator("#start-review").click();
   await page.locator('[data-builder-mode="tools"]').click();
@@ -285,6 +296,15 @@ async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false } =
   await page.locator("#tool-amount-1").fill("25");
   assert(!(await page.locator("#tools-scope").isChecked()), "Changed charges retained the old scope confirmation.");
   await page.locator("#tools-scope").check();
+  const promptCount = replacementPrompts.messages.length;
+  replacementPrompts.accept = false;
+  await page.locator("#build-review").click();
+  await page.waitForFunction(() => !document.querySelector("#build-review").disabled);
+  assert(replacementPrompts.messages.length === promptCount + 1, "Updating a tool baseline did not ask before replacement.");
+  assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), "Cancelling discarded the new tool draft.");
+  assert((await page.locator("#bill-finding-title").textContent()).includes("$68.25"), "Cancelling changed the existing tool baseline.");
+  assert(await page.locator("#tool-amount-1").inputValue() === "25", "Cancelling lost the edited charge.");
+  replacementPrompts.accept = true;
   await page.locator("#build-review").click();
   assert((await page.locator("#bill-finding-title").innerText()).includes("$73.25"), "Editing one tool did not retain and recalculate the other charges.");
   await page.locator("#bill-compare-next").click();
@@ -293,7 +313,7 @@ async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false } =
   await page.locator("#close-review").click();
 }
 
-async function verifyEditableComparison(page, { mobile = false } = {}) {
+async function verifyEditableComparison(page, { mobile = false, replacementPrompts } = {}) {
   if (mobile) await page.locator("#header-menu-toggle").click();
   await page.locator("#start-review").click();
   await page.locator('[data-builder-mode="simple"]').click();
@@ -343,6 +363,16 @@ async function verifyEditableComparison(page, { mobile = false } = {}) {
   assert((await page.locator("#unit-economics-card").innerText()).includes("Time value at $30/hr"), "The result hides the time value behind its total.");
   await page.locator("#edit-simple-comparison").click();
   await page.locator("#simple-approved").check();
+  const beforeCancel = await page.locator("#simple-switch-check").textContent();
+  const promptCount = replacementPrompts.messages.length;
+  replacementPrompts.accept = false;
+  await page.locator("#build-review").click();
+  await page.waitForFunction(() => !document.querySelector("#build-review").disabled);
+  assert(replacementPrompts.messages.length === promptCount + 1, "A comparison did not ask before replacing the open result.");
+  assert(await page.locator("#review-dialog").evaluate((dialog) => dialog.open), "Cancelling discarded the comparison draft.");
+  assert((await page.locator("#simple-switch-check").textContent()) === beforeCancel, "Cancelling changed the saved comparison’s approval state.");
+  assert(await page.locator("#simple-approved").isChecked(), "Cancelling lost the draft approval choice.");
+  replacementPrompts.accept = true;
   await page.locator("#build-review").click();
   assert((await page.locator("#simple-switch-check").innerText()).includes("Approval: you confirmed"), "Confirmed approval disappeared from the result.");
   assert(await page.locator("#review-title").evaluate((element) => element === document.activeElement), "A completed comparison did not focus its result heading.");
@@ -415,7 +445,7 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
     const parts = [];
     for (let index = 1; index <= pdf.numPages; index += 1) parts.push((await (await pdf.getPage(index)).getTextContent()).items.map((item) => item.str).join(" "));
     const text = parts.join(" ").toLowerCase().replace(/\s+/g, "");
-    for (const expected of ["One change test record", "INVENTED DATA", "40 distinct validation cases", "API cost per ready result", "Cost evidence supplied"]) assert(text.includes(expected.toLowerCase().replace(/\s+/g, "")), `Test PDF is missing ${expected}. Extracted text: ${text.slice(0, 2400)}`);
+    for (const expected of ["One change test record", "INVENTED DATA", "40 distinct validation cases", "API cost per ready result", "Cost evidence supplied", "Invented repeat"]) assert(text.includes(expected.toLowerCase().replace(/\s+/g, "")), `Test PDF is missing ${expected}. Extracted text: ${text.slice(0, 2400)}`);
     assert(pdf.numPages <= 3, `The two-run test PDF has ${pdf.numPages} pages.`);
     await loading.destroy();
   }
@@ -430,6 +460,22 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
   await page.locator("#experiment-file").setInputFiles({ name: "saved-test.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(reopen)) });
   await page.waitForFunction(() => document.querySelector("#toast")?.textContent?.includes("Saved test reopened"));
   assert((await page.locator("#experiment-summary").innerText()).includes("Candidate worth a finance review"), `${engineName}: reopening trusted a saved headline instead of rebuilding it.`);
+  for (const origin of ["changed", "unavailable"]) {
+    const imported = JSON.parse(JSON.stringify(example));
+    if (origin === "changed") imported.runs[0].candidate_cost = .20;
+    else delete imported.integrity;
+    await page.locator("#experiment-reset-confirm").check();
+    await page.locator("#experiment-file").setInputFiles({ name: `${origin}-test.json`, mimeType: "application/json", buffer: Buffer.from(JSON.stringify(imported)) });
+    const firstNotice = origin === "changed" ? "This file changed after" : "This imported file has no edit check";
+    await page.waitForFunction((text) => document.querySelector("#experiment-summary").textContent.includes(text), firstNotice);
+    const roundTrip = await saveJsonDownload(page, "#experiment-download", `test-${origin}-${engineName}.json`);
+    assert(roundTrip.integrity.reopened_from === origin && !Object.hasOwn(roundTrip, "integrity_check"), `${engineName}: the download lost import history or retained a stale runtime notice.`);
+    await page.locator("#experiment-reset-confirm").check();
+    await page.locator("#experiment-file").setInputFiles({ name: "round-trip.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(roundTrip)) });
+    const history = origin === "changed" ? "An earlier import had a changed or invalid edit check" : "An earlier import had no edit check";
+    await page.waitForFunction((text) => document.querySelector("#experiment-summary").textContent.includes(text), history);
+    assert((await page.locator("#experiment-summary").innerText()).includes("does not clear that warning"), `${engineName}: saving a reopened file cleared the warning.`);
+  }
   await page.locator("#experiment-attach").click();
   assert((await page.locator("#experiment-error").innerText()).includes("same workload"), `${engineName}: an unrelated test attached to this review.`);
   if (!(await page.locator(".experiment-reset").evaluate((element) => element.open))) await page.locator(".experiment-reset summary").click();
@@ -472,6 +518,7 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
   const archive = await saveJsonDownload(page, "#experiment-download", `controlled-test-new-${engineName}.json`);
   assert(archive.summary.validation_runs === 2 && !archive.evidence_gate.route_change_approved, `${engineName}: new runs are missing or approved a route.`);
   assert(archive.integrity?.fingerprint && archive.runs[1].matching_evidence_confirmed, `${engineName}: edit check or repeated-execution declaration missing from the record.`);
+  assert((await page.locator("#experiment-runs tbody tr").nth(1).innerText()).toLowerCase().includes("declared repeat"), `${engineName}: the repeated-execution declaration is missing from its run.`);
   await page.locator("#experiment-attach").click();
   if (mobile && await page.locator("#header-actions").isHidden()) await page.locator("#header-menu-toggle").click();
   await page.locator("#print-memo").click();
@@ -491,6 +538,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const browser = await engine.launch({ headless: true });
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
+  const replacementPrompts = watchReviewReplacements(page);
   const observed = watchPage(page, origin);
   await page.goto(origin, { waitUntil: "networkidle" });
   await page.locator("#welcome-title").waitFor({ state: "visible" });
@@ -755,7 +803,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   const rich_decisions = engineName === "chromium" ? await verifyRichDecisionFlow(page) : null;
   if (engineName === "chromium") await verifyOpenAIPartialBucket(page);
   if (engineName === "chromium") await verifyFictionalProjectCost(page);
-  await verifyToolSpendFlow(page, { roundTrip: engineName === "chromium" });
+  await verifyToolSpendFlow(page, { roundTrip: engineName === "chromium", replacementPrompts });
   await page.locator("#start-review").click();
   await page.locator('[data-builder-mode="single"]').click();
   assert((await page.locator("#single-builder-fields .path-requirements").first().innerText()).includes("no file is required"), `${engineName}: bill-only path incorrectly requires a CSV.`);
@@ -839,7 +887,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     const unequalLabels = await page.locator("#bill-history-metrics .metric-cell span").allTextContents();
     assert(/different lengths/i.test(unequalTrend) && /calendar-day reference/i.test(unequalTrend) && /fixed monthly plans/i.test(unequalTrend) && !unequalLabels.some((label) => label.trim().toLowerCase() === "bill change"), `Unequal service periods were presented as a like-for-like change or lacked the daily caveat: ${unequalTrend}`);
   }
-  await verifyEditableComparison(page);
+  await verifyEditableComparison(page, { replacementPrompts });
   await verifyGuide(page, origin);
   await verifyControlledTest(page, engineName);
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
@@ -852,6 +900,7 @@ async function mobileAndAccessibility(origin) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
+  const replacementPrompts = watchReviewReplacements(page);
   const observed = watchPage(page, origin);
   await page.goto(origin, { waitUntil: "networkidle" });
   await page.locator("#welcome-title").waitFor({ state: "visible" });
@@ -904,8 +953,8 @@ async function mobileAndAccessibility(origin) {
   const priceA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   assert(priceA11y.violations.length === 0, `mobile pricing accessibility violations: ${axeSummary(priceA11y)}`);
   await page.locator("#close-price-prompt").click();
-  await verifyToolSpendFlow(page, { mobile: true });
-  await verifyEditableComparison(page, { mobile: true });
+  await verifyToolSpendFlow(page, { mobile: true, replacementPrompts });
+  await verifyEditableComparison(page, { mobile: true, replacementPrompts });
   await verifyGuide(page, origin);
   await verifyControlledTest(page, "mobile", { mobile: true });
 
