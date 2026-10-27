@@ -518,7 +518,7 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
   const archive = await saveJsonDownload(page, "#experiment-download", `controlled-test-new-${engineName}.json`);
   assert(archive.summary.validation_runs === 2 && !archive.evidence_gate.route_change_approved, `${engineName}: new runs are missing or approved a route.`);
   assert(archive.integrity?.fingerprint && archive.runs[1].matching_evidence_confirmed, `${engineName}: edit check or repeated-execution declaration missing from the record.`);
-  assert((await page.locator("#experiment-runs tbody tr").nth(1).innerText()).includes("Declared repeat"), `${engineName}: the repeated-execution declaration is missing from its run.`);
+  assert((await page.locator("#experiment-runs tbody tr").nth(1).innerText()).toLowerCase().includes("declared repeat"), `${engineName}: the repeated-execution declaration is missing from its run.`);
   await page.locator("#experiment-attach").click();
   if (mobile && await page.locator("#header-actions").isHidden()) await page.locator("#header-menu-toggle").click();
   await page.locator("#print-memo").click();
