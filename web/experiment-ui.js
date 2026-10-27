@@ -36,7 +36,7 @@
 
   function tableHtml() {
     return `<table class="usage-table experiment-run-table"><thead><tr><th>Run</th><th>Cases</th><th>Ready rate</th><th>Total API cost</th><th>API cost per ready result</th><th>Unit-cost change</th><th>Review minutes</th><th>Quality</th></tr></thead><tbody>${record.summary.runs.map((run) => `<tr>
-      <th>${escape(run.id)}<small>${escape(run.partition)}</small></th><td>${run.baseline.cases}</td>
+      <th>${escape(run.id)}<small>${escape(run.partition)}</small>${run.matching_evidence_confirmed ? `<small>${record.mode === "illustrative" ? "Invented repeat" : "Declared repeat"}</small>` : ""}</th><td>${run.baseline.cases}</td>
       <td>${percent(run.baseline.ready_rate)} → ${percent(run.candidate.ready_rate)}</td>
       <td>${money(run.baseline_api_cost)} → ${money(run.candidate_api_cost)}</td>
       <td>${money(run.baseline_api_cost_per_ready)} → ${money(run.candidate_api_cost_per_ready)}</td>
@@ -79,7 +79,7 @@
     const note = $("experiment-paired-threshold-note");
     if (!note) return;
     note.hidden = !record;
-    if (record) note.textContent = `The paired check below uses its own thresholds. This controlled test uses the locked thresholds above: ${percent(record.plan.thresholds.minimum_deterministic_pass_rate)} checks, ${percent(record.plan.thresholds.minimum_ready_rate)} ready results, and ${(record.plan.thresholds.maximum_ready_rate_regression * 100).toFixed(1)} points of permitted regression. A paired-check pass does not establish that this test passed.`;
+    if (record) note.textContent = `This paired check uses its own thresholds. This controlled test uses the locked thresholds above: ${percent(record.plan.thresholds.minimum_deterministic_pass_rate)} checks, ${percent(record.plan.thresholds.minimum_ready_rate)} ready results, and ${(record.plan.thresholds.maximum_ready_rate_regression * 100).toFixed(1)} points of permitted regression. A paired-check pass does not establish that this test passed.`;
   }
 
   function attach() {
