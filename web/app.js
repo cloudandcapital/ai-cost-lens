@@ -6809,12 +6809,13 @@
     submit.disabled = true;
     submit.textContent = "Checking the evidence…";
     const previousData = state.data;
+    const replaceReviewAfterValidation = (candidate) => {
+      validateResult(candidate);
+      if (!confirmReviewReplacement()) return false;
+      state.data = candidate;
+      return true;
+    };
     try {
-      const importPreviewOnly = state.builderMode === "openai" && (
-        (state.uploadRoute?.kind === "mapping" && !state.pendingMappedImport)
-        || (state.importProvider === "claude" && !state.pendingClaudeImport)
-      );
-      if (!importPreviewOnly && !confirmReviewReplacement()) return;
       if (state.builderMode === "simple") {
         const inputSnapshot = {
           schema_version: "ai-cost-lens-simple-inputs/1.0",
@@ -6866,19 +6867,19 @@
           planning: null,
         };
         if (config.qualityFloor < 0.01 || config.qualityFloor > 1) throw simpleInputError("simple-quality-floor", "Minimum usable rate must be between 1% and 100%.");
-        state.data = await buildSimpleReview(spendText, {
+        const candidate = await buildSimpleReview(spendText, {
           baseline: { population: monthlyTasks, ready: currentUsable, correction: currentChecked - currentUsable, escalation: 0, humanMinutes: value("simple-current-minutes", "Current review and fixing minutes") },
           proposed: { population: monthlyTasks, ready: otherUsable, correction: otherChecked - otherUsable, escalation: 0, humanMinutes: value("simple-other-minutes", "Other review and fixing minutes") },
         }, config);
-        state.data.experience = "simple";
-        state.data.simple_input_snapshot = inputSnapshot;
-        state.data.workload.name = "My monthly AI-assisted work";
-        state.data.workload.description = "A plain-language comparison of two AI options using monthly cost, usable work, and the user's review and fixing time.";
-        state.data.workload.outcome_unit = "usable result";
-        state.data.baseline.label = currentName;
-        state.data.proposed.label = otherName;
-        state.data.period = { start: null, end: null, timezone: "Not supplied" };
-        for (const scenario of [state.data.baseline, state.data.proposed]) {
+        candidate.experience = "simple";
+        candidate.simple_input_snapshot = inputSnapshot;
+        candidate.workload.name = "My monthly AI-assisted work";
+        candidate.workload.description = "A plain-language comparison of two AI options using monthly cost, usable work, and the user's review and fixing time.";
+        candidate.workload.outcome_unit = "usable result";
+        candidate.baseline.label = currentName;
+        candidate.proposed.label = otherName;
+        candidate.period = { start: null, end: null, timezone: "Not supplied" };
+        for (const scenario of [candidate.baseline, candidate.proposed]) {
           scenario.evidence.source = "User-entered monthly cost and sample; no provider export supplied";
           scenario.evidence.observed_at = "Not supplied";
           scenario.evidence.cost_boundary = "Entered tool cost plus estimated value of review and fixing time; time value is not necessarily a cash expense";
@@ -6889,21 +6890,21 @@
           scenario.measures.cache_reuse_rate = null;
           scenario.measures.cache_write_rate = null;
         }
-        state.data.comparison.limitation = "User-entered monthly scenario, not a verified invoice. The denominator counts results usable without a significant fix, not all final completed tasks. Time value is an estimate, not necessarily cash paid.";
+        candidate.comparison.limitation = "User-entered monthly scenario, not a verified invoice. The denominator counts results usable without a significant fix, not all final completed tasks. Time value is an estimate, not necessarily cash paid.";
         if (state.priceEstimate) {
-          state.data.pricing_estimate = cloneData(state.priceEstimate);
-          state.data.comparison.savings_claim_allowed = false;
+          candidate.pricing_estimate = cloneData(state.priceEstimate);
+          candidate.comparison.savings_claim_allowed = false;
           const customRateCopy = state.priceEstimate.estimate_basis.rate_source_scope === "official_list_only"
             ? ""
             : " One or more rates were supplied by the user and were not independently verified.";
-          state.data.comparison.limitation += ` The provider charges came from an AI Cost Lens rate estimate.${customRateCopy} Estimated calculator data cannot support a savings claim.`;
-          for (const scenario of [state.data.baseline, state.data.proposed]) {
+          candidate.comparison.limitation += ` The provider charges came from an AI Cost Lens rate estimate.${customRateCopy} Estimated calculator data cannot support a savings claim.`;
+          for (const scenario of [candidate.baseline, candidate.proposed]) {
             scenario.evidence.source = "AI Cost Lens list-price estimate; no provider bill supplied";
             scenario.evidence.cost_boundary = "Estimated API list price plus user-entered value of review and fixing time; not billed spend. Shared infrastructure was not supplied and is excluded, not verified as zero.";
           }
         }
-        state.data.comparison.recommendation = decisionFor(state.data).reason;
-        validateResult(state.data);
+        candidate.comparison.recommendation = decisionFor(candidate).reason;
+        if (!replaceReviewAfterValidation(candidate)) return;
         renderAll();
         setView("review");
         reviewDialog.close();
@@ -6918,7 +6919,7 @@
           const item = Object.fromEntries([["tool", "name"], ["kind", "kind"], ["amount", "amount"], ["reference", "source"], ["owner", "owner"]].map(([key, field]) => [key, document.getElementById(`tool-${field}-${index}`).value.trim()]));
           if ([item.tool, item.amount, item.reference, item.owner].some(Boolean)) items.push(item);
         }
-        state.data = await buildToolSpendReview(items, {
+        const candidate = await buildToolSpendReview(items, {
           name: document.getElementById("tools-name").value,
           currency: document.getElementById("tools-currency").value,
           start: document.getElementById("tools-start").value,
@@ -6926,6 +6927,7 @@
           basis: document.getElementById("tools-basis").value,
           scopeConfirmed: document.getElementById("tools-scope").checked,
         });
+        if (!replaceReviewAfterValidation(candidate)) return;
         discardImportedSourceState();
         renderAll();
         reviewDialog.close();
@@ -6955,7 +6957,7 @@
           if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a three-letter code.");
           spendText = rowsToCsv([{ period: "baseline", date: invoiceDate, workload, provider, model: "", route: "Subscription or invoice", requests: "", input_tokens: "", cached_input_tokens: "", cache_write_input_tokens: "", output_tokens: "", provider_cost: String(amount), cost_basis: "user_entered", currency }]);
         }
-        state.data = await buildSingleBillReview(spendText, workFile ? await readLocalFile(workFile) : "", {
+        const candidate = await buildSingleBillReview(spendText, workFile ? await readLocalFile(workFile) : "", {
           acceptanceRule: document.getElementById("single-ready-rule").value.trim(),
           verifier: document.getElementById("single-verifier").value.trim(),
           complete: document.getElementById("single-complete").checked,
@@ -6967,6 +6969,7 @@
           ...(hasPrevious ? { previousBill: { amount: previousInputs[0], invoiceDate: previousInputs[1], serviceStart: previousInputs[2], serviceEnd: previousInputs[3], sameScope: document.getElementById("previous-bill-scope").checked } } : {}),
           ...(hasBudget ? { billBudget: { amount: budgetAmount, sameScope: document.getElementById("bill-budget-scope").checked } } : {}),
         });
+        if (!replaceReviewAfterValidation(candidate)) return;
         discardImportedSourceState();
         renderAll();
         reviewDialog.close();
@@ -6977,8 +6980,7 @@
       if (state.builderMode === "openai") {
         if (state.uploadRoute?.kind === "mapping") {
           if (state.pendingMappedImport) {
-            state.data = state.pendingMappedImport.review;
-            validateResult(state.data);
+            if (!replaceReviewAfterValidation(state.pendingMappedImport.review)) return;
             discardImportedSourceState();
             renderAll(); reviewDialog.close(); document.getElementById("bill-review-title").focus({ preventScroll: true }); showToast("Mapped bill reviewed locally. Only the fields you confirmed were included. Unmapped source fields were discarded."); return;
           }
@@ -6990,8 +6992,7 @@
         }
         if (state.importProvider === "claude") {
           if (state.pendingClaudeImport) {
-            state.data = state.pendingClaudeImport.review;
-            validateResult(state.data);
+            if (!replaceReviewAfterValidation(state.pendingClaudeImport.review)) return;
             discardImportedSourceState();
             renderAll(); reviewDialog.close(); document.getElementById("bill-review-title").focus({ preventScroll: true }); showToast("Claude bill reviewed locally. Personal identifiers were discarded."); return;
           }
@@ -7020,8 +7021,8 @@
         const [usageFile] = document.getElementById("openai-usage-file").files;
         const [costFile] = document.getElementById("openai-cost-file").files;
         if ((!usageFile || !costFile) && state.uploadRoute?.kind !== "openai") throw new Error("Add both OpenAI CSV exports before building the bill review.");
-        state.data = await buildOpenAIBillReview(usageFile ? await readLocalFile(usageFile) : state.uploadRoute.usageText, costFile ? await readLocalFile(costFile) : state.uploadRoute.costText);
-        validateResult(state.data);
+        const candidate = await buildOpenAIBillReview(usageFile ? await readLocalFile(usageFile) : state.uploadRoute.usageText, costFile ? await readLocalFile(costFile) : state.uploadRoute.costText);
+        if (!replaceReviewAfterValidation(candidate)) return;
         discardImportedSourceState();
         renderAll();
         reviewDialog.close();
@@ -7079,6 +7080,7 @@
       };
       if (!config.acceptanceRule || !config.verifier) throw new Error("Accepted means and Verified by are required.");
       if (config.qualityFloor <= 0 || config.qualityFloor > 1) throw new Error("Quality floor must be between 1% and 100%.");
+      let candidate;
       if (state.outcomeMode === "sample") {
         const sampleValue = (id, label) => finiteNumber(document.getElementById(id).value, label);
         const samples = {
@@ -7097,17 +7099,17 @@
             humanMinutes: sampleValue("proposed-human-minutes", "Proposed sample human minutes"),
           },
         };
-        state.data = await buildSampledReview(await readLocalFile(spendFile), samples, config);
+        candidate = await buildSampledReview(await readLocalFile(spendFile), samples, config);
       } else {
         const [workFile] = document.getElementById("work-file").files;
         if (!workFile) throw new Error("Add the detailed work log before building this review.");
-        state.data = await buildLocalReview(await readLocalFile(spendFile), await readLocalFile(workFile), config);
+        candidate = await buildLocalReview(await readLocalFile(spendFile), await readLocalFile(workFile), config);
       }
       if (state.pendingVerification) {
-        state.data.verification_evidence = cloneData(state.pendingVerification);
-        state.data.comparison.limitation += " The paired verification record supports the quality sample only; it does not establish billed or realized savings.";
+        candidate.verification_evidence = cloneData(state.pendingVerification);
+        candidate.comparison.limitation += " The paired verification record supports the quality sample only; it does not establish billed or realized savings.";
       }
-      validateResult(state.data);
+      if (!replaceReviewAfterValidation(candidate)) return;
       renderAll();
       setView("review");
       reviewDialog.close();

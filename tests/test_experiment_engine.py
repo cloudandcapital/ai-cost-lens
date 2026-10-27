@@ -410,3 +410,21 @@ def test_invented_repeats_have_own_wording_and_per_run_markers():
     assert "declared by the user" not in notice
     assert result["summary"]["runs"][0]["matching_evidence_confirmed"] is False
     assert result["summary"]["runs"][1]["matching_evidence_confirmed"] is True
+
+
+def test_unchanged_selected_setting_explains_the_change_and_the_alternative():
+    result = run_node(r"""
+const raw={...example.plan,...example.plan.thresholds};
+raw.candidate={...raw.candidate,caching:raw.baseline.caching,model:'Another model'};
+const multiple=copy(raw);multiple.candidate.effort='Another effort';
+const missing=copy(raw);missing.baseline.caching=null;missing.candidate.caching=null;
+console.log(JSON.stringify({single:caught(()=>e.createExperiment(raw)),
+ multiple:caught(()=>e.createExperiment(multiple)),missing:caught(()=>e.createExperiment(missing))}));
+""")
+    for key in ["single", "missing"]:
+        assert "Caching needs different before and after values" in result[key]
+        assert "Model also differs" in result[key]
+        assert "or choose Model as the change to test" in result[key]
+    assert "Caching needs different before and after values" in result["multiple"]
+    assert "Model, Effort also differ" in result["multiple"]
+    assert "Choose one setting to test" in result["multiple"]

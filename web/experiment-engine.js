@@ -45,10 +45,18 @@
     const different = fields.filter((field) => baseline[field] !== candidate[field]);
     const names = { model: "Model", effort: "Effort", prompt_version: "Prompt version", caching: "Caching", processing: "Processing mode" };
     const extraChanges = different.filter((field) => field !== changedField);
+    const selectedNeedsChange = !different.includes(changedField) || !baseline[changedField] || !candidate[changedField];
     if (extraChanges.length) {
-      throw new Error(`Record exactly one changed setting: ${extraChanges.map((field) => names[field]).join(", ")} ${extraChanges.length === 1 ? "also differs" : "also differ"}. Keep ${extraChanges.map((field) => names[field]).join(", ")} unchanged for a ${names[changedField]} test. Settings are compared exactly, including capitalization; blank unchanged fields keep their starting value.`);
+      const extraNames = extraChanges.map((field) => names[field]).join(", ");
+      const selectedNote = selectedNeedsChange ? `${names[changedField]} needs different before and after values. ` : "";
+      const advice = selectedNeedsChange
+        ? extraChanges.length === 1
+          ? `Change ${names[changedField]} and keep ${extraNames} unchanged, or choose ${extraNames} as the change to test.`
+          : "Choose one setting to test and keep the other settings unchanged."
+        : `Keep ${extraNames} unchanged for a ${names[changedField]} test.`;
+      throw new Error(`Record exactly one changed setting: ${selectedNote}${extraNames} ${extraChanges.length === 1 ? "also differs" : "also differ"}. ${advice} Settings are compared exactly, including capitalization; blank unchanged fields keep their starting value.`);
     }
-    if (!different.length || !baseline[changedField] || !candidate[changedField]) {
+    if (selectedNeedsChange) {
       throw new Error(`Record exactly one changed setting: ${names[changedField]} needs different before and after values. Keep the other settings unchanged; blank unchanged fields keep their starting value.`);
     }
     if (raw.other_settings_unchanged !== true) throw new Error("Confirm that the other settings and task requirements stayed the same.");
