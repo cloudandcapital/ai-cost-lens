@@ -460,6 +460,7 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
     await page.locator("#experiment-reserved").check();
     await page.locator("#experiment-add-run").click();
     if (index > 0) {
+      await page.locator("#experiment-matching-wrap").waitFor({ state: "visible" });
       assert(await page.locator("#experiment-matching-wrap").isVisible(), `${engineName}: identical parsed results did not require a separate declaration.`);
       await page.locator("#experiment-matching-confirm").check();
       await page.locator("#experiment-add-run").click();
