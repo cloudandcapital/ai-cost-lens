@@ -193,7 +193,7 @@ def test_verification_template_has_no_fake_results():
     assert "resetVerificationMethodDeclarations" in app
     assert "state.pendingVerification = cloneData(record)" in app
     assert (
-        "state.data.verification_evidence = cloneData(state.pendingVerification)" in app
+        "candidate.verification_evidence = cloneData(state.pendingVerification)" in app
     )
     assert "paired verification record supports the quality sample only" in app
 

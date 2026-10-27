@@ -214,6 +214,7 @@ async function verifyOpenAIPartialBucket(page) {
   await page.locator("#openai-usage-file").setInputFiles({ name: "partial-usage.csv", mimeType: "text/csv", buffer: Buffer.from(usage) });
   await page.locator("#openai-cost-file").setInputFiles(join(fixtureDir, "openai-dashboard-cost.csv"));
   await page.locator("#build-review").click();
+  await page.locator("#review-dialog").waitFor({ state: "hidden" });
   await page.locator("#bill-mode-tag").waitFor({ state: "visible" });
   assert((await page.locator("#bill-mode-tag").innerText()) === "PERIOD MISMATCH", "Same-day partial usage bucket was accepted.");
   assert((await page.locator("#bill-source-copy").innerText()).includes("do not match"), "Mismatch introduction describes exports as aligned.");
@@ -231,6 +232,7 @@ async function verifyFictionalProjectCost(page) {
   await page.locator("#openai-usage-file").setInputFiles(join(fixtureDir, "fictional-asterdesk-openai-activity.csv"));
   await page.locator("#openai-cost-file").setInputFiles(join(fixtureDir, "fictional-asterdesk-openai-cost.csv"));
   await page.locator("#build-review").click();
+  await page.locator("#review-dialog").waitFor({ state: "hidden" });
   await page.locator("#bill-project-cost").waitFor({ state: "visible" });
   assert((await page.locator("#bill-project-cost").innerText()).includes("$487.20"), "Billed Support cost is missing.");
   assert((await page.locator("#bill-next-step").innerText()).includes("proj_aster_support"), "The review prioritized the busy low-cost model instead of the billed project.");
@@ -253,13 +255,19 @@ async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false, re
   await page.locator("#tool-kind-3").selectOption("usage");
   await page.locator("#tool-amount-3").fill("3.25");
   await page.locator("#tool-source-3").fill("Separate usage charge");
+  const promptsBeforeInvalidTools = replacementPrompts.messages.length;
   await page.locator("#build-review").click();
+  await page.locator("#tools-basis-error").waitFor({ state: "visible" });
+  assert(replacementPrompts.messages.length === promptsBeforeInvalidTools, "Invalid tool charges asked to replace the open review.");
   assert(await page.locator("#tools-basis-error").isVisible() && await page.locator("#tools-basis").evaluate((element) => element === document.activeElement), "Missing cost basis was not explained at the focused field.");
   await page.locator("#tools-basis").selectOption("provider_reported");
   await page.locator("#build-review").click();
+  await page.locator("#tools-scope-error").waitFor({ state: "visible" });
+  assert(replacementPrompts.messages.length === promptsBeforeInvalidTools, "A missing charge boundary asked to replace the review.");
   assert(await page.locator("#tools-scope-error").isVisible() && await page.locator("#tools-scope").evaluate((element) => element === document.activeElement), "Missing charge boundary was not explained at the focused checkbox.");
   await page.locator("#tools-scope").check();
   await page.locator("#build-review").click();
+  await page.locator("#review-dialog").waitFor({ state: "hidden" });
   await page.locator("#tool-spend-result").waitFor({ state: "visible" });
   assert((await page.locator("#bill-finding-title").innerText()).includes("$68.25"), "AI tool total did not reconcile.");
   assert((await page.locator("#bill-metric-ledger").innerText()).includes("$65.00"), "Subscriptions were not separated from extra usage.");
@@ -306,6 +314,7 @@ async function verifyToolSpendFlow(page, { mobile = false, roundTrip = false, re
   assert(await page.locator("#tool-amount-1").inputValue() === "25", "Cancelling lost the edited charge.");
   replacementPrompts.accept = true;
   await page.locator("#build-review").click();
+  await page.locator("#review-dialog").waitFor({ state: "hidden" });
   assert((await page.locator("#bill-finding-title").innerText()).includes("$73.25"), "Editing one tool did not retain and recalculate the other charges.");
   await page.locator("#bill-compare-next").click();
   assert(await page.locator("#simple-builder-fields").isVisible(), "AI tool review did not open a tool comparison.");
@@ -325,6 +334,7 @@ async function verifyEditableComparison(page, { mobile = false, replacementPromp
     "simple-hourly-rate": "30", "simple-quality-floor": "75",
   })) await page.locator(`#${id}`).fill(value);
   await page.locator("#build-review").click();
+  await page.locator("#review-dialog").waitFor({ state: "hidden" });
   assert((await page.locator("#finding-title").innerText()).includes("Plan A has the lower estimated cost"), "The approval gate hid the cost finding.");
   assert((await page.locator("#simple-cost-finding").innerText()).includes("Plan A: $2.56. Plan B: $4.25."), "The result hero lost the calculated cost finding.");
   assert((await page.locator("#simple-switch-check").innerText()).includes("approval"), "The cost finding bypassed approval.");
@@ -342,7 +352,10 @@ async function verifyEditableComparison(page, { mobile = false, replacementPromp
   assert(await page.locator("#simple-current-cost").inputValue() === "80" && await page.locator("#simple-other-minutes").inputValue() === "120", "Editing replaced entered values.");
   await page.locator("#simple-other-usable").fill("21");
   const checkedHeight = (await page.locator("#simple-other-checked").boundingBox()).height;
+  const promptsBeforeInvalidSimple = replacementPrompts.messages.length;
   await page.locator("#build-review").click();
+  await page.locator("#simple-other-usable-error").waitFor({ state: "visible" });
+  assert(replacementPrompts.messages.length === promptsBeforeInvalidSimple, "An invalid comparison asked to replace the open review.");
   assert((await page.locator("#simple-other-usable-error").innerText()).includes("greater than the number you checked"), "Invalid usable counts were accepted.");
   assert((await page.locator("#simple-other-usable-error").innerText()).includes("Plan B"), "The error does not identify the option.");
   assert(await page.locator("#simple-other-usable").getAttribute("aria-invalid") === "true", "The invalid field was not marked.");
@@ -351,6 +364,7 @@ async function verifyEditableComparison(page, { mobile = false, replacementPromp
   await page.locator("#simple-other-usable").fill("16");
   assert(!(await page.locator("#simple-other-usable-error").isVisible()) && await page.locator("#simple-other-usable").getAttribute("aria-invalid") === "false", "The corrected field kept a stale error.");
   await page.locator("#build-review").click();
+  await page.locator("#review-dialog").waitFor({ state: "hidden" });
   if (mobile) await page.locator("#header-menu-toggle").click();
   const saved = await saveJsonDownload(page, "#download-review", "editable-comparison.json");
   assert(saved.baseline.costs.recurring_operating_cost === 230 && saved.proposed.costs.recurring_operating_cost === 340, "The saved comparison differs from independent arithmetic.");
@@ -374,6 +388,7 @@ async function verifyEditableComparison(page, { mobile = false, replacementPromp
   assert(await page.locator("#simple-approved").isChecked(), "Cancelling lost the draft approval choice.");
   replacementPrompts.accept = true;
   await page.locator("#build-review").click();
+  await page.locator("#review-dialog").waitFor({ state: "hidden" });
   assert((await page.locator("#simple-switch-check").innerText()).includes("Approval: you confirmed"), "Confirmed approval disappeared from the result.");
   assert(await page.locator("#review-title").evaluate((element) => element === document.activeElement), "A completed comparison did not focus its result heading.");
   if (!mobile && page.context().browser().browserType().name() === "chromium") {
@@ -386,6 +401,7 @@ async function verifyEditableComparison(page, { mobile = false, replacementPromp
     "simple-current-minutes": "0", "simple-other-minutes": "0", "simple-hourly-rate": "0",
   })) await page.locator(`#${id}`).fill(value);
   await page.locator("#build-review").click();
+  await page.locator("#review-dialog").waitFor({ state: "hidden" });
   for (const selector of ["#unit-economics-card", "#memo-table-body"]) {
     const text = await page.locator(selector).textContent();
     assert(text.includes("$0.24") && text.includes("$0.16"), `${selector} rounded a nonzero charge to zero.`);
@@ -823,6 +839,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#invoice-amount").fill("90");
   await page.locator("#invoice-currency").fill("USD");
   await page.locator("#build-review").click();
+  await page.locator("#review-dialog").waitFor({ state: "hidden" });
   assert(await page.locator("#bill-review-screen").isVisible(), `${engineName}: one-bill review did not render.`);
   assert((await page.locator("#bill-metric-ledger .metric-cell:first-child span").textContent()).includes("User-entered billed amount"), `${engineName}: manual amount was presented as provider-verified.`);
   await page.locator("#review-usage").click();
@@ -855,6 +872,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await page.locator("#bill-budget-amount").fill("80");
   await page.locator("#bill-budget-scope").check();
   await page.locator("#build-review").click();
+  await page.locator("#review-dialog").waitFor({ state: "hidden" });
   assert(await page.locator("#bill-history-result").isVisible(), `${engineName}: two-bill comparison is missing.`);
   const billTrend = await page.locator("#bill-history-result").innerText();
   assert(billTrend.includes("$100.00") && billTrend.includes("$90.00") && billTrend.includes("−$10.00") && billTrend.includes("10.0% lower"), `${engineName}: equal-period bill difference is incorrect: ${billTrend}`);
@@ -882,6 +900,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
     await page.locator("#previous-bill-end").fill("2026-08-31");
     await page.locator("#previous-bill-scope").check();
     await page.locator("#build-review").click();
+    await page.locator("#review-dialog").waitFor({ state: "hidden" });
     assert(!(await page.locator("#bill-budget-result").isVisible()), "A previous budget persisted into a new bill review.");
     const unequalTrend = await page.locator("#bill-history-result").innerText();
     const unequalLabels = await page.locator("#bill-history-metrics .metric-cell span").allTextContents();

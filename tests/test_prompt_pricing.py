@@ -647,7 +647,7 @@ def test_price_a_prompt_ui_and_review_handoff_keep_the_evidence_gate():
     assert "Your prompt stays in this browser" in html
     assert "ESTIMATED · NOT A SAVINGS CLAIM" in html
     assert "state.priceEstimate = cloneData(pendingPriceRecord)" in app
-    assert "state.data.pricing_estimate = cloneData(state.priceEstimate)" in app
+    assert "candidate.pricing_estimate = cloneData(state.priceEstimate)" in app
     assert 'id="download-price-estimate"' in html
     assert "ai-cost-lens-prompt-price-estimate.json" in app
     assert 'id="prompt-custom-rate"' in html
@@ -655,7 +655,7 @@ def test_price_a_prompt_ui_and_review_handoff_keep_the_evidence_gate():
     assert "custom/user-supplied-rate" in app
     assert "normalizeCustomModel" in engine
     assert "AI Cost Lens did not verify it" in app
-    assert "state.data.comparison.savings_claim_allowed = false" in app
+    assert "candidate.comparison.savings_claim_allowed = false" in app
     assert 'decision: "TEST_FIRST"' in engine
     assert "prompt_text_stored: false" in engine
     assert 'id="model-catalog-search"' in html
