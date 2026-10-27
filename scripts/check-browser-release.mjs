@@ -396,6 +396,7 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
   const planA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   assert(planA11y.violations.length === 0, `${engineName}: test-plan accessibility violations: ${axeSummary(planA11y)}`);
   await page.locator("#experiment-example").click();
+  assert(!(await page.locator("#experiment-run-form").isVisible()), `${engineName}: invented examples must be read-only.`);
   const example = await saveJsonDownload(page, "#experiment-download", `controlled-test-${engineName}.json`);
   assert(example.mode === "illustrative" && example.summary.unique_validation_cases === 40 && example.summary.validation_observations === 80, `${engineName}: repeated test counts or example label are incorrect.`);
   assert(example.summary.decision === "REVIEW_CANDIDATE" && !example.evidence_gate.savings_claim_allowed, `${engineName}: the example did not keep test evidence separate from savings.`);
@@ -423,11 +424,15 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
   reopen.summary.decision = "REJECT_CHANGE";
   reopen.evidence_gate.savings_claim_allowed = true;
   await page.locator("#experiment-file").setInputFiles({ name: "saved-test.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(reopen)) });
+  assert((await page.locator("#experiment-error").innerText()).includes("test is already open"), `${engineName}: an open test was replaced without confirmation.`);
+  await page.locator(".experiment-reset summary").click();
+  await page.locator("#experiment-reset-confirm").check();
+  await page.locator("#experiment-file").setInputFiles({ name: "saved-test.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(reopen)) });
   await page.waitForFunction(() => document.querySelector("#toast")?.textContent?.includes("Saved test reopened"));
   assert((await page.locator("#experiment-summary").innerText()).includes("Candidate worth a finance review"), `${engineName}: reopening trusted a saved headline instead of rebuilding it.`);
   await page.locator("#experiment-attach").click();
   assert((await page.locator("#experiment-error").innerText()).includes("same workload"), `${engineName}: an unrelated test attached to this review.`);
-  await page.locator(".experiment-reset summary").click();
+  if (!(await page.locator(".experiment-reset").evaluate((element) => element.open))) await page.locator(".experiment-reset summary").click();
   await page.locator("#experiment-reset-confirm").check();
   await page.locator("#experiment-new").click();
 
@@ -439,6 +444,8 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
   await page.waitForFunction(() => document.querySelector("#toast")?.textContent?.includes("synthetic-test-review.json is open"));
   if (mobile) await page.locator("#mobile-section-nav").selectOption("verify");
   else await page.locator('.nav-item[data-view="verify"]').click();
+  assert((await page.locator("#experiment-baseline-label").inputValue()) === "Starting test setup", `${engineName}: the test borrowed review route labels.`);
+  assert((await page.locator("#experiment-candidate-label").inputValue()) === "Changed test setup", `${engineName}: the test borrowed review route labels.`);
   await page.locator("#experiment-baseline-caching").fill("Off");
   await page.locator("#experiment-candidate-caching").fill("On");
   await page.locator("#experiment-unchanged").check();
@@ -452,15 +459,23 @@ async function verifyControlledTest(page, engineName, { mobile = false } = {}) {
     await page.locator("#experiment-independent").check();
     await page.locator("#experiment-reserved").check();
     await page.locator("#experiment-add-run").click();
+    if (index > 0) {
+      assert(await page.locator("#experiment-matching-wrap").isVisible(), `${engineName}: identical parsed results did not require a separate declaration.`);
+      await page.locator("#experiment-matching-confirm").check();
+      await page.locator("#experiment-add-run").click();
+    }
     await page.locator("#experiment-runs tbody tr").nth(index).waitFor({ state: "visible" });
     assert((await page.locator("#experiment-error").innerText()) === "", `${engineName}: a new test run failed.`);
     assert(!(await page.locator("#experiment-independent").isChecked()), `${engineName}: execution attestation carried into another run.`);
   }
   const archive = await saveJsonDownload(page, "#experiment-download", `controlled-test-new-${engineName}.json`);
   assert(archive.summary.validation_runs === 2 && !archive.evidence_gate.route_change_approved, `${engineName}: new runs are missing or approved a route.`);
+  assert(archive.integrity?.fingerprint && archive.runs[1].matching_evidence_confirmed, `${engineName}: edit check or repeated-execution declaration missing from the record.`);
+  await page.locator("#experiment-attach").click();
   if (mobile && await page.locator("#header-actions").isHidden()) await page.locator("#header-menu-toggle").click();
   await page.locator("#print-memo").click();
   assert((await page.locator("#memo-experiment").textContent()).includes("40 distinct validation cases"), `${engineName}: the finance memo lost the attached test.`);
+  assert((await page.locator("#memo-experiment").textContent()).includes("not a validation of the review’s proposed route"), `${engineName}: the separate test was presented as proposed-route validation.`);
   await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
   if (mobile && await page.locator("#header-actions").isVisible()) await page.locator("#header-menu-toggle").click();
   await page.locator("#experiment-to-actuals").click();

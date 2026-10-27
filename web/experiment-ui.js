@@ -17,8 +17,9 @@
 
   function money(value) {
     if (value === null) return "Unavailable";
+    if (value > 0 && value < 1e-6) return `${value.toExponential(3)} ${record.plan.currency}`;
     const format = new Intl.NumberFormat("en-US", { style: "currency", currency: record.plan.currency, maximumFractionDigits: 8 });
-    return value > 0 && value < 1e-8 ? `Less than ${format.format(1e-8)}` : format.format(value);
+    return format.format(value);
   }
 
   function summaryHtml() {
@@ -28,14 +29,18 @@
       <h3>${escape(decisions[s.decision])}</h3><p>${escape(record.plan.workload)} · ${escape(record.plan.change_kind)} change</p>
       <p>${escape(s.reason)}</p>
       <p><strong>${s.validation_runs} validation runs · ${s.unique_validation_cases} distinct validation cases</strong> · ${s.validation_observations} paired observations across repeats.</p>
-      <p>${escape(s.statistical_note)}</p><p>${escape(record.evidence_gate.reason)}</p>`;
+      <p>${escape(s.statistical_note)}</p><p>${escape(record.evidence_gate.reason)}</p>
+      ${(s.warnings || []).map((message) => `<p class="experiment-evidence-notice">${escape(message)}</p>`).join("")}
+      ${record.integrity_check ? `<p class="experiment-evidence-notice">${escape(record.integrity_check.note)}</p>` : ""}`;
   }
 
   function tableHtml() {
-    return `<table class="usage-table experiment-run-table"><thead><tr><th>Run</th><th>Cases</th><th>Ready rate</th><th>API cost per ready result</th><th>Review minutes</th><th>Quality</th></tr></thead><tbody>${record.summary.runs.map((run) => `<tr>
+    return `<table class="usage-table experiment-run-table"><thead><tr><th>Run</th><th>Cases</th><th>Ready rate</th><th>Total API cost</th><th>API cost per ready result</th><th>Unit-cost change</th><th>Review minutes</th><th>Quality</th></tr></thead><tbody>${record.summary.runs.map((run) => `<tr>
       <th>${escape(run.id)}<small>${escape(run.partition)}</small></th><td>${run.baseline.cases}</td>
       <td>${percent(run.baseline.ready_rate)} → ${percent(run.candidate.ready_rate)}</td>
+      <td>${money(run.baseline_api_cost)} → ${money(run.candidate_api_cost)}</td>
       <td>${money(run.baseline_api_cost_per_ready)} → ${money(run.candidate_api_cost_per_ready)}</td>
+      <td>${run.api_unit_cost_change_fraction === null ? "Unavailable" : `${run.api_unit_cost_change_fraction > 0 ? "+" : ""}${percent(run.api_unit_cost_change_fraction)}`}</td>
       <td>${run.baseline.human_minutes ?? "Not recorded"} → ${run.candidate.human_minutes ?? "Not recorded"}</td>
       <td>${run.quality_held ? "Held in this run" : "Failed locked rule"}<small>Checks: ${percent(run.baseline.deterministic_pass_rate)} → ${percent(run.candidate.deterministic_pass_rate)}</small></td></tr>`).join("")}</tbody></table>`;
   }
@@ -48,12 +53,14 @@
     $("experiment-plan").hidden = Boolean(record);
     $("experiment-locked").hidden = !record;
     $("experiment-result").hidden = !record;
+    refreshEvidenceNote();
     if (!record) {
       $("experiment-summary").replaceChildren();
       $("experiment-actuals-note").hidden = true;
       return;
     }
     $("experiment-plan-summary").textContent = `${record.plan.workload} · ${record.plan.change_kind} only · ${record.plan.quality_rule}`;
+    $("experiment-run-form").hidden = record.mode === "illustrative";
     const field = { prompt: "prompt_version", batch: "processing" }[record.plan.change_kind] || record.plan.change_kind;
     $("experiment-config-summary").textContent = `${labels[field]}: ${record.plan.baseline[field]} → ${record.plan.candidate[field]}. Check pass minimum: ${percent(record.plan.thresholds.minimum_deterministic_pass_rate)}; ready-result minimum: ${percent(record.plan.thresholds.minimum_ready_rate)}; permitted regression: ${(record.plan.thresholds.maximum_ready_rate_regression * 100).toFixed(1)} points.`;
     $("experiment-config-details").innerHTML = settingsHtml();
@@ -62,10 +69,17 @@
     const canViewActuals = context.getReview()?.baseline && context.getReview()?.proposed && context.getReview()?.experience !== "simple";
     $("experiment-to-actuals").hidden = !canViewActuals;
     const attached = linkedReview === context.getReview();
-    $("experiment-attachment").textContent = attached ? "The test summary will accompany this review’s finance memo and workspace archive. Its test costs do not replace production costs." : "This is a separate test record. Open or build a review for the same workload before attaching its summary.";
+    $("experiment-attachment").textContent = attached ? `This separate ${record.plan.change_kind} test accompanies the memo. It does not validate the review’s proposed route; its test costs do not replace production costs.` : "This is a separate test record. Attach it explicitly only when it is relevant to the review. The archive labels whether it is attached.";
     $("experiment-actuals-note").hidden = !attached;
     if (attached) $("experiment-actuals-copy").textContent = `${record.plan.workload}: ${decisions[record.summary.decision]}. Use full post-change cost and outcome records below; small test-run costs are not production actuals. No approval or evidence box is filled automatically.`;
     $("experiment-run-id").value = `run-${record.runs.length + 1}`;
+  }
+
+  function refreshEvidenceNote() {
+    const note = $("experiment-paired-threshold-note");
+    if (!note) return;
+    note.hidden = !record;
+    if (record) note.textContent = `The paired check below uses its own thresholds. This controlled test uses the locked thresholds above: ${percent(record.plan.thresholds.minimum_deterministic_pass_rate)} checks, ${percent(record.plan.thresholds.minimum_ready_rate)} ready results, and ${(record.plan.thresholds.maximum_ready_rate_regression * 100).toFixed(1)} points of permitted regression. A paired-check pass does not establish that this test passed.`;
   }
 
   function attach() {
@@ -103,11 +117,13 @@
     $("experiment-verification-file").value = "";
     $("experiment-independent").checked = false;
     $("experiment-reserved").checked = false;
+    $("experiment-matching-confirm").checked = false;
+    $("experiment-matching-wrap").hidden = true;
   }
 
   function download() {
     if (!record) return;
-    const safe = engine.restoreExperiment(record);
+    const safe = engine.exportExperiment(record);
     const url = URL.createObjectURL(new Blob([`${JSON.stringify(safe, null, 2)}\n`], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url; a.download = "ai-cost-lens-test-record.json"; document.body.appendChild(a); a.click(); a.remove();
@@ -121,7 +137,6 @@
       try {
         const next = engine.createExperiment(config());
         record = next; linkedReview = null;
-        try { attach(); } catch (_ignored) { /* Standalone tests remain separate. */ }
         clearRunInputs(); render(); $("experiment-locked-title").focus();
       } catch (caught) { error(caught.message); }
     });
@@ -140,18 +155,29 @@
           cost_source: $("experiment-cost-source").value,
           independent_execution: $("experiment-independent").checked,
           reserved_before_tuning: $("experiment-reserved").checked,
+          matching_evidence_confirmed: $("experiment-matching-confirm").checked,
         }, evidence);
         clearRunInputs(); render(); context.toast("Run recorded locally. Test evidence stays separate from savings.");
-      } catch (caught) { error(caught instanceof SyntaxError ? "Choose a valid saved paired verification JSON file." : caught.message); }
+      } catch (caught) {
+        if (caught.code === "MATCHING_RUN_EVIDENCE") $("experiment-matching-wrap").hidden = false;
+        error(caught instanceof SyntaxError ? "Choose a valid saved paired verification JSON file." : caught.message);
+      }
       finally { submit.disabled = false; }
     });
     $("experiment-download").addEventListener("click", download);
-    $("experiment-open").addEventListener("click", () => $("experiment-file").click());
+    function canReplaceOpenTest() {
+      if (!record || $("experiment-reset-confirm").checked) return true;
+      error("A test is already open. Download it if needed, then tick the confirmation under Start another test before replacing it with a saved test.");
+      return false;
+    }
+    $("experiment-open").addEventListener("click", () => { error(""); if (canReplaceOpenTest()) $("experiment-file").click(); });
     $("experiment-file").addEventListener("change", async (event) => {
       error(""); const file = event.target.files[0]; if (!file) return;
       try {
+        if (!canReplaceOpenTest()) return;
         const restored = engine.restoreExperiment(JSON.parse(await context.readFile(file)));
         record = restored; linkedReview = null;
+        $("experiment-reset-confirm").checked = false;
         clearRunInputs(); render(); context.toast("Saved test reopened. Its calculations were rebuilt locally.");
       } catch (caught) { error(caught instanceof SyntaxError ? "Choose a valid saved test JSON file." : caught.message); }
       finally { event.target.value = ""; }
@@ -191,13 +217,15 @@
       $("experiment-workload").value = review.workload.name;
       $("experiment-currency").value = review.currency || "";
       $("experiment-quality-rule").value = review.baseline?.outcomes?.acceptance_rule || review.config?.acceptanceRule || "";
-      $("experiment-baseline-label").value = review.baseline?.label || "Starting setup";
-      $("experiment-candidate-label").value = review.proposed?.label || "Changed setup";
+      $("experiment-baseline-label").value = "Starting test setup";
+      $("experiment-candidate-label").value = "Changed test setup";
     }
   }
 
   root.AICostLensExperimentUI = Object.freeze({ init, setContext,
-    getRecord: () => record ? engine.restoreExperiment(record) : null,
-    memoHtml: () => record && linkedReview === context.getReview() ? `<h2>Controlled test evidence</h2>${summaryHtml()}<p>${escape($("experiment-config-summary").textContent)}</p>${tableHtml()}` : "",
+    getRecord: () => record ? engine.exportExperiment(record) : null,
+    getAttachment: () => ({ attached: Boolean(record && linkedReview === context.getReview()), relationship: "separate_controlled_api_test", note: "Packaging or attaching a test does not validate the review’s proposed route or establish production savings." }),
+    refreshEvidenceNote,
+    memoHtml: () => record && linkedReview === context.getReview() ? `<h2>Separate controlled API test</h2><p><strong>This ${escape(record.plan.change_kind)} test compares ${escape(record.plan.baseline.label)} with ${escape(record.plan.candidate.label)}. It is not a validation of the review’s proposed route.</strong></p>${summaryHtml()}<p>${escape($("experiment-config-summary").textContent)}</p>${tableHtml()}` : "",
   });
 })(globalThis);

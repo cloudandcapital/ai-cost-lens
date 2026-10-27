@@ -10,11 +10,11 @@ const e = require('./web/experiment-engine.js');
 const v = require('./web/verification-engine.js');
 const example = e.illustrativeExample(v);
 const copy = value => JSON.parse(JSON.stringify(value));
-function empty() { const r=copy(example); r.runs=[]; return e.restoreExperiment(r); }
+function empty() { const r=copy(example); r.mode='user_supplied'; r.runs=[]; return e.restoreExperiment(r); }
 function trial(id='one', extra={}) {
   return {id, partition:'validation', independent_execution:true,
     reserved_before_tuning:true, baseline_cost:.40, candidate_cost:.22,
-    cost_source:'Recorded execution', ...extra};
+    cost_source:'Recorded execution', matching_evidence_confirmed:true, ...extra};
 }
 function evidence(id='new') { const r=copy(example.runs[0].verification); r.source.sha256=id; return r; }
 function caught(fn) { try { fn(); return null; } catch (err) {return err.message;} }
@@ -188,3 +188,132 @@ console.log(JSON.stringify({missing:caught(()=>e.addRun(empty(),trial(),missing)
 """)
     assert "human outcomes" in result["missing"]
     assert "duplicate checks" in result["repeated"]
+
+
+def test_resaved_or_hashless_matching_evidence_needs_a_separate_confirmation():
+    result = run_node(r"""
+const one=e.addRun(empty(),trial('one'),evidence('LF bytes'));
+const crlf=evidence('CRLF bytes');
+const hashless=evidence(); delete hashless.source.sha256;
+const before=JSON.stringify(one);
+console.log(JSON.stringify({
+  resaved:caught(()=>e.addRun(one,trial('two',{matching_evidence_confirmed:false}),crlf)),
+  hashless:caught(()=>e.addRun(one,trial('two',{matching_evidence_confirmed:false}),hashless)),
+  unchanged:before===JSON.stringify(one),
+  confirmed:e.addRun(one,trial('two'),crlf)
+}));
+""")
+    assert "re-saved file is not another execution" in result["resaved"]
+    assert "match one" in result["hashless"]
+    assert result["unchanged"] is True
+    assert result["confirmed"]["runs"][1]["matching_evidence_confirmed"] is True
+    assert result["confirmed"]["summary"]["unique_validation_cases"] == 40
+    assert "not independently verified" in " ".join(
+        result["confirmed"]["summary"]["warnings"]
+    )
+
+
+def test_reopened_matching_runs_without_the_new_confirmation_do_not_gain_a_verdict():
+    result = run_node(r"""
+const raw=copy(example); raw.mode='user_supplied';
+raw.runs.forEach(r=>delete r.matching_evidence_confirmed);
+raw.summary.decision='REVIEW_CANDIDATE';
+console.log(JSON.stringify(e.restoreExperiment(raw)));
+""")
+    assert result["summary"]["decision"] == "NEEDS_MORE_EVIDENCE"
+    assert "do not have the separate" in result["summary"]["reason"]
+
+
+def test_zero_ready_candidate_rejects_even_with_zero_quality_floors():
+    result = run_node(r"""
+const raw=copy(example); raw.mode='user_supplied';raw.runs=[];
+raw.plan.thresholds={minimum_deterministic_pass_rate:0,minimum_ready_rate:0,maximum_ready_rate_regression:1};
+let record=e.restoreExperiment(raw);
+for(let i=1;i<=2;i++) {
+ const ev=evidence('zero-'+i);ev.cases.forEach(c=>c.candidate.outcome_status='needs_escalation');
+ record=e.addRun(record,trial('zero-'+i),ev);
+}
+console.log(JSON.stringify(record));
+""")
+    assert result["summary"]["decision"] == "REJECT_CHANGE"
+    assert "zero ready results" in result["summary"]["reason"]
+    assert result["summary"]["runs"][0]["quality_held"] is False
+    assert result["summary"]["runs"][0]["candidate_api_cost_per_ready"] is None
+    assert "0%" in " ".join(result["summary"]["warnings"])
+
+
+def test_no_ready_baseline_explains_the_unavailable_cost_comparison():
+    result = run_node(r"""
+let record=empty();
+for(let i=1;i<=2;i++) {
+ const ev=evidence('no-base-'+i);ev.cases.forEach(c=>c.baseline.outcome_status='needs_escalation');
+ record=e.addRun(record,trial('no-base-'+i),ev);
+}
+console.log(JSON.stringify(record.summary));
+""")
+    assert result["decision"] == "NEEDS_MORE_EVIDENCE"
+    assert "starting setup has no ready results" in result["reason"]
+    assert "two new runs" not in result["reason"]
+
+
+def test_rejection_reasons_distinguish_quality_and_cost_failures():
+    result = run_node(r"""
+const bad=evidence();bad.cases[0].candidate.outcome_status='needs_escalation';
+console.log(JSON.stringify({quality:e.addRun(empty(),trial('quality'),bad).summary,
+cost:e.addRun(empty(),trial('cost',{candidate_cost:.5}),evidence()).summary}));
+""")
+    assert "locked quality thresholds" in result["quality"]["reason"]
+    assert "did not decrease" not in result["quality"]["reason"]
+    assert "API cost per ready result did not decrease" in result["cost"]["reason"]
+    assert "failed the locked quality" not in result["cost"]["reason"]
+
+
+def test_illustrative_record_is_read_only_but_reopens_and_exports():
+    result = run_node(r"""
+console.log(JSON.stringify({blocked:caught(()=>e.addRun(example,trial('own'),evidence())),
+ reopened:e.restoreExperiment(e.exportExperiment(example)).summary.decision,
+ containsOutput:JSON.stringify(e.exportExperiment(example)).includes('output_text')}));
+""")
+    assert "read-only" in result["blocked"]
+    assert result["reopened"] == "REVIEW_CANDIDATE"
+    assert result["containsOutput"] is False
+
+
+def test_edit_check_covers_cases_and_example_status_without_claiming_authentication():
+    result = run_node(r"""
+const saved=e.exportExperiment(example);
+const edited=copy(saved);edited.runs[0].verification.cases[0].candidate.outcome_status='needs_correction';
+const mode=copy(saved);mode.mode='user_supplied';
+const noCheck=copy(saved);delete noCheck.integrity;
+console.log(JSON.stringify({same:e.restoreExperiment(saved).integrity_check,
+ edited:e.restoreExperiment(edited).integrity_check,
+ mode:e.restoreExperiment(mode).integrity_check,
+ noCheck:e.restoreExperiment(noCheck).integrity_check}));
+""")
+    assert result["same"]["status"] == "matches"
+    assert "not a signature" in result["same"]["note"]
+    assert result["edited"]["status"] == "changed"
+    assert result["mode"]["status"] == "changed"
+    assert result["noCheck"]["status"] == "unavailable"
+    assert "not authenticated" in result["noCheck"]["note"]
+
+
+def test_totals_and_relative_change_remain_precise_for_tiny_costs():
+    result = run_node(r"""
+const r=e.addRun(empty(),trial('tiny',{baseline_cost:4e-8,candidate_cost:3e-8}),evidence());
+console.log(JSON.stringify(r.summary.runs[0]));
+""")
+    assert result["baseline_api_cost"] == 4e-8
+    assert result["candidate_api_cost"] == 3e-8
+    assert abs(result["api_unit_cost_change_fraction"] + 0.25) < 1e-12
+
+
+def test_blank_unchanged_settings_inherit_but_the_changed_setting_is_named():
+    result = run_node(r"""
+const raw={...example.plan,...example.plan.thresholds};raw.candidate=copy(raw.candidate);raw.candidate.model='';
+const ok=e.createExperiment(raw);
+const bad=copy(raw);bad.change_kind='model';bad.candidate.caching=bad.baseline.caching;
+console.log(JSON.stringify({model:ok.plan.candidate.model,error:caught(()=>e.createExperiment(bad))}));
+""")
+    assert result["model"] == "Same example model"
+    assert "Model needs different before and after" in result["error"]

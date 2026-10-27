@@ -4481,6 +4481,7 @@
       VERIFIED_PASS: "The candidate cleared the declared deterministic and human-outcome gates on at least 30 blinded, randomized, randomly or systematically selected pairs. This supports the quality gate only; billed savings still require the finance review and post-change actuals.",
     };
     document.getElementById("verification-result-conclusion").textContent = conclusions[record.comparison.status] || record.evidence_gate.reason;
+    experimentUI?.refreshEvidenceNote();
     const displayed = record.cases.slice(0, 100);
     document.getElementById("verification-case-rows").innerHTML = displayed.map((item) => {
       const checks = (route) => {
@@ -5754,9 +5755,15 @@
 
   const reviewDialog = document.getElementById("review-dialog");
 
+  function confirmReviewReplacement() {
+    if (!state.hasStarted || !state.data || state.data.mode === "illustrative") return true;
+    return window.confirm("This will replace your open review or comparison. Cancel to return and download the decision record first if you need to keep it. Choose OK only when you are ready to replace it.");
+  }
+
   function openIllustrativeExample(kind) {
     const data = kind === "growth" ? state.growthDemoData : state.demoData;
     if (!data) { showToast("That example is still loading. Try again in a moment."); return; }
+    if (!confirmReviewReplacement()) return;
     state.data = cloneData(data);
     state.hasStarted = true;
     state.view = "review";
@@ -7152,6 +7159,7 @@
       growth_scenario: state.growthPlannerReview === state.data ? state.growthPlannerRecord : null,
       verification_record: state.verificationRecord,
       experiment_record: experimentUI?.getRecord() || null,
+      experiment_attachment: experimentUI?.getAttachment() || { attached: false, relationship: "separate_controlled_api_test" },
       actuals_ledger: state.actualsLedger,
       limitations: "Local archive of completed sections. Null means that section has no current result. The Open saved review control accepts the decision record, not this archive. Provider bills and savings are not verified by packaging the records together.",
     };
@@ -7203,6 +7211,7 @@
         throw new Error("That file isn't valid JSON. Choose a saved AI Cost Lens review.");
       }
       validateResult(data);
+      if (!confirmReviewReplacement()) return;
       state.data = data;
       state.hasStarted = true;
       renderAll();
