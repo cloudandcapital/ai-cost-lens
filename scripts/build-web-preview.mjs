@@ -10,6 +10,17 @@ await buildOpenAITokenizer();
 
 let html = await readFile(resolve(web, "index.html"), "utf8");
 const css = await readFile(resolve(web, "styles.css"), "utf8");
+let designerCSS = await readFile(resolve(web, "designer.css"), "utf8");
+for (const font of [
+  "cormorant-garamond-latin-400-normal.woff2",
+  "cormorant-garamond-latin-400-italic.woff2",
+  "jost-latin-400-normal.woff2",
+  "jost-latin-500-normal.woff2",
+  "jost-latin-700-normal.woff2",
+]) {
+  const bytes = await readFile(resolve(web, "brand/fonts", font));
+  designerCSS = designerCSS.replaceAll(`url("brand/fonts/${font}")`, `url("data:font/woff2;base64,${bytes.toString("base64")}")`);
+}
 const brandWordmark = await readFile(resolve(web, "brand/cloud-and-capital-wordmark.png"));
 const data = await readFile(
   resolve(web, "data", "illustrative-review-result.json"),
@@ -62,6 +73,7 @@ app = app.replace(
 );
 html = html
   .replace('<link rel="stylesheet" href="styles.css" />', () => `<style>${css}</style>`)
+  .replace('<link rel="stylesheet" href="designer.css" />', () => `<style>${designerCSS}</style>`)
   .replaceAll(
     'href="templates/ai-cost-lens-spend-template.csv"',
     `href="data:text/csv;base64,${spendTemplate.toString("base64")}"`,
