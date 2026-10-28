@@ -25,6 +25,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="/color-mode.css" />
+    <link rel="stylesheet" href="designer.css" />
   </head>
   <body class="welcome-mode">
     <div class="shell">
@@ -93,11 +94,21 @@
       <main>
         <section class="lens-welcome" id="lens-welcome" aria-labelledby="welcome-title">
           <p class="kicker">AI COST LENS · FREE TOOL</p>
-          <h1 id="welcome-title">Is the cheaper AI<br /> actually costing you more?</h1>
+          <h1 id="welcome-title">Is the cheaper AI<br /> actually <em>costing you more?</em></h1>
           <p class="welcome-copy">Compare two tools or plans, including the time you spend checking and fixing their work. Or start with a bill to see the costs you can account for.</p>
           <div class="welcome-actions">
-            <button class="build-button" id="welcome-compare" type="button">Compare two options <span aria-hidden="true">→</span></button>
-            <button class="text-button" id="welcome-spending" type="button">Review my AI spending <span aria-hidden="true">→</span></button>
+            <button class="welcome-path" id="welcome-compare" type="button" aria-label="Compare two options">
+              <span class="path-eyebrow">Two tools or plans</span>
+              <span class="path-title">Compare two options</span>
+              <span class="path-copy">Start with monthly charges and a small sample of the same work.</span>
+              <span class="path-arrow" aria-hidden="true">→</span>
+            </button>
+            <button class="welcome-path" id="welcome-spending" type="button" aria-label="Review my AI spending">
+              <span class="path-eyebrow">Your costs and usage</span>
+              <span class="path-title">Review my AI spending</span>
+              <span class="path-copy">Start with a bill or subscription, then add the records you have.</span>
+              <span class="path-arrow" aria-hidden="true">→</span>
+            </button>
           </div>
           <p class="welcome-local">No account or connection needed. Your files are read in this browser.</p>
           <div class="welcome-example">
