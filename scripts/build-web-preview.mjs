@@ -10,7 +10,8 @@ await buildOpenAITokenizer();
 
 let html = await readFile(resolve(web, "index.html"), "utf8");
 const css = await readFile(resolve(web, "styles.css"), "utf8");
-const welcomeArt = await readFile(resolve(web, "brand/ai-cost-lens-glass-v1.png"));
+const welcomeArt = await readFile(resolve(web, "brand/ai-cost-lens-optic-v2.png"));
+const startArrow = await readFile(resolve(web, "brand/arrow-right.svg"));
 let designerCSS = await readFile(resolve(web, "designer.css"), "utf8");
 for (const font of [
   "cormorant-garamond-latin-400-normal.woff2",
@@ -73,7 +74,8 @@ app = app.replace(
   `  state.data = ${data.trim()};\n  state.demoData = cloneData(state.data);\n  state.growthDemoData = ${growthData.trim()};\n  renderAll();`,
 );
 html = html
-  .replace('src="brand/ai-cost-lens-glass-v1.png"', () => `src="data:image/png;base64,${welcomeArt.toString("base64")}"`)
+  .replace('src="brand/ai-cost-lens-optic-v2.png"', () => `src="data:image/png;base64,${welcomeArt.toString("base64")}"`)
+  .replaceAll('src="brand/arrow-right.svg"', () => `src="data:image/svg+xml;base64,${startArrow.toString("base64")}"`)
   .replace('<link rel="stylesheet" href="styles.css" />', () => `<style>${css}</style>`)
   .replace('<link rel="stylesheet" href="designer.css" />', () => `<style>${designerCSS}</style>`)
   .replaceAll(
