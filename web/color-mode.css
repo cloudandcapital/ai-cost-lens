@@ -51,6 +51,11 @@ color-scheme:dark;
 :root[data-color-mode="dark"] a:not([class]) { color:#B8CCBD; }
 :root[data-color-mode="dark"] .payback-card { background:#283D34; color:#F5EEE9; }
 :root[data-color-mode="dark"] .payback-card :is(.kicker.inverse,dd.positive) { color:#B8CCBD; }
+/* These inverse panels use the pale ink background in dark mode. */
+:root[data-color-mode="dark"] .lumen-panel > p:not(.kicker),
+:root[data-color-mode="dark"] .lumen-panel small,
+:root[data-color-mode="dark"] .lumen-signals span,
+:root[data-color-mode="dark"] .finding .finding-limit { color:var(--surface); }
 }
 
 @media(max-width:620px) { body { min-width:0; } .masthead { gap:8px; } .masthead .wordmark span { font-size:clamp(15px,4.6vw,20px); } .header-menu-toggle { flex-shrink:0; padding-inline:8px; } }
