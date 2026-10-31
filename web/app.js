@@ -6477,7 +6477,7 @@
       : lowest.role === "current"
         ? `${current.label} remains the lowest modeled token-cost route in this set at ${promptPriceMoney(current.estimated_monthly_cost_usd)} per month. A higher-priced route may still be worth testing for quality, speed, or less human rework.`
         : `${lowest.label} has the lowest modeled token cost in this set at ${promptPriceMoney(lowest.estimated_monthly_cost_usd)} per month, ${promptPriceMoney(Math.abs(lowest.monthly_difference_from_current_usd))} below the current route. That makes it worth testing, not a proven switch.`;
-    const retryCopy = basis.retry_rate ? `Calls are increased by ${(basis.retry_rate * 100).toFixed(1)}% for retries.` : "No retry calls are included.";
+    const retryCopy = `${wholeNumber(basis.calls_per_month)} planned calls per month; ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(current.billed_calls_per_month)} modeled billed attempts including retries. Per-call figures divide the monthly cost, including retries, by planned calls.`;
     const usableCopy = basis.expected_usable_rate === null
       ? "Cost per usable result is not modeled because no usable rate was entered."
       : `Cost per usable result assumes ${(basis.expected_usable_rate * 100).toFixed(1)}% of original calls produce a usable result.`;

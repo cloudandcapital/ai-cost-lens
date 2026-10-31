@@ -400,7 +400,8 @@
     const cacheStorageCost = cacheStorageTokenHours * (rates.cache_storage_per_1m_token_hour || 0) / 1_000_000;
     const outputCost = scenario.output_tokens * billedCalls * rates.output / 1_000_000;
     const monthly = uncachedInputCost + cacheReadCost + cacheWriteCost + cacheStorageCost + outputCost;
-    const perCall = billedCalls ? monthly / billedCalls : 0;
+    // The entered workload is the denominator; retry attempts add cost, not results.
+    const perCall = scenario.calls_per_month ? monthly / scenario.calls_per_month : 0;
     const expectedUsable = scenario.usable_rate === null ? null : scenario.calls_per_month * scenario.usable_rate;
     const rateBoundary = profile.rate_boundary || model.promotional_rate_guaranteed_through ||
       (model.scheduled_rate_change?.effective_at
