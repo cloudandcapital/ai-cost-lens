@@ -11,6 +11,56 @@ ROOT = Path(__file__).parents[1]
 WEB = ROOT / "web"
 
 
+def test_retry_cost_units_use_planned_calls_and_survive_estimate_export():
+    script = r"""
+const catalog = require(process.argv[1]);
+const engine = require(process.argv[2]);
+const base = {input_tokens: 2000, output_tokens: 500, calls_per_month: 1000,
+  retry_rate: .25, cached_input_share: 0, usable_rate: .8, pricing_date: '2026-10-31'};
+const results = [0, .25].map(retry_rate => {
+  const scenario = {...base, retry_rate};
+  const comparison = engine.compareModels(catalog, ['openai/gpt-6-astra'], scenario);
+  const record = engine.buildEstimateRecord(catalog, comparison, scenario,
+    {tokens: 2000, method: 'manual'}, '2026-10-31T12:00:00Z');
+  return JSON.parse(JSON.stringify(record)).comparison[0];
+});
+const model = catalog.models.find(model => model.id === 'openai/gpt-6-astra');
+const storage = engine.priceModel({...model, standard: {...model.standard,
+  cache_storage_per_1m_token_hour: 2}}, {...base, input_tokens: 0, output_tokens: 0,
+  calls_per_month: 10, retry_rate: .5, usable_rate: .5, cache_storage_token_hours_per_month: 1000000});
+const zero = engine.priceModel(model, {...base, calls_per_month: 0});
+console.log(JSON.stringify({results, storage, zero}));
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            script,
+            str(WEB / "data/pricing-catalog-v0.5.js"),
+            str(WEB / "pricing-engine.js"),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    data = json.loads(result.stdout)
+    ordinary, retried = data["results"]
+    assert ordinary["estimated_monthly_cost_usd"] == 45
+    assert ordinary["estimated_cost_per_1000_calls_usd"] == 45
+    assert retried["estimated_monthly_cost_usd"] == 56.25
+    assert retried["estimated_cost_per_call_usd"] == 0.05625
+    assert retried["estimated_cost_per_1000_calls_usd"] == 56.25
+    assert retried["billed_calls_per_month"] == 1250
+    assert retried["estimated_cost_per_usable_result_usd"] == 0.0703125
+    assert data["storage"]["estimated_monthly_cost_usd"] == 2
+    assert data["storage"]["estimated_cost_per_call_usd"] == 0.2
+    assert data["storage"]["billed_calls_per_month"] == 15
+    assert data["storage"]["estimated_cost_per_usable_result_usd"] == 0.4
+    assert data["zero"]["estimated_cost_per_call_usd"] == 0
+    assert data["zero"]["estimated_cost_per_1000_calls_usd"] == 0
+    assert data["zero"]["estimated_cost_per_usable_result_usd"] is None
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_versioned_catalog_and_deterministic_prompt_pricing():
     script = r"""

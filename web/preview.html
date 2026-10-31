@@ -8454,12 +8454,13 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
             <div class="price-field-grid">
               <label><span>Known input tokens <small>optional override</small></span><input id="prompt-input-tokens" type="number" min="0" step="1" placeholder="Estimate from prompt" /></label>
               <label><span>Expected output tokens</span><input id="prompt-output-tokens" type="number" min="0" step="1" value="500" /></label>
-              <label><span>Calls per month</span><input id="prompt-calls" type="number" min="0" step="1" value="1000" /></label>
+              <label><span>Calls per month</span><input id="prompt-calls" type="number" min="0" step="1" value="1000" aria-describedby="prompt-call-basis" /></label>
               <label><span>Pricing date</span><input id="prompt-pricing-date" type="date" /></label>
               <label><span>Retry calls</span><div class="input-suffix"><input id="prompt-retry-rate" type="number" min="0" max="100" step="0.1" value="0" /><em>%</em></div></label>
               <label><span>Cached input share</span><div class="input-suffix"><input id="prompt-cache-share" type="number" min="0" max="100" step="0.1" value="0" /><em>%</em></div></label>
               <label><span>Expected usable rate <small>optional</small></span><div class="input-suffix"><input id="prompt-usable-rate" type="number" min="0" max="100" step="0.1" placeholder="Not known" /><em>%</em></div></label>
             </div>
+            <p class="price-field-note" id="prompt-call-basis">Enter planned calls before retries. Retry costs are included in the per-call and monthly estimates.</p>
             <details class="price-advanced-workload">
               <summary>Advanced cache assumptions</summary>
               <p>Cached input is treated as a repeated prefix. Add refreshes only when the provider publishes a separate cache-write rate. A refresh replaces one cache-read call; it is not added on top of the same call.</p>
@@ -9470,7 +9471,8 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
     const cacheStorageCost = cacheStorageTokenHours * (rates.cache_storage_per_1m_token_hour || 0) / 1_000_000;
     const outputCost = scenario.output_tokens * billedCalls * rates.output / 1_000_000;
     const monthly = uncachedInputCost + cacheReadCost + cacheWriteCost + cacheStorageCost + outputCost;
-    const perCall = billedCalls ? monthly / billedCalls : 0;
+    // The entered workload is the denominator; retry attempts add cost, not results.
+    const perCall = scenario.calls_per_month ? monthly / scenario.calls_per_month : 0;
     const expectedUsable = scenario.usable_rate === null ? null : scenario.calls_per_month * scenario.usable_rate;
     const rateBoundary = profile.rate_boundary || model.promotional_rate_guaranteed_through ||
       (model.scheduled_rate_change?.effective_at
@@ -19395,7 +19397,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       : lowest.role === "current"
         ? `${current.label} remains the lowest modeled token-cost route in this set at ${promptPriceMoney(current.estimated_monthly_cost_usd)} per month. A higher-priced route may still be worth testing for quality, speed, or less human rework.`
         : `${lowest.label} has the lowest modeled token cost in this set at ${promptPriceMoney(lowest.estimated_monthly_cost_usd)} per month, ${promptPriceMoney(Math.abs(lowest.monthly_difference_from_current_usd))} below the current route. That makes it worth testing, not a proven switch.`;
-    const retryCopy = basis.retry_rate ? `Calls are increased by ${(basis.retry_rate * 100).toFixed(1)}% for retries.` : "No retry calls are included.";
+    const retryCopy = `${wholeNumber(basis.calls_per_month)} planned calls per month; ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(current.billed_calls_per_month)} modeled billed attempts including retries. Per-call figures divide the monthly cost, including retries, by planned calls.`;
     const usableCopy = basis.expected_usable_rate === null
       ? "Cost per usable result is not modeled because no usable rate was entered."
       : `Cost per usable result assumes ${(basis.expected_usable_rate * 100).toFixed(1)}% of original calls produce a usable result.`;
