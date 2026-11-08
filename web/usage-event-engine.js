@@ -194,11 +194,12 @@
     return matches.length === 1 ? matches[0] : null;
   }
 
-  function calculatedTokenCost(event, catalog) {
+  function calculatedTokenCost(event, catalog, pricingDateOverride = null) {
     let model = findModel(catalog, event.provider, event.model);
     if (!model || event.input_tokens === null || event.output_tokens === null) return null;
     if (event.currency !== catalog.currency || event.processing_mode === null || event.cached_input_tokens === null || event.tool_charges === null || !event.timestamp) return null;
-    const eventDate = event.timestamp.slice(0, 10);
+    const eventDate = pricingDateOverride || event.timestamp.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return null;
     let routedModelId = null;
     if (model.routed_to_model_id) {
       if (eventDate > model.last_verified_unrouted_at && eventDate < model.routing_confirmed_at) return null;
@@ -258,7 +259,21 @@
       + cacheWrite * (cacheWriteRate || 0)
       + event.output_tokens * rates.output
     ) / 1_000_000 + storageCost;
-    return { cost: round(tokenCost + event.tool_charges), routed_model_id: routedModelId };
+    const appliedRateChange = model.rate_change && eventDate >= model.rate_change.effective_at
+      ? {
+          provider: model.provider,
+          model: model.label || model.model || model.id,
+          effective_at: model.rate_change.effective_at,
+          source_url: model.rate_change.source_url,
+        }
+      : null;
+    return {
+      cost: round(tokenCost + event.tool_charges),
+      routed_model_id: routedModelId,
+      priced_model_id: model.id,
+      pricing_date: eventDate,
+      applied_rate_change: appliedRateChange,
+    };
   }
 
   function normalizeStatus(value) {
@@ -965,7 +980,96 @@
     return new Date(timestamp).toISOString().slice(0, 10);
   }
 
-  function periodVariance(events, period, currency, currencyComparable) {
+  function unavailableCostChangeBridge(status, currency, priorPeriod, currentPeriod, limitations, catalog = null) {
+    return {
+      status,
+      currency,
+      starting_cost: priorPeriod.selected_cost,
+      request_volume_effect: null,
+      verified_official_rate_effect: null,
+      usage_and_mix_effect: null,
+      unsupported_or_unproven_residual: null,
+      ending_cost: currentPeriod.selected_cost,
+      limitations: [...new Set(limitations)],
+      provenance: {
+        pricing_catalog_version: catalog?.catalog_version || null,
+        reference_rate_date: priorPeriod.end,
+        current_period_end: currentPeriod.end,
+        rate_changes: [],
+      },
+      method: "Starting cost plus request-volume effect plus verified official list-rate effect plus usage-and-mix effect plus any unsupported residual equals ending cost. Official-rate and mix effects remain unavailable unless every row reconciles exactly to the supplied pricing catalog and current-window usage can be repriced at the prior window end.",
+      savings_claim_allowed: false,
+    };
+  }
+
+  function costChangeBridge(priorEvents, currentEvents, priorPeriod, currentPeriod, currency, totalChange, volumeEffect, unitCostEffect, catalog) {
+    const base = unavailableCostChangeBridge("PARTIAL", currency, priorPeriod, currentPeriod, [], catalog);
+    base.request_volume_effect = volumeEffect;
+    base.unsupported_or_unproven_residual = unitCostEffect;
+    const limitations = [];
+    if (!catalog) limitations.push("Official pricing catalog not supplied");
+    if ([...priorEvents, ...currentEvents].some((event) => event.cost_basis !== "calculated")) {
+      limitations.push("Every row must use catalog-reconciled calculated cost; provider-reported and unpriced rows cannot be split into official rate and usage effects");
+    }
+    const referenceCalculations = [];
+    if (!limitations.length) {
+      for (const event of [...priorEvents, ...currentEvents]) {
+        const calculation = calculatedTokenCost(event, catalog);
+        if (!calculation || Math.abs(calculation.cost - event.selected_cost) > 0.00000001) {
+          limitations.push("At least one selected cost does not reconcile exactly to the supplied official pricing catalog");
+          break;
+        }
+      }
+    }
+    if (!limitations.length) {
+      for (const event of currentEvents) {
+        const actual = calculatedTokenCost(event, catalog);
+        const reference = calculatedTokenCost(event, catalog, priorPeriod.end);
+        if (!actual || !reference) {
+          limitations.push("At least one current request cannot be repriced safely at the prior-window-end official rate");
+          break;
+        }
+        if (actual.priced_model_id !== reference.priced_model_id || actual.routed_model_id !== reference.routed_model_id) {
+          limitations.push("A model or routing transition crosses the comparison boundary and cannot be labeled an official rate effect");
+          break;
+        }
+        referenceCalculations.push(reference);
+      }
+    }
+    if (limitations.length) {
+      base.limitations = [...new Set(limitations)];
+      return base;
+    }
+    const currentAtReferenceRates = referenceCalculations.reduce((sum, item) => sum + item.cost, 0);
+    const currentCost = currentPeriod.selected_cost;
+    const rateEffect = round(currentCost - currentAtReferenceRates);
+    const usageMixEffect = round(totalChange - volumeEffect - rateEffect);
+    const rateChanges = [];
+    const seen = new Set();
+    currentEvents.forEach((event) => {
+      const calculation = calculatedTokenCost(event, catalog);
+      const change = calculation?.applied_rate_change;
+      if (!change || change.effective_at <= priorPeriod.end || change.effective_at > event.timestamp.slice(0, 10)) return;
+      const key = `${change.provider}\u0000${change.model}\u0000${change.effective_at}\u0000${change.source_url}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      rateChanges.push(change);
+    });
+    return {
+      ...base,
+      status: "AVAILABLE",
+      verified_official_rate_effect: rateEffect,
+      usage_and_mix_effect: usageMixEffect,
+      unsupported_or_unproven_residual: 0,
+      limitations: [],
+      provenance: {
+        ...base.provenance,
+        rate_changes: rateChanges,
+      },
+    };
+  }
+
+  function periodVariance(events, period, currency, currencyComparable, catalog = null) {
     const limitations = [];
     if (!period.complete_period_confirmed) limitations.push("Complete continuous period not confirmed");
     if (period.timestamped_rows !== events.length) limitations.push("Some rows have no timestamp");
@@ -991,13 +1095,15 @@
       if (!priorEvents.length || !currentEvents.length) limitations.push("One comparison window has no requests");
     }
     if (limitations.length) {
+      const priorPeriod = { start: priorStart, end: priorEnd, requests: priorEvents.length, selected_cost: null, cost_per_request: null };
+      const currentPeriod = { start: currentStart, end: currentEnd, requests: currentEvents.length, selected_cost: null, cost_per_request: null };
       return {
         status: "NOT_SUPPORTED",
         currency,
         window_days: windowDays,
         excluded_leading_days: period.calendar_days && windowDays ? period.calendar_days - windowDays * 2 : null,
-        prior_period: { start: priorStart, end: priorEnd, requests: priorEvents.length, selected_cost: null, cost_per_request: null },
-        current_period: { start: currentStart, end: currentEnd, requests: currentEvents.length, selected_cost: null, cost_per_request: null },
+        prior_period: priorPeriod,
+        current_period: currentPeriod,
         total_cost_change: null,
         total_cost_change_rate: null,
         request_volume_effect: null,
@@ -1006,6 +1112,7 @@
         top_model_cost_changes: [],
         top_processing_mode_cost_changes: [],
         top_geography_cost_changes: [],
+        cost_change_bridge: unavailableCostChangeBridge("NOT_SUPPORTED", currency, priorPeriod, currentPeriod, limitations, catalog),
         limitations,
         method: "Two equal consecutive UTC windows. Total cost change equals request-volume effect plus average-cost-per-request effect; the latter can reflect model mix, token shape, cache, tools, service tier, or price and is not treated as a rate-card change.",
         savings_claim_allowed: false,
@@ -1037,13 +1144,15 @@
         return { label, prior_cost: round(prior), current_cost: round(current), change: round(current - prior) };
       }).sort((left, right) => Math.abs(right.change) - Math.abs(left.change) || left.label.localeCompare(right.label)).slice(0, 5);
     };
+    const priorPeriod = { start: priorStart, end: priorEnd, requests: priorEvents.length, selected_cost: round(priorCost), cost_per_request: round(priorUnitCost) };
+    const currentPeriod = { start: currentStart, end: currentEnd, requests: currentEvents.length, selected_cost: round(currentCost), cost_per_request: round(currentUnitCost) };
     return {
       status: "AVAILABLE",
       currency,
       window_days: windowDays,
       excluded_leading_days: period.calendar_days - windowDays * 2,
-      prior_period: { start: priorStart, end: priorEnd, requests: priorEvents.length, selected_cost: round(priorCost), cost_per_request: round(priorUnitCost) },
-      current_period: { start: currentStart, end: currentEnd, requests: currentEvents.length, selected_cost: round(currentCost), cost_per_request: round(currentUnitCost) },
+      prior_period: priorPeriod,
+      current_period: currentPeriod,
       total_cost_change: totalChange,
       total_cost_change_rate: priorCost > 0 ? round((currentCost - priorCost) / priorCost, 6) : null,
       request_volume_effect: volumeEffect,
@@ -1068,6 +1177,7 @@
         currentEvents,
         (event) => event.inference_geography || "Geography not supplied",
       ),
+      cost_change_bridge: costChangeBridge(priorEvents, currentEvents, priorPeriod, currentPeriod, currency, totalChange, volumeEffect, unitCostEffect, catalog),
       limitations: [],
       method: "Two equal consecutive UTC windows. Total cost change equals request-volume effect plus average-cost-per-request effect; the latter can reflect model mix, token shape, cache, tools, service tier, or price and is not treated as a rate-card change.",
       savings_claim_allowed: false,
@@ -1320,7 +1430,7 @@
       cost_stack: costStack,
       allocation: allocationSummary(events, rawOptions, costStack, currencyComparable),
       budget: budgetSummary(rawOptions, runRateAvailable ? "AVAILABLE" : "NOT_SUPPORTED", projected30DayCost, currency),
-      period_variance: periodVariance(events, period, currency, currencyComparable),
+      period_variance: periodVariance(events, period, currency, currencyComparable, rawOptions.catalog || null),
       operational_metrics: operationalSummary(events, rawOptions.source_rows || []),
       breakdowns: {
         provider: spendBreakdown(breakdownEvents, "provider", comparableBreakdown, breakdownCost),

@@ -72,6 +72,7 @@ It accepts local evidence files rather than credentials, preserves cost provenan
 5. Normalize comparisons by usable output before discussing savings.
 6. Build a browser interface that can run locally and load exported JSON.
 7. Preserve a clear boundary between analysis and enforcement.
+8. Explain cost movement with an exact, evidence-gated bridge: volume first, official rate only when the catalog proves it, usage/mix only when that split is supported, and an explicit residual otherwise.
 
 ## Primary sources reviewed
 

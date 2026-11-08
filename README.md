@@ -61,7 +61,7 @@ These contracts are deliberately different and are not interchangeable templates
 - A local request-log review with canonical events, reversible duplicate flags, retained unpriced rows, request-level waste candidates, and overlap-safe financial boundaries
 - Request-cost spike detection, local spend breakdowns, evidence-gated 30-day run rate, and optional bill reconciliation that never deletes suspected duplicate rows
 - Optional local monthly-budget thresholds against that evidence-gated run rate, with `WITHIN`, `WATCH`, `OVER`, or unavailable status and no claim of live enforcement
-- Equal-window period variance with an exact volume-versus-average-cost bridge, plus latency, cache, failure, retry, and outcome-evidence coverage
+- Equal-window cost-change bridge with request volume, evidence-gated official rate, usage/mix, and explicit unsupported residual effects, plus latency, cache, failure, retry, and outcome-evidence coverage
 - Cost-weighted allocation coverage across project, team, feature, customer, product, workload, workflow, session, and environment, with a user-set unallocated-cost warning
 - A fail-closed operating-cost stack for compute, retrieval/data, network, tooling, pipeline, and human review; fully loaded cost appears only when every category is supplied
 - Separate usage-telemetry, request-cost, and billing-evidence layers so a fast operational signal cannot masquerade as an invoice
