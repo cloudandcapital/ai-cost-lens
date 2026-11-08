@@ -4005,16 +4005,39 @@
     } else {
       const changeRate = variance.total_cost_change_rate === null ? "Not available" : `${variance.total_cost_change_rate > 0 ? "+" : ""}${(variance.total_cost_change_rate * 100).toFixed(1)}%`;
       const leading = variance.excluded_leading_days ? ` ${wholeNumber(variance.excluded_leading_days)} leading day${variance.excluded_leading_days === 1 ? " was" : "s were"} excluded so the windows are equal.` : "";
+      const bridge = variance.cost_change_bridge || {
+        status: "PARTIAL",
+        currency: variance.currency,
+        starting_cost: variance.prior_period.selected_cost,
+        request_volume_effect: variance.request_volume_effect,
+        verified_official_rate_effect: null,
+        usage_and_mix_effect: null,
+        unsupported_or_unproven_residual: variance.average_cost_per_request_effect,
+        ending_cost: variance.current_period.selected_cost,
+        limitations: ["This saved review predates the evidence-gated official-rate bridge"],
+        provenance: { pricing_catalog_version: null, reference_rate_date: variance.prior_period.end, current_period_end: variance.current_period.end, rate_changes: [] },
+      };
+      const bridgeAvailable = bridge?.status === "AVAILABLE";
+      const rateSources = bridge?.provenance?.rate_changes || [];
+      const rateSourceCopy = rateSources.length
+        ? ` Official rate evidence: ${rateSources.map((item) => `<a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(item.provider)} ${escapeHtml(item.model)} · effective ${escapeHtml(item.effective_at)}</a>`).join("; ")}.`
+        : bridgeAvailable
+          ? " No catalog-recorded official rate change crossed these windows."
+          : "";
+      const bridgeLimitation = bridgeAvailable
+        ? "Every row reconciled to the checked-in official list-price catalog, and recent-window usage was repriced at the prior window end."
+        : `The official-rate and usage/mix split is unavailable: ${escapeHtml((bridge?.limitations || []).join("; "))}. The residual keeps the unproven average-cost effect visible instead of guessing.`;
       const costChangeTable = (title, rows) => rows?.length ? `<div class="request-variance-table-wrap" role="region" aria-label="${escapeHtml(title)} cost changes" tabindex="0"><h4>${escapeHtml(title)}</h4><table><thead><tr><th>${escapeHtml(title)}</th><th>Prior</th><th>Recent</th><th>Change</th></tr></thead><tbody>${rows.map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${requestReviewMoney(item.prior_cost, variance.currency)}</td><td>${requestReviewMoney(item.current_cost, variance.currency)}</td><td>${escapeHtml(signedCost(item.change))}</td></tr>`).join("")}</tbody></table></div>` : "";
       document.getElementById("request-variance").innerHTML = `
         <div class="request-variance-cards">
-          <article><span>Prior ${wholeNumber(variance.window_days)} days</span><strong>${requestReviewMoney(variance.prior_period.selected_cost, variance.currency)}</strong><p>${wholeNumber(variance.prior_period.requests)} requests · ${requestReviewMoney(variance.prior_period.cost_per_request, variance.currency)} each</p></article>
-          <article><span>Recent ${wholeNumber(variance.window_days)} days</span><strong>${requestReviewMoney(variance.current_period.selected_cost, variance.currency)}</strong><p>${wholeNumber(variance.current_period.requests)} requests · ${requestReviewMoney(variance.current_period.cost_per_request, variance.currency)} each</p></article>
-          <article><span>Total cost change</span><strong>${escapeHtml(signedCost(variance.total_cost_change))}</strong><p>${escapeHtml(changeRate)} between equal windows.</p></article>
-          <article><span>Request-volume effect</span><strong>${escapeHtml(signedCost(variance.request_volume_effect))}</strong><p>Change in request count at the prior window's average cost per request.</p></article>
-          <article><span>Average-cost effect</span><strong>${escapeHtml(signedCost(variance.average_cost_per_request_effect))}</strong><p>Can reflect mix, token shape, cache, tools, service tier, or price. It is not labeled a rate change.</p></article>
+          <article><span>Starting cost</span><strong>${requestReviewMoney(bridge.starting_cost, bridge.currency)}</strong><p>${wholeNumber(variance.prior_period.requests)} requests across the prior ${wholeNumber(variance.window_days)} days.</p></article>
+          <article><span>Request-volume effect</span><strong>${escapeHtml(signedCost(bridge.request_volume_effect))}</strong><p>Request-count change at the prior window's average cost.</p></article>
+          <article><span>Verified official rate effect</span><strong>${escapeHtml(signedCost(bridge.verified_official_rate_effect))}</strong><p>${bridgeAvailable ? "Checked-in official list-rate changes only." : "Unavailable without exact catalog reconciliation."}</p></article>
+          <article><span>Usage and mix effect</span><strong>${escapeHtml(signedCost(bridge.usage_and_mix_effect))}</strong><p>${bridgeAvailable ? "Token shape, cache, tools, tier, model, geography, and other usage mix." : "Unavailable while the rate split is unsupported."}</p></article>
+          <article><span>Unsupported / unproven residual</span><strong>${escapeHtml(signedCost(bridge.unsupported_or_unproven_residual))}</strong><p>${bridgeAvailable ? "Zero: the bridge reconciles with supported components." : "Retains the unsplit average-cost effect; it is not labeled savings."}</p></article>
+          <article><span>Ending cost</span><strong>${requestReviewMoney(bridge.ending_cost, bridge.currency)}</strong><p>${wholeNumber(variance.current_period.requests)} requests across the recent ${wholeNumber(variance.window_days)} days.</p></article>
         </div>
-        <p class="request-variance-note">${escapeHtml(variance.prior_period.start)} to ${escapeHtml(variance.prior_period.end)} versus ${escapeHtml(variance.current_period.start)} to ${escapeHtml(variance.current_period.end)}.${escapeHtml(leading)} The two effects reconcile to total cost change; neither is automatically avoidable.</p>
+        <p class="request-variance-note"><strong>Total change: ${escapeHtml(signedCost(variance.total_cost_change))} (${escapeHtml(changeRate)}).</strong> ${escapeHtml(variance.prior_period.start)} to ${escapeHtml(variance.prior_period.end)} versus ${escapeHtml(variance.current_period.start)} to ${escapeHtml(variance.current_period.end)}.${escapeHtml(leading)} ${bridgeLimitation}${rateSourceCopy} Catalog ${escapeHtml(bridge?.provenance?.pricing_catalog_version || "not supplied")}; reference rate date ${escapeHtml(bridge?.provenance?.reference_rate_date || "unavailable")}. No component is automatically avoidable or a savings claim.</p>
         ${costChangeTable("Provider", variance.top_provider_cost_changes)}
         ${costChangeTable("Provider · model", variance.top_model_cost_changes)}
         ${costChangeTable("Processing mode", variance.top_processing_mode_cost_changes || [])}

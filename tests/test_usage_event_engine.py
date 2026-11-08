@@ -631,6 +631,11 @@ console.log(JSON.stringify({watch, over, incomplete, missingSignals, volumeOnly,
     assert variance["request_volume_effect"] == 0
     assert variance["average_cost_per_request_effect"] == 70
     assert variance["savings_claim_allowed"] is False
+    assert variance["cost_change_bridge"]["status"] == "PARTIAL"
+    assert variance["cost_change_bridge"]["verified_official_rate_effect"] is None
+    assert variance["cost_change_bridge"]["usage_and_mix_effect"] is None
+    assert variance["cost_change_bridge"]["unsupported_or_unproven_residual"] == 70
+    assert variance["cost_change_bridge"]["savings_claim_allowed"] is False
     assert (
         variance["request_volume_effect"] + variance["average_cost_per_request_effect"]
         == variance["total_cost_change"]
@@ -685,6 +690,92 @@ console.log(JSON.stringify({watch, over, incomplete, missingSignals, volumeOnly,
     assert missing["median_latency_ms"] is None
     assert missing["outcome_coverage_rows"] == 0
     assert review["evidence_gate"]["savings_claim_allowed"] is False
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_cost_change_bridge_separates_verified_rate_volume_and_usage_mix():
+    result = run_node(
+        r"""
+const engine = require(process.argv[1]);
+const catalog = require(process.argv[2]);
+const iso = (year, month, day) => new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10);
+const base = (eventId, date, overrides = {}) => ({
+  event_id: eventId, timestamp: `${date}T12:00:00Z`, provider: "OpenAI", model: "gpt-5.6-sol",
+  processing_mode: "standard", inference_geography: "global", input_tokens: 100000,
+  output_tokens: 10000, cached_input_tokens: 50000, cache_write_tokens: 0,
+  cache_storage_token_hours: 0, tool_charges: 0, currency: "USD", ...overrides,
+});
+const stableDates = Array.from({length: 14}, (_, index) => iso(2026, 10, index + 1));
+const volumeRows = stableDates.flatMap((date, index) => {
+  const first = base(`volume-${index}-a`, date);
+  return index < 7 ? [first] : [first, base(`volume-${index}-b`, date)];
+});
+const mixRows = stableDates.map((date, index) => base(`mix-${index}`, date, {
+  input_tokens: index < 7 ? 100000 : 200000,
+  cached_input_tokens: index < 7 ? 50000 : 100000,
+}));
+const rateDates = Array.from({length: 14}, (_, index) => iso(2026, 9, 29 + index));
+const rateRows = rateDates.map((date, index) => base(`rate-${index}`, date, {
+  provider: "Anthropic", model: "claude-sonnet-5-5", input_tokens: 1000000,
+  output_tokens: 0, cached_input_tokens: 500000,
+}));
+const historyDates = Array.from({length: 14}, (_, index) => iso(2026, 9, 22 + index));
+const missingHistoryRows = historyDates.map((date, index) => base(`history-${index}`, date, {
+  provider: "Anthropic", model: "claude-sonnet-5-5", calculated_cost: 1,
+}));
+const build = (rows) => engine.buildReview(rows, {catalog, period_complete_confirmed: true}).spend.period_variance;
+console.log(JSON.stringify({rate: build(rateRows), volume: build(volumeRows), mix: build(mixRows), missingHistory: build(missingHistoryRows)}));
+""",
+        ENGINE,
+        CATALOG,
+    )
+
+    rate = result["rate"]["cost_change_bridge"]
+    assert rate["status"] == "AVAILABLE"
+    assert rate["verified_official_rate_effect"] == -0.3
+    assert rate["usage_and_mix_effect"] == 0
+    assert rate["unsupported_or_unproven_residual"] == 0
+    assert rate["provenance"]["pricing_catalog_version"] == "2026-10-18"
+    assert rate["provenance"]["reference_rate_date"] == "2026-10-05"
+    assert rate["provenance"]["rate_changes"] == [
+        {
+            "provider": "Anthropic",
+            "model": "Claude Sonnet 5.5",
+            "effective_at": "2026-10-07",
+            "source_url": "https://platform.claude.com/docs/en/release-notes/overview",
+        }
+    ]
+    assert (
+        rate["starting_cost"]
+        + rate["request_volume_effect"]
+        + rate["verified_official_rate_effect"]
+        + rate["usage_and_mix_effect"]
+        + rate["unsupported_or_unproven_residual"]
+        == rate["ending_cost"]
+    )
+
+    volume = result["volume"]["cost_change_bridge"]
+    assert volume["status"] == "AVAILABLE"
+    assert volume["request_volume_effect"] > 0
+    assert volume["verified_official_rate_effect"] == 0
+    assert volume["usage_and_mix_effect"] == 0
+
+    mix = result["mix"]["cost_change_bridge"]
+    assert mix["status"] == "AVAILABLE"
+    assert mix["request_volume_effect"] == 0
+    assert mix["verified_official_rate_effect"] == 0
+    assert mix["usage_and_mix_effect"] > 0
+
+    missing = result["missingHistory"]["cost_change_bridge"]
+    assert missing["status"] == "PARTIAL"
+    assert missing["verified_official_rate_effect"] is None
+    assert missing["usage_and_mix_effect"] is None
+    assert (
+        missing["unsupported_or_unproven_residual"]
+        == result["missingHistory"]["average_cost_per_request_effect"]
+    )
+    assert any("does not reconcile" in item for item in missing["limitations"])
+    assert missing["savings_claim_allowed"] is False
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
@@ -1037,6 +1128,14 @@ def test_usage_event_and_review_schemas_are_versioned_and_fail_closed():
         spend["properties"]["period_variance"]["properties"]["savings_claim_allowed"][
             "const"
         ]
+        is False
+    )
+    bridge = spend["properties"]["period_variance"]["properties"]["cost_change_bridge"]
+    assert bridge["$ref"] == "#/$defs/costChangeBridge"
+    assert (
+        review_schema["$defs"]["costChangeBridge"]["properties"][
+            "savings_claim_allowed"
+        ]["const"]
         is False
     )
 

@@ -149,6 +149,7 @@
               "maxItems": 5,
               "items": { "$ref": "#/$defs/costChange" }
             },
+            "cost_change_bridge": { "$ref": "#/$defs/costChangeBridge" },
             "limitations": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
             "method": { "type": "string" },
             "savings_claim_allowed": { "const": false }
@@ -284,6 +285,48 @@
         "requests": { "type": "integer", "minimum": 0 },
         "selected_cost": { "type": ["number", "null"], "minimum": 0 },
         "cost_per_request": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "costChangeBridge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "currency", "starting_cost", "request_volume_effect", "verified_official_rate_effect", "usage_and_mix_effect", "unsupported_or_unproven_residual", "ending_cost", "limitations", "provenance", "method", "savings_claim_allowed"],
+      "properties": {
+        "status": { "enum": ["AVAILABLE", "PARTIAL", "NOT_SUPPORTED"] },
+        "currency": { "anyOf": [{ "type": "string", "pattern": "^[A-Z]{3}$" }, { "const": "MIXED" }, { "type": "null" }] },
+        "starting_cost": { "type": ["number", "null"], "minimum": 0 },
+        "request_volume_effect": { "type": ["number", "null"] },
+        "verified_official_rate_effect": { "type": ["number", "null"] },
+        "usage_and_mix_effect": { "type": ["number", "null"] },
+        "unsupported_or_unproven_residual": { "type": ["number", "null"] },
+        "ending_cost": { "type": ["number", "null"], "minimum": 0 },
+        "limitations": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pricing_catalog_version", "reference_rate_date", "current_period_end", "rate_changes"],
+          "properties": {
+            "pricing_catalog_version": { "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+            "reference_rate_date": { "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+            "current_period_end": { "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+            "rate_changes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["provider", "model", "effective_at", "source_url"],
+                "properties": {
+                  "provider": { "type": "string", "minLength": 1 },
+                  "model": { "type": "string", "minLength": 1 },
+                  "effective_at": { "type": "string", "format": "date" },
+                  "source_url": { "type": "string", "format": "uri", "pattern": "^https://" }
+                }
+              }
+            }
+          }
+        },
+        "method": { "type": "string", "minLength": 1 },
+        "savings_claim_allowed": { "const": false }
       }
     },
     "costStack": {

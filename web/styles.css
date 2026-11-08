@@ -4392,9 +4392,16 @@ body.story-mode .cockpit-grid {
 .request-operational-metrics,
 .request-variance-cards {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
   border-top: 1px solid var(--line-strong);
   border-bottom: 1px solid var(--line-strong);
+}
+
+.request-operational-metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.request-variance-cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .request-operational-metrics article,
@@ -4407,6 +4414,14 @@ body.story-mode .cockpit-grid {
 .request-operational-metrics article:last-child,
 .request-variance-cards article:last-child {
   border-right: 0;
+}
+
+.request-variance-cards article:nth-child(3n) {
+  border-right: 0;
+}
+
+.request-variance-cards article:nth-child(-n + 3) {
+  border-bottom: 1px solid var(--line);
 }
 
 .request-operational-metrics span,
@@ -5487,6 +5502,18 @@ body.story-mode .cockpit-grid {
     border-bottom: 1px solid var(--line);
   }
 
+  .request-variance-cards article:nth-child(3n) {
+    border-right: 1px solid var(--line);
+  }
+
+  .request-variance-cards article:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .request-variance-cards article:nth-child(n + 5) {
+    border-bottom: 0;
+  }
+
   .verification-result-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -5591,6 +5618,15 @@ body.story-mode .cockpit-grid {
   .request-operational-metrics article,
   .request-variance-cards article {
     border-right: 0;
+  }
+
+  .request-variance-cards article:nth-child(n) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .request-variance-cards article:last-child {
+    border-bottom: 0;
   }
 
   .request-spend-context article:last-child {
