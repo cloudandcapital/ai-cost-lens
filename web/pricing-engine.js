@@ -324,7 +324,7 @@
       throw new Error(`${model.label} has no published ${geography} geography rate in this catalog. Available locations: ${available}.`);
     }
     if (model.unsupported_combinations?.includes(`${processingMode}+${geography}`)) {
-      throw new Error(`${model.label} does not support ${processingMode} with ${geography} processing. Select an explicitly supported geography and mode.`);
+      throw new Error(`The checked-in catalog does not support ${processingMode} with ${geography} processing for ${model.label}. Select an explicitly supported geography and mode.`);
     }
     const longContext = Boolean(model.long_context && scenario.input_tokens > model.long_context.input_threshold_tokens);
     const contextRates = Object.fromEntries(RATE_FIELDS.flatMap((field) => {

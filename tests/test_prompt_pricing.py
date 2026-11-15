@@ -106,7 +106,7 @@ console.log(JSON.stringify({catalog, comparison, record}));
     payload = json.loads(result.stdout)
     catalog = payload["catalog"]
     assert catalog["schema_version"] == "ai-cost-lens-pricing-catalog/0.5"
-    assert catalog["catalog_version"] == "2026-10-18"
+    assert catalog["catalog_version"] == "2026-11-15"
     assert {model["provider"] for model in catalog["models"]} == {
         "OpenAI",
         "Anthropic",
@@ -146,7 +146,7 @@ console.log(JSON.stringify({catalog, comparison, record}));
     assert current["estimated_cost_per_usable_result_usd"] == 0.0180125
     assert alternative["estimated_monthly_cost_usd"] == 7.205
     assert alternative["monthly_difference_from_current_usd"] == -7.205
-    assert current["promotional_rate_guaranteed_through"] == "2026-11-21"
+    assert current["promotional_rate_guaranteed_through"] == "2026-11-30"
     assert current["estimated_annual_cost_usd"] is None
     assert current["annual_rate_known"] is False
     assert alternative["annual_difference_from_current_usd"] is None
@@ -233,6 +233,7 @@ console.log(JSON.stringify(Object.fromEntries(catalog.models.map((model) => [mod
     expected.update(
         {
             "openai/gpt-6.1-sol": ((2, 0.1, 10), (1, 0.05, 5)),
+            "openai/gpt-6.1-terra": ((1, 0.05, 5), (0.5, 0.025, 2.5)),
             "anthropic/claude-sonnet-5.5": ((2, 0.1, 10), (1, 0.05, 5)),
             "anthropic/claude-haiku-5.5": ((0.1, 0.01, 0.5), (0.05, 0.005, 0.25)),
             "google/gemini-3.6-flash": ((0.75, 0.075, 3.75), (0.375, 0.0375, 1.875)),
@@ -621,7 +622,7 @@ const catalog = require(process.argv[1]);
 const engine = require(process.argv[2]);
 const older = require(process.argv[3]);
 const selected = engine.selectCatalog([catalog, older], "2026-09-22");
-const current = engine.selectCatalog([catalog, older], "2026-10-18");
+const current = engine.selectCatalog([catalog, older], "2026-11-15");
 const model = catalog.models.find((item) => item.id === "openai/gpt-5.6-sol");
 const longContext = engine.priceModel(model, {
   input_tokens: 300000, output_tokens: 10000, calls_per_month: 1,
@@ -651,7 +652,7 @@ try {
   });
 } catch (_error) { missingRejected = true; }
 try { engine.selectCatalog([catalog], "2026-02-31"); } catch (_error) { invalidDateRejected = true; }
-try { engine.requireCatalogDateCoverage(catalog, "2026-11-22"); } catch (_error) { expiredCatalogRejected = true; }
+try { engine.requireCatalogDateCoverage(catalog, "2026-11-29"); } catch (_error) { expiredCatalogRejected = true; }
 console.log(JSON.stringify({selected: selected.catalog_version, current: current.catalog_version, longContext, contextRejected, outputRejected, missingRejected, invalidDateRejected, expiredCatalogRejected}));
 """
     result = subprocess.run(
@@ -670,7 +671,7 @@ console.log(JSON.stringify({selected: selected.catalog_version, current: current
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["selected"] == "2026-09-22"
-    assert payload["current"] == "2026-10-18"
+    assert payload["current"] == "2026-11-15"
     assert payload["longContext"]["pricing_adjustment"] == "long_context"
     assert payload["longContext"]["rates_per_1m_tokens"] == {
         "input": 8,

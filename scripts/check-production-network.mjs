@@ -32,13 +32,16 @@ async function settle() {
 }
 
 try {
+  const catalogResponse = page.waitForResponse((response) => response.url() === `${origin}/data/pricing-catalog-v0.5.js`);
   await page.goto(origin, { waitUntil: "networkidle" });
+  const deployedCatalog = (await (await catalogResponse).text()).match(/catalog_version:\s*"(\d{4}-\d{2}-\d{2})"/)?.[1];
+  assert(deployedCatalog, "Production catalog version is missing from its served asset.");
   await page.locator("#welcome-title").waitFor({ state: "visible" });
   await page.locator("#welcome-example").click();
   await page.locator("#review-title").waitFor({ state: "visible" });
   await page.locator("#price-prompt").click();
-  assert((await page.locator("#prompt-catalog-stamp").innerText()).includes("Catalog 2026-10-18"),
-    "Production is not serving the expected catalog.");
+  assert((await page.locator("#prompt-catalog-stamp").innerText()).includes(`Catalog ${deployedCatalog}`),
+    "Production catalog label disagrees with its served pricing asset.");
   await page.locator("#prompt-text").fill(marker);
   await page.locator("#prompt-input-tokens").fill("20000");
   await page.locator("#prompt-output-tokens").fill("500");
@@ -90,7 +93,7 @@ try {
   process.stdout.write(`${JSON.stringify({
     result: "passed",
     origin,
-    catalog: "2026-10-18",
+    catalog: deployedCatalog,
     flows: ["load", "price-prompt", "review-handoff", "fictional-csv-import", "json-exports"],
     request_counts: {
       load_and_pricing: afterPricing,

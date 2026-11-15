@@ -105,6 +105,58 @@ async function openAdvancedChoices(page) {
   if (!(await choices.evaluate((element) => element.open))) await choices.locator("summary").click();
 }
 
+async function verifyScopedChange(page, engineName) {
+  const fixture = JSON.parse(await readFile(join(root, "tests/fixtures/scoped-change-two-window.json"), "utf8"));
+  // Browser fixture uses fictional reported costs. Actual provider prices and
+  // private catalogs are not replaced; the official-rate split must stay gated.
+  const rows = fixture.rows.map((row) => ({ ...row,
+    provider_reported_cost: row.input_tokens / 1_000_000 * (row.model === "beta" ? 20 : row.timestamp < "2026-10-08" ? 10 : 12),
+  }));
+  await page.locator("#review-usage").click();
+  await page.locator("#request-log-file").setInputFiles({ name: "fictional-scoped-change.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(rows)) });
+  await page.locator("#request-period-complete").check();
+  await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
+  const region = page.locator(".request-scoped-section");
+  assert((await region.innerText()).includes("Support"), `${engineName}: scoped team contribution is missing.`);
+  assert((await region.innerText()).includes("+$72.00"), `${engineName}: scoped Support change is incorrect.`);
+  assert((await region.innerText()).includes("Unattributed"), `${engineName}: missing team labels were hidden.`);
+  assert((await region.innerText()).includes("Partial evidence"), `${engineName}: reported costs unlocked a catalog rate claim.`);
+  const team = await saveJsonDownload(page, "#download-usage-review", `${engineName}-scoped-team.json`);
+  assert(team.schema_version === "ai-cost-lens-usage-review/1.2", `${engineName}: scoped review contract was not versioned.`);
+  const originalBridge = JSON.stringify(team.spend.period_variance.cost_change_bridge);
+  await page.locator("#request-change-dimension").selectOption("model");
+  const model = await saveJsonDownload(page, "#download-usage-review", `${engineName}-scoped-model.json`);
+  assert(model.spend.period_variance.scoped_change.dimension === "model", `${engineName}: selected grouping was not exported.`);
+  assert(model.spend.period_variance.scoped_change.display.totals.change === 100, `${engineName}: grouping changed the total.`);
+  assert(JSON.stringify(model.spend.period_variance.cost_change_bridge) === originalBridge, `${engineName}: grouping mutated the parent bridge.`);
+  assert(model.evidence_gate.savings_claim_allowed === false, `${engineName}: scoped view changed the savings gate.`);
+  await page.locator("#request-change-dimension").selectOption("team_owner");
+  await region.scrollIntoViewIfNeeded();
+  await region.screenshot({ path: join(output, `${engineName}-scoped-change-desktop.png`) });
+  const viewport = page.viewportSize();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator(".request-scoped-components > summary").click();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${engineName}: scoped mobile view overflows.`);
+  await region.screenshot({ path: join(output, `${engineName}-scoped-change-mobile.png`) });
+  const accessibility = await new AxeBuilder({ page }).include(".request-scoped-section").analyze();
+  assert(accessibility.violations.length === 0, `${engineName}: scoped accessibility findings: ${axeSummary(accessibility)}`);
+  await page.emulateMedia({ forcedColors: "active" });
+  assert((await region.innerText()).includes("+$72.00"), `${engineName}: signed change depends on color.`);
+  await region.screenshot({ path: join(output, `${engineName}-scoped-change-no-color.png`) });
+  await page.emulateMedia({ forcedColors: "none" });
+  await page.setViewportSize(viewport);
+  await page.locator("#request-change-dimension").focus();
+  await page.keyboard.press("Tab");
+  assert(await page.locator("#request-scoped-change").evaluate((element) => element.contains(document.activeElement)), `${engineName}: keyboard cannot enter the scoped result.`);
+  rows[0].provider_reported_cost = null;
+  rows[0].model = "unpriced-model";
+  await page.locator("#request-log-file").setInputFiles({ name: "fictional-unpriced-scoped.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(rows)) });
+  await page.locator("#analyze-request-log").click();
+  assert((await region.innerText()).includes("Grouped change unavailable"), `${engineName}: unpriced row did not gate the scoped table.`);
+  assert(await page.locator("#request-change-dimension").isDisabled(), `${engineName}: unavailable grouping control stayed active.`);
+}
+
 async function verifyFinanceMemoPdf(page, { simple = false } = {}) {
   if (!simple) {
     await page.locator("#start-review").click();
@@ -637,7 +689,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
       assert(row.toUpperCase().includes(expected), `${engineName}: ${name} missing ${expected.replace("\n", " ")}.`);
     }
     const provenance = await card.locator(".model-catalog-card-head span").textContent();
-    const expectedCheck = name === "Gemini 4 Argon" ? "2026-10-18" : ["Claude Sonnet 5.5", "Claude Haiku 5.5", "Gemini 3.6 Flash"].includes(name) ? "2026-10-11" : "2026-10-05";
+    const expectedCheck = "2026-11-15";
     assert(provenance.includes(`checked ${expectedCheck}`), `${engineName}: ${name} is missing its checked date: ${provenance}`);
   }
   for (const oldName of ["Gemini 3.5 Flash", "Gemini 3.7 Flash"]) {
@@ -914,6 +966,7 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `${engineName}: browser errors: ${observed.errors.join(" | ")}`);
   await browser.close();
+  await verifyScopedChange(page, engineName);
   return { engine: engineName, prompt_routes: estimate.comparison.length, usage_rows: usage.event_count, finance_memo_pdf: financeMemoPdf, saved_review_reopened: savedReview, rich_decisions, egress: 0 };
 }
 

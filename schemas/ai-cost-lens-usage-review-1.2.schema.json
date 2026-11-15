@@ -1,0 +1,2009 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudandcapital.com/schemas/ai-cost-lens-usage-review-1.2.schema.json",
+  "title": "AI Cost Lens usage review 1.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "application_version",
+    "pricing_catalog_version",
+    "source",
+    "currency",
+    "event_count",
+    "events",
+    "reconciliation",
+    "spend",
+    "evidence_layers",
+    "findings",
+    "headline",
+    "evidence_gate",
+    "privacy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ai-cost-lens-usage-review/1.2"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "application_version": {
+      "type": "string"
+    },
+    "pricing_catalog_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "adapter",
+        "sha256",
+        "uploaded"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "adapter": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "uploaded": {
+          "const": false
+        }
+      }
+    },
+    "currency": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        {
+          "const": "MIXED"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "event_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20000
+    },
+    "import_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_rows",
+        "analyzed_rows",
+        "excluded_rows",
+        "issues"
+      ],
+      "properties": {
+        "source_rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20000
+        },
+        "analyzed_rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20000
+        },
+        "excluded_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20000
+        },
+        "issues": {
+          "type": "array",
+          "maxItems": 20000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "row",
+              "reason"
+            ],
+            "properties": {
+              "row": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20000,
+      "items": {
+        "$ref": "ai-cost-lens-usage-event-1.1.schema.json"
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_reported_cost",
+        "calculated_cost_used_when_reported_missing",
+        "selected_observed_cost",
+        "selected_cost_excluding_later_duplicate_rows",
+        "priced_rows",
+        "unpriced_rows",
+        "duplicate_rows_flagged",
+        "provider_reported_cost_precedence",
+        "bill"
+      ],
+      "properties": {
+        "provider_reported_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "calculated_cost_used_when_reported_missing": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "selected_observed_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "selected_cost_excluding_later_duplicate_rows": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "priced_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unpriced_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_rows_flagged": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provider_reported_cost_precedence": {
+          "const": true
+        },
+        "bill": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "supplied_total",
+            "supplied_currency",
+            "same_scope_confirmed",
+            "raw_selected_cost_difference",
+            "duplicate_excluded_reference_difference",
+            "method"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "NOT_SUPPLIED",
+                "ROWS_EXCLUDED",
+                "SCOPE_NOT_CONFIRMED",
+                "PROVIDER_SCOPE_UNCLEAR",
+                "REQUEST_COST_MISSING",
+                "MIXED_CURRENCY",
+                "REQUEST_CURRENCY_MISSING",
+                "BILL_CURRENCY_MISSING",
+                "CURRENCY_MISMATCH",
+                "COMPARABLE"
+              ]
+            },
+            "source": {
+              "enum": [
+                "user_entered_unverified"
+              ]
+            },
+            "supplied_total": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "supplied_currency": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "same_scope_confirmed": {
+              "type": "boolean"
+            },
+            "raw_selected_cost_difference": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "duplicate_excluded_reference_difference": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "method": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "spend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "period",
+        "selected_cost",
+        "cost_per_priced_request",
+        "average_cost_per_calendar_day",
+        "projected_30_day_cost",
+        "run_rate_status",
+        "run_rate_method",
+        "run_rate_limitations",
+        "cost_stack",
+        "allocation",
+        "budget",
+        "period_variance",
+        "operational_metrics",
+        "breakdowns"
+      ],
+      "properties": {
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            {
+              "const": "MIXED"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "period": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start",
+            "end",
+            "calendar_days",
+            "active_days",
+            "timestamped_rows",
+            "complete_period_confirmed"
+          ],
+          "properties": {
+            "start": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "end": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "calendar_days": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "active_days": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "timestamped_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "complete_period_confirmed": {
+              "type": "boolean"
+            }
+          }
+        },
+        "selected_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cost_per_priced_request": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "average_cost_per_calendar_day": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "projected_30_day_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "run_rate_status": {
+          "enum": [
+            "AVAILABLE",
+            "NOT_SUPPORTED"
+          ]
+        },
+        "run_rate_method": {
+          "type": "string"
+        },
+        "run_rate_limitations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "cost_stack": {
+          "$ref": "#/$defs/costStack"
+        },
+        "allocation": {
+          "$ref": "#/$defs/allocationSummary"
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "monthly_budget",
+            "warning_threshold",
+            "projected_30_day_cost",
+            "projected_utilization",
+            "projected_variance_to_budget",
+            "projected_budget_remaining",
+            "currency",
+            "method",
+            "savings_claim_allowed"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "NOT_SUPPLIED",
+                "RUN_RATE_UNAVAILABLE",
+                "WITHIN",
+                "WATCH",
+                "OVER"
+              ]
+            },
+            "monthly_budget": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            },
+            "warning_threshold": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "projected_30_day_cost": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "projected_utilization": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "projected_variance_to_budget": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "projected_budget_remaining": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "currency": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                {
+                  "const": "MIXED"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "method": {
+              "type": "string"
+            },
+            "savings_claim_allowed": {
+              "const": false
+            }
+          }
+        },
+        "period_variance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "currency",
+            "window_days",
+            "excluded_leading_days",
+            "prior_period",
+            "current_period",
+            "total_cost_change",
+            "total_cost_change_rate",
+            "request_volume_effect",
+            "average_cost_per_request_effect",
+            "top_provider_cost_changes",
+            "top_model_cost_changes",
+            "limitations",
+            "method",
+            "savings_claim_allowed",
+            "scoped_change"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "AVAILABLE",
+                "NOT_SUPPORTED"
+              ]
+            },
+            "currency": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                {
+                  "const": "MIXED"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "window_days": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "excluded_leading_days": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "prior_period": {
+              "$ref": "#/$defs/variancePeriod"
+            },
+            "current_period": {
+              "$ref": "#/$defs/variancePeriod"
+            },
+            "total_cost_change": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "total_cost_change_rate": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "request_volume_effect": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "average_cost_per_request_effect": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "top_provider_cost_changes": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "$ref": "#/$defs/costChange"
+              }
+            },
+            "top_model_cost_changes": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "$ref": "#/$defs/costChange"
+              }
+            },
+            "top_processing_mode_cost_changes": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "$ref": "#/$defs/costChange"
+              }
+            },
+            "top_geography_cost_changes": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "$ref": "#/$defs/costChange"
+              }
+            },
+            "cost_change_bridge": {
+              "$ref": "#/$defs/costChangeBridge"
+            },
+            "limitations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "method": {
+              "type": "string"
+            },
+            "savings_claim_allowed": {
+              "const": false
+            },
+            "scoped_change": {
+              "$ref": "#/$defs/scopedChange"
+            }
+          }
+        },
+        "operational_metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status_coverage_rows",
+            "failed_or_cancelled_rows",
+            "failed_or_cancelled_rate",
+            "retry_coverage_rows",
+            "retry_linked_rows",
+            "retry_linked_rate",
+            "cache_coverage_rows",
+            "cache_input_tokens",
+            "cached_input_tokens",
+            "cache_share",
+            "latency_coverage_rows",
+            "median_latency_ms",
+            "p95_latency_ms",
+            "outcome_coverage_rows"
+          ],
+          "properties": {
+            "status_coverage_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed_or_cancelled_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed_or_cancelled_rate": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/probability"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "retry_coverage_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "retry_linked_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "retry_linked_rate": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/probability"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cache_coverage_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cache_input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "cached_input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "cache_share": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/probability"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latency_coverage_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "median_latency_ms": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "p95_latency_ms": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "outcome_coverage_rows": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "currency_slices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "rows",
+              "priced_rows",
+              "unpriced_rows",
+              "selected_cost",
+              "breakdowns"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "priced_rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unpriced_rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "selected_cost": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "breakdowns": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "customer",
+                  "model",
+                  "feature"
+                ],
+                "properties": {
+                  "customer": {
+                    "$ref": "#/$defs/spendBreakdown"
+                  },
+                  "model": {
+                    "$ref": "#/$defs/spendBreakdown"
+                  },
+                  "feature": {
+                    "$ref": "#/$defs/spendBreakdown"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "breakdowns": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "model",
+            "project",
+            "team_owner",
+            "feature",
+            "customer",
+            "product",
+            "workload",
+            "workflow",
+            "session_id",
+            "environment",
+            "customer_product"
+          ],
+          "properties": {
+            "provider": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "model": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "processing_mode": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "inference_geography": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "project": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "team_owner": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "feature": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "customer": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "product": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "workload": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "workflow": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "session_id": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "environment": {
+              "$ref": "#/$defs/spendBreakdown"
+            },
+            "customer_product": {
+              "$ref": "#/$defs/spendBreakdown"
+            }
+          }
+        }
+      }
+    },
+    "evidence_layers": {
+      "$ref": "#/$defs/evidenceLayers"
+    },
+    "findings": {
+      "type": "array"
+    },
+    "headline": {
+      "type": "object"
+    },
+    "comparable_currency_review": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "rows",
+            "priced_rows",
+            "findings",
+            "headline"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "rows": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "priced_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "findings": {
+              "type": "array"
+            },
+            "headline": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "evidence_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "savings_claim_allowed",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "const": "OBSERVED_REQUEST_REVIEW"
+        },
+        "savings_claim_allowed": {
+          "const": false
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parsed_locally",
+        "prompt_text_required",
+        "prompt_text_stored",
+        "source_file_uploaded"
+      ],
+      "properties": {
+        "parsed_locally": {
+          "const": true
+        },
+        "prompt_text_required": {
+          "const": false
+        },
+        "prompt_text_stored": {
+          "const": false
+        },
+        "source_file_uploaded": {
+          "const": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "costChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "prior_cost",
+        "current_cost",
+        "change"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "prior_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "current_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "change": {
+          "type": "number"
+        }
+      }
+    },
+    "variancePeriod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "requests",
+        "selected_cost",
+        "cost_per_request"
+      ],
+      "properties": {
+        "start": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "selected_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cost_per_request": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "costChangeBridge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "currency",
+        "starting_cost",
+        "request_volume_effect",
+        "verified_official_rate_effect",
+        "usage_and_mix_effect",
+        "unsupported_or_unproven_residual",
+        "ending_cost",
+        "limitations",
+        "provenance",
+        "method",
+        "savings_claim_allowed"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "AVAILABLE",
+            "PARTIAL",
+            "NOT_SUPPORTED"
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            {
+              "const": "MIXED"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "starting_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "request_volume_effect": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "verified_official_rate_effect": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "usage_and_mix_effect": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unsupported_or_unproven_residual": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ending_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "limitations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pricing_catalog_version",
+            "reference_rate_date",
+            "current_period_end",
+            "rate_changes"
+          ],
+          "properties": {
+            "pricing_catalog_version": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reference_rate_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "current_period_end": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "rate_changes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "provider",
+                  "model",
+                  "effective_at",
+                  "source_url"
+                ],
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "effective_at": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "source_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "pattern": "^https://"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "savings_claim_allowed": {
+          "const": false
+        }
+      }
+    },
+    "costStack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "currency",
+        "provider_request_cost",
+        "categories",
+        "known_adjacent_cost",
+        "known_operating_cost",
+        "fully_loaded_cost",
+        "missing_categories",
+        "method",
+        "savings_claim_allowed"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_COMPARABLE",
+            "PROVIDER_ONLY",
+            "PARTIAL",
+            "FULLY_LOADED"
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            {
+              "const": "MIXED"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_request_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "categories": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "label",
+              "amount",
+              "supplied"
+            ],
+            "properties": {
+              "key": {
+                "enum": [
+                  "compute_cost",
+                  "retrieval_data_cost",
+                  "network_cost",
+                  "tooling_cost",
+                  "pipeline_cost",
+                  "human_review_cost"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "amount": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "supplied": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "known_adjacent_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "known_operating_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "fully_loaded_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "missing_categories": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "savings_claim_allowed": {
+          "const": false
+        }
+      }
+    },
+    "allocationDimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "allocated_priced_rows",
+        "unallocated_priced_rows",
+        "allocated_cost",
+        "unallocated_cost",
+        "unallocated_cost_pct"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allocated_priced_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unallocated_priced_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "allocated_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unallocated_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unallocated_cost_pct": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/probability"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "allocationSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cost_basis",
+        "total_known_operating_cost",
+        "period_level_cost_kept_unallocated",
+        "dimensions",
+        "decision_support",
+        "method"
+      ],
+      "properties": {
+        "cost_basis": {
+          "const": "known_operating_cost"
+        },
+        "total_known_operating_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "period_level_cost_kept_unallocated": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "project",
+            "team_owner",
+            "feature",
+            "customer",
+            "product",
+            "workload",
+            "workflow",
+            "session_id",
+            "environment"
+          ],
+          "properties": {
+            "project": {
+              "$ref": "#/$defs/allocationDimension"
+            },
+            "team_owner": {
+              "$ref": "#/$defs/allocationDimension"
+            },
+            "feature": {
+              "$ref": "#/$defs/allocationDimension"
+            },
+            "customer": {
+              "$ref": "#/$defs/allocationDimension"
+            },
+            "product": {
+              "$ref": "#/$defs/allocationDimension"
+            },
+            "workload": {
+              "$ref": "#/$defs/allocationDimension"
+            },
+            "workflow": {
+              "$ref": "#/$defs/allocationDimension"
+            },
+            "session_id": {
+              "$ref": "#/$defs/allocationDimension"
+            },
+            "environment": {
+              "$ref": "#/$defs/allocationDimension"
+            }
+          }
+        },
+        "decision_support": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "basis",
+            "warning_threshold",
+            "status",
+            "decision_ready",
+            "reason",
+            "policy_note",
+            "savings_claim_allowed"
+          ],
+          "properties": {
+            "basis": {
+              "enum": [
+                "project",
+                "team_owner",
+                "feature",
+                "customer",
+                "product",
+                "workload",
+                "workflow",
+                "session_id",
+                "environment"
+              ]
+            },
+            "warning_threshold": {
+              "$ref": "#/$defs/probability"
+            },
+            "status": {
+              "enum": [
+                "NOT_SUPPORTED",
+                "PASS",
+                "WARN"
+              ]
+            },
+            "decision_ready": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "policy_note": {
+              "type": "string",
+              "minLength": 1
+            },
+            "savings_claim_allowed": {
+              "const": false
+            }
+          }
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evidenceLayers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "usage_telemetry",
+        "request_cost",
+        "billing_evidence",
+        "precedence_rule"
+      ],
+      "properties": {
+        "usage_telemetry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "rows_with_usage_signals",
+            "total_rows",
+            "purpose"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "AVAILABLE",
+                "PARTIAL",
+                "NOT_SUPPLIED"
+              ]
+            },
+            "rows_with_usage_signals": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total_rows": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "purpose": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "request_cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "provider_reported_rows",
+            "calculated_rows",
+            "unpriced_rows",
+            "purpose"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "PROVIDER_REPORTED",
+                "CALCULATED",
+                "MIXED",
+                "UNPRICED"
+              ]
+            },
+            "provider_reported_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "calculated_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unpriced_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "purpose": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "billing_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "source_status",
+            "supplied_total",
+            "raw_request_cost_difference",
+            "purpose"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "NOT_SUPPLIED",
+                "NOT_COMPARABLE",
+                "RECONCILED",
+                "VARIANCE",
+                "USER_ENTERED_NOT_COMPARABLE",
+                "USER_ENTERED_MATCH",
+                "USER_ENTERED_VARIANCE"
+              ]
+            },
+            "source": {
+              "enum": [
+                "user_entered_unverified"
+              ]
+            },
+            "source_status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "supplied_total": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "raw_request_cost_difference": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "purpose": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "precedence_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "spendBreakdown": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "event_count",
+          "priced_rows",
+          "selected_cost",
+          "average_selected_cost_per_priced_row",
+          "share_of_selected_cost"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "event_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "priced_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "selected_cost": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "average_selected_cost_per_priced_row": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "share_of_selected_cost": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/probability"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "scopedChangeGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label",
+        "kind",
+        "group_count",
+        "prior_requests",
+        "current_requests",
+        "starting_cost",
+        "ending_cost",
+        "change",
+        "request_volume_effect",
+        "verified_official_rate_effect",
+        "usage_and_mix_effect",
+        "unsupported_or_unproven_residual"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "value",
+            "unattributed",
+            "other"
+          ]
+        },
+        "group_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "prior_requests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "current_requests": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "starting_cost": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ending_cost": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "change": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "request_volume_effect": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "verified_official_rate_effect": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "usage_and_mix_effect": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unsupported_or_unproven_residual": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "scopedChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "dimension",
+        "currency",
+        "status",
+        "prior_period",
+        "current_period",
+        "totals",
+        "groups",
+        "display",
+        "unpriced_rows",
+        "limitations",
+        "method",
+        "savings_claim_allowed"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "ai-cost-lens-scoped-change/1.0"
+        },
+        "dimension": {
+          "enum": [
+            "team_owner",
+            "model",
+            "project",
+            "feature",
+            "customer",
+            "product",
+            "workload",
+            "workflow",
+            "session_id",
+            "environment"
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            {
+              "const": "MIXED"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "AVAILABLE",
+            "PARTIAL",
+            "NOT_SUPPORTED"
+          ]
+        },
+        "prior_period": {
+          "$ref": "#/$defs/variancePeriod"
+        },
+        "current_period": {
+          "$ref": "#/$defs/variancePeriod"
+        },
+        "totals": {
+          "$ref": "#/$defs/costChangeBridge"
+        },
+        "groups": {
+          "type": "array",
+          "maxItems": 20000,
+          "items": {
+            "$ref": "#/$defs/scopedChangeGroup"
+          }
+        },
+        "display": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rows",
+                "totals",
+                "rounding_adjustments",
+                "method"
+              ],
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "items": {
+                    "$ref": "#/$defs/scopedChangeGroup"
+                  }
+                },
+                "totals": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "starting_cost",
+                    "ending_cost",
+                    "change",
+                    "request_volume_effect",
+                    "verified_official_rate_effect",
+                    "usage_and_mix_effect",
+                    "unsupported_or_unproven_residual"
+                  ],
+                  "properties": {
+                    "starting_cost": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "ending_cost": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "change": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "request_volume_effect": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "verified_official_rate_effect": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "usage_and_mix_effect": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "unsupported_or_unproven_residual": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  }
+                },
+                "rounding_adjustments": {
+                  "type": "array",
+                  "maxItems": 63,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "key",
+                      "field",
+                      "independently_rounded",
+                      "balanced_display"
+                    ],
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "field": {
+                        "enum": [
+                          "starting_cost",
+                          "ending_cost",
+                          "change",
+                          "request_volume_effect",
+                          "verified_official_rate_effect",
+                          "usage_and_mix_effect",
+                          "unsupported_or_unproven_residual"
+                        ]
+                      },
+                      "independently_rounded": {
+                        "type": "number"
+                      },
+                      "balanced_display": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                },
+                "method": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        },
+        "unpriced_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20000
+        },
+        "limitations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "method": {
+          "type": "string"
+        },
+        "savings_claim_allowed": {
+          "const": false
+        }
+      }
+    }
+  }
+}

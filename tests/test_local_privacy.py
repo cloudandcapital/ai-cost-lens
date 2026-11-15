@@ -72,7 +72,7 @@ def test_browser_app_only_fetches_its_checked_in_examples():
 def test_static_preview_inlines_request_engine_and_template():
     preview = (WEB / "preview.html").read_text()
     assert 'src="usage-event-engine.js"' not in preview
-    assert "ai-cost-lens-usage-review/1.1" in preview
+    assert "ai-cost-lens-usage-review/1.2" in preview
     assert 'href="templates/ai-cost-lens-request-log-template.csv"' not in preview
     assert "data:text/csv;base64," in preview
 

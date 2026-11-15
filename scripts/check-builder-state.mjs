@@ -837,7 +837,7 @@ el('request-tooling-cost').value = '4';
 el('request-pipeline-cost').value = '5';
 el('request-human-review-cost').value = '1';
 await click('analyze-request-log');
-assert.equal(api.state.usageReview.schema_version,'ai-cost-lens-usage-review/1.1');
+assert.equal(api.state.usageReview.schema_version,'ai-cost-lens-usage-review/1.2');
 assert.equal(api.state.usageReview.spend.projected_30_day_cost,450);
 assert.equal(api.state.usageReview.spend.run_rate_status,'AVAILABLE');
 assert.equal(api.state.usageReview.spend.budget.status,'WATCH');

@@ -89,17 +89,19 @@ const october11 = require("./docs/pricing-snapshots/pricing-catalog-2026-10-11.j
 assert.equal(prior.models.length, 17);
 assert.equal(october5.models.length, 19);
 assert.equal(october11.models.length, 21);
-assert.equal(c.models.length, 22);
+assert.equal(c.models.length, 23);
+const october18 = require("./docs/pricing-snapshots/pricing-catalog-2026-10-18.js");
+assert.equal(october18.models.length, 22);
 assert.equal(e.selectCatalog([prior, c], "2026-10-04").catalog_version, "2026-09-23");
 assert.equal(e.selectCatalog([prior, october5, c], "2026-10-05").catalog_version, "2026-10-05");
 assert.equal(e.selectCatalog([prior, october5, october11, c], "2026-10-11").catalog_version, "2026-10-11");
-assert.equal(e.selectCatalog([prior, october5, october11, c], "2026-10-18").catalog_version, "2026-10-18");
-e.requireCatalogDateCoverage(c, "2026-11-21");
-assert.throws(() => e.requireCatalogDateCoverage(c, "2026-11-22"), /review date/);
+assert.equal(e.selectCatalog([prior, october5, october11, october18, c], "2026-10-18").catalog_version, "2026-10-18");
+e.requireCatalogDateCoverage(c, "2026-11-28");
+assert.throws(() => e.requireCatalogDateCoverage(c, "2026-11-29"), /review date/);
 assert.throws(() => e.requireCatalogDateCoverage(c, "2026-02-30"), /real calendar date/);
 const promo = byId["openai/gpt-5.6-sol"];
-e.priceModel(promo, {...scenario, pricing_date: "2026-11-21"});
-assert.throws(() => e.priceModel(promo, {...scenario, pricing_date: "2026-11-22"}), /freshly verified/);
+e.priceModel(promo, {...scenario, pricing_date: "2026-11-30"});
+assert.throws(() => e.priceModel(promo, {...scenario, pricing_date: "2026-12-01"}), /freshly verified/);
 const gemini = byId["google/gemini-3.8-flash"];
 const noWrites = {...scenario, cache_refreshes_per_month: 0};
 e.priceModel(gemini, {...noWrites, pricing_date: "2026-12-31"});
@@ -142,7 +144,7 @@ assert.equal(price({processing_mode: "priority", inference_geography: "eu"}).cos
 assert.equal(price({processing_mode: "fast", inference_geography: "us"}).calculated_cost, .013838);
 assert.equal(price({input_tokens: 922001}).cost_basis, "unpriced");
 assert.equal(price({timestamp: "2026-11-21T23:59:59.999Z"}).cost_basis, "calculated");
-assert.equal(price({timestamp: "2026-11-22T00:00:00Z"}).cost_basis, "unpriced");
+assert.equal(price({timestamp: "2026-11-29T00:00:00Z"}).cost_basis, "unpriced");
 const claude = {provider: "Anthropic", model: "claude-sonnet-5-5", timestamp: "2026-09-28T00:00:00Z",
  cache_write_duration_seconds: 3600};
 assert.equal(price(claude).calculated_cost, .00648);
@@ -253,7 +255,7 @@ assert.throws(() => e.priceModel(argon, input, {processing_mode: "fast"}), /no p
 assert.throws(() => e.priceModel(argon, input, {geography: "us"}), /no published us geography/);
 const comparison = e.compareModels(c, [sol.id, argon.id], input);
 const record = e.buildEstimateRecord(c, comparison, input, {tokens: 10000, method: "manual"});
-assert.equal(record.catalog.version, "2026-10-18");
+assert.equal(record.catalog.version, "2026-11-15");
 assert.equal(record.evidence_gate.savings_claim_allowed, false);
 assert.equal(record.estimate_basis.prompt_text_stored, false);
 const usage = require("./web/usage-event-engine.js");

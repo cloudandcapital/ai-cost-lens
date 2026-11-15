@@ -57,6 +57,7 @@ jobs:
             browser-artifacts/controlled-test-record.pdf
             browser-artifacts/controlled-test-desktop.png
             browser-artifacts/controlled-test-mobile.png
+            browser-artifacts/*-scoped-change-*.png
           if-no-files-found: ignore
 
   production-network:
