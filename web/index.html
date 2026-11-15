@@ -583,6 +583,19 @@
                     <p>Equal consecutive UTC windows</p>
                   </div>
                   <div id="request-variance"></div>
+                  <section class="request-scoped-section" aria-labelledby="request-scoped-title">
+                    <div class="request-explorer-head">
+                      <div><p class="kicker">SCOPED CHANGE DRIVER</p><h4 id="request-scoped-title">Who contributed to the change?</h4></div>
+                      <label class="request-scoped-selector"><span>Group by</span><select id="request-change-dimension">
+                        <option value="team_owner">Team or owner</option><option value="model">Provider and model</option>
+                        <option value="project">Project</option><option value="feature">Feature</option>
+                        <option value="customer">Customer</option><option value="product">Product</option>
+                        <option value="workload">Workload</option><option value="workflow">Workflow</option>
+                        <option value="session_id">Session</option><option value="environment">Environment</option>
+                      </select></label>
+                    </div>
+                    <div id="request-scoped-change" aria-live="polite"></div>
+                  </section>
                 </section>
                 <div class="request-spend-breakdowns" id="request-spend-breakdowns"></div>
                 <div id="request-currency-slices" class="request-currency-slices"></div>

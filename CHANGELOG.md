@@ -2,6 +2,13 @@
 
 All notable changes to AI Cost Lens are documented here.
 
+## Unreleased: November 15, 2026
+
+- Added the Scoped Change Driver to the existing equal-window bridge, with one selected ownership dimension, complete group exports, explicit Other and Unattributed rows, and balanced displayed cents. Group components preserve the total bridge's overall prior unit-cost baseline and evidence gates.
+- Versioned usage events as 1.1 to retain missing workloads as null and usage reviews as 1.2 to carry the selected scoped record; previous schemas remain unchanged. No change to the savings gate or billing/telemetry distinction.
+- Rechecked the curated pricing catalog as of November 15, added GPT-6.1 Terra from its first verified coverage date, confirmed GPT-5.6 Sol's November 30 promotional boundary, and preserved the October 18 snapshot. Next review is November 28; future Gemini price changes remain gated.
+- Added financial, schema, boundary and browser acceptance checks. Publication and required release checks are separate from this unreleased source change.
+
 ## Unreleased — September 23 product-readiness work
 
 - Checked current direct API rates for GPT-6 Sol, GPT-6 Luna, and Claude Opus 5.5 against provider pricing; added their Standard, discounted, cache, and Fast profiles with source and catalog-use dates. Preserved the September 22 snapshot and refused to backfill the new models into earlier usage estimates.

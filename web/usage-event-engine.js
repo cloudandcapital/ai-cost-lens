@@ -5,8 +5,8 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function buildUsageEventEngine() {
   "use strict";
 
-  const SCHEMA = "ai-cost-lens-usage-event/1.0";
-  const REVIEW_SCHEMA = "ai-cost-lens-usage-review/1.1";
+  const SCHEMA = "ai-cost-lens-usage-event/1.1";
+  const REVIEW_SCHEMA = "ai-cost-lens-usage-review/1.2";
   const MAX_ROWS = 20000;
   const ALLOCATION_DIMENSIONS = Object.freeze([
     ["project", "Project"],
@@ -320,7 +320,7 @@
       model,
       project: text(pick(map, "project"), `Row ${index + 1} project`),
       team_owner: text(pick(map, "team_owner"), `Row ${index + 1} team or owner`),
-      workload: text(pick(map, "workload"), `Row ${index + 1} workload`) || "Unassigned workload",
+      workload: text(pick(map, "workload"), `Row ${index + 1} workload`),
       feature: text(pick(map, "feature"), `Row ${index + 1} feature`),
       workflow: text(pick(map, "workflow"), `Row ${index + 1} workflow`),
       session_id: text(pick(map, "session_id"), `Row ${index + 1} session ID`),
@@ -1184,6 +1184,172 @@
     };
   }
 
+  const CHANGE_DIMENSIONS = Object.freeze([
+    ["team_owner", "Team or owner"], ["model", "Provider and model"],
+    ...ALLOCATION_DIMENSIONS.filter(([key]) => key !== "team_owner"),
+  ]);
+  const CHANGE_AMOUNT_FIELDS = Object.freeze([
+    "starting_cost", "ending_cost", "change", "request_volume_effect",
+    "verified_official_rate_effect", "usage_and_mix_effect", "unsupported_or_unproven_residual",
+  ]);
+
+  function changeAtoms(value) {
+    const atoms = Math.round(value * 100_000_000);
+    if (!Number.isFinite(value) || !Number.isSafeInteger(atoms)) {
+      throw new Error("Scoped amounts exceed the supported exact-precision range");
+    }
+    return BigInt(atoms);
+  }
+
+  const changeAmount = (atoms) => Number(atoms) / 100_000_000;
+  const sumChangeAtoms = (values) => values.reduce((sum, value) => sum + value, 0n);
+
+  // Allocate only the rounding remainder, in stable group order. Signed request
+  // movement uses the same overall prior unit cost as the existing total bridge.
+  function balanceChangeAmounts(numerators, denominator, target) {
+    const values = numerators.map((value) => value / denominator);
+    let difference = target - sumChangeAtoms(values);
+    const order = numerators.map((value, index) => ({ index, remainder: value % denominator }));
+    order.sort((left, right) => left.remainder === right.remainder
+      ? left.index - right.index
+      : difference >= 0n
+        ? left.remainder > right.remainder ? -1 : 1
+        : left.remainder < right.remainder ? -1 : 1);
+    if (difference > BigInt(values.length) || difference < -BigInt(values.length)) {
+      throw new Error("Scoped rounding does not reconcile to the total bridge");
+    }
+    for (let index = 0; difference !== 0n; index += 1) {
+      const step = difference > 0n ? 1n : -1n;
+      values[order[index].index] += step;
+      difference -= step;
+    }
+    return values;
+  }
+
+  function scopedChangeDisplay(groups, bridge, limit = 6) {
+    const attributed = groups.filter((group) => group.kind === "value");
+    const visible = attributed.slice(0, limit);
+    const remaining = attributed.slice(limit);
+    if (remaining.length) {
+      const other = {
+        key: "other", label: `Other groups (${remaining.length})`, kind: "other", group_count: remaining.length,
+        prior_requests: remaining.reduce((sum, group) => sum + group.prior_requests, 0),
+        current_requests: remaining.reduce((sum, group) => sum + group.current_requests, 0),
+      };
+      CHANGE_AMOUNT_FIELDS.forEach((field) => {
+        other[field] = remaining.some((group) => group[field] === null)
+          ? null : changeAmount(sumChangeAtoms(remaining.map((group) => changeAtoms(group[field]))));
+      });
+      visible.push(other);
+    }
+    visible.push(...groups.filter((group) => group.kind === "unattributed"));
+    const columns = {};
+    for (const field of ["starting_cost", "ending_cost", "request_volume_effect", "verified_official_rate_effect", "unsupported_or_unproven_residual"]) {
+      columns[field] = bridge[field] === null
+        ? visible.map(() => null)
+        : balanceChangeAmounts(visible.map((group) => changeAtoms(group[field])), 1_000_000n, BigInt(Math.round(bridge[field] * 100)));
+    }
+    const rows = visible.map((group, index) => {
+      const row = { ...group };
+      Object.keys(columns).forEach((field) => { row[field] = columns[field][index] === null ? null : Number(columns[field][index]) / 100; });
+      const delta = columns.ending_cost[index] - columns.starting_cost[index];
+      row.change = Number(delta) / 100;
+      row.usage_and_mix_effect = bridge.usage_and_mix_effect === null
+        ? null : Number(delta - columns.request_volume_effect[index] - columns.verified_official_rate_effect[index] - columns.unsupported_or_unproven_residual[index]) / 100;
+      if (row.usage_and_mix_effect === null) row.unsupported_or_unproven_residual = Number(delta - columns.request_volume_effect[index]) / 100;
+      return row;
+    });
+    const totals = Object.fromEntries(CHANGE_AMOUNT_FIELDS.map((field) => [field,
+      rows.some((row) => row[field] === null) ? null : round(rows.reduce((sum, row) => sum + row[field], 0), 2),
+    ]));
+    const adjustments = [];
+    rows.forEach((row, index) => CHANGE_AMOUNT_FIELDS.forEach((field) => {
+      if (row[field] !== null && Math.round(row[field] * 100) !== Math.round(visible[index][field] * 100)) {
+        adjustments.push({ key: row.key, field, independently_rounded: round(visible[index][field], 2), balanced_display: row[field] });
+      }
+    }));
+    CHANGE_AMOUNT_FIELDS.forEach((field) => {
+      const raw = field === "change" ? bridge.ending_cost - bridge.starting_cost : bridge[field];
+      if (raw !== null && Math.round(totals[field] * 100) !== Math.round(raw * 100)) {
+        adjustments.push({ key: "total", field, independently_rounded: round(raw, 2), balanced_display: totals[field] });
+      }
+    });
+    return {
+      rows, totals, rounding_adjustments: adjustments,
+      method: "Display includes the six largest absolute attributed changes, all remaining attributed groups together, and an explicit unattributed row. Cent allocation balances the displayed columns; the remaining component balances every row. Original eight-decimal groups and every adjusted cent remain in this record.",
+    };
+  }
+
+  function scopedCostChange(events, variance, dimension = "team_owner", catalog = null) {
+    if (!CHANGE_DIMENSIONS.some(([key]) => key === dimension)) throw new Error("Choose a supported cost-change dimension.");
+    const bridge = variance.cost_change_bridge;
+    const base = {
+      schema_version: "ai-cost-lens-scoped-change/1.0", dimension,
+      currency: variance.currency, status: "NOT_SUPPORTED",
+      prior_period: { ...variance.prior_period }, current_period: { ...variance.current_period },
+      totals: JSON.parse(JSON.stringify(bridge)), groups: [], display: null,
+      unpriced_rows: events.filter((event) => event.selected_cost === null).length,
+      limitations: [...bridge.limitations],
+      method: "Group request-count movement uses the overall prior cost per request, preserving the total bridge. Supported rate effects reprice each current request at the prior window end. Remaining supported change is usage/mix; otherwise it stays an unsupported residual. Attribution does not establish cause, waste, quality, or realized savings.",
+      savings_claim_allowed: false,
+    };
+    if (variance.status !== "AVAILABLE") return base;
+    try {
+      const prior = variance.prior_period;
+      const current = variance.current_period;
+      const grouped = new Map();
+      events.forEach((event) => {
+        const date = event.timestamp?.slice(0, 10);
+        const window = date >= prior.start && date <= prior.end ? "prior"
+          : date >= current.start && date <= current.end ? "current" : null;
+        if (!window) return;
+        const missing = event[dimension] === null || event[dimension] === undefined || String(event[dimension]).trim() === "";
+        const key = missing ? "unattributed" : JSON.stringify(dimension === "model" ? [event.provider, event.model] : ["value", event[dimension]]);
+        if (!grouped.has(key)) grouped.set(key, {
+          key, label: missing ? "Unattributed" : dimension === "model" ? `${event.provider || "Provider not supplied"} · ${event.model}` : event[dimension],
+          kind: missing ? "unattributed" : "value", group_count: 1, prior: [], current: [],
+        });
+        grouped.get(key)[window].push(event);
+      });
+      const entries = [...grouped.values()].sort((left, right) => left.key.localeCompare(right.key));
+      const volumes = balanceChangeAmounts(
+        entries.map((group) => BigInt(group.current.length - group.prior.length) * changeAtoms(bridge.starting_cost)),
+        BigInt(prior.requests), changeAtoms(bridge.request_volume_effect),
+      );
+      const groups = entries.map((group, index) => {
+        const start = sumChangeAtoms(group.prior.map((event) => changeAtoms(event.selected_cost)));
+        const end = sumChangeAtoms(group.current.map((event) => changeAtoms(event.selected_cost)));
+        let rate = null;
+        let mix = null;
+        let residual = end - start - volumes[index];
+        if (bridge.status === "AVAILABLE") {
+          const references = group.current.map((event) => calculatedTokenCost(event, catalog, prior.end));
+          if (references.some((reference) => !reference)) throw new Error("Scoped prior-date pricing is unavailable");
+          rate = end - sumChangeAtoms(references.map((reference) => changeAtoms(reference.cost)));
+          mix = end - start - volumes[index] - rate;
+          residual = 0n;
+        }
+        return {
+          key: group.key, label: group.label, kind: group.kind, group_count: 1,
+          prior_requests: group.prior.length, current_requests: group.current.length,
+          starting_cost: changeAmount(start), ending_cost: changeAmount(end), change: changeAmount(end - start),
+          request_volume_effect: changeAmount(volumes[index]), verified_official_rate_effect: rate === null ? null : changeAmount(rate),
+          usage_and_mix_effect: mix === null ? null : changeAmount(mix), unsupported_or_unproven_residual: changeAmount(residual),
+        };
+      });
+      groups.sort((left, right) => Math.abs(right.change) - Math.abs(left.change) || left.key.localeCompare(right.key));
+      for (const field of CHANGE_AMOUNT_FIELDS.filter((field) => field !== "change")) {
+        if (bridge[field] !== null && sumChangeAtoms(groups.map((group) => changeAtoms(group[field]))) !== changeAtoms(bridge[field])) {
+          throw new Error("Scoped precision does not reconcile to the total bridge");
+        }
+      }
+      return { ...base, status: bridge.status, groups, display: scopedChangeDisplay(groups, bridge) };
+    } catch (error) {
+      return { ...base, limitations: [...new Set([...base.limitations, error.message])] };
+    }
+  }
+
+
   function budgetSummary(rawOptions, runRateStatus, projected30DayCost, currency) {
     const amount = number(rawOptions.monthly_budget, "Monthly budget");
     const thresholdRaw = rawOptions.budget_warning_threshold;
@@ -1564,6 +1730,7 @@
       method: "Unverified user-entered total minus selected request cost after scope confirmation. The duplicate-excluded difference retains the first source row in each repeated-ID group as a review reference only; no row is deleted or presumed invalid.",
     };
     const spend = spendSummary(events, reviewOptions, reviewCurrency, selectedObservedCost, !currencyNotComparable);
+    spend.period_variance.scoped_change = scopedCostChange(events, spend.period_variance, rawOptions.change_dimension || "team_owner", rawOptions.catalog || null);
     const primarySlice = currencyNotComparable ? [...spend.currency_slices].sort((a, b) => b.rows - a.rows || b.priced_rows - a.priced_rows || a.currency.localeCompare(b.currency))[0] : null;
     const comparableCurrencyReview = primarySlice ? (() => {
       const subset = events.filter((event) => event.currency === primarySlice.currency);
@@ -1613,7 +1780,7 @@
   }
 
   function normalizedCsv(review) {
-    if (!review || review.schema_version !== REVIEW_SCHEMA || !Array.isArray(review.events)) throw new Error("A normalized usage review is required.");
+    if (!review || ![REVIEW_SCHEMA, "ai-cost-lens-usage-review/1.1", "ai-cost-lens-usage-review/1.0"].includes(review.schema_version) || !Array.isArray(review.events)) throw new Error("A normalized usage review is required.");
     const fields = ["record_id", "event_id", "timestamp", "provider", "billing_channel", "processing_mode", "inference_geography", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "customer_product", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_duration_seconds", "cache_storage_token_hours", "batch", "tool_charges", "provider_reported_cost", "calculated_cost", "selected_cost", "cost_basis", "currency", "request_status", "retry_parent_event_id", "latency_ms", "evidence_source", "source_file_hash", "prefix_fingerprint", "tool_call_count", "outcome_status", "duplicate_group", "routed_model_id"];
     return `${fields.join(",")}\n${review.events.map((event) => fields.map((field) => csvCell(event[field])).join(",")).join("\n")}\n`;
   }
@@ -1623,5 +1790,5 @@
     return `source_row,reason\n${review.import_coverage.issues.map((issue) => [issue.row, issue.reason].map(csvCell).join(",")).join("\n")}\n`;
   }
 
-  return Object.freeze({ SCHEMA, REVIEW_SCHEMA, aliases, normalizeRows, analyzeEvents, buildReview, normalizedCsv, issuesCsv, detectAdapter, spendSummary, operationalSummary, periodVariance, budgetSummary, operatingCostStack, allocationSummary, evidenceLayers });
+  return Object.freeze({ SCHEMA, REVIEW_SCHEMA, aliases, normalizeRows, analyzeEvents, buildReview, normalizedCsv, issuesCsv, detectAdapter, spendSummary, operationalSummary, periodVariance, scopedCostChange, CHANGE_DIMENSIONS, budgetSummary, operatingCostStack, allocationSummary, evidenceLayers });
 });

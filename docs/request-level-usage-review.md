@@ -1,8 +1,18 @@
 # Request-level usage review
 
-AI Cost Lens can analyze a flat CSV or JSON request log entirely in the browser. The import creates versioned `ai-cost-lens-usage-event/1.0` records and an `ai-cost-lens-usage-review/1.1` review. It does not call a provider, ask for an API key, upload the source file, or require prompt text.
+AI Cost Lens can analyze a flat CSV or JSON request log entirely in the browser. The import creates versioned `ai-cost-lens-usage-event/1.1` records and an `ai-cost-lens-usage-review/1.2` review. It does not call a provider, ask for an API key, upload the source file, or require prompt text.
 
 This is a request-level telemetry contract, not a second spelling of the CLI's period-level `ai-cost-lens/2.x` billing ledger. Use the [data-contract boundary and field guide](data-contract-boundaries.md) before translating between them; several fields are intentionally not lossless.
+
+## Group a cost change
+
+The Scoped Change Driver sits below the total cost-change bridge. Choose team or owner, provider and model, project, feature, customer, product, workload, workflow, session, or environment. It uses exactly the parent bridge's two windows and evidence gates. Changing the dimension never changes the parent calculation.
+
+The six largest absolute attributed changes appear individually. All remaining attributed groups are included in an explicit Other row, and requests without the chosen label remain Unattributed. The analysis JSON retains every group, the selected dimension, reference-rate provenance, full precision, and cent-display adjustments. Opposite signs remain visible rather than being presented as a share of net movement.
+
+Volume is the group's request-count change multiplied by the overall prior cost per request. Separate team averages would not sum to the existing total bridge. Supported rate effects use current requests repriced at the same prior-window-end rate; usage/mix is the remaining supported movement. If the parent rate split is partial, every group keeps rate and usage/mix unavailable and exposes an unsupported remainder. Missing prices, currencies, timestamps or period confirmation prevent the grouped comparison too. A contribution is an investigation target, not a cause, avoidable expense, quality judgment or savings claim.
+
+Usage event 1.1 preserves a missing workload as `null`. A literal workload named `Unassigned workload` is therefore distinct from a missing label. Review 1.2 adds the selected scoped record. Earlier schemas remain unchanged, and normalized CSV export still accepts review 1.0 and 1.1 records. Old exports that already replaced missing workloads with a label cannot recover the original missingness.
 
 ## Supported local inputs
 

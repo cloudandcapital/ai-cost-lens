@@ -5,7 +5,7 @@ AI Cost Lens has two deliberate usage contracts because they answer different qu
 | Contract | Grain | Primary job | Entry point |
 | --- | --- | --- | --- |
 | `ai-cost-lens/2.0` and `ai-cost-lens/2.1` | One daily or period usage bucket, which may represent many requests | Reconcile provider-reported or independently calculated usage cost and produce CCAC output | Python CLI |
-| `ai-cost-lens-usage-event/1.0` | One request or trace observation | Diagnose request behavior, allocation coverage, retries, latency, caching, tools, and outcome joins | Browser **Review AI usage** |
+| `ai-cost-lens-usage-event/1.1` | One request or trace observation | Diagnose request behavior, allocation coverage, retries, latency, caching, tools, and outcome joins | Browser **Review AI usage** |
 
 The CLI contract is strict and aggregate. It requires explicit mutually exclusive token categories, a request count, a batch price multiplier, ownership fields, and one cost basis. The browser event contract is granular. It preserves one row per call, keeps missing values unknown, and can carry operational fields that do not exist in the aggregate ledger.
 

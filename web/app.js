@@ -3915,6 +3915,39 @@
       : `Showing all ${wholeNumber(events.length)} matching row${events.length === 1 ? "" : "s"}.`;
   }
 
+  function renderScopedChangeDriver(review) {
+    const variance = review.spend.period_variance;
+    const scoped = variance.scoped_change;
+    const result = document.getElementById("request-scoped-change");
+    const selector = document.getElementById("request-change-dimension");
+    selector.value = scoped?.dimension || "team_owner";
+    selector.disabled = !scoped || variance.status !== "AVAILABLE";
+    if (!scoped || scoped.status === "NOT_SUPPORTED") {
+      result.innerHTML = `<p class="request-variance-unavailable"><strong>Grouped change unavailable.</strong> ${escapeHtml(scoped?.limitations.join("; ") || "This record has no supported scoped bridge")}. The total comparison and its evidence rules stay unchanged.</p>`;
+      return;
+    }
+    const moneyFor = (value) => value === null ? "Unavailable" : new Intl.NumberFormat("en-US", {
+      style: "currency", currency: scoped.currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(value);
+    const signed = (value) => value === null ? "Unavailable" : `${value > 0 ? "+" : value < 0 ? "−" : ""}${moneyFor(Math.abs(value))}`;
+    const amounts = [
+      ["request_volume_effect", "Request volume"], ["verified_official_rate_effect", "Official rate"],
+      ["usage_and_mix_effect", "Usage and mix"], ["unsupported_or_unproven_residual", "Unsupported remainder"],
+    ];
+    const rows = scoped.display.rows;
+    const totals = scoped.display.totals;
+    const groupLabel = ([, label]) => label;
+    const label = groupLabel(usageEventEngine.CHANGE_DIMENSIONS.find(([key]) => key === scoped.dimension));
+    const name = (row) => `${escapeHtml(row.label)}${row.kind === "unattributed" ? "<small>Missing label</small>" : row.kind === "other" ? "<small>Every remaining group is included</small>" : ""}`;
+    const tableRow = (row) => `<tr><th scope="row">${name(row)}</th><td data-label="Prior">${moneyFor(row.starting_cost)}</td><td data-label="Recent">${moneyFor(row.ending_cost)}</td><td data-label="Change"><strong>${signed(row.change)}</strong></td></tr>`;
+    result.innerHTML = `
+      <p class="request-variance-note"><strong>${scoped.status === "PARTIAL" ? "Partial evidence: rate and usage/mix remain unavailable." : "Every group reconciles to the same total bridge."}</strong> Showing changes by ${escapeHtml(label.toLowerCase())}. Contributions identify a slice to investigate; they do not establish causes or savings.</p>
+      <div class="request-variance-table-wrap request-scoped-table-wrap" role="region" aria-label="Cost change by ${escapeHtml(label.toLowerCase())}" tabindex="0"><table class="request-scoped-table"><thead><tr><th>${escapeHtml(label)}</th><th>Prior</th><th>Recent</th><th>Change</th></tr></thead><tbody>${rows.map(tableRow).join("")}</tbody><tfoot>${tableRow({ ...totals, label: "All groups", kind: "total" })}</tfoot></table></div>
+      <details class="request-scoped-components"><summary>How the contributions reconcile</summary><p class="request-variance-note">Volume uses one overall prior cost per request for every group. The remaining components use the same reference date and evidence boundary as the total bridge.</p>${rows.map((row) => `<article><h5>${name(row)}</h5><div class="request-scoped-pieces">${amounts.map(([field, title]) => `<div><span>${title}</span><strong>${signed(row[field])}</strong></div>`).join("")}</div></article>`).join("")}<article class="request-scoped-total"><h5>All groups</h5><div class="request-scoped-pieces">${amounts.map(([field, title]) => `<div><span>${title}</span><strong>${signed(totals[field])}</strong></div>`).join("")}</div></article></details>
+      <p class="request-variance-note">The largest six attributed changes are shown individually. Other groups and missing labels remain explicit. ${scoped.display.rounding_adjustments.length ? "Displayed cents are balanced; adjusted cents and original amounts are recorded in the analysis JSON. " : ""}The downloaded analysis retains every group and the selected dimension. Changes in labels or scope can move costs between groups.</p>`;
+  }
+
+
   function renderRequestSpendOverview(review) {
     const spend = review.spend;
     const breakdownSlice = review.currency === "MIXED" || review.currency === null
@@ -4043,6 +4076,7 @@
         ${costChangeTable("Processing mode", variance.top_processing_mode_cost_changes || [])}
         ${costChangeTable("Inference geography", variance.top_geography_cost_changes || [])}`;
     }
+    renderScopedChangeDriver(review);
     const dimensions = [
       ["provider", "Provider"],
       ["model", "Model"],
@@ -4265,7 +4299,8 @@
 
   // A result belongs to the options used to calculate it, not subsequent edits.
   document.querySelectorAll(".request-review-panel input:not([type=file]), .request-review-panel select").forEach((input) => {
-    if (input.id.startsWith("request-filter-") || input.id.startsWith("customer-")) return;
+    // Grouping changes the presentation of the loaded review, not its inputs.
+    if (input.id === "request-change-dimension" || input.id.startsWith("request-filter-") || input.id.startsWith("customer-")) return;
     input.addEventListener("input", () => {
       if (!state.usageReview) return;
       state.usageReview = null;
@@ -4396,6 +4431,15 @@
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
+  document.getElementById("request-change-dimension").addEventListener("change", (event) => {
+    const review = state.usageReview;
+    if (!review || !usageEventEngine) return;
+    review.spend.period_variance.scoped_change = usageEventEngine.scopedCostChange(
+      review.events, review.spend.period_variance, event.target.value, globalThis.AI_COST_LENS_PRICING_CATALOG,
+    );
+    renderScopedChangeDriver(review);
+  });
+
   document.getElementById("download-usage-review").addEventListener("click", () => {
     if (!state.usageReview) return;
     const blob = new Blob([`${JSON.stringify(state.usageReview, null, 2)}\n`], { type: "application/json" });

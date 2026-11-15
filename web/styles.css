@@ -6513,3 +6513,34 @@ body.bill-usage-mode .request-review-panel { margin-top: 0; padding-top: 0; bord
 }
 
 body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; }
+
+/* Scoped change: existing local request-review bridge. */
+.request-scoped-section { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line, #d8d0c8); }
+.request-scoped-selector { display: grid; gap: 6px; min-width: 190px; max-width: 280px; font-size: 12px; }
+.request-scoped-selector select { width: 100%; min-height: 44px; }
+.request-scoped-table { width: 100%; }
+.request-scoped-table th small, .request-scoped-components h5 small { display: block; margin-top: 4px; font-size: 11px; font-weight: 400; }
+.request-scoped-table tfoot { border-top: 2px solid var(--line, #d8d0c8); font-weight: 700; }
+.request-scoped-table td, .request-scoped-pieces strong { font-variant-numeric: tabular-nums; }
+.request-scoped-components { margin-top: 16px; }
+.request-scoped-components > summary { cursor: pointer; min-height: 44px; padding: 10px 0; font-size: 13px; font-weight: 600; }
+.request-scoped-components article { padding: 16px 0; border-top: 1px solid var(--line, #d8d0c8); }
+.request-scoped-components h5 { margin: 0 0 10px; font-size: 13px; overflow-wrap: anywhere; }
+.request-scoped-pieces { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.request-scoped-pieces span { display: block; font-size: 11px; }
+.request-scoped-pieces strong { display: block; margin-top: 5px; font-size: 15px; }
+.request-scoped-selector select:focus-visible, .request-scoped-components > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .request-scoped-section .request-explorer-head { display: grid; gap: 14px; }
+  .request-scoped-selector { max-width: none; min-width: 0; }
+  .request-scoped-pieces { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .request-scoped-table-wrap { overflow-x: visible; }
+  .request-scoped-table-wrap .request-scoped-table { min-width: 0; display: block; }
+  .request-scoped-table thead { display: none; }
+  .request-scoped-table tbody, .request-scoped-table tfoot { display: block; }
+  .request-scoped-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 15px 0; border-top: 1px solid var(--line, #d8d0c8); }
+  .request-scoped-table-wrap .request-scoped-table th, .request-scoped-table-wrap .request-scoped-table td { display: block; min-width: 0; padding: 0; text-align: left; font-size: 13px; overflow-wrap: anywhere; }
+  .request-scoped-table td[data-label="Change"] { grid-column: 1 / -1; }
+  .request-scoped-table th { grid-column: 1 / -1; }
+  .request-scoped-table td::before { content: attr(data-label); display: block; margin-bottom: 5px; font-size: 10px; font-weight: 400; }
+}

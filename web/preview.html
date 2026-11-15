@@ -4417,9 +4417,16 @@ body.story-mode .cockpit-grid {
 .request-operational-metrics,
 .request-variance-cards {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
   border-top: 1px solid var(--line-strong);
   border-bottom: 1px solid var(--line-strong);
+}
+
+.request-operational-metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.request-variance-cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .request-operational-metrics article,
@@ -4432,6 +4439,14 @@ body.story-mode .cockpit-grid {
 .request-operational-metrics article:last-child,
 .request-variance-cards article:last-child {
   border-right: 0;
+}
+
+.request-variance-cards article:nth-child(3n) {
+  border-right: 0;
+}
+
+.request-variance-cards article:nth-child(-n + 3) {
+  border-bottom: 1px solid var(--line);
 }
 
 .request-operational-metrics span,
@@ -5512,6 +5527,18 @@ body.story-mode .cockpit-grid {
     border-bottom: 1px solid var(--line);
   }
 
+  .request-variance-cards article:nth-child(3n) {
+    border-right: 1px solid var(--line);
+  }
+
+  .request-variance-cards article:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .request-variance-cards article:nth-child(n + 5) {
+    border-bottom: 0;
+  }
+
   .verification-result-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -5616,6 +5643,15 @@ body.story-mode .cockpit-grid {
   .request-operational-metrics article,
   .request-variance-cards article {
     border-right: 0;
+  }
+
+  .request-variance-cards article:nth-child(n) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .request-variance-cards article:last-child {
+    border-bottom: 0;
   }
 
   .request-spend-context article:last-child {
@@ -6502,6 +6538,37 @@ body.bill-usage-mode .request-review-panel { margin-top: 0; padding-top: 0; bord
 }
 
 body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; }
+
+/* Scoped change: existing local request-review bridge. */
+.request-scoped-section { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line, #d8d0c8); }
+.request-scoped-selector { display: grid; gap: 6px; min-width: 190px; max-width: 280px; font-size: 12px; }
+.request-scoped-selector select { width: 100%; min-height: 44px; }
+.request-scoped-table { width: 100%; }
+.request-scoped-table th small, .request-scoped-components h5 small { display: block; margin-top: 4px; font-size: 11px; font-weight: 400; }
+.request-scoped-table tfoot { border-top: 2px solid var(--line, #d8d0c8); font-weight: 700; }
+.request-scoped-table td, .request-scoped-pieces strong { font-variant-numeric: tabular-nums; }
+.request-scoped-components { margin-top: 16px; }
+.request-scoped-components > summary { cursor: pointer; min-height: 44px; padding: 10px 0; font-size: 13px; font-weight: 600; }
+.request-scoped-components article { padding: 16px 0; border-top: 1px solid var(--line, #d8d0c8); }
+.request-scoped-components h5 { margin: 0 0 10px; font-size: 13px; overflow-wrap: anywhere; }
+.request-scoped-pieces { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.request-scoped-pieces span { display: block; font-size: 11px; }
+.request-scoped-pieces strong { display: block; margin-top: 5px; font-size: 15px; }
+.request-scoped-selector select:focus-visible, .request-scoped-components > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .request-scoped-section .request-explorer-head { display: grid; gap: 14px; }
+  .request-scoped-selector { max-width: none; min-width: 0; }
+  .request-scoped-pieces { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .request-scoped-table-wrap { overflow-x: visible; }
+  .request-scoped-table-wrap .request-scoped-table { min-width: 0; display: block; }
+  .request-scoped-table thead { display: none; }
+  .request-scoped-table tbody, .request-scoped-table tfoot { display: block; }
+  .request-scoped-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 15px 0; border-top: 1px solid var(--line, #d8d0c8); }
+  .request-scoped-table-wrap .request-scoped-table th, .request-scoped-table-wrap .request-scoped-table td { display: block; min-width: 0; padding: 0; text-align: left; font-size: 13px; overflow-wrap: anywhere; }
+  .request-scoped-table td[data-label="Change"] { grid-column: 1 / -1; }
+  .request-scoped-table th { grid-column: 1 / -1; }
+  .request-scoped-table td::before { content: attr(data-label); display: block; margin-bottom: 5px; font-size: 10px; font-weight: 400; }
+}
 </style>
     <link rel="stylesheet" href="/color-mode.css" />
     <style>@font-face {
@@ -7325,10 +7392,23 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
                 </section>
                 <section class="request-variance-section" id="request-variance-section" aria-labelledby="request-variance-title">
                   <div class="request-explorer-head">
-                    <div><p class="kicker">PERIOD VARIANCE</p><h4 id="request-variance-title">Why did the recent window change?</h4></div>
+                    <div><p class="kicker">COST CHANGE BRIDGE</p><h4 id="request-variance-title">Why did cost move?</h4></div>
                     <p>Equal consecutive UTC windows</p>
                   </div>
                   <div id="request-variance"></div>
+                  <section class="request-scoped-section" aria-labelledby="request-scoped-title">
+                    <div class="request-explorer-head">
+                      <div><p class="kicker">SCOPED CHANGE DRIVER</p><h4 id="request-scoped-title">Who contributed to the change?</h4></div>
+                      <label class="request-scoped-selector"><span>Group by</span><select id="request-change-dimension">
+                        <option value="team_owner">Team or owner</option><option value="model">Provider and model</option>
+                        <option value="project">Project</option><option value="feature">Feature</option>
+                        <option value="customer">Customer</option><option value="product">Product</option>
+                        <option value="workload">Workload</option><option value="workflow">Workflow</option>
+                        <option value="session_id">Session</option><option value="environment">Environment</option>
+                      </select></label>
+                    </div>
+                    <div id="request-scoped-change" aria-live="polite"></div>
+                  </section>
                 </section>
                 <div class="request-spend-breakdowns" id="request-spend-breakdowns"></div>
                 <div id="request-currency-slices" class="request-currency-slices"></div>
@@ -8614,16 +8694,16 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
 
   return Object.freeze({
     schema_version: "ai-cost-lens-pricing-catalog/0.5",
-    catalog_version: "2026-10-18",
+    catalog_version: "2026-11-15",
     effective_at: "2026-09-22",
-    review_by: "2026-11-21",
+    review_by: "2026-11-28",
     currency: "USD",
     unit: "per_1m_tokens",
     scope: "Direct API list prices for text input, cached input, cache writes, output, and published processing modes. Taxes, negotiated discounts, tools, grounding, and data-transfer charges are excluded; Gemini cache storage is listed but only calculated when token-hours are supplied.",
     sources: [
-      { provider: "OpenAI", checked_at: "2026-10-11", url: "https://developers.openai.com/api/docs/pricing" },
-      { provider: "Anthropic", checked_at: "2026-10-11", url: "https://platform.claude.com/docs/en/about-claude/pricing" },
-      { provider: "Google", checked_at: "2026-10-18", url: "https://ai.google.dev/gemini-api/docs/pricing" },
+      { provider: "OpenAI", checked_at: "2026-11-15", url: "https://developers.openai.com/api/docs/pricing" },
+      { provider: "Anthropic", checked_at: "2026-11-15", url: "https://platform.claude.com/docs/en/about-claude/pricing" },
+      { provider: "Google", checked_at: "2026-11-15", url: "https://ai.google.dev/gemini-api/docs/pricing" },
     ],
     models: [
       {
@@ -8637,7 +8717,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models/gpt-6-astra",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 10, cached_input: 1, cache_write: 12.5, output: 50 },
         batch: { input: 5, cached_input: 0.5, cache_write: 6.25, output: 25 },
         flex: { input: 5, cached_input: 0.5, cache_write: 6.25, output: 25 },
@@ -8661,7 +8741,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 2, cached_input: 0.1, cache_write: 2.5, output: 10 },
         batch: { input: 1, cached_input: 0.05, cache_write: 1.25, output: 5 },
         flex: { input: 1, cached_input: 0.05, cache_write: 1.25, output: 5 },
@@ -8670,7 +8750,28 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         unsupported_combinations: ["fast+eu"],
         geography_source_url: "https://developers.openai.com/api/docs/guides/your-data",
         long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
-        note: "Direct API. Standard, Batch, Flex and Fast; no Ultrafast rate. Cache reads are 5% of input; writes are 1.25x. Above 272K input tokens, full-request input/cache rates double and output is 1.5x. Only US/EU residency is supported, at +10%; EU excludes Fast. FedRAMP pricing is +10% where eligible, but endpoint eligibility is not inferred here.",
+        note: "Direct API. Standard, Batch, Flex and Fast; no Ultrafast rate. Cache reads are 5% of input; writes are 1.25x. Above 272K input tokens, full-request input/cache rates double and output is 1.5x. Only US/EU residency is supported, at +10%; EU Fast is intentionally outside this catalog's historical coverage even though current provider documentation supports it. FedRAMP pricing is +10% where eligible, but endpoint eligibility is not inferred here.",
+      },
+      {
+        id: "openai/gpt-6.1-terra",
+        effective_at: "2026-11-15",
+        provider: "OpenAI",
+        label: "GPT-6.1 Terra",
+        model: "gpt-6.1-terra",
+        context_window_tokens: 1050000,
+        max_output_tokens: 128000,
+        source_url: "https://developers.openai.com/api/docs/pricing",
+        capability_source_url: "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+        workload_tags: ["general", "reasoning", "high_volume", "long_context", "multimodal"],
+        verified_at: "2026-11-15",
+        standard: { input: 1, cached_input: 0.05, cache_write: 1.25, output: 5 },
+        batch: { input: 0.5, cached_input: 0.025, cache_write: 0.625, output: 2.5 },
+        flex: { input: 0.5, cached_input: 0.025, cache_write: 0.625, output: 2.5 },
+        fast: { input: 2, cached_input: 0.1, cache_write: 2.5, output: 10 },
+        geography_multipliers: { global: 1, us: 1.1, eu: 1.1 },
+        geography_source_url: "https://developers.openai.com/api/docs/guides/data-residency",
+        long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
+        note: "Direct API list rates first verified for this catalog on November 15, 2026; that is the start of coverage, not a claimed launch date. Standard, Batch, Flex and Fast; global, US and EU processing. Cache writes represent 30-minute retention only; 12-hour retention, Ultrafast, tools and negotiated rates are outside this catalog. List price does not establish workload quality.",
       },
       {
         id: "openai/gpt-6-sol",
@@ -8684,7 +8785,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models/gpt-6-sol",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 10 },
         batch: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 5 },
         flex: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 5 },
@@ -8706,7 +8807,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models/gpt-6-luna",
         workload_tags: ["general", "reasoning", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 0.1, cached_input: 0.01, cache_write: 0.125, output: 0.5 },
         batch: { input: 0.05, cached_input: 0.005, cache_write: 0.0625, output: 0.25 },
         flex: { input: 0.05, cached_input: 0.005, cache_write: 0.0625, output: 0.25 },
@@ -8714,28 +8815,28 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         geography_multipliers: { global: 1, regional: 1.1, us: 1.1, eu: 1.1 },
         unsupported_combinations: ["fast+eu", "fast+regional"],
         long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
-        note: "Direct API list rate. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional rates are represented; EU data residency supports Standard, Flex and Batch; Fast is unavailable in the EU.",
+        note: "Direct API list rate. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional rates are represented; EU data residency supports Standard, Flex and Batch; EU Fast is intentionally outside this catalog's historical coverage even though current provider documentation supports it.",
       },
       {
         id: "openai/gpt-5.6-sol",
         provider: "OpenAI",
         label: "GPT-5.6 Sol",
         model: "gpt-5.6-sol",
-        promotional_rate_guaranteed_through: "2026-11-21",
+        promotional_rate_guaranteed_through: "2026-11-30",
         context_window_tokens: 1050000,
         input_token_limit: 922000,
         max_output_tokens: 128000,
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 4, cached_input: 0.4, cache_write: 5, output: 20 },
         batch: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 10 },
         flex: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 10 },
         fast: { input: 8, cached_input: 0.8, cache_write: 10, output: 40 },
         geography_multipliers: { global: 1, regional: 1.1 },
         long_context: { input_threshold_tokens: 272000, input_multiplier: 2, cached_input_multiplier: 2, cache_write_multiplier: 2, output_multiplier: 1.5 },
-        note: "Direct API promotional price, published as available at least through November 21, 2026. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional rates are represented.",
+        note: "Direct API promotional price, published as available through November 30, 2026. Standard, Batch, Flex, Fast, cache-write, long-context, and 10% regional rates are represented.",
       },
       {
         id: "openai/gpt-5.6-terra",
@@ -8748,7 +8849,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
         workload_tags: ["general", "reasoning", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 2, cached_input: 0.2, cache_write: 2.5, output: 12 },
         batch: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 6 },
         flex: { input: 1, cached_input: 0.1, cache_write: 1.25, output: 6 },
@@ -8768,7 +8869,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://developers.openai.com/api/docs/pricing",
         capability_source_url: "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
         workload_tags: ["general", "reasoning", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 0.2, cached_input: 0.02, cache_write: 0.25, output: 1.2 },
         batch: { input: 0.1, cached_input: 0.01, cache_write: 0.125, output: 0.6 },
         flex: { input: 0.1, cached_input: 0.01, cache_write: 0.125, output: 0.6 },
@@ -8787,7 +8888,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/fable-5-1/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 10, cached_input: 0.25, cache_write_5m: 12.5, cache_write_1h: 20, output: 50 },
         batch: { input: 5, cached_input: 0.125, cache_write_5m: 6.25, cache_write_1h: 10, output: 25 },
         geography_multipliers: { global: 1, us: 1.1 },
@@ -8804,7 +8905,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/opus-5-5/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 4, cached_input: 0.2, cache_write_5m: 5, cache_write_1h: 8, output: 20 },
         batch: { input: 2, cached_input: 0.1, cache_write_5m: 2.5, cache_write_1h: 4, output: 10 },
         fast: { input: 8, cached_input: 0.4, cache_write_5m: 10, cache_write_1h: 16, output: 40 },
@@ -8822,7 +8923,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/opus-5/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 5, cached_input: 0.5, cache_write_5m: 6.25, cache_write_1h: 10, output: 25 },
         batch: { input: 2.5, cached_input: 0.25, cache_write_5m: 3.125, cache_write_1h: 5, output: 12.5 },
         fast: { input: 10, cached_input: 1, cache_write_5m: 12.5, cache_write_1h: 20, output: 50 },
@@ -8844,7 +8945,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/sonnet-5-5/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-11",
+        verified_at: "2026-11-15",
         standard: { input: 2, cached_input: 0.1, cache_write_5m: 2.5, cache_write_1h: 4, output: 10 },
         batch: { input: 1, cached_input: 0.05, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 },
         rate_change: {
@@ -8866,7 +8967,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/sonnet-5/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 2, cached_input: 0.2, cache_write_5m: 2.5, cache_write_1h: 4, output: 10 },
         batch: { input: 1, cached_input: 0.1, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 },
         geography_multipliers: { global: 1, us: 1.1 },
@@ -8882,7 +8983,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/sonnet-4-6/overview",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 3, cached_input: 0.3, cache_write_5m: 3.75, cache_write_1h: 6, output: 15 },
         batch: { input: 1.5, cached_input: 0.15, cache_write_5m: 1.875, cache_write_1h: 3, output: 7.5 },
         geography_multipliers: { global: 1, us: 1.1 },
@@ -8901,7 +9002,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
         workload_tags: ["general", "reasoning", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-10-11",
+        verified_at: "2026-11-15",
         standard: { input: 0.1, cached_input: 0.01, cache_write_5m: 0.125, cache_write_1h: 0.2, output: 0.5 },
         batch: { input: 0.05, cached_input: 0.005, cache_write_5m: 0.0625, cache_write_1h: 0.1, output: 0.25 },
         geography_multipliers: { global: 1, us: 1.1 },
@@ -8919,7 +9020,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://platform.claude.com/docs/en/about-claude/pricing",
         capability_source_url: "https://platform.claude.com/docs/en/models/haiku-4-5/overview",
         workload_tags: ["general", "reasoning", "high_volume", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 1, cached_input: 0.1, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 },
         batch: { input: 0.5, cached_input: 0.05, cache_write_5m: 0.625, cache_write_1h: 1, output: 2.5 },
         geography_multipliers: { global: 1 },
@@ -8938,7 +9039,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
         capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-4-argon",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-18",
+        verified_at: "2026-11-15",
         standard: { input: 2, cached_input: 0.1, output: 10 },
         batch: { input: 1, cached_input: 0.05, output: 5 },
         flex: { input: 1, cached_input: 0.05, output: 5 },
@@ -8958,7 +9059,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
         capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 0.75, cached_input: 0.075, cache_storage_per_1m_token_hour: 0.5, output: 3.75 },
         batch: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
         flex: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
@@ -8977,7 +9078,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
         capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.6-flash",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-11",
+        verified_at: "2026-11-15",
         standard: { input: 0.75, cached_input: 0.075, cache_storage_per_1m_token_hour: 0.5, output: 3.75 },
         batch: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
         flex: { input: 0.375, cached_input: 0.0375, cache_storage_per_1m_token_hour: 0.5, output: 1.875 },
@@ -8996,7 +9097,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
         capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.7-flash",
         workload_tags: ["general", "reasoning", "coding", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         routed_to_model_id: "google/gemini-3.8-flash",
         last_verified_unrouted_at: "2026-10-05",
         routing_confirmed_at: "2026-10-09",
@@ -9018,7 +9119,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
         capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash",
         workload_tags: ["general", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         routed_to_model_id: "google/gemini-3.6-flash",
         last_verified_unrouted_at: "2026-10-05",
         routing_confirmed_at: "2026-10-09",
@@ -9039,7 +9140,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
         capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite",
         workload_tags: ["general", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 0.3, cached_input: 0.03, cache_storage_per_1m_token_hour: 1, output: 2.5 },
         batch: { input: 0.15, cached_input: 0.02, cache_storage_per_1m_token_hour: 1, output: 1.25 },
         flex: { input: 0.15, cached_input: 0.02, cache_storage_per_1m_token_hour: 1, output: 1.25 },
@@ -9057,7 +9158,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         source_url: "https://ai.google.dev/gemini-api/docs/pricing",
         capability_source_url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite",
         workload_tags: ["general", "high_volume", "long_context", "multimodal"],
-        verified_at: "2026-10-05",
+        verified_at: "2026-11-15",
         standard: { input: 0.25, cached_input: 0.025, cache_storage_per_1m_token_hour: 1, output: 1.5 },
         batch: { input: 0.125, cached_input: 0.0125, cache_storage_per_1m_token_hour: 0.5, output: 0.75 },
         flex: { input: 0.125, cached_input: 0.0125, cache_storage_per_1m_token_hour: 0.5, output: 0.75 },
@@ -9395,7 +9496,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       throw new Error(`${model.label} has no published ${geography} geography rate in this catalog. Available locations: ${available}.`);
     }
     if (model.unsupported_combinations?.includes(`${processingMode}+${geography}`)) {
-      throw new Error(`${model.label} does not support ${processingMode} with ${geography} processing. Select an explicitly supported geography and mode.`);
+      throw new Error(`The checked-in catalog does not support ${processingMode} with ${geography} processing for ${model.label}. Select an explicitly supported geography and mode.`);
     }
     const longContext = Boolean(model.long_context && scenario.input_tokens > model.long_context.input_threshold_tokens);
     const contextRates = Object.fromEntries(RATE_FIELDS.flatMap((field) => {
@@ -9882,8 +9983,8 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
 })(typeof globalThis !== "undefined" ? globalThis : this, function buildUsageEventEngine() {
   "use strict";
 
-  const SCHEMA = "ai-cost-lens-usage-event/1.0";
-  const REVIEW_SCHEMA = "ai-cost-lens-usage-review/1.1";
+  const SCHEMA = "ai-cost-lens-usage-event/1.1";
+  const REVIEW_SCHEMA = "ai-cost-lens-usage-review/1.2";
   const MAX_ROWS = 20000;
   const ALLOCATION_DIMENSIONS = Object.freeze([
     ["project", "Project"],
@@ -10071,11 +10172,12 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
     return matches.length === 1 ? matches[0] : null;
   }
 
-  function calculatedTokenCost(event, catalog) {
+  function calculatedTokenCost(event, catalog, pricingDateOverride = null) {
     let model = findModel(catalog, event.provider, event.model);
     if (!model || event.input_tokens === null || event.output_tokens === null) return null;
     if (event.currency !== catalog.currency || event.processing_mode === null || event.cached_input_tokens === null || event.tool_charges === null || !event.timestamp) return null;
-    const eventDate = event.timestamp.slice(0, 10);
+    const eventDate = pricingDateOverride || event.timestamp.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return null;
     let routedModelId = null;
     if (model.routed_to_model_id) {
       if (eventDate > model.last_verified_unrouted_at && eventDate < model.routing_confirmed_at) return null;
@@ -10135,7 +10237,21 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       + cacheWrite * (cacheWriteRate || 0)
       + event.output_tokens * rates.output
     ) / 1_000_000 + storageCost;
-    return { cost: round(tokenCost + event.tool_charges), routed_model_id: routedModelId };
+    const appliedRateChange = model.rate_change && eventDate >= model.rate_change.effective_at
+      ? {
+          provider: model.provider,
+          model: model.label || model.model || model.id,
+          effective_at: model.rate_change.effective_at,
+          source_url: model.rate_change.source_url,
+        }
+      : null;
+    return {
+      cost: round(tokenCost + event.tool_charges),
+      routed_model_id: routedModelId,
+      priced_model_id: model.id,
+      pricing_date: eventDate,
+      applied_rate_change: appliedRateChange,
+    };
   }
 
   function normalizeStatus(value) {
@@ -10182,7 +10298,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       model,
       project: text(pick(map, "project"), `Row ${index + 1} project`),
       team_owner: text(pick(map, "team_owner"), `Row ${index + 1} team or owner`),
-      workload: text(pick(map, "workload"), `Row ${index + 1} workload`) || "Unassigned workload",
+      workload: text(pick(map, "workload"), `Row ${index + 1} workload`),
       feature: text(pick(map, "feature"), `Row ${index + 1} feature`),
       workflow: text(pick(map, "workflow"), `Row ${index + 1} workflow`),
       session_id: text(pick(map, "session_id"), `Row ${index + 1} session ID`),
@@ -10842,7 +10958,96 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
     return new Date(timestamp).toISOString().slice(0, 10);
   }
 
-  function periodVariance(events, period, currency, currencyComparable) {
+  function unavailableCostChangeBridge(status, currency, priorPeriod, currentPeriod, limitations, catalog = null) {
+    return {
+      status,
+      currency,
+      starting_cost: priorPeriod.selected_cost,
+      request_volume_effect: null,
+      verified_official_rate_effect: null,
+      usage_and_mix_effect: null,
+      unsupported_or_unproven_residual: null,
+      ending_cost: currentPeriod.selected_cost,
+      limitations: [...new Set(limitations)],
+      provenance: {
+        pricing_catalog_version: catalog?.catalog_version || null,
+        reference_rate_date: priorPeriod.end,
+        current_period_end: currentPeriod.end,
+        rate_changes: [],
+      },
+      method: "Starting cost plus request-volume effect plus verified official list-rate effect plus usage-and-mix effect plus any unsupported residual equals ending cost. Official-rate and mix effects remain unavailable unless every row reconciles exactly to the supplied pricing catalog and current-window usage can be repriced at the prior window end.",
+      savings_claim_allowed: false,
+    };
+  }
+
+  function costChangeBridge(priorEvents, currentEvents, priorPeriod, currentPeriod, currency, totalChange, volumeEffect, unitCostEffect, catalog) {
+    const base = unavailableCostChangeBridge("PARTIAL", currency, priorPeriod, currentPeriod, [], catalog);
+    base.request_volume_effect = volumeEffect;
+    base.unsupported_or_unproven_residual = unitCostEffect;
+    const limitations = [];
+    if (!catalog) limitations.push("Official pricing catalog not supplied");
+    if ([...priorEvents, ...currentEvents].some((event) => event.cost_basis !== "calculated")) {
+      limitations.push("Every row must use catalog-reconciled calculated cost; provider-reported and unpriced rows cannot be split into official rate and usage effects");
+    }
+    const referenceCalculations = [];
+    if (!limitations.length) {
+      for (const event of [...priorEvents, ...currentEvents]) {
+        const calculation = calculatedTokenCost(event, catalog);
+        if (!calculation || Math.abs(calculation.cost - event.selected_cost) > 0.00000001) {
+          limitations.push("At least one selected cost does not reconcile exactly to the supplied official pricing catalog");
+          break;
+        }
+      }
+    }
+    if (!limitations.length) {
+      for (const event of currentEvents) {
+        const actual = calculatedTokenCost(event, catalog);
+        const reference = calculatedTokenCost(event, catalog, priorPeriod.end);
+        if (!actual || !reference) {
+          limitations.push("At least one current request cannot be repriced safely at the prior-window-end official rate");
+          break;
+        }
+        if (actual.priced_model_id !== reference.priced_model_id || actual.routed_model_id !== reference.routed_model_id) {
+          limitations.push("A model or routing transition crosses the comparison boundary and cannot be labeled an official rate effect");
+          break;
+        }
+        referenceCalculations.push(reference);
+      }
+    }
+    if (limitations.length) {
+      base.limitations = [...new Set(limitations)];
+      return base;
+    }
+    const currentAtReferenceRates = referenceCalculations.reduce((sum, item) => sum + item.cost, 0);
+    const currentCost = currentPeriod.selected_cost;
+    const rateEffect = round(currentCost - currentAtReferenceRates);
+    const usageMixEffect = round(totalChange - volumeEffect - rateEffect);
+    const rateChanges = [];
+    const seen = new Set();
+    currentEvents.forEach((event) => {
+      const calculation = calculatedTokenCost(event, catalog);
+      const change = calculation?.applied_rate_change;
+      if (!change || change.effective_at <= priorPeriod.end || change.effective_at > event.timestamp.slice(0, 10)) return;
+      const key = `${change.provider}\u0000${change.model}\u0000${change.effective_at}\u0000${change.source_url}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      rateChanges.push(change);
+    });
+    return {
+      ...base,
+      status: "AVAILABLE",
+      verified_official_rate_effect: rateEffect,
+      usage_and_mix_effect: usageMixEffect,
+      unsupported_or_unproven_residual: 0,
+      limitations: [],
+      provenance: {
+        ...base.provenance,
+        rate_changes: rateChanges,
+      },
+    };
+  }
+
+  function periodVariance(events, period, currency, currencyComparable, catalog = null) {
     const limitations = [];
     if (!period.complete_period_confirmed) limitations.push("Complete continuous period not confirmed");
     if (period.timestamped_rows !== events.length) limitations.push("Some rows have no timestamp");
@@ -10868,13 +11073,15 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       if (!priorEvents.length || !currentEvents.length) limitations.push("One comparison window has no requests");
     }
     if (limitations.length) {
+      const priorPeriod = { start: priorStart, end: priorEnd, requests: priorEvents.length, selected_cost: null, cost_per_request: null };
+      const currentPeriod = { start: currentStart, end: currentEnd, requests: currentEvents.length, selected_cost: null, cost_per_request: null };
       return {
         status: "NOT_SUPPORTED",
         currency,
         window_days: windowDays,
         excluded_leading_days: period.calendar_days && windowDays ? period.calendar_days - windowDays * 2 : null,
-        prior_period: { start: priorStart, end: priorEnd, requests: priorEvents.length, selected_cost: null, cost_per_request: null },
-        current_period: { start: currentStart, end: currentEnd, requests: currentEvents.length, selected_cost: null, cost_per_request: null },
+        prior_period: priorPeriod,
+        current_period: currentPeriod,
         total_cost_change: null,
         total_cost_change_rate: null,
         request_volume_effect: null,
@@ -10883,6 +11090,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         top_model_cost_changes: [],
         top_processing_mode_cost_changes: [],
         top_geography_cost_changes: [],
+        cost_change_bridge: unavailableCostChangeBridge("NOT_SUPPORTED", currency, priorPeriod, currentPeriod, limitations, catalog),
         limitations,
         method: "Two equal consecutive UTC windows. Total cost change equals request-volume effect plus average-cost-per-request effect; the latter can reflect model mix, token shape, cache, tools, service tier, or price and is not treated as a rate-card change.",
         savings_claim_allowed: false,
@@ -10914,13 +11122,15 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         return { label, prior_cost: round(prior), current_cost: round(current), change: round(current - prior) };
       }).sort((left, right) => Math.abs(right.change) - Math.abs(left.change) || left.label.localeCompare(right.label)).slice(0, 5);
     };
+    const priorPeriod = { start: priorStart, end: priorEnd, requests: priorEvents.length, selected_cost: round(priorCost), cost_per_request: round(priorUnitCost) };
+    const currentPeriod = { start: currentStart, end: currentEnd, requests: currentEvents.length, selected_cost: round(currentCost), cost_per_request: round(currentUnitCost) };
     return {
       status: "AVAILABLE",
       currency,
       window_days: windowDays,
       excluded_leading_days: period.calendar_days - windowDays * 2,
-      prior_period: { start: priorStart, end: priorEnd, requests: priorEvents.length, selected_cost: round(priorCost), cost_per_request: round(priorUnitCost) },
-      current_period: { start: currentStart, end: currentEnd, requests: currentEvents.length, selected_cost: round(currentCost), cost_per_request: round(currentUnitCost) },
+      prior_period: priorPeriod,
+      current_period: currentPeriod,
       total_cost_change: totalChange,
       total_cost_change_rate: priorCost > 0 ? round((currentCost - priorCost) / priorCost, 6) : null,
       request_volume_effect: volumeEffect,
@@ -10945,11 +11155,178 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
         currentEvents,
         (event) => event.inference_geography || "Geography not supplied",
       ),
+      cost_change_bridge: costChangeBridge(priorEvents, currentEvents, priorPeriod, currentPeriod, currency, totalChange, volumeEffect, unitCostEffect, catalog),
       limitations: [],
       method: "Two equal consecutive UTC windows. Total cost change equals request-volume effect plus average-cost-per-request effect; the latter can reflect model mix, token shape, cache, tools, service tier, or price and is not treated as a rate-card change.",
       savings_claim_allowed: false,
     };
   }
+
+  const CHANGE_DIMENSIONS = Object.freeze([
+    ["team_owner", "Team or owner"], ["model", "Provider and model"],
+    ...ALLOCATION_DIMENSIONS.filter(([key]) => key !== "team_owner"),
+  ]);
+  const CHANGE_AMOUNT_FIELDS = Object.freeze([
+    "starting_cost", "ending_cost", "change", "request_volume_effect",
+    "verified_official_rate_effect", "usage_and_mix_effect", "unsupported_or_unproven_residual",
+  ]);
+
+  function changeAtoms(value) {
+    const atoms = Math.round(value * 100_000_000);
+    if (!Number.isFinite(value) || !Number.isSafeInteger(atoms)) {
+      throw new Error("Scoped amounts exceed the supported exact-precision range");
+    }
+    return BigInt(atoms);
+  }
+
+  const changeAmount = (atoms) => Number(atoms) / 100_000_000;
+  const sumChangeAtoms = (values) => values.reduce((sum, value) => sum + value, 0n);
+
+  // Allocate only the rounding remainder, in stable group order. Signed request
+  // movement uses the same overall prior unit cost as the existing total bridge.
+  function balanceChangeAmounts(numerators, denominator, target) {
+    const values = numerators.map((value) => value / denominator);
+    let difference = target - sumChangeAtoms(values);
+    const order = numerators.map((value, index) => ({ index, remainder: value % denominator }));
+    order.sort((left, right) => left.remainder === right.remainder
+      ? left.index - right.index
+      : difference >= 0n
+        ? left.remainder > right.remainder ? -1 : 1
+        : left.remainder < right.remainder ? -1 : 1);
+    if (difference > BigInt(values.length) || difference < -BigInt(values.length)) {
+      throw new Error("Scoped rounding does not reconcile to the total bridge");
+    }
+    for (let index = 0; difference !== 0n; index += 1) {
+      const step = difference > 0n ? 1n : -1n;
+      values[order[index].index] += step;
+      difference -= step;
+    }
+    return values;
+  }
+
+  function scopedChangeDisplay(groups, bridge, limit = 6) {
+    const attributed = groups.filter((group) => group.kind === "value");
+    const visible = attributed.slice(0, limit);
+    const remaining = attributed.slice(limit);
+    if (remaining.length) {
+      const other = {
+        key: "other", label: `Other groups (${remaining.length})`, kind: "other", group_count: remaining.length,
+        prior_requests: remaining.reduce((sum, group) => sum + group.prior_requests, 0),
+        current_requests: remaining.reduce((sum, group) => sum + group.current_requests, 0),
+      };
+      CHANGE_AMOUNT_FIELDS.forEach((field) => {
+        other[field] = remaining.some((group) => group[field] === null)
+          ? null : changeAmount(sumChangeAtoms(remaining.map((group) => changeAtoms(group[field]))));
+      });
+      visible.push(other);
+    }
+    visible.push(...groups.filter((group) => group.kind === "unattributed"));
+    const columns = {};
+    for (const field of ["starting_cost", "ending_cost", "request_volume_effect", "verified_official_rate_effect", "unsupported_or_unproven_residual"]) {
+      columns[field] = bridge[field] === null
+        ? visible.map(() => null)
+        : balanceChangeAmounts(visible.map((group) => changeAtoms(group[field])), 1_000_000n, BigInt(Math.round(bridge[field] * 100)));
+    }
+    const rows = visible.map((group, index) => {
+      const row = { ...group };
+      Object.keys(columns).forEach((field) => { row[field] = columns[field][index] === null ? null : Number(columns[field][index]) / 100; });
+      const delta = columns.ending_cost[index] - columns.starting_cost[index];
+      row.change = Number(delta) / 100;
+      row.usage_and_mix_effect = bridge.usage_and_mix_effect === null
+        ? null : Number(delta - columns.request_volume_effect[index] - columns.verified_official_rate_effect[index] - columns.unsupported_or_unproven_residual[index]) / 100;
+      if (row.usage_and_mix_effect === null) row.unsupported_or_unproven_residual = Number(delta - columns.request_volume_effect[index]) / 100;
+      return row;
+    });
+    const totals = Object.fromEntries(CHANGE_AMOUNT_FIELDS.map((field) => [field,
+      rows.some((row) => row[field] === null) ? null : round(rows.reduce((sum, row) => sum + row[field], 0), 2),
+    ]));
+    const adjustments = [];
+    rows.forEach((row, index) => CHANGE_AMOUNT_FIELDS.forEach((field) => {
+      if (row[field] !== null && Math.round(row[field] * 100) !== Math.round(visible[index][field] * 100)) {
+        adjustments.push({ key: row.key, field, independently_rounded: round(visible[index][field], 2), balanced_display: row[field] });
+      }
+    }));
+    CHANGE_AMOUNT_FIELDS.forEach((field) => {
+      const raw = field === "change" ? bridge.ending_cost - bridge.starting_cost : bridge[field];
+      if (raw !== null && Math.round(totals[field] * 100) !== Math.round(raw * 100)) {
+        adjustments.push({ key: "total", field, independently_rounded: round(raw, 2), balanced_display: totals[field] });
+      }
+    });
+    return {
+      rows, totals, rounding_adjustments: adjustments,
+      method: "Display includes the six largest absolute attributed changes, all remaining attributed groups together, and an explicit unattributed row. Cent allocation balances the displayed columns; the remaining component balances every row. Original eight-decimal groups and every adjusted cent remain in this record.",
+    };
+  }
+
+  function scopedCostChange(events, variance, dimension = "team_owner", catalog = null) {
+    if (!CHANGE_DIMENSIONS.some(([key]) => key === dimension)) throw new Error("Choose a supported cost-change dimension.");
+    const bridge = variance.cost_change_bridge;
+    const base = {
+      schema_version: "ai-cost-lens-scoped-change/1.0", dimension,
+      currency: variance.currency, status: "NOT_SUPPORTED",
+      prior_period: { ...variance.prior_period }, current_period: { ...variance.current_period },
+      totals: JSON.parse(JSON.stringify(bridge)), groups: [], display: null,
+      unpriced_rows: events.filter((event) => event.selected_cost === null).length,
+      limitations: [...bridge.limitations],
+      method: "Group request-count movement uses the overall prior cost per request, preserving the total bridge. Supported rate effects reprice each current request at the prior window end. Remaining supported change is usage/mix; otherwise it stays an unsupported residual. Attribution does not establish cause, waste, quality, or realized savings.",
+      savings_claim_allowed: false,
+    };
+    if (variance.status !== "AVAILABLE") return base;
+    try {
+      const prior = variance.prior_period;
+      const current = variance.current_period;
+      const grouped = new Map();
+      events.forEach((event) => {
+        const date = event.timestamp?.slice(0, 10);
+        const window = date >= prior.start && date <= prior.end ? "prior"
+          : date >= current.start && date <= current.end ? "current" : null;
+        if (!window) return;
+        const missing = event[dimension] === null || event[dimension] === undefined || String(event[dimension]).trim() === "";
+        const key = missing ? "unattributed" : JSON.stringify(dimension === "model" ? [event.provider, event.model] : ["value", event[dimension]]);
+        if (!grouped.has(key)) grouped.set(key, {
+          key, label: missing ? "Unattributed" : dimension === "model" ? `${event.provider || "Provider not supplied"} · ${event.model}` : event[dimension],
+          kind: missing ? "unattributed" : "value", group_count: 1, prior: [], current: [],
+        });
+        grouped.get(key)[window].push(event);
+      });
+      const entries = [...grouped.values()].sort((left, right) => left.key.localeCompare(right.key));
+      const volumes = balanceChangeAmounts(
+        entries.map((group) => BigInt(group.current.length - group.prior.length) * changeAtoms(bridge.starting_cost)),
+        BigInt(prior.requests), changeAtoms(bridge.request_volume_effect),
+      );
+      const groups = entries.map((group, index) => {
+        const start = sumChangeAtoms(group.prior.map((event) => changeAtoms(event.selected_cost)));
+        const end = sumChangeAtoms(group.current.map((event) => changeAtoms(event.selected_cost)));
+        let rate = null;
+        let mix = null;
+        let residual = end - start - volumes[index];
+        if (bridge.status === "AVAILABLE") {
+          const references = group.current.map((event) => calculatedTokenCost(event, catalog, prior.end));
+          if (references.some((reference) => !reference)) throw new Error("Scoped prior-date pricing is unavailable");
+          rate = end - sumChangeAtoms(references.map((reference) => changeAtoms(reference.cost)));
+          mix = end - start - volumes[index] - rate;
+          residual = 0n;
+        }
+        return {
+          key: group.key, label: group.label, kind: group.kind, group_count: 1,
+          prior_requests: group.prior.length, current_requests: group.current.length,
+          starting_cost: changeAmount(start), ending_cost: changeAmount(end), change: changeAmount(end - start),
+          request_volume_effect: changeAmount(volumes[index]), verified_official_rate_effect: rate === null ? null : changeAmount(rate),
+          usage_and_mix_effect: mix === null ? null : changeAmount(mix), unsupported_or_unproven_residual: changeAmount(residual),
+        };
+      });
+      groups.sort((left, right) => Math.abs(right.change) - Math.abs(left.change) || left.key.localeCompare(right.key));
+      for (const field of CHANGE_AMOUNT_FIELDS.filter((field) => field !== "change")) {
+        if (bridge[field] !== null && sumChangeAtoms(groups.map((group) => changeAtoms(group[field]))) !== changeAtoms(bridge[field])) {
+          throw new Error("Scoped precision does not reconcile to the total bridge");
+        }
+      }
+      return { ...base, status: bridge.status, groups, display: scopedChangeDisplay(groups, bridge) };
+    } catch (error) {
+      return { ...base, limitations: [...new Set([...base.limitations, error.message])] };
+    }
+  }
+
 
   function budgetSummary(rawOptions, runRateStatus, projected30DayCost, currency) {
     const amount = number(rawOptions.monthly_budget, "Monthly budget");
@@ -11197,7 +11574,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       cost_stack: costStack,
       allocation: allocationSummary(events, rawOptions, costStack, currencyComparable),
       budget: budgetSummary(rawOptions, runRateAvailable ? "AVAILABLE" : "NOT_SUPPORTED", projected30DayCost, currency),
-      period_variance: periodVariance(events, period, currency, currencyComparable),
+      period_variance: periodVariance(events, period, currency, currencyComparable, rawOptions.catalog || null),
       operational_metrics: operationalSummary(events, rawOptions.source_rows || []),
       breakdowns: {
         provider: spendBreakdown(breakdownEvents, "provider", comparableBreakdown, breakdownCost),
@@ -11331,6 +11708,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       method: "Unverified user-entered total minus selected request cost after scope confirmation. The duplicate-excluded difference retains the first source row in each repeated-ID group as a review reference only; no row is deleted or presumed invalid.",
     };
     const spend = spendSummary(events, reviewOptions, reviewCurrency, selectedObservedCost, !currencyNotComparable);
+    spend.period_variance.scoped_change = scopedCostChange(events, spend.period_variance, rawOptions.change_dimension || "team_owner", rawOptions.catalog || null);
     const primarySlice = currencyNotComparable ? [...spend.currency_slices].sort((a, b) => b.rows - a.rows || b.priced_rows - a.priced_rows || a.currency.localeCompare(b.currency))[0] : null;
     const comparableCurrencyReview = primarySlice ? (() => {
       const subset = events.filter((event) => event.currency === primarySlice.currency);
@@ -11380,7 +11758,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
   }
 
   function normalizedCsv(review) {
-    if (!review || review.schema_version !== REVIEW_SCHEMA || !Array.isArray(review.events)) throw new Error("A normalized usage review is required.");
+    if (!review || ![REVIEW_SCHEMA, "ai-cost-lens-usage-review/1.1", "ai-cost-lens-usage-review/1.0"].includes(review.schema_version) || !Array.isArray(review.events)) throw new Error("A normalized usage review is required.");
     const fields = ["record_id", "event_id", "timestamp", "provider", "billing_channel", "processing_mode", "inference_geography", "model", "project", "team_owner", "feature", "customer", "product", "workload", "workflow", "session_id", "environment", "customer_product", "input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_duration_seconds", "cache_storage_token_hours", "batch", "tool_charges", "provider_reported_cost", "calculated_cost", "selected_cost", "cost_basis", "currency", "request_status", "retry_parent_event_id", "latency_ms", "evidence_source", "source_file_hash", "prefix_fingerprint", "tool_call_count", "outcome_status", "duplicate_group", "routed_model_id"];
     return `${fields.join(",")}\n${review.events.map((event) => fields.map((field) => csvCell(event[field])).join(",")).join("\n")}\n`;
   }
@@ -11390,7 +11768,7 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
     return `source_row,reason\n${review.import_coverage.issues.map((issue) => [issue.row, issue.reason].map(csvCell).join(",")).join("\n")}\n`;
   }
 
-  return Object.freeze({ SCHEMA, REVIEW_SCHEMA, aliases, normalizeRows, analyzeEvents, buildReview, normalizedCsv, issuesCsv, detectAdapter, spendSummary, operationalSummary, periodVariance, budgetSummary, operatingCostStack, allocationSummary, evidenceLayers });
+  return Object.freeze({ SCHEMA, REVIEW_SCHEMA, aliases, normalizeRows, analyzeEvents, buildReview, normalizedCsv, issuesCsv, detectAdapter, spendSummary, operationalSummary, periodVariance, scopedCostChange, CHANGE_DIMENSIONS, budgetSummary, operatingCostStack, allocationSummary, evidenceLayers });
 });
 </script>
     <script>(function attachScenarioEngine(root, factory) {
@@ -16835,6 +17213,39 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
       : `Showing all ${wholeNumber(events.length)} matching row${events.length === 1 ? "" : "s"}.`;
   }
 
+  function renderScopedChangeDriver(review) {
+    const variance = review.spend.period_variance;
+    const scoped = variance.scoped_change;
+    const result = document.getElementById("request-scoped-change");
+    const selector = document.getElementById("request-change-dimension");
+    selector.value = scoped?.dimension || "team_owner";
+    selector.disabled = !scoped || variance.status !== "AVAILABLE";
+    if (!scoped || scoped.status === "NOT_SUPPORTED") {
+      result.innerHTML = `<p class="request-variance-unavailable"><strong>Grouped change unavailable.</strong> ${escapeHtml(scoped?.limitations.join("; ") || "This record has no supported scoped bridge")}. The total comparison and its evidence rules stay unchanged.</p>`;
+      return;
+    }
+    const moneyFor = (value) => value === null ? "Unavailable" : new Intl.NumberFormat("en-US", {
+      style: "currency", currency: scoped.currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(value);
+    const signed = (value) => value === null ? "Unavailable" : `${value > 0 ? "+" : value < 0 ? "−" : ""}${moneyFor(Math.abs(value))}`;
+    const amounts = [
+      ["request_volume_effect", "Request volume"], ["verified_official_rate_effect", "Official rate"],
+      ["usage_and_mix_effect", "Usage and mix"], ["unsupported_or_unproven_residual", "Unsupported remainder"],
+    ];
+    const rows = scoped.display.rows;
+    const totals = scoped.display.totals;
+    const groupLabel = ([, label]) => label;
+    const label = groupLabel(usageEventEngine.CHANGE_DIMENSIONS.find(([key]) => key === scoped.dimension));
+    const name = (row) => `${escapeHtml(row.label)}${row.kind === "unattributed" ? "<small>Missing label</small>" : row.kind === "other" ? "<small>Every remaining group is included</small>" : ""}`;
+    const tableRow = (row) => `<tr><th scope="row">${name(row)}</th><td data-label="Prior">${moneyFor(row.starting_cost)}</td><td data-label="Recent">${moneyFor(row.ending_cost)}</td><td data-label="Change"><strong>${signed(row.change)}</strong></td></tr>`;
+    result.innerHTML = `
+      <p class="request-variance-note"><strong>${scoped.status === "PARTIAL" ? "Partial evidence: rate and usage/mix remain unavailable." : "Every group reconciles to the same total bridge."}</strong> Showing changes by ${escapeHtml(label.toLowerCase())}. Contributions identify a slice to investigate; they do not establish causes or savings.</p>
+      <div class="request-variance-table-wrap request-scoped-table-wrap" role="region" aria-label="Cost change by ${escapeHtml(label.toLowerCase())}" tabindex="0"><table class="request-scoped-table"><thead><tr><th>${escapeHtml(label)}</th><th>Prior</th><th>Recent</th><th>Change</th></tr></thead><tbody>${rows.map(tableRow).join("")}</tbody><tfoot>${tableRow({ ...totals, label: "All groups", kind: "total" })}</tfoot></table></div>
+      <details class="request-scoped-components"><summary>How the contributions reconcile</summary><p class="request-variance-note">Volume uses one overall prior cost per request for every group. The remaining components use the same reference date and evidence boundary as the total bridge.</p>${rows.map((row) => `<article><h5>${name(row)}</h5><div class="request-scoped-pieces">${amounts.map(([field, title]) => `<div><span>${title}</span><strong>${signed(row[field])}</strong></div>`).join("")}</div></article>`).join("")}<article class="request-scoped-total"><h5>All groups</h5><div class="request-scoped-pieces">${amounts.map(([field, title]) => `<div><span>${title}</span><strong>${signed(totals[field])}</strong></div>`).join("")}</div></article></details>
+      <p class="request-variance-note">The largest six attributed changes are shown individually. Other groups and missing labels remain explicit. ${scoped.display.rounding_adjustments.length ? "Displayed cents are balanced; adjusted cents and original amounts are recorded in the analysis JSON. " : ""}The downloaded analysis retains every group and the selected dimension. Changes in labels or scope can move costs between groups.</p>`;
+  }
+
+
   function renderRequestSpendOverview(review) {
     const spend = review.spend;
     const breakdownSlice = review.currency === "MIXED" || review.currency === null
@@ -16925,21 +17336,45 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
     } else {
       const changeRate = variance.total_cost_change_rate === null ? "Not available" : `${variance.total_cost_change_rate > 0 ? "+" : ""}${(variance.total_cost_change_rate * 100).toFixed(1)}%`;
       const leading = variance.excluded_leading_days ? ` ${wholeNumber(variance.excluded_leading_days)} leading day${variance.excluded_leading_days === 1 ? " was" : "s were"} excluded so the windows are equal.` : "";
+      const bridge = variance.cost_change_bridge || {
+        status: "PARTIAL",
+        currency: variance.currency,
+        starting_cost: variance.prior_period.selected_cost,
+        request_volume_effect: variance.request_volume_effect,
+        verified_official_rate_effect: null,
+        usage_and_mix_effect: null,
+        unsupported_or_unproven_residual: variance.average_cost_per_request_effect,
+        ending_cost: variance.current_period.selected_cost,
+        limitations: ["This saved review predates the evidence-gated official-rate bridge"],
+        provenance: { pricing_catalog_version: null, reference_rate_date: variance.prior_period.end, current_period_end: variance.current_period.end, rate_changes: [] },
+      };
+      const bridgeAvailable = bridge?.status === "AVAILABLE";
+      const rateSources = bridge?.provenance?.rate_changes || [];
+      const rateSourceCopy = rateSources.length
+        ? ` Official rate evidence: ${rateSources.map((item) => `<a href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(item.provider)} ${escapeHtml(item.model)} · effective ${escapeHtml(item.effective_at)}</a>`).join("; ")}.`
+        : bridgeAvailable
+          ? " No catalog-recorded official rate change crossed these windows."
+          : "";
+      const bridgeLimitation = bridgeAvailable
+        ? "Every row reconciled to the checked-in official list-price catalog, and recent-window usage was repriced at the prior window end."
+        : `The official-rate and usage/mix split is unavailable: ${escapeHtml((bridge?.limitations || []).join("; "))}. The residual keeps the unproven average-cost effect visible instead of guessing.`;
       const costChangeTable = (title, rows) => rows?.length ? `<div class="request-variance-table-wrap" role="region" aria-label="${escapeHtml(title)} cost changes" tabindex="0"><h4>${escapeHtml(title)}</h4><table><thead><tr><th>${escapeHtml(title)}</th><th>Prior</th><th>Recent</th><th>Change</th></tr></thead><tbody>${rows.map((item) => `<tr><th>${escapeHtml(item.label)}</th><td>${requestReviewMoney(item.prior_cost, variance.currency)}</td><td>${requestReviewMoney(item.current_cost, variance.currency)}</td><td>${escapeHtml(signedCost(item.change))}</td></tr>`).join("")}</tbody></table></div>` : "";
       document.getElementById("request-variance").innerHTML = `
         <div class="request-variance-cards">
-          <article><span>Prior ${wholeNumber(variance.window_days)} days</span><strong>${requestReviewMoney(variance.prior_period.selected_cost, variance.currency)}</strong><p>${wholeNumber(variance.prior_period.requests)} requests · ${requestReviewMoney(variance.prior_period.cost_per_request, variance.currency)} each</p></article>
-          <article><span>Recent ${wholeNumber(variance.window_days)} days</span><strong>${requestReviewMoney(variance.current_period.selected_cost, variance.currency)}</strong><p>${wholeNumber(variance.current_period.requests)} requests · ${requestReviewMoney(variance.current_period.cost_per_request, variance.currency)} each</p></article>
-          <article><span>Total cost change</span><strong>${escapeHtml(signedCost(variance.total_cost_change))}</strong><p>${escapeHtml(changeRate)} between equal windows.</p></article>
-          <article><span>Request-volume effect</span><strong>${escapeHtml(signedCost(variance.request_volume_effect))}</strong><p>Change in request count at the prior window's average cost per request.</p></article>
-          <article><span>Average-cost effect</span><strong>${escapeHtml(signedCost(variance.average_cost_per_request_effect))}</strong><p>Can reflect mix, token shape, cache, tools, service tier, or price. It is not labeled a rate change.</p></article>
+          <article><span>Starting cost</span><strong>${requestReviewMoney(bridge.starting_cost, bridge.currency)}</strong><p>${wholeNumber(variance.prior_period.requests)} requests across the prior ${wholeNumber(variance.window_days)} days.</p></article>
+          <article><span>Request-volume effect</span><strong>${escapeHtml(signedCost(bridge.request_volume_effect))}</strong><p>Request-count change at the prior window's average cost.</p></article>
+          <article><span>Verified official rate effect</span><strong>${escapeHtml(signedCost(bridge.verified_official_rate_effect))}</strong><p>${bridgeAvailable ? "Checked-in official list-rate changes only." : "Unavailable without exact catalog reconciliation."}</p></article>
+          <article><span>Usage and mix effect</span><strong>${escapeHtml(signedCost(bridge.usage_and_mix_effect))}</strong><p>${bridgeAvailable ? "Token shape, cache, tools, tier, model, geography, and other usage mix." : "Unavailable while the rate split is unsupported."}</p></article>
+          <article><span>Unsupported / unproven residual</span><strong>${escapeHtml(signedCost(bridge.unsupported_or_unproven_residual))}</strong><p>${bridgeAvailable ? "Zero: the bridge reconciles with supported components." : "Retains the unsplit average-cost effect; it is not labeled savings."}</p></article>
+          <article><span>Ending cost</span><strong>${requestReviewMoney(bridge.ending_cost, bridge.currency)}</strong><p>${wholeNumber(variance.current_period.requests)} requests across the recent ${wholeNumber(variance.window_days)} days.</p></article>
         </div>
-        <p class="request-variance-note">${escapeHtml(variance.prior_period.start)} to ${escapeHtml(variance.prior_period.end)} versus ${escapeHtml(variance.current_period.start)} to ${escapeHtml(variance.current_period.end)}.${escapeHtml(leading)} The two effects reconcile to total cost change; neither is automatically avoidable.</p>
+        <p class="request-variance-note"><strong>Total change: ${escapeHtml(signedCost(variance.total_cost_change))} (${escapeHtml(changeRate)}).</strong> ${escapeHtml(variance.prior_period.start)} to ${escapeHtml(variance.prior_period.end)} versus ${escapeHtml(variance.current_period.start)} to ${escapeHtml(variance.current_period.end)}.${escapeHtml(leading)} ${bridgeLimitation}${rateSourceCopy} Catalog ${escapeHtml(bridge?.provenance?.pricing_catalog_version || "not supplied")}; reference rate date ${escapeHtml(bridge?.provenance?.reference_rate_date || "unavailable")}. No component is automatically avoidable or a savings claim.</p>
         ${costChangeTable("Provider", variance.top_provider_cost_changes)}
         ${costChangeTable("Provider · model", variance.top_model_cost_changes)}
         ${costChangeTable("Processing mode", variance.top_processing_mode_cost_changes || [])}
         ${costChangeTable("Inference geography", variance.top_geography_cost_changes || [])}`;
     }
+    renderScopedChangeDriver(review);
     const dimensions = [
       ["provider", "Provider"],
       ["model", "Model"],
@@ -17162,7 +17597,8 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
 
   // A result belongs to the options used to calculate it, not subsequent edits.
   document.querySelectorAll(".request-review-panel input:not([type=file]), .request-review-panel select").forEach((input) => {
-    if (input.id.startsWith("request-filter-") || input.id.startsWith("customer-")) return;
+    // Grouping changes the presentation of the loaded review, not its inputs.
+    if (input.id === "request-change-dimension" || input.id.startsWith("request-filter-") || input.id.startsWith("customer-")) return;
     input.addEventListener("input", () => {
       if (!state.usageReview) return;
       state.usageReview = null;
@@ -17293,6 +17729,15 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
+  document.getElementById("request-change-dimension").addEventListener("change", (event) => {
+    const review = state.usageReview;
+    if (!review || !usageEventEngine) return;
+    review.spend.period_variance.scoped_change = usageEventEngine.scopedCostChange(
+      review.events, review.spend.period_variance, event.target.value, globalThis.AI_COST_LENS_PRICING_CATALOG,
+    );
+    renderScopedChangeDriver(review);
+  });
+
   document.getElementById("download-usage-review").addEventListener("click", () => {
     if (!state.usageReview) return;
     const blob = new Blob([`${JSON.stringify(state.usageReview, null, 2)}\n`], { type: "application/json" });

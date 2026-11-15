@@ -49,7 +49,7 @@ console.log(JSON.stringify(review));
         CATALOG,
     )
     event = result["events"][0]
-    assert event["schema_version"] == "ai-cost-lens-usage-event/1.0"
+    assert event["schema_version"] == "ai-cost-lens-usage-event/1.1"
     assert event["provider"] == "OpenAI"
     assert event["provider_reported_cost"] == 9.99
     assert event["calculated_cost"] == 1.25
@@ -600,7 +600,7 @@ console.log(JSON.stringify({watch, over, incomplete, missingSignals, volumeOnly,
         ENGINE,
     )
     review = result["watch"]
-    assert review["schema_version"] == "ai-cost-lens-usage-review/1.1"
+    assert review["schema_version"] == "ai-cost-lens-usage-review/1.2"
     assert review["application_version"] == "1.0.0"
     budget = review["spend"]["budget"]
     assert budget == {
@@ -735,7 +735,7 @@ console.log(JSON.stringify({rate: build(rateRows), volume: build(volumeRows), mi
     assert rate["verified_official_rate_effect"] == -0.3
     assert rate["usage_and_mix_effect"] == 0
     assert rate["unsupported_or_unproven_residual"] == 0
-    assert rate["provenance"]["pricing_catalog_version"] == "2026-10-18"
+    assert rate["provenance"]["pricing_catalog_version"] == "2026-11-15"
     assert rate["provenance"]["reference_rate_date"] == "2026-10-05"
     assert rate["provenance"]["rate_changes"] == [
         {
@@ -1052,14 +1052,14 @@ def test_request_log_template_and_browser_asset_are_present():
 
 def test_usage_event_and_review_schemas_are_versioned_and_fail_closed():
     event_schema = json.loads(
-        (ROOT / "schemas" / "ai-cost-lens-usage-event-1.0.schema.json").read_text()
+        (ROOT / "schemas" / "ai-cost-lens-usage-event-1.1.schema.json").read_text()
     )
     review_schema = json.loads(
-        (ROOT / "schemas" / "ai-cost-lens-usage-review-1.1.schema.json").read_text()
+        (ROOT / "schemas" / "ai-cost-lens-usage-review-1.2.schema.json").read_text()
     )
     assert (
         event_schema["properties"]["schema_version"]["const"]
-        == "ai-cost-lens-usage-event/1.0"
+        == "ai-cost-lens-usage-event/1.1"
     )
     assert event_schema["additionalProperties"] is False
     assert "selected_cost" in event_schema["required"]
@@ -1077,7 +1077,7 @@ def test_usage_event_and_review_schemas_are_versioned_and_fail_closed():
     }.issubset(event_schema["required"])
     assert (
         review_schema["properties"]["schema_version"]["const"]
-        == "ai-cost-lens-usage-review/1.1"
+        == "ai-cost-lens-usage-review/1.2"
     )
     assert (
         review_schema["properties"]["evidence_gate"]["properties"][
@@ -1182,10 +1182,10 @@ console.log(JSON.stringify({full, minimal, mixed, unpriced}));
         FIXTURE,
     )
     event_schema = json.loads(
-        (ROOT / "schemas" / "ai-cost-lens-usage-event-1.0.schema.json").read_text()
+        (ROOT / "schemas" / "ai-cost-lens-usage-event-1.1.schema.json").read_text()
     )
     review_schema = json.loads(
-        (ROOT / "schemas" / "ai-cost-lens-usage-review-1.1.schema.json").read_text()
+        (ROOT / "schemas" / "ai-cost-lens-usage-review-1.2.schema.json").read_text()
     )
     Draft202012Validator.check_schema(event_schema)
     Draft202012Validator.check_schema(review_schema)
