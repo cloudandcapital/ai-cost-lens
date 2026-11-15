@@ -125,19 +125,52 @@ async function verifyScopedChange(page, engineName) {
   const team = await saveJsonDownload(page, "#download-usage-review", `${engineName}-scoped-team.json`);
   assert(team.schema_version === "ai-cost-lens-usage-review/1.2", `${engineName}: scoped review contract was not versioned.`);
   const originalBridge = JSON.stringify(team.spend.period_variance.cost_change_bridge);
+  const withoutGrouping = (review) => {
+    const copy = structuredClone(review);
+    delete copy.spend.period_variance.scoped_change;
+    return JSON.stringify(copy);
+  };
+  const originalReview = withoutGrouping(team);
   await page.locator("#request-change-dimension").selectOption("model");
+  assert(await page.locator("#request-analysis-results").isVisible(), `${engineName}: grouping cleared the loaded review.`);
+  const modelRows = region.locator("tbody tr");
+  assert(await modelRows.count() === 2, `${engineName}: model grouping did not replace the team rows.`);
+  assert((await modelRows.filter({ hasText: "Fictional · alpha" }).innerText()).includes("+$70.00"), `${engineName}: alpha contribution is incorrect.`);
+  assert((await modelRows.filter({ hasText: "Fictional · beta" }).innerText()).includes("+$30.00"), `${engineName}: beta contribution is incorrect.`);
   const model = await saveJsonDownload(page, "#download-usage-review", `${engineName}-scoped-model.json`);
+  assert(withoutGrouping(model) === originalReview, `${engineName}: grouping changed loaded events, totals, provenance or evidence.`);
   assert(model.spend.period_variance.scoped_change.dimension === "model", `${engineName}: selected grouping was not exported.`);
   assert(model.spend.period_variance.scoped_change.display.totals.change === 100, `${engineName}: grouping changed the total.`);
   assert(JSON.stringify(model.spend.period_variance.cost_change_bridge) === originalBridge, `${engineName}: grouping mutated the parent bridge.`);
   assert(model.evidence_gate.savings_claim_allowed === false, `${engineName}: scoped view changed the savings gate.`);
   await page.locator("#request-change-dimension").selectOption("team_owner");
+  const restored = await saveJsonDownload(page, "#download-usage-review", `${engineName}-scoped-team-restored.json`);
+  assert(JSON.stringify(restored) === JSON.stringify(team), `${engineName}: returning to team grouping changed the review.`);
   await region.scrollIntoViewIfNeeded();
   await region.screenshot({ path: join(output, `${engineName}-scoped-change-desktop.png`) });
   const viewport = page.viewportSize();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator(".request-scoped-components > summary").click();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${engineName}: scoped mobile view overflows.`);
+  const changeCells = region.locator('td[data-label="Change"]');
+  assert(JSON.stringify(await changeCells.allTextContents()) === JSON.stringify(["+$72.00", "+$14.00", "$0.00", "+$14.00", "+$100.00"]), `${engineName}: narrow view lost signed changes or total.`);
+  const readableChanges = await changeCells.evaluateAll((cells) => cells.every((cell) => {
+    const bounds = cell.getBoundingClientRect();
+    const wrapper = cell.closest(".request-scoped-table-wrap");
+    const clip = wrapper.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(cell.querySelector("strong"));
+    const value = range.getBoundingClientRect();
+    const label = getComputedStyle(cell, "::before").content;
+    // Firefox preserves attr() in computed content; Chromium resolves its value.
+    const hasLabel = label.includes('"Change"') || (label === "attr(data-label)" && cell.dataset.label === "Change");
+    return bounds.width > 0 && value.width > 0 && value.left >= Math.max(0, clip.left)
+      && value.right <= Math.min(innerWidth, clip.right) + 1
+      && wrapper.scrollWidth <= wrapper.clientWidth + 1
+      && parseFloat(getComputedStyle(cell).fontSize) >= 12
+      && hasLabel;
+  }));
+  assert(readableChanges, `${engineName}: narrow Change labels or values are clipped, too small or require horizontal scrolling.`);
   await region.screenshot({ path: join(output, `${engineName}-scoped-change-mobile.png`) });
   const accessibility = await new AxeBuilder({ page }).include(".request-scoped-section").analyze();
   assert(accessibility.violations.length === 0, `${engineName}: scoped accessibility findings: ${axeSummary(accessibility)}`);
@@ -145,14 +178,25 @@ async function verifyScopedChange(page, engineName) {
   assert((await region.innerText()).includes("+$72.00"), `${engineName}: signed change depends on color.`);
   await region.screenshot({ path: join(output, `${engineName}-scoped-change-no-color.png`) });
   await page.emulateMedia({ forcedColors: "none" });
-  await page.setViewportSize(viewport);
   await page.locator("#request-change-dimension").focus();
   await page.keyboard.press("Tab");
   assert(await page.locator("#request-scoped-change").evaluate((element) => element.contains(document.activeElement)), `${engineName}: keyboard cannot enter the scoped result.`);
+  const summary = page.locator(".request-scoped-components > summary");
+  await summary.focus();
+  await page.keyboard.press("Enter");
+  assert(!(await summary.evaluate((element) => element.parentElement.open)), `${engineName}: keyboard cannot collapse the components.`);
+  await page.keyboard.press("Enter");
+  assert(await summary.evaluate((element) => element.parentElement.open), `${engineName}: keyboard cannot expand the components.`);
+  await page.setViewportSize(viewport);
+  // True analysis inputs must still invalidate a result; only grouping is exempt.
+  await page.locator("#request-period-complete").uncheck();
+  assert(!(await page.locator("#request-analysis-results").isVisible()), `${engineName}: changed period confirmation retained a stale result.`);
+  await page.locator("#request-period-complete").check();
   rows[0].provider_reported_cost = null;
   rows[0].model = "unpriced-model";
   await page.locator("#request-log-file").setInputFiles({ name: "fictional-unpriced-scoped.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(rows)) });
   await page.locator("#analyze-request-log").click();
+  await page.locator("#request-analysis-results").waitFor({ state: "visible" });
   assert((await region.innerText()).includes("Grouped change unavailable"), `${engineName}: unpriced row did not gate the scoped table.`);
   assert(await page.locator("#request-change-dimension").isDisabled(), `${engineName}: unavailable grouping control stayed active.`);
 }
@@ -963,10 +1007,10 @@ async function priceAndUsageFlow(engineName, engine, origin) {
   await verifyEditableComparison(page, { replacementPrompts });
   await verifyGuide(page, origin);
   await verifyControlledTest(page, engineName);
+  await verifyScopedChange(page, engineName);
   assert(observed.egress.length === 0, `${engineName}: observed external requests: ${observed.egress.join(", ")}`);
   assert(observed.errors.length === 0, `${engineName}: browser errors: ${observed.errors.join(" | ")}`);
   await browser.close();
-  await verifyScopedChange(page, engineName);
   return { engine: engineName, prompt_routes: estimate.comparison.length, usage_rows: usage.event_count, finance_memo_pdf: financeMemoPdf, saved_review_reopened: savedReview, rich_decisions, egress: 0 };
 }
 

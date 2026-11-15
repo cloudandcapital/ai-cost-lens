@@ -4299,7 +4299,8 @@
 
   // A result belongs to the options used to calculate it, not subsequent edits.
   document.querySelectorAll(".request-review-panel input:not([type=file]), .request-review-panel select").forEach((input) => {
-    if (input.id.startsWith("request-filter-") || input.id.startsWith("customer-")) return;
+    // Grouping changes the presentation of the loaded review, not its inputs.
+    if (input.id === "request-change-dimension" || input.id.startsWith("request-filter-") || input.id.startsWith("customer-")) return;
     input.addEventListener("input", () => {
       if (!state.usageReview) return;
       state.usageReview = null;

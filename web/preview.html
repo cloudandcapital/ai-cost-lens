@@ -6560,11 +6560,12 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
   .request-scoped-selector { max-width: none; min-width: 0; }
   .request-scoped-pieces { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .request-scoped-table-wrap { overflow-x: visible; }
-  .request-scoped-table { min-width: 0; display: block; }
+  .request-scoped-table-wrap .request-scoped-table { min-width: 0; display: block; }
   .request-scoped-table thead { display: none; }
   .request-scoped-table tbody, .request-scoped-table tfoot { display: block; }
-  .request-scoped-table tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 15px 0; border-top: 1px solid var(--line, #d8d0c8); }
-  .request-scoped-table th, .request-scoped-table td { display: block; min-width: 0; padding: 0; text-align: left; overflow-wrap: anywhere; }
+  .request-scoped-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 15px 0; border-top: 1px solid var(--line, #d8d0c8); }
+  .request-scoped-table-wrap .request-scoped-table th, .request-scoped-table-wrap .request-scoped-table td { display: block; min-width: 0; padding: 0; text-align: left; font-size: 13px; overflow-wrap: anywhere; }
+  .request-scoped-table td[data-label="Change"] { grid-column: 1 / -1; }
   .request-scoped-table th { grid-column: 1 / -1; }
   .request-scoped-table td::before { content: attr(data-label); display: block; margin-bottom: 5px; font-size: 10px; font-weight: 400; }
 }
@@ -17596,7 +17597,8 @@ body.simple-mode #review-usage, body.simple-mode #price-prompt { display: none; 
 
   // A result belongs to the options used to calculate it, not subsequent edits.
   document.querySelectorAll(".request-review-panel input:not([type=file]), .request-review-panel select").forEach((input) => {
-    if (input.id.startsWith("request-filter-") || input.id.startsWith("customer-")) return;
+    // Grouping changes the presentation of the loaded review, not its inputs.
+    if (input.id === "request-change-dimension" || input.id.startsWith("request-filter-") || input.id.startsWith("customer-")) return;
     input.addEventListener("input", () => {
       if (!state.usageReview) return;
       state.usageReview = null;
